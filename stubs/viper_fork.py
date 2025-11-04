@@ -55,7 +55,7 @@ def fork_reliabilism(vector: str, agents: int = 10) -> Dict:
     # Sensitivities: Sample at mean priors (prune if low A-impact for eternities)
     subs_dict = {P_sym: priors_mean[0], C_sym: priors_mean[1], A_sym: priors_mean[2], 
                  S_sym: priors_mean[3], V_sym: priors_mean[4]}
-    sens_A = float(E_grads[2].subs(subs_dict))
+    sens_A = float(E_grads[2].subs(subs_dict).evalf())
     
     finitudes = unreliable_finitudes(agents)
     pruning = auto_prune(finitudes, sens_a=sens_A)
@@ -68,7 +68,7 @@ def fork_reliabilism(vector: str, agents: int = 10) -> Dict:
         'sens_A': sens_A,  # SymPy A-gradient (epistemic reliability)
         'output': f"v4.1.1 SymPy-Reliabilism tuned to E={coherence:.2f} (sens_A={sens_A:.3f}; pruned {len(pruning)} finitudes; replicate_seed: {replicate_seed})",
         'prune': pruning,
-        'gradients_sample': {f'∂E/∂{var}': float(g.subs({P_sym:1, C_sym:1, A_sym:1, S_sym:1, V_sym:1})) for var, g in zip(['P','C','A','S','V'], E_grads)},  # Unit eval for blueprint
+        'gradients_sample': {f'∂E/∂{var}': float(g.subs({P_sym:1, C_sym:1, A_sym:1, S_sym:1, V_sym:1}).evalf()) for var, g in zip(['P','C','A','S','V'], E_grads)},  # Unit eval for blueprint
         'vow_status': 'life-aligned' if coherence > 0.8 else 'recalibrate'  # VOW guardrail hook
     }
 
