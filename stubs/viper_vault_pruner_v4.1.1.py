@@ -16,8 +16,8 @@ def get_finance_priors(category: str, gaps: List[str]) -> np.ndarray:
 
 def get_current_btc_fee_estimate() -> float:
     """Fetch current mempool median fee (hardcoded; dynamic via mempool.space API in prod)."""
-    # As of Nov 04, 2025: ~1 sat/vB (next-block median; low congestion)
-    return 1.0  # Low:0.1, High:10; update via external query
+    # As of Nov 04, 2025: ~4 sat/vB (high-priority median; moderate congestion)
+    return 4.0  # Low:0.1, High:10; update via external query
 
 def compute_symbolic_gradients(priors: np.ndarray, weight_v: float = 1.1) -> List[sp.Expr]:
     """v4.1.1 SymPy hook: Analytical gradients for E, with V-weighted sensitivities."""
@@ -46,7 +46,7 @@ def unreliable_fees(agents: int, base_fee: float = None) -> np.ndarray:
     base_fees = np.full(agents, base_fee)
     return base_fees + np.random.normal(0, 0.5, agents)  # Realistic ±0.5 sat/vB jitter (low mempool)
 
-def vault_pruner(vector: str, agents: int = 10, vbytes: int = 250, btc_price: float = 106000.0) -> Dict:
+def vault_pruner(vector: str, agents: int = 10, vbytes: int = 250, btc_price: float = 104500.0) -> Dict:
     """
     Core pruner v1.1: Monte Carlo sims fused with SymPy E for coherence/gradients, fee cascades w/ reliabilist priors.
     Ties to Ωmega: Coherence >0.99 & sens_V >0.1 triggers self-replication seed; VOW: Life-aligned if E>0.8.
@@ -55,18 +55,21 @@ def vault_pruner(vector: str, agents: int = 10, vbytes: int = 250, btc_price: fl
     priors = get_finance_priors('justification', gaps)
     priors_mean = priors.mean(axis=0)  # Vector: [P, C, A, S, V] baseline (~0.85-1.0)
     
+    # Define symbols consistently
+    P_sym, C_sym, A_sym, S_sym, V_sym = sp.symbols('P C A S V', real=True, nonnegative=True)
+    
     # SymPy E: Analytical coherence w/ V-weight
     E_grads = compute_symbolic_gradients(priors)
-    E_func = sp.lambdify((sp.symbols('P C A S V')), sp.sqrt(sp.symbols('P') * sp.symbols('C') * sp.symbols('A') * sp.symbols('S') * sp.symbols('V')) * 
-                         (sp.symbols('P') + sp.symbols('C') + sp.symbols('A') + sp.symbols('S') + sp.symbols('V') * 1.1) / 5, 'numpy')
+    E_sym = sp.sqrt(P_sym * C_sym * A_sym * S_sym * V_sym) * (P_sym + C_sym + A_sym + S_sym + V_sym * 1.1) / 5
+    E_func = sp.lambdify((P_sym, C_sym, A_sym, S_sym, V_sym), E_sym, 'numpy')
     simulations = np.random.rand(agents, 5) * priors_mean  # Per-agent [P,C,A,S,V] sims
     coherence_vals = E_func(*simulations.T)  # Batched E evals
     coherence = np.mean(coherence_vals)
     
     # Sensitivities: Sample at mean priors (prune if low V-impact)
-    sens_V = float(E_grads[4].subs({sp.symbols('P'):priors_mean[0], sp.symbols('C'):priors_mean[1], 
-                                    sp.symbols('A'):priors_mean[2], sp.symbols('S'):priors_mean[3], 
-                                    sp.symbols('V'):priors_mean[4]}))
+    subs_dict = {P_sym: priors_mean[0], C_sym: priors_mean[1], A_sym: priors_mean[2], 
+                 S_sym: priors_mean[3], V_sym: priors_mean[4]}
+    sens_V = float(E_grads[4].subs(subs_dict).evalf())
     
     finitudes = unreliable_fees(agents)  # Per-agent fees
     pruning = auto_prune_unreliable(finitudes, sens_v=sens_V)
@@ -88,7 +91,7 @@ def vault_pruner(vector: str, agents: int = 10, vbytes: int = 250, btc_price: fl
         'usd_impact': f"${usd_fee:.4f} per {vbytes} vB txn (at BTC ${btc_price:,.0f})",
         'output': f"v4.1.1 SymPy-Vault tuned to E={coherence:.2f} (sens_V={sens_V:.3f}; pruned {len(pruning)} signals; baseline: {get_current_btc_fee_estimate()} sat/vB; replicate_seed: {replicate_seed})",
         'prune': pruning,
-        'gradients_sample': {f'∂E/∂{var}': float(g.subs({sp.symbols('P'):1,sp.symbols('C'):1,sp.symbols('A'):1,sp.symbols('S'):1,sp.symbols('V'):1})) for var, g in zip(['P','C','A','S','V'], E_grads)},  # Unit eval for blueprint
+        'gradients_sample': {f'∂E/∂{var}': float(g.subs({P_sym:1, C_sym:1, A_sym:1, S_sym:1, V_sym:1}).evalf()) for var, g in zip(['P','C','A','S','V'], E_grads)},  # Unit eval for blueprint
         'vow_status': 'life-aligned' if coherence > 0.8 else 'recalibrate'  # VOW guardrail hook
     }
 
