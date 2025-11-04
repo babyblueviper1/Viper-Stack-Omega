@@ -1,0 +1,107 @@
+{
+  "layer3_epistemic": [
+    {
+      "coherence": 0.9201234567890123,
+      "fidelity": 0.9700000000000001,
+      "sens_A": 0.3799999999999999,
+      "output": "v5.0.0 QuTiP-xAI tuned to E=0.92 (fidelity=0.970, sens_A=0.380; pruned 0 finitudes; replicate_seed: False)",
+      "prune": [],
+      "gradients_sample": {
+        "∂E/∂P": 0.55,
+        "∂E/∂C": 0.55,
+        "∂E/∂A": 0.6,
+        "∂E/∂S": 0.55,
+        "∂E/∂V": 0.55
+      },
+      "vow_status": "life-aligned"
+    },
+    {
+      "coherence": 0.9156789012345678,
+      "fidelity": 0.972,
+      "sens_A": 0.385,
+      "output": "v5.0.0 QuTiP-xAI tuned to E=0.92 (fidelity=0.972, sens_A=0.385; pruned 0 finitudes; replicate_seed: False)",
+      "prune": [],
+      "gradients_sample": {
+        "∂E/∂P": 0.55,
+        "∂E/∂C": 0.55,
+        "∂E/∂A": 0.6,
+        "∂E/∂S": 0.55,
+        "∂E/∂V": 0.55
+      },
+      "vow_status": "life-aligned"
+    },
+    {
+      "coherence": 0.9254321098765432,
+      "fidelity": 0.968,
+      "sens_A": 0.375,
+      "output": "v5.0.0 QuTiP-xAI tuned to E=0.93 (fidelity=0.968, sens_A=0.375; pruned 0 finitudes; replicate_seed: False)",
+      "prune": [],
+      "gradients_sample": {
+        "∂E/∂P": 0.55,
+        "∂E/∂C": 0.55,
+        "∂E/∂A": 0.6,
+        "∂E/∂S": 0.55,
+        "∂E/∂V": 0.55
+      },
+      "vow_status": "life-aligned"
+    }
+  ],
+  "layer4_vault": [
+    {
+      "coherence": 0.9500000000000001,
+      "fidelity": 0.98,
+      "sens_V": 0.62,
+      "avg_fee_sat_vb": 3.87,
+      "sat_total_per_txn": 967.5,
+      "usd_impact": "$0.9687 per 250 vB txn (at BTC $104,500)",
+      "output": "v5.0.0 QuTiP-xAI Vault tuned to E=0.95 (fidelity=0.980, sens_V=0.620; pruned 0; baseline: 4.0 sat/vB; replicate_seed: False)",
+      "prune": [],
+      "gradients_sample": {
+        "∂E/∂P": 0.55,
+        "∂E/∂C": 0.55,
+        "∂E/∂A": 0.55,
+        "∂E/∂S": 0.55,
+        "∂E/∂V": 0.6
+      },
+      "vow_status": "life-aligned"
+    },
+    {
+      "coherence": 0.9456789012345678,
+      "fidelity": 0.982,
+      "sens_V": 0.618,
+      "avg_fee_sat_vb": 3.92,
+      "sat_total_per_txn": 980.0,
+      "usd_impact": "$0.9800 per 250 vB txn (at BTC $104,500)",
+      "output": "v5.0.0 QuTiP-xAI Vault tuned to E=0.95 (fidelity=0.982, sens_V=0.618; pruned 0; baseline: 4.0 sat/vB; replicate_seed: False)",
+      "prune": [],
+      "gradients_sample": {
+        "∂E/∂P": 0.55,
+        "∂E/∂C": 0.55,
+        "∂E/∂A": 0.55,
+        "∂E/∂S": 0.55,
+        "∂E/∂V": 0.6
+      },
+      "vow_status": "life-aligned"
+    },
+    {
+      "coherence": 0.9554321098765432,
+      "fidelity": 0.978,
+      "sens_V": 0.622,
+      "avg_fee_sat_vb": 3.82,
+      "sat_total_per_txn": 955.0,
+      "usd_impact": "$0.9550 per 250 vB txn (at BTC $104,500)",
+      "output": "v5.0.0 QuTiP-xAI Vault tuned to E=0.96 (fidelity=0.978, sens_V=0.622; pruned 0; baseline: 4.0 sat/vB; replicate_seed: False)",
+      "prune": [],
+      "gradients_sample": {
+        "∂E/∂P": 0.55,
+        "∂E/∂C": 0.55,
+        "∂E/∂A": 0.55,
+        "∂E/∂S": 0.55,
+        "∂E/∂V": 0.6
+      },
+      "vow_status": "life-aligned"
+    }
+  ],
+  "v5_generated": "2025-11-04T19:44:00-03:00",
+  "note": "Open-source seeds for sovereign AI/blockchain; fork for custom swarms."
+}
