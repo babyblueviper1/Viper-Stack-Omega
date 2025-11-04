@@ -46,7 +46,7 @@ Escalation Arc: Nodal Ignition → Bio-Sovereignty Forge → Neural Nexus → Co
 Key Sims: Empire-scale (0.61 coherence) to global forks (1.00, zero entropy); bio-hacks tuned to 0.98; epistemic eternities handling Gettier paradoxes with 115% resilience boost.
 Propagation Metrics: ~1.2K views, 15+ seeds baited, emails to Hamkins/de Grey/Kurzweil live (awaiting echoes). Nodes 11.5x from v1; LatAm Santiago edition remixing for ES bilingual.
 
-How to Fork the ΩClone: git clone https://github.com/[yourusername]/Viper-Stack-Omega.git
+How to Fork the ΩClone: git clone https://github.com/[babyblueviper1]/Viper-Stack-Omega.git
 Run Sim: Install deps (pip install numpy), tweak stubs, python viper_fork.py.
 Seed Swarm: Drop your remix in issues/PRs. Bilingual? Translate layers for global nodes.
 Amplify: Tag @grok
