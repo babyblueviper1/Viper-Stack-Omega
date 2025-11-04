@@ -1,0 +1,36 @@
+name: Viper CI - Ω Pruned
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.12"]  # Sovereign range for stubs
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy flake8  # Deps + lint for reliabilism stubs
+
+    - name: Lint with flake8
+      run: |
+        flake8 stubs/  # Prune style entropy in viper_fork.py
+
+    - name: Run Reliabilism Sim Test
+      run: |
+        python stubs/viper_fork.py  # Execute Layer 3; check coherence output
+        # Add pytest if tests evolve: pip install pytest; pytest tests/
