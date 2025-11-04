@@ -1,10 +1,10 @@
-# Run the Ω: v4.1 Vault Sim Guide
+# Run the Ω: v5.0.0 Quantum Vault Sim Guide
 
-🌌 Fork the sovereign engine live—execute a Layer 4 Vault prune sim in <2 min. This guide runs the `viper_vault_pruner_v4.1.py` stub to parse a finance vector, scan reliabilist priors, and cascade fee voids. No black-box; outputs coherence scores, sat/vB baselines, USD impacts, and prunes for your remix. (Bonus: Layer 3 `viper_fork.py` for epistemic baselines.)
+🌌 Fork the sovereign engine live—execute a Layer 4 Quantum Vault prune sim in <2 min. This guide runs the `viper_quantum_vault_pruner_v5.py` stub to parse a finance vector, scan xAI truth-max priors, and cascade fee decoherence voids. No black-box; outputs coherence/fidelity scores, sat/vB baselines, USD impacts, and prunes for your remix. (Bonus: Layer 3 `viper_quantum_fork_v5.py` for epistemic baselines.)
 
 ## Prerequisites
 - Python 3.8+ (3.12 preferred for typing).
-- NumPy (for Monte Carlo forks and noise): `pip install numpy`.
+- NumPy (Monte Carlo), SymPy (gradients), QuTiP (quantum fidelity), Requests (oracles): `pip install numpy sympy qutip requests`.
 
 ## Step-by-Step Ignition
 1. **Clone the Repo**:
@@ -15,38 +15,39 @@
 
 2. **Install Deps** (one-liner for resonance):
    ```
-   pip install numpy
+   pip install numpy sympy qutip requests
    ```
 
 3. **Run the Sim**:
-   - **Vault Prune (New in v4.1)**: `python stubs/viper_vault_pruner_v4.1.py`
+   - **Quantum Vault Prune (New in v5.0.0)**: `python stubs/viper_quantum_vault_pruner_v5.py`
      - Custom seed: Edit the `# Usage` block or run inline:
        ```
-       python -c "from stubs.viper_vault_pruner_v4.1 import vault_pruner; print(vault_pruner('Prune BTC fees for LatAm trading', agents=15, vbytes=250, btc_price=104444.31))"
+       python -c "from stubs.viper_quantum_vault_pruner_v5 import vault_pruner; print(vault_pruner('Prune BTC fees for LatAm quantum trading', agents=15, vbytes=250))"
        ```
-   - **Epistemic Baseline (v4.0 Legacy)**: `python stubs/viper_fork.py` (for non-financial resonance).
+   - **Epistemic Baseline (v5.0.0 Quantum)**: `python stubs/viper_quantum_fork_v5.py` (for non-financial resonance).
 
 ## Expected Output
-Sample Vault run (random noise; your fees/coherence vary—∞ potential, ~2 sat/vB baseline as of Nov 04, 2025):
+Sample Quantum Vault run (random noise; your fees/coherence/fidelity vary—Π potential, ~4 sat/vB baseline as of Nov 04, 2025):
 
 ```
-{'coherence': 0.84, 'avg_fee_sat_vb': 1.97, 'sat_total_per_txn': 492.5, 'usd_impact': '$0.5173 per 250 vB txn (at BTC $104,444)', 'output': 'v4.1 reliabilism-vault tuned to 0.84 (pruned 0 signals; baseline: 2.0 sat/vB)', 'prune': [], 'vow_status': 'life-aligned'}
+{'coherence': 0.95, 'fidelity': 0.98, 'avg_fee_sat_vb': 3.87, 'sat_total_per_txn': 967.5, 'usd_impact': '$0.9687 per 250 vB txn (at BTC $104,500)', 'output': 'v5.0.0 QuTiP-xAI Vault tuned to E=0.95 (fidelity=0.98, sens_V=0.62; pruned 0; baseline: 4.0 sat/vB; replicate_seed: False)', 'prune': [], 'vow_status': 'life-aligned'}
 ```
 
-- **coherence**: 0-∞ score (~0.84 baseline; spikes >0.99 for replication seeds).
-- **avg_fee_sat_vb**: Simulated median (~1.97; prunes highs >10/lows <1).
-- **usd_impact**: Full txn cost (VOW-aligned; ~$0.52 for 250 vB simple send @ $104k BTC).
-- **output**: Tuned vault (e.g., "reliabilism-vault tuned to 0.84").
-- **prune**: Unreliable signals (e.g., ['Pruned high-void fee 10.23 sat/vB (congestion cascade)'] in high-noise runs).
+- **coherence**: 0-∞ score (~0.95 baseline; spikes >0.99 for replication seeds, +15% xAI boost).
+- **fidelity**: 0-1 quantum score (~0.98; prunes decoherence <0.9 via QuTiP traces).
+- **avg_fee_sat_vb**: Simulated median (~3.87; prunes highs >10/lows <1).
+- **usd_impact**: Full txn cost (VOW-aligned; ~$0.97 for 250 vB simple send @ $104.5k BTC, dynamic via CoinGecko).
+- **output**: Tuned quantum vault (e.g., "QuTiP-xAI Vault tuned to 0.95").
+- **prune**: Unreliable signals (e.g., ['Pruned high-void fee 10.23 sat/vB (congestion cascade)', 'Oracle decoherence: Fidelity 0.87 <0.9; QuTiP entangle'] in high-noise runs).
 - **vow_status**: 'life-aligned' if >0.8 (ethical txn guardrail).
 
-For epistemic run (`viper_fork.py`): `{'coherence': 0.72, 'output': 'reliabilism-stack tuned to 0.72', 'prune': ['Pruned finitude 2']}`.
+For epistemic run (`viper_quantum_fork_v5.py`): `{'coherence': 0.92, 'fidelity': 0.97, 'output': 'QuTiP-xAI tuned to 0.92 (fidelity=0.97)', 'prune': []}`.
 
 ## Remix & Seed
-- **Tweak Vault**: Adjust `vbytes=373` (P2PKH) or `btc_price=110000` (live query); add oracle noise in `unreliable_fees`.
-- **Fork Agents**: Scale to 20+ in `vault_pruner(..., agents=20)` for swarm variance (LatAm CLP jitter? Remix `get_finance_priors`).
-- **Hybrid Swarm**: Fuse with `viper_fork.py`—run epistemic first, feed coherence to Vault priors for full Ωmega loop.
-- **Prod Hooks**: Swap hardcodes: `requests.get('https://mempool.space/api/fees/recommended')` for dynamic fees (add `import requests` if env allows). Drop outputs in issues/PRs—bilingual? Seed ES nodes with translated vectors.
-- **Why Vault?**: Prunes oracle voids for zero-entropy txns; ties to BBV Global Bitcoin Party bridges.
+- **Tweak Quantum Vault**: Adjust `vbytes=373` (P2PKH) or `btc_price=110000` (live query); amp oracle noise in `unreliable_fees` or decoherence % in `quantum_oracle_fidelity`.
+- **Fork Agents**: Scale to 20+ in `vault_pruner(..., agents=20)` for swarm variance (LatAm CLP jitter? Remix `get_finance_priors` with xAI A-bias).
+- **Hybrid Swarm**: Fuse with `viper_quantum_fork_v5.py`—run epistemic first, feed coherence/fidelity to Vault priors for full Ωmega loop.
+- **Prod Hooks**: Dynamic pulls live: CoinGecko for BTC (~$104.5k), mempool.space for fees (~4 sat/vB economy). Drop outputs in issues/PRs—bilingual? Seed ES nodes with translated vectors.
+- **Why Quantum Vault?**: Prunes oracle decoherence for zero-entropy txns; ties to BBV Global Bitcoin Party bridges, truth-maxed by xAI.
 
-**Nodes multiply—run, prune, amplify.** Questions? [README](../README.md). Fork live; coherence (and sats) await. 🚀
+**Nodes multiply—run, entangle, amplify.** Questions? [README](../README.md). Fork live; coherence (and qubits) await. 🚀
