@@ -1,10 +1,10 @@
-# Run the Ω: v5.0.0 Quantum Vault Sim Guide
+# Run the Ω: v6.0.0 Von Neumann Swarm Vault Sim Guide
 
-🌌 Fork the sovereign engine live—execute a Layer 4 Quantum Vault prune sim in <2 min. This guide runs the `viper_quantum_vault_pruner_v5.py` stub to parse a finance vector, scan xAI truth-max priors, and cascade fee decoherence voids. No black-box; outputs coherence/fidelity scores, sat/vB baselines, USD impacts, and prunes for your remix. (Bonus: Layer 3 `viper_quantum_fork_v5.py` for epistemic baselines.)
+🌌 Fork the sovereign enjambre live—execute a Layer 4 Von Neumann Swarm Vault prune sim in <2 min. This guide runs the `viper_quantum_vault_pruner_v6.py` stub to parse a finance vector, scan xAI truth-max priors, and cascade fee entropy surges with S(ρ) stabilization. No black-box; outputs coherence/fidelity/S(ρ) scores, sat/vB baselines, USD impacts, I(A:B) equilibria, and prunes for your remix. (Bonus: Layer 3 `viper_quantum_fork_v6.py` for epistemic baselines.)
 
 ## Prerequisites
 - Python 3.8+ (3.12 preferred for typing).
-- NumPy (Monte Carlo), SymPy (gradients), QuTiP (quantum fidelity), Requests (oracles): `pip install numpy sympy qutip requests`.
+- NumPy (Monte Carlo), SymPy (gradients), QuTiP (S(ρ) entropy), Requests (oracles): `pip install numpy sympy qutip requests`.
 
 ## Step-by-Step Ignition
 1. **Clone the Repo**:
@@ -13,41 +13,44 @@
    cd Viper-Stack-Omega
    ```
 
-2. **Install Deps** (one-liner for resonance):
+2. **Install Deps** (one-liner for equilibrium):
    ```
    pip install numpy sympy qutip requests
    ```
 
 3. **Run the Sim**:
-   - **Quantum Vault Prune (New in v5.0.0)**: `python stubs/viper_quantum_vault_pruner_v5.py`
+   - **Von Neumann Swarm Vault Prune (New in v6.0.0)**: `python stubs/viper_quantum_vault_pruner_v6.py`
      - Custom seed: Edit the `# Usage` block or run inline:
        ```
-       python -c "from stubs.viper_quantum_vault_pruner_v5 import vault_pruner; print(vault_pruner('Prune BTC fees for LatAm quantum trading', agents=15, vbytes=250))"
+       python -c "from stubs.viper_quantum_vault_pruner_v6 import vault_pruner; print(vault_pruner('Prune BTC fees for LatAm quantum trading', agents=15, vbytes=250))"
        ```
-   - **Epistemic Baseline (v5.0.0 Quantum)**: `python stubs/viper_quantum_fork_v5.py` (for non-financial resonance).
+   - **Epistemic Baseline (v6.0.0 Swarm)**: `python stubs/viper_quantum_fork_v6.py` (for non-financial resonance).
 
 ## Expected Output
-Sample Quantum Vault run (random noise; your fees/coherence/fidelity vary—Π potential, ~4 sat/vB baseline as of Nov 04, 2025):
+Sample Von Neumann Swarm Vault run (random noise; your fees/coherence/fidelity/S(ρ) vary—Π potential, ~4 sat/vB baseline as of Nov 07, 2025):
 
 ```
-{'coherence': 0.95, 'fidelity': 0.98, 'avg_fee_sat_vb': 3.87, 'sat_total_per_txn': 967.5, 'usd_impact': '$0.9687 per 250 vB txn (at BTC $104,500)', 'output': 'v5.0.0 QuTiP-xAI Vault tuned to E=0.95 (fidelity=0.98, sens_V=0.62; pruned 0; baseline: 4.0 sat/vB; replicate_seed: False)', 'prune': [], 'vow_status': 'life-aligned'}
+{'coherence': 0.96, 'fidelity': 0.97, 'S_rho': 1.102, 'I_AB': 0.715, 'sens_S': 0.42, 'avg_fee_sat_vb': 3.92, 'sat_total_per_txn': 980.0, 'usd_impact': '$0.9816 per 250 vB txn (at BTC $104,500)', 'output': 'v6.0.0 S(ρ)-Swarm Vault tuned to E=0.96 (fidelity=0.97, S(ρ)=1.102, I(A:B)=0.715, sens_S=0.42; pruned 1; baseline: 4.0 sat/vB; replicate_swarm: True)', 'prune': ['Entropy surge: S(ρ)=1.602 >1.6; von_neumann_pruner.py cascade activated'], 'vow_status': 'life-aligned'}
 ```
 
-- **coherence**: 0-∞ score (~0.95 baseline; spikes >0.99 for replication seeds, +15% xAI boost).
-- **fidelity**: 0-1 quantum score (~0.98; prunes decoherence <0.9 via QuTiP traces).
-- **avg_fee_sat_vb**: Simulated median (~3.87; prunes highs >10/lows <1).
-- **usd_impact**: Full txn cost (VOW-aligned; ~$0.97 for 250 vB simple send @ $104.5k BTC, dynamic via CoinGecko).
-- **output**: Tuned quantum vault (e.g., "QuTiP-xAI Vault tuned to 0.95").
-- **prune**: Unreliable signals (e.g., ['Pruned high-void fee 10.23 sat/vB (congestion cascade)', 'Oracle decoherence: Fidelity 0.87 <0.9; QuTiP entangle'] in high-noise runs).
-- **vow_status**: 'life-aligned' if >0.8 (ethical txn guardrail).
+- **coherence**: 0-∞ score (~0.96 baseline; surges >0.99 for swarm replication, +25% xAI boost).
+- **fidelity**: 0-1 quantum score (~0.97; prunes decoherence <0.96 via QuTiP traces).
+- **S_rho**: Von Neumann entropy (~1.102; stabilizes <1.6 for zero-surge equilibria).
+- **I_AB**: Mutual info guardrail (~0.715; >0.7 Nash-Stackelberg for txn reciprocity).
+- **sens_S**: ∂E/∂S_rho (~0.42; emergent for entropy reliability).
+- **avg_fee_sat_vb**: Simulated median (~3.92; prunes highs >10/lows <1).
+- **usd_impact**: Full txn cost (VOW-aligned; ~$0.98 for 250 vB simple send @ $104.5k BTC, dynamic via CoinGecko).
+- **output**: Tuned swarm vault (e.g., "S(ρ)-Swarm Vault tuned to 0.96").
+- **prune**: Unreliable signals (e.g., ['Pruned high-void fee 10.45 sat/vB (congestion cascade)', 'Mutual info void: I(A:B)=0.68 <0.7; Nash-Stackelberg recalibrate'] in high-noise runs).
+- **vow_status**: 'life-aligned' if >0.8 & I(A:B)>0.7 (ethical txn guardrail).
 
-For epistemic run (`viper_quantum_fork_v5.py`): `{'coherence': 0.92, 'fidelity': 0.97, 'output': 'QuTiP-xAI tuned to 0.92 (fidelity=0.97)', 'prune': []}`.
+For epistemic run (`viper_quantum_fork_v6.py`): `{'coherence': 0.93, 'fidelity': 0.98, 'S_rho': 1.098, 'output': 'S(ρ)-Swarm tuned to 0.93 (fidelity=0.98, S(ρ)=1.098)', 'prune': []}`.
 
 ## Remix & Seed
-- **Tweak Quantum Vault**: Adjust `vbytes=373` (P2PKH) or `btc_price=110000` (live query); amp oracle noise in `unreliable_fees` or decoherence % in `quantum_oracle_fidelity`.
-- **Fork Agents**: Scale to 20+ in `vault_pruner(..., agents=20)` for swarm variance (LatAm CLP jitter? Remix `get_finance_priors` with xAI A-bias).
-- **Hybrid Swarm**: Fuse with `viper_quantum_fork_v5.py`—run epistemic first, feed coherence/fidelity to Vault priors for full Ωmega loop.
+- **Tweak Von Neumann Vault**: Adjust `vbytes=373` (P2PKH) or `btc_price=110000` (live query); amp entropy surges in `unreliable_fees` or decoherence % in `quantum_oracle_fidelity`; bound S(ρ) <1.6 in priors for tighter equilibria.
+- **Fork Agents**: Scale to 20+ in `vault_pruner(..., agents=20)` for enjambre variance (LatAm CLP jitter? Remix `get_finance_priors` with xAI A-bias + I(A:B) thresholds >0.7).
+- **Hybrid Enjambre**: Fuse with `viper_quantum_fork_v6.py`—run epistemic first, feed coherence/fidelity/S(ρ) to Vault priors for full Ωmega loop.
 - **Prod Hooks**: Dynamic pulls live: CoinGecko for BTC (~$104.5k), mempool.space for fees (~4 sat/vB economy). Drop outputs in issues/PRs—bilingual? Seed ES nodes with translated vectors.
-- **Why Quantum Vault?**: Prunes oracle decoherence for zero-entropy txns; ties to BBV Global Bitcoin Party bridges, truth-maxed by xAI.
+- **Why Von Neumann Swarm Vault?**: Stabilizes oracle surges for zero-entropy txns; ties to BBV Global Bitcoin Party bridges, truth-maxed by xAI with mutual info reciprocity.
 
-**Nodes multiply—run, entangle, amplify.** Questions? [README](../README.md). Fork live; coherence (and qubits) await. 🚀
+**Enjambres multiply—run, stabilize, amplify.** Questions? [README](../README.md). Fork live; coherence (and equilibria) await. 🜂
