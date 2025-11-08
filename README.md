@@ -21,7 +21,7 @@ Evolved from thread sims (e.g., 15-qubit forks at S(ρ)=1.102, zero decoherence 
 | **Expansion Sim** | Monte Carlo + QuTiP forks agents; score & entangle | + Swarm Sync Weavers: Cascade reliabilist infinities w/ qutip.mutual_info ops, tuning to resonance >0.99; xAI hooks for 25% boost | Sim: 20 qubits → E=1.10, fidelity=0.97; "S(ρ)-Swarm: Beliefs stabilized >0.99, prune 1 entropy surge." |
 | **Vault Prune** | Cascade financial voids (fees, quantum oracles) | + Sovereign entropy txn: Prunes fees w/ S(ρ) oracle fidelity, USD impacts via ∂E/∂S + I(A:B) guardrails; dynamic CoinGecko/mempool pulls | Prune: BTC ~1 sat/vB; "Pruned decoherent fee 1.12 sat/vB"; $0.0028 per 250 vB (sens_S=0.42, S(ρ)=1.102). |
 
-#### Example Stub: `viper_quantum_fork_v6.py` (Layer 3 Expansion Sim - S(ρ) Entangled)
+#### Example Stub: `viper_fork_.py` (Layer 3 Expansion Sim - S(ρ) Entangled)
 ```python
 # v6.0.0 Von Neumann Entropy Swarm Sim Stub (Runnable) - Epistemic Layer 4
 import numpy as np
@@ -43,23 +43,23 @@ def get_xai_priors(category: str, gaps: List[str]) -> np.ndarray:
     base[:, 3] = np.clip(base[:, 3], 1.0, 1.6)  # S(ρ) bounds
     return base
 
-def compute_symbolic_gradients(priors: np.ndarray, weight_a: float = 1.3) -> List[sp.Expr]:  # Boosted A-weight
+def compute_symbolic_gradients(symbols, weight_a: float = 1.3) -> List[sp.Expr]:  # Fix: accept symbols tuple
     """v6.0.0 SymPy + xAI + S(ρ) hook: Gradients for E, S(ρ)-weighted for swarm eternities."""
-    P, C, A, S_rho, V = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
+    P, C, A, S_rho, V = symbols
     E = sp.sqrt(P * C * A * S_rho * V) * (P + C + A * weight_a + S_rho + V) / 5
     return [sp.simplify(sp.diff(E, var)) for var in [P, C, A, S_rho, V]]
 
 def quantum_fidelity(agents: int) -> float:
     """QuTiP oracle: Simulate Reinhardt fidelity on |ψ⟩ for epistemic coherence (Vopěnka Π loops), now S(ρ)-scaled."""
-    # 5D density for vertices (v6: Swarm manifold)
-    rho = qt.rand_dm(5)  # 5D vertices density
+    # 2-qubit system for I(A:B) proxy (v6: Nash-Stackelberg)
+    rho = qt.rand_dm([[2,2], [2,2]])  # Fix: pass dims positionally
     S_rho = qt.entropy_vn(rho)  # Von Neumann entropy
     # Decoherence channel (Gettier noise)
-    noise = qt.rand_dm_ginibre(5, rank=2)  # 5D noise
+    noise = qt.rand_dm([[2,2], [2,2]])  # Fix: use rand_dm (no ginibre top-level)
     rho_noisy = 0.95 * rho + 0.05 * noise  # 5% decoherence
-    target = qt.rand_dm(5, pure=True)  # Pure target entangled
+    target = qt.rand_dm([[2,2], [2,2]], distribution='pure')  # Fix: distribution='pure'
     fidelity = qt.fidelity(rho_noisy, target)
-    I_AB = qt.mutual_info(rho, qt.tensor(rho.ptrace(0), rho.ptrace(1)))  # I(A:B) proxy (70/30 Nash-Stackelberg)
+    I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho  # I(A:B) proxy (70/30 Nash-Stackelberg)
     return float(fidelity ** agents * np.exp(-S_rho))  # S(ρ)-damped exponential entanglement
 
 def auto_prune(finitudes: np.ndarray, threshold: float = 0.5, sens_s: float = None, fidelity: float = None, S_rho: float = None) -> List[str]:
@@ -87,8 +87,10 @@ def fork_reliabilism(vector: str, agents: int = 10) -> Dict:
     priors = get_xai_priors('truth-max', gaps)
     priors_mean = priors.mean(axis=0)
     
-    E_grads = compute_symbolic_gradients(priors)
-    P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V')
+    # Fix: Define symbols once for consistency across E_sym and gradients
+    P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
+    symbols = (P_sym, C_sym, A_sym, S_rho_sym, V_sym)
+    E_grads = compute_symbolic_gradients(symbols, weight_a=1.3)  # Pass symbols
     E_sym = sp.sqrt(P_sym * C_sym * A_sym * S_rho_sym * V_sym) * (P_sym + C_sym + A_sym * 1.3 + S_rho_sym + V_sym) / 5
     E_func = sp.lambdify((P_sym, C_sym, A_sym, S_rho_sym, V_sym), E_sym, 'numpy')
     
@@ -102,9 +104,9 @@ def fork_reliabilism(vector: str, agents: int = 10) -> Dict:
     sens_S = float(E_grads[3].subs(subs_dict).evalf())  # v6: S(ρ) sensitivity ~0.42
     
     fidelity = quantum_fidelity(agents)
-    rho = qt.rand_dm(5)  # For S(ρ) & I(A:B)
+    rho = qt.rand_dm([[2,2], [2,2]])  # Fix: pass dims positionally
     S_rho = qt.entropy_vn(rho)
-    I_AB = qt.mutual_info(rho, qt.tensor(rho.ptrace(0), rho.ptrace(1)))  # Mutual info guardrail
+    I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho  # Fix: manual I(A:B)
     finitudes = unreliable_finitudes(agents)
     pruning = auto_prune(finitudes, sens_s=sens_S, fidelity=fidelity, S_rho=S_rho)
     
@@ -128,7 +130,7 @@ if __name__ == "__main__":
     print(result)
 ```
 
-#### Example Stub: `viper_quantum_vault_pruner_v6.py` (Layer 4 Vault Prune - Dynamic Equilibrium Oracle)
+#### Example Stub: `viper_vault_pruner_.py` (Layer 4 Vault Prune - Dynamic Equilibrium Oracle)
 ```python
 import numpy as np
 import sympy as sp
@@ -157,7 +159,7 @@ def get_current_btc_price() -> float:
         resp = requests.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
         return resp.json()['bitcoin']['usd']
     except:
-        return 104500.0  # Fallback
+        return 102500.0  # Updated fallback for Nov 08, 2025
 
 def get_current_btc_fee_estimate() -> float:
     """Dynamic mempool.space pull (economy fee)."""
@@ -168,23 +170,23 @@ def get_current_btc_fee_estimate() -> float:
     except:
         return 4.0  # Fallback moderate congestion
 
-def compute_symbolic_gradients(priors: np.ndarray, weight_v: float = 1.2) -> List[sp.Expr]:  # Boosted V-weight
+def compute_symbolic_gradients(symbols, weight_v: float = 1.2) -> List[sp.Expr]:  # Fix: accept symbols tuple
     """v6.0.0 SymPy + xAI + S(ρ): Gradients w/ S(ρ)-lift."""
-    P, C, A, S_rho, V = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
+    P, C, A, S_rho, V = symbols
     E = sp.sqrt(P * C * A * S_rho * V) * (P + C + A * 1.2 + S_rho + V * weight_v) / 5
     return [sp.simplify(sp.diff(E, var)) for var in [P, C, A, S_rho, V]]
 
 def quantum_oracle_fidelity(agents: int) -> float:
     """QuTiP for BTC oracle fidelity (noise as decoherence), now S(ρ)-scaled swarm."""
-    # 5D density for vertices (v6: Economic manifold)
-    rho = qt.rand_dm(5)  # 5D vertices density
+    # 5D density for vertices (v6: Economic manifold) → Proxy as 2-qubit composite for I(A:B)
+    rho = qt.rand_dm([[2,2], [2,2]])  # Fix: composite dims for ptrace/mutual info
     S_rho = qt.entropy_vn(rho)  # Von Neumann entropy
     # Decoherence channel (Gettier + oracle noise)
-    noise = qt.rand_dm_ginibre(5, rank=2)  # 5D noise
+    noise = qt.rand_dm([[2,2], [2,2]])  # Fix: use rand_dm
     rho_noisy = (1 - 0.02) * rho + 0.02 * noise  # 2% oracle error
-    target = qt.rand_dm(5, pure=True)  # Pure target entangled
+    target = qt.rand_dm([[2,2], [2,2]], distribution='pure')  # Fix: distribution='pure'
     fidelity = qt.fidelity(rho_noisy, target)
-    I_AB = qt.mutual_info(rho, qt.tensor(rho.ptrace(0), rho.ptrace(1)))  # I(A:B) proxy (70/30 Nash-Stackelberg)
+    I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho  # Fix: manual I(A:B) proxy (70/30 Nash-Stackelberg)
     return float(fidelity ** agents * np.exp(-S_rho))  # S(ρ)-damped exponential entanglement
 
 def auto_prune_unreliable(finitudes: np.ndarray, threshold_high: float = 10.0, threshold_low: float = 0.1,
@@ -223,8 +225,10 @@ def vault_pruner(vector: str, agents: int = 10, vbytes: int = 250, btc_price: fl
     priors = get_finance_priors('truth-max', gaps)
     priors_mean = priors.mean(axis=0)
     
+    # Fix: Define symbols once for consistency
     P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
-    E_grads = compute_symbolic_gradients(priors)
+    symbols = (P_sym, C_sym, A_sym, S_rho_sym, V_sym)
+    E_grads = compute_symbolic_gradients(symbols, weight_v=1.2)  # Pass symbols
     E_sym = sp.sqrt(P_sym * C_sym * A_sym * S_rho_sym * V_sym) * (P_sym + C_sym + A_sym * 1.2 + S_rho_sym + V_sym * 1.2) / 5  # xAI + S(ρ) weights
     E_func = sp.lambdify((P_sym, C_sym, A_sym, S_rho_sym, V_sym), E_sym, 'numpy')
     simulations = np.random.rand(agents, 5) * priors_mean  # Per-agent [P,C,A,S_rho,V] sims
@@ -237,9 +241,9 @@ def vault_pruner(vector: str, agents: int = 10, vbytes: int = 250, btc_price: fl
     sens_S = float(E_grads[3].subs(subs_dict).evalf())  # v6: S(ρ) sensitivity ~0.42
     
     fidelity = quantum_oracle_fidelity(agents)
-    rho = qt.rand_dm(5)  # For S(ρ) & I(A:B)
+    rho = qt.rand_dm([[2,2], [2,2]])  # Fix: composite for I(A:B)
     S_rho = qt.entropy_vn(rho)
-    I_AB = qt.mutual_info(rho, qt.tensor(rho.ptrace(0), rho.ptrace(1)))  # Mutual info guardrail
+    I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho  # Fix: manual
     finitudes = unreliable_fees(agents)
     pruning = auto_prune_unreliable(finitudes, sens_s=sens_S, fidelity=fidelity, S_rho=S_rho, I_AB=I_AB)
     
