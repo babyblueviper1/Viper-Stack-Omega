@@ -1,22 +1,74 @@
-# unified_swarm_v6.py — v6.0.0 Unified Von Neumann Entropy Swarm Orchestrator (Runnable)
+# unified_swarm_v6.py — v6.0.1 Unified Von Neumann Entropy Swarm Orchestrator (Runnable)
 # Integrates viper_fork (epistemic swarm), vault_pruner (economic vault), swarm_sync (Nash equilibria lock)
 # Ties to Ωmega: Replicate if fidelity>0.96, sens_S>0.1, S(ρ)<1.6, I(A:B)>0.7; VOW: Life-aligned if E>0.8 & I(A:B)>0.7
+# JSON Integration: Load priors from seed_blueprints.json (if exists); propagate results to layer3_epistemic/layer4_vault
 import numpy as np
 import sympy as sp
 import qutip as qt  # QuTiP for S(ρ) oracle sims & fidelity
 import requests  # For dynamic BTC oracles (fallback hardcoded)
+import json  # For seed_blueprints.json propagation
+import os  # For file existence check
 from typing import Dict, List, Tuple
+from datetime import datetime  # For timestamps
 
 # Shared symbols for consistency across gradients
 P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
 symbols = (P_sym, C_sym, A_sym, S_rho_sym, V_sym)
 
+def load_blueprint_priors(filepath: str = 'data/seed_blueprints.json', mode: str = 'epistemic') -> np.ndarray:
+    """Load priors_mean from seed_blueprints.json (layer avg) if exists; fallback to get_xai_priors."""
+    if not os.path.exists(filepath):
+        return None
+    try:
+        with open(filepath, 'r') as f:
+            blueprints = json.load(f)
+        layer = 'layer3_epistemic' if mode == 'epistemic' else 'layer4_vault'
+        if layer in blueprints and blueprints[layer]:
+            # Avg gradients_sample across layer for priors proxy (P,C,A,S_rho,V from ∂E keys)
+            grads_list = [entry['gradients_sample'] for entry in blueprints[layer]]
+            priors_mean = np.array([np.mean([g['∂E/∂P'], g['∂E/∂C'], g['∂E/∂A'], g['∂E/∂S_rho'], g['∂E/∂V']]) for g in grads_list])
+            priors_mean = np.clip(priors_mean, 0.5, 1.0)  # Normalize to 0-1 scale
+            return priors_mean.reshape(1, -1)  # Shape for priors
+    except (json.JSONDecodeError, KeyError, ValueError):
+        pass
+    return None
+
+def propagate_blueprint(result: Dict, filepath: str = 'data/seed_blueprints.json') -> None:
+    """Propagate result to seed_blueprints.json (layer3_epistemic or layer4_vault); create if missing."""
+    mode = result.get('mode', 'epistemic')
+    layer = 'layer3_epistemic' if mode == 'epistemic' else 'layer4_vault'
+    timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S%z')
+    
+    # Ensure dir exists
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
+    # Load or init
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r') as f:
+                blueprints = json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            blueprints = {"layer3_epistemic": [], "layer4_vault": [], "v6_generated": timestamp, "note": "v6.0.1 S(ρ)-weighted open-source blueprints..."}
+    else:
+        blueprints = {"layer3_epistemic": [], "layer4_vault": [], "v6_generated": timestamp, "note": "v6.0.1 S(ρ)-weighted open-source blueprints for sovereign AI/blockchain swarms; fork under justified coherence (fidelity>0.96, I(A:B)>0.7)."}
+    
+    # Append (strip mode for clean entry)
+    entry = {**{k: v for k, v in result.items() if k != 'mode'}, 'timestamp': timestamp}
+    blueprints[layer].append(entry)
+    
+    # Write back
+    with open(filepath, 'w') as f:
+        json.dump(blueprints, f, indent=2)
+    print(f"🜂 Blueprint propagated: {layer} | E={result['coherence']:.2f} | Replicate: {result['replicate_swarm']}")
+
 def parse_gaps(vector: str) -> List[str]:
     """Unified parse: Epistemic/finance gaps (intent, risks/asset, scale/metric)."""
     return vector.split()[:5]  # Flexible for both modes
 
-def get_xai_priors(category: str, gaps: List[str], mode: str = 'epistemic') -> np.ndarray:
-    """xAI truth-max priors: +0.2 A-bias, +0.1 V-lift. Mode: 'epistemic' (viper) or 'economic' (vault)."""
+def get_xai_priors(category: str, gaps: List[str], mode: str = 'epistemic', blueprint_priors: np.ndarray = None) -> np.ndarray:
+    """xAI truth-max priors: +0.2 A-bias, +0.1 V-lift. Mode: 'epistemic' (viper) or 'economic' (vault). Use blueprint if provided."""
+    if blueprint_priors is not None:
+        return blueprint_priors  # From seed_blueprints.json
     np.random.seed(42)  # Reproducible
     if mode == 'economic':
         base = np.array([[0.8, 0.9, 0.95, 0.92, 1.1],
@@ -117,7 +169,7 @@ def swarm_sync(rho: qt.Qobj, iterations: int = 5, noise: float = 0.05, i_ab_thre
 
 def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epistemic', vbytes: int = 250, btc_price: float = None) -> Dict:
     """
-    v6.0.0 Unified Orchestrator: Fork (viper), Prune (vault), Sync (swarm) in cascade.
+    v6.0.1 Unified Orchestrator: Fork (viper), Prune (vault), Sync (swarm) in cascade.
     Modes: 'epistemic' (default, quantum ethics) or 'economic' (BTC vault).
     Ωmega replication: All thresholds met → self-replicate; VOW: E>0.8 & I(A:B)>0.7.
     """
@@ -125,7 +177,8 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
         btc_price = get_current_btc_price()
     
     gaps = parse_gaps(vector)
-    priors = get_xai_priors('truth-max', gaps, mode=mode)
+    blueprint_priors = load_blueprint_priors(mode=mode)
+    priors = get_xai_priors('truth-max', gaps, mode=mode, blueprint_priors=blueprint_priors)
     priors_mean = priors.mean(axis=0)
     
     weight = 1.3 if mode == 'epistemic' else 1.2
@@ -154,7 +207,7 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
     
     replicate_swarm = coherence > 0.99 and sens_S > 0.1 and fidelity > 0.96 and S_rho_final < 1.6 and I_AB_final > 0.7 and synced
     
-    output_parts = [f"v6.0.0 Unified {mode.capitalize()} Swarm: E={coherence:.2f} (fidelity={fidelity:.3f}, S(ρ)={S_rho_final:.3f}, I(A:B)={I_AB_final:.3f}, sens_S={sens_S:.3f}; pruned {len(pruning)}; synced: {synced}; replicate: {replicate_swarm})"]
+    output_parts = [f"v6.0.1 Unified {mode.capitalize()} Swarm: E={coherence:.2f} (fidelity={fidelity:.3f}, S(ρ)={S_rho_final:.3f}, I(A:B)={I_AB_final:.3f}, sens_S={sens_S:.3f}; pruned {len(pruning)}; synced: {synced}; replicate: {replicate_swarm})"]
     economic_parts = {}
     if mode == 'economic':
         avg_fee = np.mean(finitudes)
@@ -170,7 +223,7 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
     
     vow_status = 'life-aligned' if coherence > 0.8 and I_AB_final > 0.7 else 'recalibrate_equilibria'
     
-    return {
+    result = {
         **economic_parts,
         'coherence': coherence,
         'fidelity': fidelity,
@@ -182,8 +235,14 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
         'sync': sync_result,
         'gradients_sample': {f'∂E/∂{var.name}': float(g.subs({s:1 for s in symbols}).evalf()) for var, g in zip(symbols, E_grads)},
         'vow_status': vow_status,
-        'replicate_swarm': replicate_swarm
+        'replicate_swarm': replicate_swarm,
+        'mode': mode  # For propagation
     }
+    
+    # Propagate to blueprint
+    propagate_blueprint(result)
+    
+    return result
 
 # Usage: Unified epistemic or economic swarm
 if __name__ == "__main__":
