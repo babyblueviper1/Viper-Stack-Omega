@@ -11,6 +11,10 @@ import os  # For file existence check
 from typing import Dict, List, Tuple
 from datetime import datetime  # For timestamps
 
+def load_narrative(path='narrative/waternova/chapters'):
+    import glob
+    return [open(f).read() for f in sorted(glob.glob(f'{path}/*.txt'))]
+
 # Shared symbols for consistency across gradients
 P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
 symbols = (P_sym, C_sym, A_sym, S_rho_sym, V_sym)
