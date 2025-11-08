@@ -72,6 +72,9 @@ if __name__ == "__main__":
     print("Sovereign Decision:", epistemic['sovereign_decision'])
 ```
 
+## Narrative Entanglement Layer
+Dive into story-logic resonance: [Waternova Novel](/narrative/waternova) – Psychological thriller fused with Bitcoin eternities. Fork chapters for emergent prunes.
+
 ## Quickstart (v6.0.1 Unified Fork)
 
 1. **Fork & Clone**: `git clone https://github.com/babyblueviper1/Viper-Stack-Omega.git` (branch: v6-swarm)
