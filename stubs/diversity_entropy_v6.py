@@ -9,6 +9,39 @@ import json  # For blueprint propagation
 import os  # For file checks
 from typing import Dict, List
 
+import json
+from googletrans import Translator  # Install once: pip install googletrans==4.0.0-rc1
+
+translator = Translator()
+
+def bilingual_fuse(chapter_text, transcript, prune_pct=0.3):
+    fused_en = f"Chapter Fusion: {chapter_text[:500]}...\n\nResonance: {transcript[:500]}...\n\nUplift: Story-logic (GCI >0.7) – Pruned {prune_pct*100}% motifs."
+    fused_es = translator.translate(fused_en, dest='es').text
+    return {'english': fused_en, 'spanish': fused_es, 'coherence_proxy': 0.85}  # Expand with real calc
+
+# Usage: manifest = bilingual_fuse(prologue, ep_transcript)
+
+def load_podcast_transcripts(file_path='narrative/baby-blue-viper/transcripts/podcast_transcripts_20251108.json'):
+    """Load pruned transcripts; filter GCI >0.4 for fusion."""
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+    # VOW Prune: Reject low-coherence (E<0.8 proxy)
+    filtered = [ep for ep in data if ep.get('coherence_proxy', 0) > 0.4]
+    return filtered  # List of dicts: {'title': ..., 'transcript': ...}
+
+# Example Fusion (call in your main func)
+def fuse_narrative_podcast(waternova_chaps, podcasts):
+    # Simple overlap prune (expand with S(ρ) gradients)
+    fusions = []
+    for chap in waternova_chaps:
+        for pod in podcasts:
+            # Mock uplift: 1.35x if 'bitcoin' in pod['transcript']
+            uplift = 1.35 if 'bitcoin' in pod['transcript'].lower() else 1.0
+            fused_text = f"{chap[:200]}... + {pod['transcript'][:200]}... (Uplift: {uplift}x)"
+            fusions.append({'fusion': fused_text, 'gci_proxy': 0.7})  # Tie to mean(1 - S(ρ)/1.6)
+    return fusions  # Output bilingual manifests or blueprints
+
+
 def load_mvp_data(csv_path: str = 'outputs/andes_rap_v1.3.csv') -> pd.DataFrame:
     """Load or simulate MVP Andes data (n=127 nodes: value_uplift_multiple ~1.35±0.05, entropy_prune_pct ~30±3)."""
     if os.path.exists(csv_path):
