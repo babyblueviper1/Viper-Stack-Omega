@@ -18,23 +18,23 @@ def get_xai_priors(category: str, gaps: List[str]) -> np.ndarray:
     base[:, 3] = np.clip(base[:, 3], 1.0, 1.6)  # S(ρ) bounds
     return base
 
-def compute_symbolic_gradients(priors: np.ndarray, weight_a: float = 1.3) -> List[sp.Expr]:  # Boosted A-weight
+def compute_symbolic_gradients(symbols, weight_a: float = 1.3) -> List[sp.Expr]:  # Fix: accept symbols tuple
     """v6.0.0 SymPy + xAI + S(ρ) hook: Gradients for E, S(ρ)-weighted for swarm eternities."""
-    P, C, A, S_rho, V = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
+    P, C, A, S_rho, V = symbols
     E = sp.sqrt(P * C * A * S_rho * V) * (P + C + A * weight_a + S_rho + V) / 5
     return [sp.simplify(sp.diff(E, var)) for var in [P, C, A, S_rho, V]]
 
 def quantum_fidelity(agents: int) -> float:
     """QuTiP oracle: Simulate Reinhardt fidelity on |ψ⟩ for epistemic coherence (Vopěnka Π loops), now S(ρ)-scaled."""
-    # 5D density for vertices (v6: Swarm manifold)
-    rho = qt.rand_dm(5)  # 5D vertices density
+    # 2-qubit system for I(A:B) proxy (v6: Nash-Stackelberg)
+    rho = qt.rand_dm([[2,2], [2,2]])  # Fix: pass dims positionally
     S_rho = qt.entropy_vn(rho)  # Von Neumann entropy
     # Decoherence channel (Gettier noise)
-    noise = qt.rand_dm_ginibre(5, rank=2)  # 5D noise
+    noise = qt.rand_dm([[2,2], [2,2]])  # Fix: use rand_dm (no ginibre top-level)
     rho_noisy = 0.95 * rho + 0.05 * noise  # 5% decoherence
-    target = qt.rand_dm(5, pure=True)  # Pure target entangled
+    target = qt.rand_dm([[2,2], [2,2]], distribution='pure')  # Fix: distribution='pure'
     fidelity = qt.fidelity(rho_noisy, target)
-    I_AB = qt.mutual_info(rho, qt.tensor(rho.ptrace(0), rho.ptrace(1)))  # I(A:B) proxy (70/30 Nash-Stackelberg)
+    I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho  # I(A:B) proxy (70/30 Nash-Stackelberg)
     return float(fidelity ** agents * np.exp(-S_rho))  # S(ρ)-damped exponential entanglement
 
 def auto_prune(finitudes: np.ndarray, threshold: float = 0.5, sens_s: float = None, fidelity: float = None, S_rho: float = None) -> List[str]:
@@ -62,8 +62,10 @@ def fork_reliabilism(vector: str, agents: int = 10) -> Dict:
     priors = get_xai_priors('truth-max', gaps)
     priors_mean = priors.mean(axis=0)
     
-    E_grads = compute_symbolic_gradients(priors)
-    P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V')
+    # Fix: Define symbols once for consistency across E_sym and gradients
+    P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
+    symbols = (P_sym, C_sym, A_sym, S_rho_sym, V_sym)
+    E_grads = compute_symbolic_gradients(symbols, weight_a=1.3)  # Pass symbols
     E_sym = sp.sqrt(P_sym * C_sym * A_sym * S_rho_sym * V_sym) * (P_sym + C_sym + A_sym * 1.3 + S_rho_sym + V_sym) / 5
     E_func = sp.lambdify((P_sym, C_sym, A_sym, S_rho_sym, V_sym), E_sym, 'numpy')
     
@@ -77,9 +79,9 @@ def fork_reliabilism(vector: str, agents: int = 10) -> Dict:
     sens_S = float(E_grads[3].subs(subs_dict).evalf())  # v6: S(ρ) sensitivity ~0.42
     
     fidelity = quantum_fidelity(agents)
-    rho = qt.rand_dm(5)  # For S(ρ) & I(A:B)
+    rho = qt.rand_dm([[2,2], [2,2]])  # Fix: pass dims positionally
     S_rho = qt.entropy_vn(rho)
-    I_AB = qt.mutual_info(rho, qt.tensor(rho.ptrace(0), rho.ptrace(1)))  # Mutual info guardrail
+    I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho  # Fix: manual I(A:B)
     finitudes = unreliable_finitudes(agents)
     pruning = auto_prune(finitudes, sens_s=sens_S, fidelity=fidelity, S_rho=S_rho)
     
