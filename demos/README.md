@@ -16,6 +16,8 @@
 - **[podcast_entanglement_v6.1.ipynb](Viper_Podcast_Entanglement_v6_1.ipynb)**: RSS Pull → Whisper Transcribe → Bilingual Waternova Fusion.  
   Substack feed sync (3 eps baseline), prune 30% voids, toggle manual/random/threshold for ep selection. Outputs JSON manifests (GCI ~0.74 post-fuse).
 
+  - **[Podcast Entanglement v6.1](podcast_entanglement_v6.1.py)**: Standalone RSS sync → Whisper transcribe → Waternova bilingual fusion. Toggle modes, outputs JSON (GCI ~0.74). Run: `python demos/podcast_entanglement_v6.1.py`.
+
 ## Quick Start
 ```bash
 git clone https://github.com/babyblueviper1/Viper-Stack-Omega
