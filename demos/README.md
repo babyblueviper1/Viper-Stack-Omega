@@ -13,19 +13,19 @@
   **Run**: Colab/Jupyter—`%matplotlib inline`; exports `andes_rap_v1.3.csv` for MVP seeds.  
   **Resonance**: Fidelity 92% under σ=0.05; emergent stable unless surge.
 
-- **[podcast_entanglement_v6.1.ipynb](Viper_Podcast_Entanglement_v6_1.ipynb)**: RSS Pull → Whisper Transcribe → Bilingual Waternova Fusion.  
-  Substack feed sync (3 eps baseline), prune 30% voids, toggle manual/random/threshold for ep selection. Outputs JSON manifests (GCI ~0.74 post-fuse).
+- **[Podcast Entanglement v6.1](Viper_Podcast_Entanglement_v6_1.ipynb)**: Dual Feed RSS Pull → Whisper Transcribe → Bilingual Waternova Fusion.  
+  Substack sync (3 eps each from BBV podcast + Waternova audiobook), prune 30% voids, toggle manual/random/threshold for ep selection. Outputs JSON manifests (GCI ~0.74 post-fuse).
 
-  - **[Podcast Entanglement v6.1](podcast_entanglement_v6.1.py)**: Standalone RSS sync → Whisper transcribe → Waternova bilingual fusion. Toggle modes, outputs JSON (GCI ~0.74). Run: `python demos/podcast_entanglement_v6.1.py`.
+- **[Podcast Entanglement v6.1.py](podcast_entanglement_v6.1.py)**: Standalone RSS sync → Whisper transcribe → Waternova bilingual fusion. Toggle modes, outputs JSON (GCI ~0.74). Run: `python demos/podcast_entanglement_v6.1.py`.
 
 ## Quick Start
 ```bash
 git clone https://github.com/babyblueviper1/Viper-Stack-Omega
 cd demos
 jupyter notebook  # Or Colab: Upload .ipynb
+```
 
-##Dependencies
-pip install qutip matplotlib pandas numpy ipywidgets (or run in notebook)
+**Dependencies**:  
+pip install qutip matplotlib pandas numpy ipywidgets transformers torch feedparser requests googletrans==4.0.0-rc1 (or run in notebook).
 
-##Fork the swarm—simulate surges at σ=0.1 for 35% prunes. 🜂
-
+Fork the swarm—simulate surges at σ=0.1 for 35% prunes. 🜂
