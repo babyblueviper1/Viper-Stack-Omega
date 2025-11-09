@@ -21,3 +21,9 @@
 git clone https://github.com/babyblueviper1/Viper-Stack-Omega
 cd demos
 jupyter notebook  # Or Colab: Upload .ipynb
+
+##Dependencies
+pip install qutip matplotlib pandas numpy ipywidgets (or run in notebook)
+
+##Fork the swarm—simulate surges at σ=0.1 for 35% prunes. 🜂
+
