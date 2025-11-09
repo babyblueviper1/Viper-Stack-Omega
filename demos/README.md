@@ -16,7 +16,7 @@
 - **[Podcast Entanglement v6.1](Viper_Podcast_Entanglement_v6_1.ipynb)**: Dual Feed RSS Pull → Whisper Transcribe → Bilingual Waternova Fusion.  
   Substack sync (3 eps each from BBV podcast + Waternova audiobook), prune 30% voids, toggle manual/random/threshold for ep selection. Outputs JSON manifests (GCI ~0.74 post-fuse).
 
-- **[Podcast Entanglement v6.1.py](Viper_Podcast_Entanglement_v6.1.py)**: Standalone RSS sync → Whisper transcribe → Waternova bilingual fusion. Toggle modes, outputs JSON (GCI ~0.74). Run: `python demos/podcast_entanglement_v6.1.py`.
+- **[Podcast Entanglement v6.1.py](demos/viper_podcast_entanglement_v6_1.py)**: Standalone RSS sync → Whisper transcribe → Waternova bilingual fusion. Toggle modes, outputs JSON (GCI ~0.74). Run: `python demos/podcast_entanglement_v6.1.py`.
 
 ## Quick Start
 ```bash
