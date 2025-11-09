@@ -40,6 +40,20 @@ def bilingual_fuse(chapter_text, transcript, prune_pct=0.3):
         fused_es = "Fallback: English-only (install googletrans)."
     return {'english': fused_en, 'spanish': fused_es, 'coherence_proxy': 0.85}  # Expand with real calc
 
+def on_fly_bilingual(chap_en, transcript, dest='es', prune_pct=0.3):
+    """On-the-fly bilingual fusion: English base + translated resonance (prune motifs)."""
+    fused_en = f"Chapter Fusion: {chap_en[:500]}...\n\nResonance: {transcript[:500]}...\n\nUplift: Story-logic (GCI >0.7) – Pruned {prune_pct*100}% motifs."
+    if BILINGUAL_AVAILABLE:
+        fused_es = translator.translate(fused_en, dest=dest).text
+    else:
+        fused_es = "Fallback: English-only (install googletrans)."
+    chap_words = set(chap_en.split())
+    transcript_words = set(transcript.split())
+    overlap = len(chap_words & transcript_words) / len(chap_words) if chap_words else 0
+    coherence_proxy = min(1.0, 0.5 + 0.5 * overlap)
+    return {'en': fused_en, 'es': fused_es, 'coherence_proxy': coherence_proxy}  # Fixed key
+
+
 def load_podcast_transcripts(file_path='narratives/baby-blue-viper/transcripts/podcast_transcripts_20251108.json'):
     """Load pruned transcripts; filter GCI >0.4 for fusion."""
     if not os.path.exists(file_path):
@@ -77,7 +91,9 @@ def fuse_narrative_podcast(waternova_chaps, podcasts, mode='threshold', manual_i
         # Mock uplift: 1.35x if 'bitcoin' in transcript
         uplift = 1.35 if 'bitcoin' in selected_ep['transcript'].lower() else 1.0
         fused_text = f"{chap[:200]}... + {selected_ep['transcript'][:200]}... (Uplift: {uplift}x)"
-        manifest = bilingual_fuse(chap, selected_ep['transcript'])
+        
+        # On-Fly Bilingual Call (Replace old bilingual_fuse)
+        manifest = on_fly_bilingual(chap, selected_ep['transcript'], dest='es', prune_pct=0.3)
         fusions.append({
             'chapter': chap,  # Or file name
             'episode': selected_ep['title'],
@@ -186,7 +202,7 @@ if __name__ == "__main__":
     podcasts = load_podcast_transcripts()
     if podcasts:
         # Mock chapters (load real via requests if needed)
-        waternova_chaps = ["Sample prologue text..."]  # Replace with load_chapter
+        waternova_prologue = load_chapter("00-Prologue.txt")
         fusions = fuse_narrative_podcast(waternova_chaps, podcasts, mode='threshold')
         print(f"\n--- Fusion Demo ({len(fusions)} outputs) ---")
         for f in fusions[:1]:  # Tease first
