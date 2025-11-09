@@ -51,7 +51,7 @@ def on_fly_bilingual(chap_en, transcript, dest='es', prune_pct=0.3):
     transcript_words = set(transcript.split())
     overlap = len(chap_words & transcript_words) / len(chap_words) if chap_words else 0
     coherence_proxy = min(1.0, 0.5 + 0.5 * overlap)
-    return {'en': fused_en, 'es': fused_es, 'coherence_proxy': coherence_proxy}  # Fixed key
+    return {'en': fused_en, 'es': fused_es, 'coherence_proxy': coherence_proxy}  # Expand with S(ρ) overlap
 
 
 def load_podcast_transcripts(file_path='narratives/baby-blue-viper/transcripts/podcast_transcripts_20251108.json'):
