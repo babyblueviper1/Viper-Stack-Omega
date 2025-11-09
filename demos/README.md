@@ -13,7 +13,7 @@
   **Run**: Colab/Jupyter—`%matplotlib inline`; exports `andes_rap_v1.3.csv` for MVP seeds.  
   **Resonance**: Fidelity 92% under σ=0.05; emergent stable unless surge.
 
-- **[podcast_entanglement_v6.1.ipynb](podcast_entanglement_v6.1.ipynb)**: RSS Pull → Whisper Transcribe → Bilingual Waternova Fusion.  
+- **[podcast_entanglement_v6.1.ipynb](demos/Viper_Podcast_Entanglement_v6_1.ipynb)**: RSS Pull → Whisper Transcribe → Bilingual Waternova Fusion.  
   Substack feed sync (3 eps baseline), prune 30% voids, toggle manual/random/threshold for ep selection. Outputs JSON manifests (GCI ~0.74 post-fuse).
 
 ## Quick Start
