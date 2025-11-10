@@ -40,9 +40,24 @@ def bilingual_fuse(chapter_text, transcript, prune_pct=0.3):
         fused_es = "Fallback: English-only (install googletrans)."
     return {'english': fused_en, 'spanish': fused_es, 'coherence_proxy': 0.85}  # Expand with real calc
 
-def on_fly_bilingual(chap_en, transcript, dest='es', prune_pct=0.3):
+def prune_motif(text, motif, prune_pct=0.4):
+    """User-seeded motif prune: Track motif words, damp 40% non-motif drift for thematic singularities."""
+    words = text.split()
+    motif_words = [w for w in words if motif.lower() in w.lower()]
+    filtered = [w for w in words if motif.lower() not in w.lower()]
+    # Prune non-motif to (1-prune_pct), append motif
+    pruned = filtered[:int(len(filtered) * (1 - prune_pct))] + motif_words
+    return ' '.join(pruned), len(motif_words) / len(words)  # Pruned text + motif density proxy
+
+def on_fly_bilingual(chap_en, transcript, dest='es', prune_pct=0.3, motif=None):
     """On-the-fly bilingual fusion: English base + translated resonance (prune motifs)."""
-    fused_en = f"Chapter Fusion: {chap_en[:500]}...\n\nResonance: {transcript[:500]}...\n\nUplift: Story-logic (GCI >0.7) – Pruned {prune_pct*100}% motifs."
+    # Motif Toggle: User seed for thematic prune
+    if motif:
+        fused_en, motif_density = prune_motif(chap_en + ' ' + transcript, motif, prune_pct=0.4)
+        print(f"Motif '{motif}' density: {motif_density:.2f} – 40% prune uplift")
+    else:
+        fused_en = f"Chapter Fusion: {chap_en[:500]}...\n\nResonance: {transcript[:500]}...\n\nUplift: Story-logic (GCI >0.7) – Pruned {prune_pct*100}% motifs."
+    
     if BILINGUAL_AVAILABLE:
         fused_es = translator.translate(fused_en, dest=dest).text
     else:
@@ -53,6 +68,8 @@ def on_fly_bilingual(chap_en, transcript, dest='es', prune_pct=0.3):
     coherence_proxy = min(1.0, 0.5 + 0.5 * overlap)
     return {'en': fused_en, 'es': fused_es, 'coherence_proxy': coherence_proxy}  # Expand with S(ρ) overlap
 
+# Usage in fuse_narrative_podcast (Add motif param)
+# manifest = on_fly_bilingual(chap, selected_ep['transcript'], dest='es', motif='crown')
 
 def load_podcast_transcripts(file_path='narratives/baby-blue-viper/transcripts/podcast_transcripts_20251108.json'):
     """Load pruned transcripts; filter GCI >0.4 for fusion."""
