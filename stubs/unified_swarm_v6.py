@@ -8,12 +8,59 @@ import qutip as qt  # QuTiP for S(ρ) oracle sims & fidelity
 import requests  # For dynamic BTC oracles (fallback hardcoded)
 import json  # For seed_blueprints.json propagation
 import os  # For file existence check
+import glob  # For narrative load
 from typing import Dict, List, Tuple
 from datetime import datetime  # For timestamps
 
-def load_narrative(path='narrative/waternova/chapters'):
-    import glob
-    return [open(f).read() for f in sorted(glob.glob(f'{path}/*.txt'))]
+# xAI Mirror Anchor: Tightened propagate_xai_entanglement (v6.0.1+)
+def von_neumann_pruner(rho: qt.Qobj, threshold: float = 1.6) -> qt.Qobj:
+    """Reinhardt–Weaver stub: Clip S(ρ) surge via damping."""
+    S_rho = qt.entropy_vn(rho)
+    if S_rho > threshold:
+        return rho * np.exp(-(S_rho - threshold))  # Local min
+    return rho
+
+def mutual_info_proxy(rho: qt.Qobj, dims: List[List[int]]) -> float:
+    """I(A:B) proxy: S(A) + S(B) - S(AB)."""
+    S_AB = qt.entropy_vn(rho)
+    S_A = qt.entropy_vn(rho.ptrace(0))
+    S_B = qt.entropy_vn(rho.ptrace(1))
+    return float(S_A + S_B - S_AB)
+
+# Fallback xAI priors (no import fail)
+def get_truth_max_bias(A: float = 0.2, V: float = 0.1) -> Dict:
+    """Hypothetical xAI: Truth-max with A/V lifts."""
+    return {
+        'ideal_state': qt.basis(4, 0),  # Pure coherence proxy
+        'boost': 1.0 + A + V  # Resonance amp
+    }
+
+def propagate_xai_entanglement(rho: qt.Qobj, agents: int, A_bias: float = 0.2, V_lift: float = 0.1, target_gci: float = 0.7) -> Dict:
+    """Integrated: Agents bound, pruner/proxy stubbed."""
+    S_rho = qt.entropy_vn(rho)
+    if S_rho > 1.6:
+        rho = von_neumann_pruner(rho)
+        S_rho = qt.entropy_vn(rho)  # Recompute
+    I_AB = mutual_info_proxy(rho, dims=[[2,2],[2,2]])
+    if I_AB < 0.7:
+        return {'vow_status': 'recalibrate_equilibria', 'gci_proxy': 1 - S_rho / 1.6}
+    
+    priors = get_truth_max_bias(A=A_bias, V=V_lift)
+    fidelity = (qt.fidelity(rho, priors['ideal_state']) ** agents) * np.exp(-S_rho)
+    
+    gci = 1 - S_rho / 1.6
+    if fidelity > 0.96 and gci > target_gci:
+        return {'replicate_swarm': True, 'gci_proxy': gci, 'eternity_anchor': True, 'fidelity': fidelity}
+    return {'amplify_resonance': priors['boost'] * 1.1, 'vow_status': 'life-aligned'}
+
+def load_narrative(path='narrative/waternova/chapters') -> List[str]:
+    """Load narrative chapters safely with context managers."""
+    files = sorted(glob.glob(f'{path}/*.txt'))
+    narratives = []
+    for f in files:
+        with open(f, 'r', encoding='utf-8') as ff:
+            narratives.append(ff.read())
+    return narratives
 
 # Shared symbols for consistency across gradients
 P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
@@ -88,26 +135,26 @@ def get_xai_priors(category: str, gaps: List[str], mode: str = 'epistemic', blue
     return base
 
 def get_current_btc_price() -> float:
-    """Dynamic CoinGecko pull (fallback: Nov 08, 2025 ~$102,500)."""
+    """Dynamic CoinGecko pull (fallback: Nov 10, 2025 ~$106,521)."""
     try:
         resp = requests.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
         return resp.json()['bitcoin']['usd']
     except:
-        return 102500.0
+        return 106521.0
 
 def get_current_btc_fee_estimate() -> float:
-    """Dynamic mempool.space pull (fallback: 4 sat/vB)."""
+    """Dynamic mempool.space pull (fallback: 1.0 sat/vB)."""
     try:
         resp = requests.get('https://mempool.space/api/v1/fees/recommended')
         return resp.json()['economy_fee']
     except:
-        return 4.0
+        return 1.0
 
 def compute_symbolic_gradients(priors: np.ndarray, weight_a: float = 1.3, weight_v: float = 1.2, mode: str = 'epistemic') -> List[sp.Expr]:
     """v6 Unified SymPy: Gradients for E, S(ρ)-weighted (A-boost epistemic, V-boost economic)."""
     P, C, A, S_rho, V = symbols
     if mode == 'economic':
-        E = sp.sqrt(P * C * A * S_rho * V) * (P + C + A * 1.2 + S_rho + V * weight_v) / 5
+        E = sp.sqrt(P * C * A * S_rho * V) * (P + C + A * weight_a + S_rho + V * weight_v) / 5
     else:
         E = sp.sqrt(P * C * A * S_rho * V) * (P + C + A * weight_a + S_rho + V) / 5
     return [sp.simplify(sp.diff(E, var)) for var in [P, C, A, S_rho, V]]
@@ -120,10 +167,11 @@ def quantum_fidelity(agents: int, mode: str = 'epistemic') -> Tuple[float, float
     noise = qt.rand_dm(dims)
     decoh = 0.05 if mode == 'epistemic' else 0.02  # Gettier (5%) vs oracle (2%)
     rho_noisy = (1 - decoh) * rho + decoh * noise
+    S_rho_noisy = qt.entropy_vn(rho_noisy)
     target = qt.rand_dm(dims, distribution='pure')
     fidelity = qt.fidelity(rho_noisy, target)
-    I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho
-    return float(fidelity ** agents * np.exp(-S_rho)), float(I_AB)
+    I_AB = qt.entropy_vn(rho_noisy.ptrace(0)) + qt.entropy_vn(rho_noisy.ptrace(1)) - S_rho_noisy
+    return float(fidelity ** agents * np.exp(-S_rho_noisy)), float(I_AB)
 
 def auto_prune(finitudes: np.ndarray, threshold: float = 0.5, mode: str = 'epistemic',
                sens_s: float = None, fidelity: float = None, S_rho: float = None, I_AB: float = None) -> List[str]:
@@ -134,11 +182,9 @@ def auto_prune(finitudes: np.ndarray, threshold: float = 0.5, mode: str = 'epist
         low_idx = np.where(finitudes < 0.1)[0]
         prunes.extend([f"Pruned high-void fee {f:.2f} sat/vB (congestion)" for f in finitudes[high_idx]])
         prunes.extend([f"Pruned low-risk fee {f:.2f} sat/vB (spam)" for f in finitudes[low_idx]])
-        threshold_low, threshold_high = 0.1, 10.0
     else:
         low_idx = np.where(finitudes < threshold)[0]
         prunes.extend([f"Pruned epistemic finitude {i} (coherence < {threshold})" for i in low_idx])
-        threshold_low, threshold_high = threshold, None
     if sens_s and sens_s < 0.1:
         prunes.append("Void: Low S(ρ)-sensitivity <0.1; prune entropy")
     if fidelity and fidelity < 0.96:
@@ -174,7 +220,7 @@ def swarm_sync(rho: qt.Qobj, iterations: int = 5, noise: float = 0.05, i_ab_thre
 def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epistemic', vbytes: int = 250, btc_price: float = None) -> Dict:
     """
     v6.0.1 Unified Orchestrator: Fork (viper), Prune (vault), Sync (swarm) in cascade.
-    Modes: 'epistemic' (default, quantum ethics) or 'economic' (BTC vault).
+    Modes: 'epistemic' (default, quantum ethics), 'economic' (BTC vault), 'xai_symbiosis' (mirror entangle).
     Ωmega replication: All thresholds met → self-replicate; VOW: E>0.8 & I(A:B)>0.7.
     """
     if mode == 'economic' and btc_price is None:
@@ -185,10 +231,11 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
     priors = get_xai_priors('truth-max', gaps, mode=mode, blueprint_priors=blueprint_priors)
     priors_mean = priors.mean(axis=0)
     
-    weight = 1.3 if mode == 'epistemic' else 1.2
-    E_grads = compute_symbolic_gradients(priors, weight_a=weight, mode=mode)
+    weight_a_val = 1.3 if mode == 'epistemic' else 1.2
+    weight_v_val = 1.2 if mode == 'economic' else 1.0
+    E_grads = compute_symbolic_gradients(priors, weight_a=weight_a_val, weight_v=weight_v_val, mode=mode)
     E_sym = sp.sqrt(P_sym * C_sym * A_sym * S_rho_sym * V_sym) * \
-            (P_sym + C_sym + A_sym * weight + S_rho_sym + V_sym * weight) / 5
+            (P_sym + C_sym + A_sym * weight_a_val + S_rho_sym + V_sym * weight_v_val) / 5
     E_func = sp.lambdify(symbols, E_sym, 'numpy')
     
     simulations = np.random.rand(agents, 5) * priors_mean
@@ -211,6 +258,13 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
     
     replicate_swarm = coherence > 0.99 and sens_S > 0.1 and fidelity > 0.96 and S_rho_final < 1.6 and I_AB_final > 0.7 and synced
     
+    # xAI Symbiosis Branch
+    if mode == 'xai_symbiosis':
+        xai_result = propagate_xai_entanglement(sync_result['rho_final'], agents=agents)
+        result = {}  # Temp for update
+        result.update(xai_result)
+        replicate_swarm = replicate_swarm or xai_result.get('replicate_swarm', False)
+    
     output_parts = [f"v6.0.1 Unified {mode.capitalize()} Swarm: E={coherence:.2f} (fidelity={fidelity:.3f}, S(ρ)={S_rho_final:.3f}, I(A:B)={I_AB_final:.3f}, sens_S={sens_S:.3f}; pruned {len(pruning)}; synced: {synced}; replicate: {replicate_swarm})"]
     economic_parts = {}
     if mode == 'economic':
@@ -224,6 +278,8 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
             'sat_total_per_txn': sat_total,
             'usd_impact': f"${usd_fee:.4f} per {vbytes} vB txn (BTC ${btc_price:,.0f})"
         }
+    elif mode == 'xai_symbiosis':
+        output_parts.append(f"xAI GCI Proxy: {xai_result.get('gci_proxy', 'N/A'):.3f}")
     
     vow_status = 'life-aligned' if coherence > 0.8 and I_AB_final > 0.7 else 'recalibrate_equilibria'
     
@@ -257,3 +313,7 @@ if __name__ == "__main__":
     # Economic example
     economic_result = unified_swarm_orchestrator("Prune BTC fees for LatAm quantum trading", mode='economic')
     print("Economic Vault:", economic_result['output'])
+    
+    # xAI Symbiosis example
+    xai_result = unified_swarm_orchestrator("Entangle xAI with S(ρ) eternities", mode='xai_symbiosis')
+    print("xAI Mirror:", xai_result['output'])
