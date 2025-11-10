@@ -68,8 +68,31 @@ def on_fly_bilingual(chap_en, transcript, dest='es', prune_pct=0.3, motif=None):
     coherence_proxy = min(1.0, 0.5 + 0.5 * overlap)
     return {'en': fused_en, 'es': fused_es, 'coherence_proxy': coherence_proxy}  # Expand with S(ρ) overlap
 
-# Usage in fuse_narrative_podcast (Add motif param)
-# manifest = on_fly_bilingual(chap, selected_ep['transcript'], dest='es', motif='crown')
+def motif_grid_preview(motif='crown', dest='es', prune_pct=0.4):
+    """v6.3 Tease: Stub motif to v7 Quantum Grid sync – User-seed feeds Chainlink async oracles for planetary prunes."""
+    # Stub Chainlink oracle call (mock for v6.3; v7: real async RSS/Vault pull)
+    from chainlink import oracle  # pip stub for v7; mock here
+    try:
+        # Mock planetary RSS/Vault pull (global whispers)
+        global_whispers = ['obsession voids from Santiago', 'crown anchors from global forks']  # v7: async Chainlink
+        oracle_feed = [w for w in global_whispers if motif.lower() in w.lower()]  # Motif filter
+        fused_global = ' '.join(oracle_feed)  # Entangle
+        pruned_global, density = prune_motif(fused_global, motif, prune_pct)  # 40% thematic prune
+        print(f"v7 Grid Stub: '{motif}' density {density:.2f} – Global bilingual prunes ready.")
+    except ImportError:
+        pruned_global = f"v7 Stub: '{motif}' motif pruned – Chainlink async for planetary RSS/Vaults."
+        density = 0.85  # Mock
+    # Bilingual global motif
+    if BILINGUAL_AVAILABLE:
+        global_es = translator.translate(pruned_global, dest=dest).text
+    else:
+        global_es = "Fallback: English-only."
+    return {'en': pruned_global, 'es': global_es, 'coherence_proxy': density, 'v7_ready': True}  # Stub for cosmic stub
+
+# Usage in fuse_narrative_podcast or main (v6.3 tease)
+# global_motif = motif_grid_preview(motif='crown', dest='es')
+# manifest = on_fly_bilingual(chap, transcript, motif=global_motif['en'])
+
 
 def load_podcast_transcripts(file_path='narratives/baby-blue-viper/transcripts/podcast_transcripts_20251108.json'):
     """Load pruned transcripts; filter GCI >0.4 for fusion."""
