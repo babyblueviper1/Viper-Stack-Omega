@@ -71,7 +71,6 @@ def on_fly_bilingual(chap_en, transcript, dest='es', prune_pct=0.3, motif=None):
 def motif_grid_preview(motif='crown', dest='es', prune_pct=0.4):
     """v6.3 Tease: Stub motif to v7 Quantum Grid sync – User-seed feeds Chainlink async oracles for planetary prunes."""
     # Stub Chainlink oracle call (mock for v6.3; v7: real async RSS/Vault pull)
-    from chainlink import oracle  # pip stub for v7; mock here
     try:
         # Mock planetary RSS/Vault pull (global whispers)
         global_whispers = ['obsession voids from Santiago', 'crown anchors from global forks']  # v7: async Chainlink
@@ -89,10 +88,9 @@ def motif_grid_preview(motif='crown', dest='es', prune_pct=0.4):
         global_es = "Fallback: English-only."
     return {'en': pruned_global, 'es': global_es, 'coherence_proxy': density, 'v7_ready': True}  # Stub for cosmic stub
 
-# Usage in fuse_narrative_podcast or main (v6.3 tease)
+# Usage in fuse_narrative_fusion or main (v6.3 tease)
 # global_motif = motif_grid_preview(motif='crown', dest='es')
 # manifest = on_fly_bilingual(chap, transcript, motif=global_motif['en'])
-
 
 def load_podcast_transcripts(file_path='narratives/baby-blue-viper/transcripts/podcast_transcripts_20251108.json'):
     """Load pruned transcripts; filter GCI >0.4 for fusion."""
@@ -224,7 +222,7 @@ if __name__ == "__main__":
     print("Diversity Entropy Fusion:")
     print(f"Diversity Scalar: {result['diversity']:.3f} | Resonance: {result['resonance']}")
     print("\nEN Manifest:", result['manifest_en'])
-    print("ES Manifest:", result['manifest_es'])
+    print("ES Manifest:", result['manifest_es"])
     
     # Propagate to blueprints
     propagate_narrative(result)
@@ -242,7 +240,7 @@ if __name__ == "__main__":
     podcasts = load_podcast_transcripts()
     if podcasts:
         # Mock chapters (load real via requests if needed)
-        waternova_prologue = load_chapter("00-Prologue.txt")
+        waternova_chaps = ["Sample prologue text..."]  # Replace with load_chapter
         fusions = fuse_narrative_podcast(waternova_chaps, podcasts, mode='threshold')
         print(f"\n--- Fusion Demo ({len(fusions)} outputs) ---")
         for f in fusions[:1]:  # Tease first
