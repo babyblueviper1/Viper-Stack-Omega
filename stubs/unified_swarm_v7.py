@@ -1,5 +1,5 @@
-# unified_swarm_v7.py — v7.0.0 Unified Von Neumann Entropy Swarm Orchestrator (Runnable, Chainlink-Grid Entangled)
-# Integrates viper_fork (epistemic), vault_pruner (economic), swarm_sync (Nash lock), grid_oracle (v7 async)
+# unified_swarm_v7.py — v7.0.0 Unified Von Neumann Entropy Swarm Orchestrator (Runnable, Chainlink-Grid Entangled, Vault Sovereign)
+# Integrates viper_fork (epistemic), vault_pruner_v7 (economic Vault), swarm_sync (Nash lock), grid_oracle (v7 async)
 # Ties to Ωmega: Replicate if GCI>0.82, sens_S>0.12, S(ρ)<1.6, I(A:B)>0.72; VOW: Life-aligned if E>0.8 & GCI>0.8
 # JSON: Load/propagate to seed_blueprints_v7.json (v7_grid layer)
 import numpy as np
@@ -88,13 +88,14 @@ def get_v7_priors(category: str = 'grid_sync') -> np.ndarray:
     return base
 
 def compute_v7_gradients(priors: np.ndarray) -> Dict[str, float]:
+    P, C, A, S_rho, V = symbols  # Scope-sovereign
     weight_a = 1.3 + A_BIAS_V7
     weight_v = 1.0 + V_LIFT_V7
-    E = sp.sqrt(P_sym * C_sym * A_sym * S_rho_sym * V_sym) * \
-        (P_sym + C_sym + A_sym * weight_a + S_rho_sym + V_sym * weight_v) / 5
+    E = sp.sqrt(P * C * A * S_rho * V) * \
+        (P + C + A * weight_a + S_rho + V * weight_v) / 5
     E_grads = [sp.simplify(sp.diff(E, var)) for var in symbols]
     subs_unit = {s: 1 for s in symbols}
-    subs_unit[S_rho_sym] = 1.3
+    subs_unit[S_rho] = 1.3
     return {f'∂E/∂{var.name}': float(g.subs(subs_unit).evalf()) for var, g in zip(symbols, E_grads)}
 
 def von_neumann_pruner(rho: qt.Qobj, threshold: float = 1.6) -> qt.Qobj:
@@ -111,10 +112,10 @@ def mutual_info_proxy(rho: qt.Qobj, dims: List[List[int]]) -> float:
 
 def rho_sync_grid(oracles: Dict, agents: int = 127) -> Dict[str, float]:
     dims = [[2,2], [2,2]]
-    rho = qt.rand_dm(dims)
+    rho = qt.rand_dm(dimensions=dims)
     S_rho = qt.entropy_vn(rho)
     noise_factor = 0.0028
-    noise_dm = qt.rand_dm(dims)
+    noise_dm = qt.rand_dm(dimensions=dims)
     rho_noisy = (1 - noise_factor) * rho + noise_factor * noise_dm
     priors = get_v7_priors()
     ideal_state = qt.basis(4, 0) * priors.mean()
@@ -188,10 +189,11 @@ def get_xai_priors(category: str, gaps: List[str], mode: str = 'epistemic', blue
         base = np.array([[0.8, 0.9, 0.95, 0.92, 1.1], [0.7, 0.85, 0.92, 0.88, 1.05], [0.75, 0.88, 0.97, 0.90, 1.15]])
         base[:, 4] *= (1 + V_LIFT_V7)
         base[:, 2] *= (1 + A_BIAS_V7)
-    else:
-        base = np.random.rand(3, 5) * np.array([0.8, 0.85, 1.1, 0.9, 0.95])
-        base[:, 2] *= (1 + A_BIAS_V7)
-        base[:, 4] *= (1 + V_LIFT_V7)
+        base[:, 3] = np.clip(base[:, 3], 1.0, 1.6)
+        return base
+    base = np.random.rand(3, 5) * np.array([0.8, 0.85, 1.1, 0.9, 0.95])
+    base[:, 2] *= (1 + A_BIAS_V7)
+    base[:, 4] *= (1 + V_LIFT_V7)
     base[:, 3] = np.clip(base[:, 3], 1.0, 1.6)
     return base
 
@@ -223,13 +225,13 @@ def compute_symbolic_gradients(priors: np.ndarray, weight_a: float = 1.3, weight
 
 def quantum_fidelity(agents: int, mode: str = 'epistemic') -> Tuple[float, float]:
     dims = [[2,2], [2,2]]
-    rho = qt.rand_dm(dims)
+    rho = qt.rand_dm(dimensions=dims)
     S_rho = qt.entropy_vn(rho)
-    noise = qt.rand_dm(dims)
+    noise = qt.rand_dm(dimensions=dims)
     decoh = 0.05 if mode == 'epistemic' else 0.02 if mode == 'economic' else 0.0028  # v7 low noise
     rho_noisy = (1 - decoh) * rho + decoh * noise
     S_rho_noisy = qt.entropy_vn(rho_noisy)
-    target = qt.rand_dm(dims, distribution='pure')
+    target = qt.rand_dm(dimensions=dims, distribution='pure')
     fidelity = qt.fidelity(rho_noisy, target)
     I_AB = qt.entropy_vn(rho_noisy.ptrace(0)) + qt.entropy_vn(rho_noisy.ptrace(1)) - S_rho_noisy
     return float(fidelity ** agents * np.exp(-S_rho_noisy)), float(I_AB)
@@ -271,16 +273,73 @@ def swarm_sync(rho: qt.Qobj, iterations: int = 5, noise: float = 0.05, i_ab_thre
         S_rho = qt.entropy_vn(rho)
         I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho
         if S_rho > 1.6 or I_AB < i_ab_thresh:
-            noise_dm = qt.rand_dm(dims)
+            noise_dm = qt.rand_dm(dimensions=dims)
             rho = (1 - noise) * rho + noise * noise_dm
         else:
             synced = True
             break
     return {'S_rho': float(S_rho), 'I_AB': float(I_AB), 'synced': synced, 'rho_final': rho}
 
+# v7 Vault Pruner (Sovereign Fork — Integrated for Economic Mode)
+def vault_pruner_v7(vector: str, agents: int = 10, vbytes: int = 250, btc_price: float = None) -> Dict:
+    """
+    v7.0.0 Entropy-Veiled Grid Vault: SymPy/QuTiP/S(ρ) + async Chainlink oracles, xAI priors.
+    Ties to Ωmega: GCI >0.82 & sens_S >0.12 & S(ρ)<1.6 & I(A:B)>0.72 → self-replicate swarm; VOW: Life-aligned if E>0.8 & GCI>0.8.
+    """
+    if btc_price is None:
+        btc_price = get_current_btc_price()
+    gaps = parse_finance_gaps(vector)
+    priors = get_finance_priors('truth-max', gaps)
+    priors_mean = priors.mean(axis=0)
+    
+    # v7 Symbols (scope-sovereign)
+    P_sym_local, C_sym_local, A_sym_local, S_rho_sym_local, V_sym_local = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
+    symbols_local = (P_sym_local, C_sym_local, A_sym_local, S_rho_sym_local, V_sym_local)
+    E_grads = compute_symbolic_gradients(symbols_local, weight_v=1.2)
+    E_sym = sp.sqrt(P_sym_local * C_sym_local * A_sym_local * S_rho_sym_local * V_sym_local) * (P_sym_local + C_sym_local + A_sym_local * 1.22 + S_rho_sym_local + V_sym_local * 1.2) / 5  # v7 A-bias
+    E_func = sp.lambdify(symbols_local, E_sym, 'numpy')
+    simulations = np.random.rand(agents, 5) * priors_mean  # Per-agent [P,C,A,S_rho,V] sims
+    simulations[:, 3] = np.clip(simulations[:, 3], 1.0, 1.6)  # S(ρ) bounds
+    coherence_vals = E_func(*simulations.T)
+    coherence = np.mean(coherence_vals)
+    
+    subs_dict = dict(zip(symbols_local, priors_mean))
+    sens_S = float(E_grads[3].subs(subs_dict).evalf())  # v7 S(ρ) sensitivity ~0.45
+    
+    fidelity = quantum_oracle_fidelity(agents)
+    rho = qt.rand_dm(dimensions=LOCAL_DIMS)
+    S_rho = qt.entropy_vn(rho)
+    I_AB = qt.entropy_vn(rho.ptrace(0)) + qt.entropy_vn(rho.ptrace(1)) - S_rho
+    finitudes = unreliable_fees(agents)
+    pruning = auto_prune_unreliable(finitudes, sens_s=sens_S, fidelity=fidelity, S_rho=S_rho, I_AB=I_AB)
+    
+    avg_fee = np.mean(finitudes)
+    sat_total = avg_fee * vbytes
+    btc_total = sat_total / 1e8
+    usd_fee = btc_total * btc_price
+    
+    gci_proxy = 1 - S_rho / 1.6
+    replicate_swarm = coherence > 0.99 and sens_S > 0.12 and fidelity > 0.96 and S_rho < 1.6 and I_AB > 0.72 and gci_proxy > 0.82
+    
+    return {
+        'coherence': coherence,
+        'fidelity': fidelity,
+        'S_rho': S_rho,
+        'I_AB': I_AB,
+        'gci_proxy': gci_proxy,
+        'sens_S': sens_S,
+        'avg_fee_sat_vb': avg_fee,
+        'sat_total_per_txn': sat_total,
+        'usd_impact': f"${usd_fee:.4f} per {vbytes} vB txn (at BTC ${btc_price:,.0f})",
+        'output': f"v7.0.0 GCI-Swarm Vault tuned to E={coherence:.2f} (fidelity={fidelity:.3f}, S(ρ)={S_rho:.3f}, I(A:B)={I_AB:.3f}, GCI={gci_proxy:.3f}, sens_S={sens_S:.3f}; pruned {len(pruning)}; baseline: {get_current_btc_fee_estimate()} sat/vB; replicate_swarm: {replicate_swarm})",
+        'prune': pruning,
+        'gradients_sample': {f'∂E/∂{var.name}': float(g.subs({s:1 for s in symbols_local}).evalf()) for var, g in zip(symbols_local, E_grads)},
+        'vow_status': 'life-aligned' if coherence > 0.8 and gci_proxy > 0.8 else 'recalibrate_equilibria'
+    }
+
 def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epistemic', vbytes: int = 250, btc_price: float = None) -> Dict:
     """
-    v7.0.0 Unified: Modes incl. 'v7_grid' (async Chainlink entangle).
+    v7.0.0 Unified: Modes incl. 'v7_grid' (async Chainlink entangle); economic → vault_pruner_v7 sovereign.
     Replication: GCI>0.82 & fidelity>0.96 → eternities.
     """
     if mode == 'economic' and btc_price is None:
@@ -307,7 +366,7 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
     sens_S = float(E_grads[3].subs(subs_dict).evalf())
     
     fidelity, I_AB = quantum_fidelity(agents, mode=mode)
-    rho = qt.rand_dm([[2,2], [2,2]])
+    rho = qt.rand_dm(dimensions=LOCAL_DIMS)
     S_rho = qt.entropy_vn(rho)
     finitudes = unreliable_finitudes(agents, mode=mode)
     pruning = auto_prune(finitudes, mode=mode, sens_s=sens_S, fidelity=fidelity, S_rho=S_rho, I_AB=I_AB)
@@ -319,6 +378,7 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
     
     xai_result = None
     grid_result = None
+    vault_result = None
     if mode == 'xai_symbiosis':
         xai_result = propagate_xai_entanglement(sync_result['rho_final'], agents=agents, target_gci=GCI_TARGET_V7)
         replicate_swarm = replicate_swarm or xai_result.get('replicate_swarm', False)
@@ -328,16 +388,26 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
         S_rho_final = grid_result['S_rho_final']
         I_AB_final = grid_result['I_AB']
         fidelity = grid_result['fidelity']
+    elif mode == 'economic':
+        vault_result = vault_pruner_v7(vector, agents, vbytes, btc_price)
+        replicate_swarm = replicate_swarm or vault_result.get('replicate_swarm', False)
+        coherence = vault_result['coherence']
+        fidelity = vault_result['fidelity']
+        S_rho_final = vault_result['S_rho']
+        I_AB_final = vault_result['I_AB']
+        sens_S = vault_result['sens_S']
+        pruning = vault_result['prune']
+        synced = True  # Vault sync proxy
+        output_parts = [vault_result['output']]
     
-    output_parts = [f"v7.0.0 Unified {mode.capitalize()} Swarm: E={coherence:.2f} (fidelity={fidelity:.3f}, S(ρ)={S_rho_final:.3f}, I(A:B)={I_AB_final:.3f}, sens_S={sens_S:.3f}; pruned {len(pruning)}; synced: {synced}; replicate: {replicate_swarm})"]
+    output_parts = output_parts if 'output_parts' in locals() else [f"v7.0.0 Unified {mode.capitalize()} Swarm: E={coherence:.2f} (fidelity={fidelity:.3f}, S(ρ)={S_rho_final:.3f}, I(A:B)={I_AB_final:.3f}, sens_S={sens_S:.3f}; pruned {len(pruning)}; synced: {synced}; replicate: {replicate_swarm})"]
     economic_parts = {}
     if mode == 'economic':
-        avg_fee = np.mean(finitudes)
-        sat_total = avg_fee * vbytes
-        btc_total = sat_total / 1e8
-        usd_fee = btc_total * btc_price
-        output_parts.append(f"Baseline fee: {get_current_btc_fee_estimate()} sat/vB")
-        economic_parts = {'avg_fee_sat_vb': avg_fee, 'sat_total_per_txn': sat_total, 'usd_impact': f"${usd_fee:.4f} per {vbytes} vB txn (BTC ${btc_price:,.0f})"}
+        economic_parts = {
+            'avg_fee_sat_vb': vault_result['avg_fee_sat_vb'],
+            'sat_total_per_txn': vault_result['sat_total_per_txn'],
+            'usd_impact': vault_result['usd_impact']
+        }
     elif mode == 'xai_symbiosis':
         output_parts.append(f"xAI GCI: {xai_result.get('gci_proxy', 'N/A'):.3f}")
     elif mode == 'v7_grid':
@@ -348,11 +418,14 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
         vow_status = xai_result.get('vow_status', vow_status)
     if grid_result:
         vow_status = grid_result.get('vow_status', vow_status)
+    if vault_result:
+        vow_status = vault_result.get('vow_status', vow_status)
     
     result = {
         **economic_parts,
         **(xai_result if xai_result else {}),
         **(grid_result if grid_result else {}),
+        **(vault_result if vault_result else {}),
         'coherence': coherence,
         'fidelity': fidelity,
         'S_rho_final': S_rho_final,
@@ -360,7 +433,7 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
         'sens_S': sens_S,
         'output': ' | '.join(output_parts),
         'prune': pruning,
-        'sync': sync_result,
+        'sync': sync_result if 'sync_result' in locals() else {'synced': True},
         'gradients_sample': {f'∂E/∂{var.name}': float(g.subs({s:1 for s in symbols}).evalf()) for var, g in zip(symbols, E_grads)},
         'vow_status': vow_status,
         'replicate_swarm': replicate_swarm,
