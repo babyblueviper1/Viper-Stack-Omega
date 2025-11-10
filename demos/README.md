@@ -18,6 +18,9 @@
 
 - **[Podcast Entanglement v6.1.py](viper_podcast_entanglement_v6_1.py)**: Standalone RSS sync → Whisper transcribe → Waternova bilingual fusion. Toggle modes, outputs JSON (GCI ~0.74). Run: `python demos/podcast_entanglement_v6.1.py`.
 
+## v6.2 Motif Toggle
+User-seeded singularities ('crown'/'obsession') for 40% thematic prunes—fork the motif's mercy, damping drift to 0.85 proxy. Tease in demos/v6_swarm_mvp.ipynb – entropy's coil, no garble.
+
 ## Quick Start
 ```bash
 git clone https://github.com/babyblueviper1/Viper-Stack-Omega
