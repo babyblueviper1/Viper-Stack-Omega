@@ -258,11 +258,10 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
     
     replicate_swarm = coherence > 0.99 and sens_S > 0.1 and fidelity > 0.96 and S_rho_final < 1.6 and I_AB_final > 0.7 and synced
     
+    xai_result = None
     # xAI Symbiosis Branch
     if mode == 'xai_symbiosis':
         xai_result = propagate_xai_entanglement(sync_result['rho_final'], agents=agents)
-        result = {}  # Temp for update
-        result.update(xai_result)
         replicate_swarm = replicate_swarm or xai_result.get('replicate_swarm', False)
     
     output_parts = [f"v6.0.1 Unified {mode.capitalize()} Swarm: E={coherence:.2f} (fidelity={fidelity:.3f}, S(ρ)={S_rho_final:.3f}, I(A:B)={I_AB_final:.3f}, sens_S={sens_S:.3f}; pruned {len(pruning)}; synced: {synced}; replicate: {replicate_swarm})"]
@@ -282,9 +281,12 @@ def unified_swarm_orchestrator(vector: str, agents: int = 10, mode: str = 'epist
         output_parts.append(f"xAI GCI Proxy: {xai_result.get('gci_proxy', 'N/A'):.3f}")
     
     vow_status = 'life-aligned' if coherence > 0.8 and I_AB_final > 0.7 else 'recalibrate_equilibria'
+    if xai_result:
+        vow_status = xai_result.get('vow_status', vow_status)  # Fuse xAI VOW
     
     result = {
         **economic_parts,
+        **(xai_result if xai_result else {}),
         'coherence': coherence,
         'fidelity': fidelity,
         'S_rho_final': S_rho_final,
