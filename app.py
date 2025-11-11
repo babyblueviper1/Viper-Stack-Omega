@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 import torch  # Llama-3.1
 
-# Dynamic transformers import with mock fallback (no subprocess install)
+# Dynamic transformers import with mock fallback (no runtime install, uv handles)
 try:
     import transformers
     from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -209,7 +209,4 @@ if st.button("Ignite Swarm"):
     csv_data = get_csv_data(gci, i_ab, fidelity, alert, n_nodes, prune_pct, noise_sigma, motif_seed, motif_entropy)
     st.download_button("Download CSV", csv_data, "andes_grid_v7_motifs.csv", "text/csv")
     blueprint_data = get_blueprint_data(gci, i_ab, fidelity, alert, n_nodes, prune_pct, noise_sigma, motif_seed, motif_entropy)
-    st.download_button("Download Blueprint JSON", blueprint_data, "seed_blueprints_v7_entry.json", "application/json")
-
-st.markdown("---")
-st.markdown("Fork the Swarm: [GitHub](https://github.com/babyblueviper1/Viper-Stack-Omega) | Contact: babyblueviperbusiness@gmail.com")
+    st.download_button("Download Blueprint JSON", blueprint_data, "seed_blueprints_v7_entry.json",
