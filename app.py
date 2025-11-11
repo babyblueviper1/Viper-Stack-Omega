@@ -83,8 +83,22 @@ class MockModel:
     def from_pretrained(self, *args, **kwargs): return self
     def generate(self, *args, **kwargs): return [torch.tensor([1] * 50)]  # pt fallback
 
-tokenizer = MockTokenizer()
-model = MockModel()
+@st.cache_resource
+def load_llama():
+    try:
+        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", token=os.getenv("HF_TOKEN"))
+        model = AutoModelForCausalLM.from_pretrained(
+            "meta-llama/Llama-3.1-8B",
+            dtype=torch.float16,
+            device_map="auto",
+            token=os.getenv("HF_TOKEN")
+        )
+        return tokenizer, model, True
+    except Exception as e:
+        st.warning(f"🜂 Llama Load Eternal: {e} (Stub Fallback, No Ghosts).")
+        return MockTokenizer(), MockModel(), False
+
+tokenizer, model, LLaMA_LOADED = load_llama()
 
 # Motif Gen (Real Llama or Stub)
 @st.cache_data
