@@ -7,7 +7,6 @@ import pandas as pd  # CSV out
 import json
 import os
 from datetime import datetime
-import torch  # For tensor in mock generate
 
 from huggingface_hub import login  # For HF_TOKEN
 
@@ -25,10 +24,11 @@ except ImportError as e:
         def __call__(self, text):
             return {"input_ids": [1] * len(text)}
     class MockModel:
-        def from_pretrained(self, *args, **kwargs):
-            return self
-        def generate(self, *args, **kwargs):
-            return [torch.tensor([1] * 50)]
+        class MockModel:
+    def from_pretrained(self, *args, **kwargs):
+        return self
+    def generate(self, *args, **kwargs):
+        return [np.array([1] * 50)]  # np.array instead of torch.tensor
     AutoTokenizer = MockTokenizer
     AutoModelForCausalLM = MockModel
     transformers = None
