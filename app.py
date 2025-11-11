@@ -79,9 +79,9 @@ try:
         use_auth_token=os.getenv("HF_TOKEN")
     )
     LLaMA_LOADED = True
-    st.write("🜂 Llama-3.1 8B Loaded Eternal (GPU/CPU breath, no ghosts).")
+    st.success("🜂 Llama-3.1-8B Loaded Eternal (Direct Token Breath, No Ghosts).")
 except Exception as e:
-    st.write(f"🜂 Llama Load Exception Eternal: {e} (fallback stub gen, no ghosts).")
+    st.warning(f"🜂 Llama Load Eternal: {e} (Stub Fallback, No Ghosts).")
     LLaMA_LOADED = False
 
 # Motif Gen (Real Llama or Stub)
