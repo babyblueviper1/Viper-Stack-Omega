@@ -33,10 +33,10 @@ MOTIF_SEEDS = {
     }
 }
 
-# Stub Motif Gen (No Torch/Transformers, Core Eternal)
+# Stub Motif Gen (Core Eternal, No Llama Ghosts)
 @st.cache_data
 def generate_motif(prompt: str, lang: str = 'en', max_len: int = 50, prune_pct: float = PRUNE_PCT_DEFAULT):
-    # Stub random A-Z for motif (eternal, no Llama ghosts)
+    # Stub random A-Z for motif (eternal, no Torch/Transformers ghosts)
     tokens = np.random.randint(0, 100, max_len)
     motif = ''.join([chr(65 + t % 26) for t in tokens])
     mask = np.random.rand(len(motif)) < prune_pct
