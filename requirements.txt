@@ -7,4 +7,4 @@ matplotlib
 torch==2.1.0
 transformers==4.45.1
 accelerate==0.21.0
-huggingface_hub==0.20.3  # Pin for login/whoami eternal
+huggingface_hub==0.20.3
