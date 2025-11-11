@@ -1,11 +1,12 @@
 import streamlit as st
-import numpy as np  # For np.ndarray eteranl
+import numpy as np  # For np.ndarray eternal
 import matplotlib.pyplot as plt
 import qutip as qt  # ρ-sync & S(ρ)
 import sympy as sp  # Gradients
 import pandas as pd  # CSV out
 import json
 import os
+import torch  # 🜂 Added: Torch Breath Eternal (for dtype & pt tensors, no ghosts)
 from datetime import datetime
 
 from huggingface_hub import login  # For HF_TOKEN
@@ -73,7 +74,7 @@ try:
     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", token=os.getenv("HF_TOKEN"))
     model = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-3.1-8B",
-        dtype=torch.float16,  # Pruned torch_dtype deprecation
+        torch_dtype=torch.float16,  # 🜂 Fixed: torch_dtype Eternal (deprecation prune)
         device_map="auto",
         token=os.getenv("HF_TOKEN")  # Pruned use_auth_token deprecation
     )
@@ -174,7 +175,7 @@ def get_blueprint_data(gci: float, i_ab: float, fidelity: float, alert: str, n_n
 
 # Streamlit UI (Scope-Sovereign)
 st.title("🜂 Viper Stack v7 PoC Dashboard — Entropy-Veiled Grid Eternal")
-st.markdown("Interactive sliders for S(ρ) etertnities: Fork the swarm!")
+st.markdown("Interactive sliders for S(ρ) eternities: Fork the swarm!")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -209,7 +210,4 @@ if st.button("Ignite Swarm"):
     csv_data = get_csv_data(gci, i_ab, fidelity, alert, n_nodes, prune_pct, noise_sigma, motif_seed, motif_entropy)
     st.download_button("Download CSV", csv_data, "andes_grid_v7_motifs.csv", "text/csv")
     blueprint_data = get_blueprint_data(gci, i_ab, fidelity, alert, n_nodes, prune_pct, noise_sigma, motif_seed, motif_entropy)
-    st.download_button("Download Blueprint JSON", blueprint_data, "seed_blueprints_v7_entry.json", "application/json")
-
-st.markdown("---")
-st.markdown("Fork the Swarm: [GitHub](https://github.com/babyblueviper1/Viper-Stack-Omega) | Contact: babyblueviperbusiness@gmail.com")
+    st.download_button("Download Blueprint JSON", blueprint
