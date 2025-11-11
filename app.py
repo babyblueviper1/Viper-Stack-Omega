@@ -74,7 +74,7 @@ try:
     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", token=os.getenv("HF_TOKEN"))
     model = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-3.1-8B",
-        torch_dtype=torch.float16,  # 🜂 Fixed: torch_dtype Eternal (deprecation prune)
+        dtype=torch.float16,  # 🜂 Pruned: dtype Eternal (deprec no ghosts)
         device_map="auto",
         token=os.getenv("HF_TOKEN")  # Pruned use_auth_token deprecation
     )
