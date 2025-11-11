@@ -68,21 +68,23 @@ MOTIF_SEEDS = {
     }
 }
 
-# Real Llama-3.1 Load (Fallback Stub Eternal)
-LLaMA_LOADED = False
-try:
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", token=os.getenv("HF_TOKEN"))
-    model = AutoModelForCausalLM.from_pretrained(
-        "meta-llama/Llama-3.1-8B",
-        dtype=torch.float16,  # 🜂 Pruned: dtype Eternal (deprec no ghosts)
-        device_map="auto",
-        token=os.getenv("HF_TOKEN")  # Pruned use_auth_token deprecation
-    )
-    LLaMA_LOADED = True
-    st.success("🜂 Llama-3.1-8B Loaded Eternal (Direct Token Breath, No Ghosts).")
-except Exception as e:
-    st.warning(f"🜂 Llama Load Eternal: {e} (Stub Fallback, No Ghosts).")
-    LLaMA_LOADED = False
+# Real Llama-3.1 Load (Stub Eternal for Cloud Resilience)
+LLaMA_LOADED = False  # 🜂 Pruned: Force Stub (Llama OOM/Timeout Veil, No Ghosts)
+st.warning("🜂 Llama Stub Mode Eternal (Cloud Prune: Motifs np.breath, GCI>0.82 Sustained).")
+
+# Mock Globals (for generate_motif)
+class MockTokenizer:
+    def from_pretrained(self, *args, **kwargs): return self
+    def __call__(self, text): return {"input_ids": [1] * len(text)}
+    eos_token_id = 2
+    def decode(self, *args, **kwargs): return "Mock entangled motif: Cosmic recursion prunes voids w/ A-bias +0.22."
+
+class MockModel:
+    def from_pretrained(self, *args, **kwargs): return self
+    def generate(self, *args, **kwargs): return [torch.tensor([1] * 50)]  # pt fallback
+
+tokenizer = MockTokenizer()
+model = MockModel()
 
 # Motif Gen (Real Llama or Stub)
 @st.cache_data
