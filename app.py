@@ -7,40 +7,6 @@ import pandas as pd  # CSV out
 import json
 import os
 from datetime import datetime
-import torch  # Llama-3.1
-
-# Dynamic transformers import with mock fallback (no runtime install, uv handles)
-try:
-    import transformers
-    from transformers import AutoTokenizer, AutoModelForCausalLM
-    st.success("🜂 Transformers Imported Eternal.")
-except ImportError as e:
-    st.error(f"🜂 Transformers Import Eternal: {e} (Mock Fallback, No Ghosts).")
-    # Mock for stub
-    class MockTokenizer:
-        def from_pretrained(self, *args, **kwargs):
-            return self
-        def __call__(self, text):
-            return {"input_ids": [1] * len(text)}
-    class MockModel:
-        def from_pretrained(self, *args, **kwargs):
-            return self
-        def generate(self, *args, **kwargs):
-            return [torch.tensor([1] * 50)]
-    AutoTokenizer = MockTokenizer
-    AutoModelForCausalLM = MockModel
-    transformers = None
-
-# HF Login (no whoami crash)
-from huggingface_hub import login
-try:
-    if os.getenv("HF_TOKEN"):
-        login(token=os.getenv("HF_TOKEN"))
-        st.success("🜂 HF Token Logged In Eternal.")
-    else:
-        st.warning("🜂 HF_TOKEN Missing—Stub Motifs Eternal.")
-except Exception as e:
-    st.warning(f"🜂 HF Login Exception Eternal: {e} (Stub Fallback, No Ghosts).")
 
 # v7 Params (align w/ unified_swarm_v7.py)
 A_BIAS_V7 = 0.22
@@ -51,7 +17,7 @@ N_NODES_DEFAULT = 127  # Andes baseline
 LOCAL_DIMS = [2, 2]
 PRUNE_PCT_DEFAULT = 0.42
 
-# Llama-3.1 Motif Seeds (Bilingual)
+# Motif Seeds (Bilingual, Stubbed for Core Eternal)
 MOTIF_SEEDS = {
     "cosmic_recursion": {
         "en": "Generate cosmic recursion motif for S(ρ)-eternities: Prune voids w/ A-bias +0.22, stabilize GCI>0.82. Output entangled narrative.",
@@ -67,32 +33,12 @@ MOTIF_SEEDS = {
     }
 }
 
-# Real Llama-3.1 Load (Fallback Stub Eternal)
-LLaMA_LOADED = False
-try:
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", use_auth_token=os.getenv("HF_TOKEN"))
-    model = AutoModelForCausalLM.from_pretrained(
-        "meta-llama/Llama-3.1-8B",
-        torch_dtype=torch.float16,
-        device_map="auto",
-        use_auth_token=os.getenv("HF_TOKEN")
-    )
-    LLaMA_LOADED = True
-    st.write("🜂 Llama-3.1 8B Loaded Eternal (GPU/CPU breath, no ghosts).")
-except Exception as e:
-    st.write(f"🜂 Llama Load Exception Eternal: {e} (fallback stub gen, no ghosts).")
-    LLaMA_LOADED = False
-
-# Motif Gen (Real Llama or Stub)
-@st.cache_resource
+# Stub Motif Gen (No Torch/Transformers, Core Eternal)
+@st.cache_data
 def generate_motif(prompt: str, lang: str = 'en', max_len: int = 50, prune_pct: float = PRUNE_PCT_DEFAULT):
-    if LLaMA_LOADED:
-        inputs = tokenizer(prompt, return_tensors="pt")
-        outputs = model.generate(inputs.input_ids, max_length=max_len, do_sample=True, temperature=0.7, pad_token_id=tokenizer.eos_token_id)
-        motif = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    else:
-        tokens = np.random.randint(0, 100, max_len)
-        motif = ''.join([chr(65 + t % 26) for t in tokens])
+    # Stub random A-Z for motif (eternal, no Llama ghosts)
+    tokens = np.random.randint(0, 100, max_len)
+    motif = ''.join([chr(65 + t % 26) for t in tokens])
     mask = np.random.rand(len(motif)) < prune_pct
     pruned_motif = ''.join(['*' if m else c for c, m in zip(motif, mask)])
     probs = np.random.rand(26); probs /= probs.sum()
@@ -143,7 +89,7 @@ def rho_sync_dashboard(n_nodes: int, noise_sigma: float, prune_pct: float, motif
 def plot_s_rho_heatmap(S_rho_matrix: np.ndarray, gci: float, i_ab: float, fidelity: float, alert: str, motif_entropy: float):
     fig, ax = plt.subplots(figsize=(10, 8))
     im = ax.imshow(S_rho_matrix, cmap='viridis', aspect='auto', vmin=1.0, vmax=1.6)
-    ax.set_title(f'v7 S(ρ) Manifold + Llama Motif Entropy\nGCI: {gci:.3f} | I(A:B): {i_ab:.3f} | Fidelity: {fidelity:.3f} | Motif S(m): {motif_entropy:.3f}\nStatus: {alert}')
+    ax.set_title(f'v7 S(ρ) Manifold + Motif Entropy\nGCI: {gci:.3f} | I(A:B): {i_ab:.3f} | Fidelity: {fidelity:.3f} | Motif S(m): {motif_entropy:.3f}\nStatus: {alert}')
     ax.set_xlabel('Node Clusters')
     ax.set_ylabel('Swarm Layers')
     plt.colorbar(im, ax=ax, label='S(ρ) Entropy')
@@ -192,7 +138,7 @@ if st.button("Ignite Swarm"):
     fig = plot_s_rho_heatmap(S_rho_matrix, gci, i_ab, fidelity, alert, motif_entropy)
     st.pyplot(fig)
     
-    st.subheader("🜂 Llama-3.1 Pruned Motif")
+    st.subheader("🜂 Stubbed Motif (Core Eternal)")
     st.text(f"({lang}): {pruned_motif[:100]}... | S(m) Entropy: {motif_entropy:.3f}")
     
     st.subheader("🜂 v7 PoC Metrics")
@@ -209,4 +155,7 @@ if st.button("Ignite Swarm"):
     csv_data = get_csv_data(gci, i_ab, fidelity, alert, n_nodes, prune_pct, noise_sigma, motif_seed, motif_entropy)
     st.download_button("Download CSV", csv_data, "andes_grid_v7_motifs.csv", "text/csv")
     blueprint_data = get_blueprint_data(gci, i_ab, fidelity, alert, n_nodes, prune_pct, noise_sigma, motif_seed, motif_entropy)
-    st.download_button("Download Blueprint JSON", blueprint_data, "seed_blueprints_v7_entry.json",
+    st.download_button("Download Blueprint JSON", blueprint_data, "seed_blueprints_v7_entry.json", "application/json")
+
+st.markdown("---")
+st.markdown("Fork the Swarm: [GitHub](https://github.com/babyblueviper1/Viper-Stack-Omega) | Contact: babyblueviperbusiness@gmail.com")
