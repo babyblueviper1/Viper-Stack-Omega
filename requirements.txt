@@ -1,0 +1,10 @@
+streamlit
+qutip
+sympy
+pandas
+numpy
+matplotlib
+torch
+transformers
+accelerate
+bitsandbytes
