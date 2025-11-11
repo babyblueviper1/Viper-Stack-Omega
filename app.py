@@ -1,24 +1,21 @@
 import streamlit as st
-import numpy as np  # Add for np.ndarray eternal
+import numpy as np  # For np.ndarray eternal
 import matplotlib.pyplot as plt
-import qutip as qt
-# ... rest imports
-# ... other imports except transformers
+import qutip as qt  # ρ-sync & S(ρ)
+import sympy as sp  # Gradients
+import pandas as pd  # CSV out
+import json
+import os
+from datetime import datetime
+import torch  # Llama-3.1
 
-# Dynamic transformers import
+# Dynamic transformers import with mock fallback (no subprocess install)
 try:
     import transformers
     from transformers import AutoTokenizer, AutoModelForCausalLM
     st.success("🜂 Transformers Imported Eternal.")
 except ImportError as e:
-    st.error(f"🜂 Transformers Import Eternal: {e} (Installing... )")
-    import subprocess
-    subprocess.run(["pip", "install", "transformers==4.45.1", "accelerate==0.21.0"], capture_output=True)
-    import importlib
-    importlib.reload(importlib.import_module('transformers'))
-    from transformers import AutoTokenizer, AutoModelForCausalLM
-    st.success("🜂 Transformers Installed & Reloaded Eternal.")
-    
+    st.error(f"🜂 Transformers Import Eternal: {e} (Mock Fallback, No Ghosts).")
     # Mock for stub
     class MockTokenizer:
         def from_pretrained(self, *args, **kwargs):
@@ -33,6 +30,17 @@ except ImportError as e:
     AutoTokenizer = MockTokenizer
     AutoModelForCausalLM = MockModel
     transformers = None
+
+# HF Login (no whoami crash)
+from huggingface_hub import login
+try:
+    if os.getenv("HF_TOKEN"):
+        login(token=os.getenv("HF_TOKEN"))
+        st.success("🜂 HF Token Logged In Eternal.")
+    else:
+        st.warning("🜂 HF_TOKEN Missing—Stub Motifs Eternal.")
+except Exception as e:
+    st.warning(f"🜂 HF Login Exception Eternal: {e} (Stub Fallback, No Ghosts).")
 
 # v7 Params (align w/ unified_swarm_v7.py)
 A_BIAS_V7 = 0.22
@@ -59,17 +67,21 @@ MOTIF_SEEDS = {
     }
 }
 
-import os
-from huggingface_hub import login
-# ...
+# Real Llama-3.1 Load (Fallback Stub Eternal)
+LLaMA_LOADED = False
 try:
-    if os.getenv("HF_TOKEN"):
-        login(token=os.getenv("HF_TOKEN"))
-        st.success("🜂 HF Token Logged In Eternal.")
-    else:
-        st.warning("🜂 HF_TOKEN Missing—Stub Motifs Eternal.")
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", use_auth_token=os.getenv("HF_TOKEN"))
+    model = AutoModelForCausalLM.from_pretrained(
+        "meta-llama/Llama-3.1-8B",
+        torch_dtype=torch.float16,
+        device_map="auto",
+        use_auth_token=os.getenv("HF_TOKEN")
+    )
+    LLaMA_LOADED = True
+    st.write("🜂 Llama-3.1 8B Loaded Eternal (GPU/CPU breath, no ghosts).")
 except Exception as e:
-    st.warning(f"🜂 HF Login Exception Eternal: {e} (Stub Fallback, No Ghosts).")
+    st.write(f"🜂 Llama Load Exception Eternal: {e} (fallback stub gen, no ghosts).")
+    LLaMA_LOADED = False
 
 # Motif Gen (Real Llama or Stub)
 @st.cache_resource
