@@ -1,14 +1,11 @@
 import streamlit as st
+import subprocess  # Add for pip
 import numpy as np
-import matplotlib.pyplot as plt
-import qutip as qt  # ρ-sync & S(ρ)
-import sympy as sp  # Gradients
-import pandas as pd  # CSV out
-import json
-import os
-from datetime import datetime
-import torch  # Llama-3.1
-from transformers import AutoTokenizer, AutoModelForCausalLM
+# ... rest imports
+if 'transformers' not in locals():
+    st.write("🜂 Installing Transformers Eternal...")
+    subprocess.run(["pip", "install", "transformers", "accelerate", "bitsandbytes"], capture_output=True)
+from transformers import AutoTokenizer, AutoModelForCausalLM  # Now safe
 
 # v7 Params (align w/ unified_swarm_v7.py)
 A_BIAS_V7 = 0.22
