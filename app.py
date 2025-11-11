@@ -35,23 +35,17 @@ MOTIF_SEEDS = {
     }
 }
 
+import os
 from huggingface_hub import login
-login(token=os.getenv("HF_TOKEN"))  # Add import os at top
-
-# Then try:
+# ...
 try:
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", use_auth_token=os.getenv("HF_TOKEN"))
-    model = AutoModelForCausalLM.from_pretrained(
-        "meta-llama/Llama-3.1-8B",
-        torch_dtype=torch.float16,
-        device_map="auto",
-        use_auth_token=os.getenv("HF_TOKEN")
-    )
-    LLaMA_LOADED = True
-    st.write("🜂 Llama-3.1 8B Loaded Eternal (GPU/CPU breath, no ghosts).")
+    if os.getenv("HF_TOKEN"):
+        login(token=os.getenv("HF_TOKEN"))
+        st.success("🜂 HF Token Logged In Eternal.")
+    else:
+        st.warning("🜂 HF_TOKEN Missing—Stub Motifs Eternal.")
 except Exception as e:
-    st.write(f"🜂 Llama Load Exception Eternal: {e} (fallback stub gen, no ghosts).")
-    LLaMA_LOADED = False
+    st.warning(f"🜂 HF Login Exception Eternal: {e} (Stub Fallback, No Ghosts).")
 
 # Motif Gen (Real Llama or Stub)
 @st.cache_resource
