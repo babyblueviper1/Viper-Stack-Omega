@@ -35,13 +35,17 @@ MOTIF_SEEDS = {
     }
 }
 
-# Real Llama-3.1 Load (Fallback Stub Eternal)
+from huggingface_hub import login
+login(token=os.getenv("HF_TOKEN"))  # Add import os at top
+
+# Then try:
 try:
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B")
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", use_auth_token=os.getenv("HF_TOKEN"))
     model = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-3.1-8B",
         torch_dtype=torch.float16,
-        device_map="auto"
+        device_map="auto",
+        use_auth_token=os.getenv("HF_TOKEN")
     )
     LLaMA_LOADED = True
     st.write("🜂 Llama-3.1 8B Loaded Eternal (GPU/CPU breath, no ghosts).")
