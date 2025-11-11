@@ -71,12 +71,12 @@ MOTIF_SEEDS = {
 # Real Llama-3.1 Load (Fallback Stub Eternal)
 LLaMA_LOADED = False
 try:
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", use_auth_token=os.getenv("HF_TOKEN"))
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", token=os.getenv("HF_TOKEN"))
     model = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-3.1-8B",
-        torch_dtype=torch.float16,
+        dtype=torch.float16,  # Pruned torch_dtype deprecation
         device_map="auto",
-        use_auth_token=os.getenv("HF_TOKEN")
+        token=os.getenv("HF_TOKEN")  # Pruned use_auth_token deprecation
     )
     LLaMA_LOADED = True
     st.success("🜂 Llama-3.1-8B Loaded Eternal (Direct Token Breath, No Ghosts).")
