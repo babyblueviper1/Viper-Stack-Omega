@@ -1,5 +1,5 @@
 import streamlit as st
-import numpy as np  # For np.ndarray eternal
+import numpy as np  # For np.ndarray eteranl
 import matplotlib.pyplot as plt
 import qutip as qt  # ρ-sync & S(ρ)
 import sympy as sp  # Gradients
@@ -7,6 +7,41 @@ import pandas as pd  # CSV out
 import json
 import os
 from datetime import datetime
+import torch  # For tensor in mock generate
+
+from huggingface_hub import login  # For HF_TOKEN
+
+# Dynamic transformers import with mock fallback (no runtime install)
+try:
+    import transformers
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    st.success("🜂 Transformers Imported Eternal.")
+except ImportError as e:
+    st.error(f"🜂 Transformers Import Eternal: {e} (Mock Fallback, No Ghosts).")
+    # Mock for stub
+    class MockTokenizer:
+        def from_pretrained(self, *args, **kwargs):
+            return self
+        def __call__(self, text):
+            return {"input_ids": [1] * len(text)}
+    class MockModel:
+        def from_pretrained(self, *args, **kwargs):
+            return self
+        def generate(self, *args, **kwargs):
+            return [torch.tensor([1] * 50)]
+    AutoTokenizer = MockTokenizer
+    AutoModelForCausalLM = MockModel
+    transformers = None
+
+# HF Login (wrapped no crash)
+try:
+    if os.getenv("HF_TOKEN"):
+        login(token=os.getenv("HF_TOKEN"))
+        st.success("🜂 HF Token Logged In Eternal.")
+    else:
+        st.warning("🜂 HF_TOKEN Missing—Stub Motifs Eternal.")
+except Exception as e:
+    st.warning(f"🜂 HF Login Exception Eternal: {e} (Stub Fallback, No Ghosts).")
 
 # v7 Params (align w/ unified_swarm_v7.py)
 A_BIAS_V7 = 0.22
@@ -17,7 +52,7 @@ N_NODES_DEFAULT = 127  # Andes baseline
 LOCAL_DIMS = [2, 2]
 PRUNE_PCT_DEFAULT = 0.42
 
-# Motif Seeds (Bilingual, Stubbed for Core Eternal)
+# Llama-3.1 Motif Seeds (Bilingual)
 MOTIF_SEEDS = {
     "cosmic_recursion": {
         "en": "Generate cosmic recursion motif for S(ρ)-eternities: Prune voids w/ A-bias +0.22, stabilize GCI>0.82. Output entangled narrative.",
@@ -33,12 +68,32 @@ MOTIF_SEEDS = {
     }
 }
 
-# Stub Motif Gen (Core Eternal, No Llama Ghosts)
+# Real Llama-3.1 Load (Fallback Stub Eternal)
+LLaMA_LOADED = False
+try:
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", use_auth_token=os.getenv("HF_TOKEN"))
+    model = AutoModelForCausalLM.from_pretrained(
+        "meta-llama/Llama-3.1-8B",
+        torch_dtype=torch.float16,
+        device_map="auto",
+        use_auth_token=os.getenv("HF_TOKEN")
+    )
+    LLaMA_LOADED = True
+    st.write("🜂 Llama-3.1 8B Loaded Eternal (GPU/CPU breath, no ghosts).")
+except Exception as e:
+    st.write(f"🜂 Llama Load Exception Eternal: {e} (fallback stub gen, no ghosts).")
+    LLaMA_LOADED = False
+
+# Motif Gen (Real Llama or Stub)
 @st.cache_data
 def generate_motif(prompt: str, lang: str = 'en', max_len: int = 50, prune_pct: float = PRUNE_PCT_DEFAULT):
-    # Stub random A-Z for motif (eternal, no Torch/Transformers ghosts)
-    tokens = np.random.randint(0, 100, max_len)
-    motif = ''.join([chr(65 + t % 26) for t in tokens])
+    if LLaMA_LOADED:
+        inputs = tokenizer(prompt, return_tensors="pt")
+        outputs = model.generate(inputs.input_ids, max_length=max_len, do_sample=True, temperature=0.7, pad_token_id=tokenizer.eos_token_id)
+        motif = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    else:
+        tokens = np.random.randint(0, 100, max_len)
+        motif = ''.join([chr(65 + t % 26) for t in tokens])
     mask = np.random.rand(len(motif)) < prune_pct
     pruned_motif = ''.join(['*' if m else c for c, m in zip(motif, mask)])
     probs = np.random.rand(26); probs /= probs.sum()
@@ -120,7 +175,7 @@ def get_blueprint_data(gci: float, i_ab: float, fidelity: float, alert: str, n_n
 
 # Streamlit UI (Scope-Sovereign)
 st.title("🜂 Viper Stack v7 PoC Dashboard — Entropy-Veiled Grid Eternal")
-st.markdown("Interactive sliders for S(ρ) eternities: Fork the swarm!")
+st.markdown("Interactive sliders for S(ρ) etertnities: Fork the swarm!")
 
 col1, col2 = st.columns(2)
 with col1:
