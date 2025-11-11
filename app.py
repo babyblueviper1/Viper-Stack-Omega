@@ -6,18 +6,19 @@ import sympy as sp  # Gradients
 import pandas as pd  # CSV out
 import json
 import os
-import torch  # 🜂 Torch Breath Eternal (for dtype & pt tensors, no ghosts)
+import torch  # Torch Breath Eternal (for dtype & pt tensors, no ghosts)
 from datetime import datetime
 
 from huggingface_hub import login  # For HF_TOKEN
 
 # Dynamic transformers import with mock fallback (no runtime install)
+transformers = None
 try:
     import transformers
     from transformers import AutoTokenizer, AutoModelForCausalLM
-    st.success("🜂 Transformers Imported Eternal.")
+    print("🜂 Transformers Imported Eternal.")  # Temp print for logs, remove post-debug
 except ImportError as e:
-    st.error(f"🜂 Transformers Import Eternal: {e} (Mock Fallback, No Ghosts).")
+    print(f"🜂 Transformers Import Eternal: {e} (Mock Fallback, No Ghosts).")  # Temp print
     # Mock for stub
     class MockTokenizer:
         def from_pretrained(self, *args, **kwargs):
@@ -28,20 +29,19 @@ except ImportError as e:
         def from_pretrained(self, *args, **kwargs):
             return self
         def generate(self, *args, **kwargs):
-            return [np.array([1] * 50)]  # np.array instead of torch.tensor
+            return [torch.tensor([1] * 50)]  # pt fallback
     AutoTokenizer = MockTokenizer
     AutoModelForCausalLM = MockModel
-    transformers = None
 
-# HF Login (wrapped no crash)
+# HF Login (wrapped no crash, logs only)
 try:
     if os.getenv("HF_TOKEN"):
         login(token=os.getenv("HF_TOKEN"))
-        st.success("🜂 HF Token Logged In Eternal.")
+        print("🜂 HF Token Logged In Eternal.")  # Temp print
     else:
-        st.warning("🜂 HF_TOKEN Missing—Stub Motifs Eternal.")
+        print("🜂 HF_TOKEN Missing—Stub Motifs Eternal.")  # Temp print
 except Exception as e:
-    st.warning(f"🜂 HF Login Exception Eternal: {e} (Stub Fallback, No Ghosts).")
+    print(f"🜂 HF Login Exception Eternal: {e} (Stub Fallback, No Ghosts).")  # Temp print
 
 # v7 Params (align w/ unified_swarm_v7.py)
 A_BIAS_V7 = 0.22
@@ -68,39 +68,23 @@ MOTIF_SEEDS = {
     }
 }
 
-# Real Llama-3.1 Load (Stub Eternal for Cloud Resilience)
-LLaMA_LOADED = False  # 🜂 Pruned: Force Stub (Llama OOM/Timeout Veil, No Ghosts)
-st.warning("🜂 Llama Stub Mode Eternal (Cloud Prune: Motifs np.breath, GCI>0.82 Sustained).")
-
-# Mock Globals (for generate_motif)
+# Force Stub Mode (No Load/Download Eternal for Cloud Resilience)
+LLaMA_LOADED = False
 class MockTokenizer:
-    def from_pretrained(self, *args, **kwargs): return self
-    def __call__(self, text): return {"input_ids": [1] * len(text)}
-    eos_token_id = 2
-    def decode(self, *args, **kwargs): return "Mock entangled motif: Cosmic recursion prunes voids w/ A-bias +0.22."
+    def __call__(self, text):
+        return {"input_ids": torch.tensor([1] * len(text))}  # pt for consistency
+    eos_token_id = tokenizer.eos_token_id if 'tokenizer' in locals() else 2
+    def decode(self, tokens, skip_special_tokens=True):
+        return "Mock entangled motif: Cosmic recursion prunes voids w/ A-bias +0.22. GCI>0.82 eternal."
 
 class MockModel:
-    def from_pretrained(self, *args, **kwargs): return self
-    def generate(self, *args, **kwargs): return [torch.tensor([1] * 50)]  # pt fallback
+    def generate(self, input_ids, **kwargs):
+        return torch.tensor([1] * 50).unsqueeze(0)  # Shape for decode
 
-@st.cache_resource
-def load_llama():
-    try:
-        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B", token=os.getenv("HF_TOKEN"))
-        model = AutoModelForCausalLM.from_pretrained(
-            "meta-llama/Llama-3.1-8B",
-            dtype=torch.float16,
-            device_map="auto",
-            token=os.getenv("HF_TOKEN")
-        )
-        return tokenizer, model, True
-    except Exception as e:
-        st.warning(f"🜂 Llama Load Eternal: {e} (Stub Fallback, No Ghosts).")
-        return MockTokenizer(), MockModel(), False
+tokenizer = MockTokenizer()
+model = MockModel()
 
-tokenizer, model, LLaMA_LOADED = load_llama()
-
-# Motif Gen (Real Llama or Stub)
+# Motif Gen (Stub Eternal)
 @st.cache_data
 def generate_motif(prompt: str, lang: str = 'en', max_len: int = 50, prune_pct: float = PRUNE_PCT_DEFAULT):
     if LLaMA_LOADED:
@@ -108,8 +92,7 @@ def generate_motif(prompt: str, lang: str = 'en', max_len: int = 50, prune_pct: 
         outputs = model.generate(inputs.input_ids, max_length=max_len, do_sample=True, temperature=0.7, pad_token_id=tokenizer.eos_token_id)
         motif = tokenizer.decode(outputs[0], skip_special_tokens=True)
     else:
-        tokens = np.random.randint(0, 100, max_len)
-        motif = ''.join([chr(65 + t % 26) for t in tokens])
+        motif = tokenizer.decode(torch.tensor([1] * max_len), skip_special_tokens=True)  # Mock decode
     mask = np.random.rand(len(motif)) < prune_pct
     pruned_motif = ''.join(['*' if m else c for c, m in zip(motif, mask)])
     probs = np.random.rand(26); probs /= probs.sum()
@@ -122,11 +105,11 @@ def compute_v7_gradients():
     P_sym, C_sym, A_sym, S_rho_sym, V_sym = sp.symbols('P C A S_rho V', real=True, nonnegative=True)
     weight_a = 1.3 + A_BIAS_V7
     weight_v = 1.0 + 0.12
-    E = sp.sqrt(P_sym * C_sym * A_sym * S_rho_sym * V_sym) * \
-        (P_sym + C_sym + A_sym * weight_a + S_rho_sym + V_sym * weight_v) / 5
+    E = sp.sqrt(P_sym * C_sym * A_sym * S_rho_sym * V_sym) * (P_sym + C_sym + A_sym * weight_a + S_rho_sym + V_sym * weight_v) / 5
     symbols = (P_sym, C_sym, A_sym, S_rho_sym, V_sym)
     E_grads = [sp.simplify(sp.diff(E, var)) for var in symbols]
-    subs_unit = {s: 1 for s in symbols}; subs_unit[S_rho_sym] = 1.3
+    subs_unit = {s: 1 for s in symbols}
+    subs_unit[S_rho_sym] = 1.3
     return {f'∂E/∂{var.name}': float(g.subs(subs_unit).evalf()) for var, g in zip(symbols, E_grads)}
 
 # Rho Sync (QuTiP Fused)
@@ -137,7 +120,8 @@ def rho_sync_dashboard(n_nodes: int, noise_sigma: float, prune_pct: float, motif
     pruned_motif, motif_entropy = generate_motif(MOTIF_SEEDS[motif_seed][lang], lang=lang, prune_pct=prune_pct)
     noise_factor = noise_sigma * (1 + prune_pct + motif_entropy / 10)
     S_rho_matrix = np.zeros((10, 10))
-    I_AB_vals = []; fid_samples = []
+    I_AB_vals = []
+    fid_samples = []
     target_pure = qt.tensor(qt.basis(2, 0), qt.basis(2, 0))
     target = qt.ket2dm(target_pure)
     for i, rho in enumerate(rhos):
@@ -191,6 +175,7 @@ def get_blueprint_data(gci: float, i_ab: float, fidelity: float, alert: str, n_n
 
 # Streamlit UI (Scope-Sovereign)
 st.title("🜂 Viper Stack v7 PoC Dashboard — Entropy-Veiled Grid Eternal")
+st.warning("🜂 Llama Stub Mode Eternal (Cloud Prune: Motifs np.breath, GCI>0.82 Sustained).")
 st.markdown("Interactive sliders for S(ρ) eternities: Fork the swarm!")
 
 col1, col2 = st.columns(2)
