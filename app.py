@@ -1,11 +1,29 @@
 import streamlit as st
-import subprocess  # Add for pip
-import numpy as np
-# ... rest imports
-if 'transformers' not in locals():
-    st.write("🜂 Installing Transformers Eternal...")
-    subprocess.run(["pip", "install", "transformers", "accelerate", "bitsandbytes"], capture_output=True)
-from transformers import AutoTokenizer, AutoModelForCausalLM  # Now safe
+import sys
+import importlib
+# ... other imports except transformers
+
+# Dynamic transformers import
+try:
+    import transformers
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    st.success("🜂 Transformers Imported Eternal.")
+except ImportError as e:
+    st.error(f"🜂 Transformers Import Eternal: {e} (Stub Fallback, No Ghosts).")
+    # Mock for stub
+    class MockTokenizer:
+        def from_pretrained(self, *args, **kwargs):
+            return self
+        def __call__(self, text):
+            return {"input_ids": [1] * len(text)}
+    class MockModel:
+        def from_pretrained(self, *args, **kwargs):
+            return self
+        def generate(self, *args, **kwargs):
+            return [torch.tensor([1] * 50)]
+    AutoTokenizer = MockTokenizer
+    AutoModelForCausalLM = MockModel
+    transformers = None
 
 # v7 Params (align w/ unified_swarm_v7.py)
 A_BIAS_V7 = 0.22
