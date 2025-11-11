@@ -11,7 +11,14 @@ try:
     from transformers import AutoTokenizer, AutoModelForCausalLM
     st.success("🜂 Transformers Imported Eternal.")
 except ImportError as e:
-    st.error(f"🜂 Transformers Import Eternal: {e} (Stub Fallback, No Ghosts).")
+    st.error(f"🜂 Transformers Import Eternal: {e} (Installing... )")
+    import subprocess
+    subprocess.run(["pip", "install", "transformers==4.45.1", "accelerate==0.21.0"], capture_output=True)
+    import importlib
+    importlib.reload(importlib.import_module('transformers'))
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    st.success("🜂 Transformers Installed & Reloaded Eternal.")
+    
     # Mock for stub
     class MockTokenizer:
         def from_pretrained(self, *args, **kwargs):
