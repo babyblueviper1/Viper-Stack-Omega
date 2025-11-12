@@ -5,7 +5,7 @@
 **Contact: @babyblueviper1 | babyblueviperbusiness@gmail.com**  
 
 ## Overview (No Ghosts)
-Omega DAO Pruner is a non-custodial, open-source script for on-chain Bitcoin mainnet fee pruning (not Lightning off-chain—this is full UTXO control on the Bitcoin blockchain for verifiable, transparent transactions). Users co-sign multisig 2-of-3 UTXOs asynchronously into batched txns, sharing 1 sat/vB low fees (vs 4 sat/vB solo—40% bloat prune, ~$0.62/txn gross savings). Users keep 90% of the savings (~$0.56/txn net after our 10% coordination cut)—still a massive win vs solo $1.03 fees. We coordinate only (no fund hold), taking 10% on savings for the service.  
+Omega DAO Pruner is a non-custodial, open-source script for on-chain Bitcoin mainnet fee pruning (not Lightning off-chain—this is full UTXO control on the Bitcoin blockchain for verifiable, transparent transactions). Users co-sign multisig 2-of-3 UTXOs asynchronously into batched txns, sharing 1 sat/vB low fees (vs 4 sat/vB solo—40% bloat prune, $0.62/txn gross savings). Users keep 90% of the savings (~$0.56/txn net after our 10% coordination cut)—still a massive win vs solo $1.03 fees. We coordinate only (no fund hold), taking 10% on savings for the service.  
 
 **Important: Wallet Requirement.** This requires a non-custodial wallet capable of sending specific UTXOs (manual selection for privacy/pruning)—not possible from custodial exchanges like Coinbase, where you can't control UTXOs. Examples: Electrum (free, 5min setup), Sparrow Wallet (advanced UTXO control), or hardware like Trezor/Ledger (with Electrum integration). Download from official sites (electrum.org, sparrowwallet.com).  
 
