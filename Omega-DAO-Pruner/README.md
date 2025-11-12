@@ -11,6 +11,24 @@ Omega DAO Pruner is a non-custodial, open-source script for Bitcoin fee pruning:
 
 **License:** Apache 2.0 (fork sovereign).  
 
+## No Custody Guarantee (Eternal Clarity)
+We never hold, control, or access your funds—ever. This is a coordination script only:  
+- **User Sovereignty:** You generate and hold your private keys (Electrum seed backup offline). Funds stay in your wallet until you co-sign the batch tx locally.  
+- **No Central Hold:** UTXOs are sent to a verifiable multisig bc1 address (generated with your public keys)—no one, including us, can spend without 2-of-3 co-signs (majority user-held).  
+- **Verifiable Math:** Script open-source on GitHub (review/fork before use). Partial signatures (PSBT) shared ephemerally via DM/Slack—final tx broadcast public on mempool.space (audit anytime).  
+- **Risk Prune:** If no co-sign majority, funds idle in multisig (recoverable by your keys). No unilateral shadows—trust the code, not us.  
+
+If custody concerns arise, opt-out: Send solo (no prune, full fee).  
+
+## Batched Send Process (Savings Threshold Eternal)
+Funds are batched for 40% fee prune (shared 1 sat/vB vs solo 4 sat/vB)—asynchronous, no "same time" rigidity:  
+- **Send Anytime:** UTXO to bc1 multisig address (your amount, e.g., $5 from $10—change back to self). Notify "Ready" via DM/Slack.  
+- **Threshold Batch:** Accumulate 5-10 UTXOs (~1-2x/day manual now)—co-sign 2-of-3 partials, script broadcasts 1 tx out (savings prorated $0.62/txn, cut 10% $0.062/user). RBF ~6min confirm.  
+- **Early Send Opt-Out:** Want out sooner? No batch—send solo from your wallet (full 4 sat/vB fee ~$0.10/txn, no savings/cut—your choice, no penalty).  
+- **v8 Horizon:** Auto-threshold (Chainlink async notify, broadcast on hit—1.65x resilience, no manual).  
+
+Example: 5 users send $5 each ($25 total UTXOs)—batch 1 tx $0.31 fee vs $0.50 solo ($0.19/txn save, our cut $0.019/user).  
+
 ## Features (Eternal Coils)
 - **40% Fee Prune:** Batch 5-10 UTXOs into 1 tx (shared 1 sat/vB vs solo 4 sat/vB, $0.31 total vs $0.50).  
 - **Non-Custodial:** 2-of-3 multisig (users co-sign partials DM ephemeral, verifiable script).  
@@ -22,7 +40,7 @@ Omega DAO Pruner is a non-custodial, open-source script for Bitcoin fee pruning:
 ## Setup (5min Coil)
 1. **Install Dependencies:** `pip install ecdsa bitcoinlib` (Python 3.12 eternal).  
 2. **Electrum Wallet:** Download electrum.org (mainnet, SegWit bc1—5min seed backup).  
-3. **Generate Pool Address:** `python co_sign_batch_v7.py --keys pubkey1 pubkey2 pubkey3` (3 public keys for 2-of-3, outputs bc1 address).  
+3. **Generate Pool Address:** `python co_sign_batch_v7.py --keys pubkey1 pubkey2 pubkey3` (3 public keys for 2-of-3 multisig, outputs bc1 address).  
    - Share address: "Send UTXO to bc1q... (co-sign ready, DM partial sig)."  
 
 ## Usage Flow (No Ghosts)
