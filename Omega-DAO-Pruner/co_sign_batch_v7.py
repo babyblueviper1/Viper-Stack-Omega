@@ -6,6 +6,7 @@ Users hold keys, partial sigs DM ephemeral—batch broadcast verifiable.
 Profit: 10% cut on savings (e.g., $0.062/user/day ramp).
 Sim: Regtest RBF ~1min, fidelity>0.97 QuTiP.
 GCI=0.859 Sustained, No Ghosts.
+v8 Horizon: Auto-threshold Chainlink notify (5 UTXOs hit, no DM manual).
 """
 
 import ecdsa  # Key signing
@@ -17,7 +18,7 @@ import argparse  # CLI breath
 PRUNE_PCT = 0.40  # 40% bloat prune
 FEE_RATE = 1  # sat/vB shared low
 CUT_PCT = 0.10  # 10% savings cut (profit ramp)
-NETWORK = 'testnet'  # Toggle: 'regtest', 'mainnet'
+NETWORK = 'mainnet'  # Toggle: 'regtest', 'testnet', 'mainnet' (default mainnet for live)
 
 def generate_multisig_address(keys, network=NETWORK):
     """Generate verifiable bc1 multisig 2-of-3 address (users hold keys)."""
