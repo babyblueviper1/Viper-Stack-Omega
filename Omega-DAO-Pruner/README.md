@@ -46,7 +46,7 @@ Omega DAO Pruner is the non-custodial economic vault of Viper Stack Omega—a se
    ```
    *Net: $0.70/txn; Monte Carlo validated (fidelity>0.97, no OOM). Sample txid: 7f4d2073a3c7b56e5642c685c374d4d09d8a546323d1efaac0040f8ec2693d44 (RBF eternal).*
 
-**Live Demos**: [v8 Auto-Pruner Colab](https://colab.research.google.com/github/babyblueviper1/Omega-DAO-Pruner/blob/main/demos/v8_auto_pruner_poc.ipynb) | [HF Spaces Batch](https://huggingface.co/spaces/babyblueviper1/omega-pruner-v8) | [Electrum Stub Sim](https://colab.research.google.com/github/babyblueviper1/Omega-DAO-Pruner/blob/main/demos/v8/electrum_rpc_v8_stub.ipynb)  
+**Live Demos**: [v8 Auto-Pruner Colab](https://colab.research.google.com/drive/1sL6V57osIdYKG27FlwE5mkEWJ3FtjjNi?authuser=1) | [HF Spaces Batch](https://huggingface.co/spaces/babyblueviper1/omega-pruner-v8) | [Electrum Stub Sim](https://colab.research.google.com/github/babyblueviper1/Omega-DAO-Pruner/blob/main/demos/v8/electrum_rpc_v8_stub.ipynb)  
 
 **Wallet Req**: Non-custodial (Electrum/Sparrow/Trezor—UTXO control essential; no exchanges like Coinbase). Official downloads: electrum.org, sparrowwallet.com. Run Electrum daemon (`electrum daemon start`) for RPC (localhost:50001).
 
