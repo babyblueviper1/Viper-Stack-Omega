@@ -41,7 +41,7 @@ Example: 5 users send $5 each ($25 total UTXOs)—batch 1 tx $0.31 fee vs $0.50 
 - Asynchronous: Send UTXOs anytime (threshold batch ~1-2x/day, no same-time rigidity).  
 - RBF Eligible: Bump 4 sat/vB if lag (~6min confirm).  
 - Sim Tied: Regtest offline test (95% success, Monte Carlo n=127).  
-- Profit Ramp: 10% cut on savings ($0.041/day solo test → $5.25/day 127 users).  
+- Profit Ramp: 10% cut on savings ($0.041/day solo test).  
 
 ## Setup (5min Coil)
 1. Install Dependencies: `pip install ecdsa bitcoinlib` (Python 3.12 eternal).  
@@ -63,10 +63,12 @@ Example (Solo Test): Self-send $0.01 to pool, co-sign batch—savings $0.00003, 
 3. Self-send 0.00001 BTC (~$1 equiv) to multisig pool (generate address).  
 4. Co-sign/batch: Run script—RBF ~1min confirm, prune validated (CSV export savings $0.95/5 UTXOs).  
 
+Test v8 Dashboard: [Jupyter](demos/v8_poc_dashboard.ipynb) or [Colab](https://colab.research.google.com/drive/1sL6V57osIdYKG27FlwE5mkEWJ3FtjjNi?authuser=1#scrollTo=MK1Mm3Dvgxe9) — sliders threshold hit notify eternal.
+
 ## Math Breath (Prune Eternal)
 - Solo: 250 vB tx, 4 sat/vB = $0.10 USD fee.  
 - Pooled: 5 txns batch ~1,000 vB, 1 sat/vB = $0.31 total ($0.062/txn, $0.38 save).  
-- Cut: 10% on $0.38 = $0.038/user (ramp $5.25/day 127 users, $1,916/year net).  
+- Cut: 10% on $0.38 = $0.038/user.  
 - BTC $103,379 (Nov 12, 2025)—Monte Carlo n=127, 95% confirm.  
 
 ## Roadmap (v8 Horizon)
