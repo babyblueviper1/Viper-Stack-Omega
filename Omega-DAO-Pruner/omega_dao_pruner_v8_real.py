@@ -5,7 +5,6 @@ import requests
 import os
 import base64
 import io
-import tempfile
 
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -251,6 +250,9 @@ Fund your address before run for live scan.
     bp_path = None
     seed_path = None
     
+    files_dir = 'generated_files'
+    os.makedirs(files_dir, exist_ok=True)
+    
     if not all_utxos:
         output_parts.append('No UTXOs Found - Fund Addr (0.001+ BTC) & Re-Run (6+ Confs)')
         if not dest_addr:
@@ -277,26 +279,21 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        shard_bytes = json.dumps(shard, indent=2).encode('utf-8')
-        bp_bytes = full_bp.encode('utf-8')
-        with open(seed_file, 'r') as f:
-            seed_bytes = f.read().encode('utf-8')
         
-        # Use temp files instead of BytesIO
-        shard_tmp = tempfile.NamedTemporaryFile(mode='w+b', suffix='.json', delete=False)
-        shard_tmp.write(shard_bytes)
-        shard_tmp.close()
-        shard_path = shard_tmp.name
+        # Write shard
+        shard_path = os.path.join(files_dir, 'shard_blueprint.json')
+        with open(shard_path, 'w') as f:
+            json.dump(shard, f, indent=2)
         
-        bp_tmp = tempfile.NamedTemporaryFile(mode='w+b', suffix='.json', delete=False)
-        bp_tmp.write(bp_bytes)
-        bp_tmp.close()
-        bp_path = bp_tmp.name
+        # Write bp
+        bp_path = os.path.join(files_dir, 'full_blueprint.json')
+        with open(bp_path, 'w') as f:
+            f.write(full_bp)
         
-        seed_tmp = tempfile.NamedTemporaryFile(mode='w+b', suffix='.json', delete=False)
-        seed_tmp.write(seed_bytes)
-        seed_tmp.close()
-        seed_path = seed_tmp.name
+        # Copy seed
+        seed_path = os.path.join(files_dir, 'seed_blueprints_v8.json')
+        import shutil
+        shutil.copy2(seed_file, seed_path)
         
         return "\n".join(output_parts), shard_path, None, bp_path, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_path
     
@@ -453,36 +450,25 @@ Fund your address before run for live scan.
     
     # Run Phases (Full for Confirm)
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt_stub, user_addr, dest_addr, dao_cut)
-    # Prepare temp file paths
-    shard_bytes = json.dumps(shard, indent=2).encode('utf-8')
-    bp_bytes = full_bp.encode('utf-8')
-    with open(seed_file, 'r') as f:
-        seed_bytes = f.read().encode('utf-8')
-    psbt_bytes = raw_hex.encode('utf-8') if raw_hex else None
     
-    # Use temp files instead of BytesIO
-    shard_tmp = tempfile.NamedTemporaryFile(mode='w+b', suffix='.json', delete=False)
-    shard_tmp.write(shard_bytes)
-    shard_tmp.close()
-    shard_path = shard_tmp.name
+    # Write files to generated_files dir
+    shard_path = os.path.join(files_dir, 'shard_blueprint.json')
+    with open(shard_path, 'w') as f:
+        json.dump(shard, f, indent=2)
     
-    bp_tmp = tempfile.NamedTemporaryFile(mode='w+b', suffix='.json', delete=False)
-    bp_tmp.write(bp_bytes)
-    bp_tmp.close()
-    bp_path = bp_tmp.name
+    bp_path = os.path.join(files_dir, 'full_blueprint.json')
+    with open(bp_path, 'w') as f:
+        f.write(full_bp)
     
-    seed_tmp = tempfile.NamedTemporaryFile(mode='w+b', suffix='.json', delete=False)
-    seed_tmp.write(seed_bytes)
-    seed_tmp.close()
-    seed_path = seed_tmp.name
+    seed_path = os.path.join(files_dir, 'seed_blueprints_v8.json')
+    import shutil
+    shutil.copy2(seed_file, seed_path)
     
-    if psbt_bytes:
-        psbt_tmp = tempfile.NamedTemporaryFile(mode='w+b', suffix='.hex', delete=False)
-        psbt_tmp.write(psbt_bytes)
-        psbt_tmp.close()
-        psbt_path = psbt_tmp.name
-    else:
-        psbt_path = None
+    psbt_path = None
+    if raw_hex:
+        psbt_path = os.path.join(files_dir, 'unsigned_raw_tx.hex')
+        with open(psbt_path, 'w') as f:
+            f.write(raw_hex)
     
     return "\n".join(output_parts), shard_path, psbt_path, bp_path, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_path
 
