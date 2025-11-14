@@ -85,10 +85,10 @@ def address_to_script_pubkey(addr):
             if data8:
                 if len(data8) == 20:
                     # P2WPKH: OP_0 PUSH20 <pubkeyhash>
-                    return bytes([0x00, 0x14]) + data8
+                    return bytes([0x00, 0x14]) + bytes(data8)
                 elif len(data8) == 32:
                     # P2WSH: OP_0 PUSH32 <scripthash>
-                    return bytes([0x00, 0x20]) + data8
+                    return bytes([0x00, 0x20]) + bytes(data8)
     elif addr.startswith('1'):
         # P2PKH
         decoded = base58_decode(addr)
@@ -98,7 +98,7 @@ def address_to_script_pubkey(addr):
     elif addr.startswith('3'):
         # P2SH
         decoded = base58_decode(addr)
-        if len(decoded) == 22 and decoded[0] == 0x05:  # Note: P2SH version is 5 (0x05)
+        if len(decoded) == 25 and decoded[0] == 0x05:  # Note: P2SH version is 5 (0x05)
             payload = decoded[1:21]  # 20-byte script hash
             return bytes([0xa9, 0x14]) + payload + bytes([0x87])
     raise ValueError(f"Unsupported or invalid address: {addr}")
