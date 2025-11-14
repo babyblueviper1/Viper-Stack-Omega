@@ -6,9 +6,6 @@ import os
 import base64
 import io
 
-# Download and place psbt.py and bitcoin_lib.py from https://github.com/Jason-Les/python-psbt in this directory
-from psbt import PSBT  # This requires the downloaded psbt.py
-
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
@@ -207,7 +204,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
     
     # Disclaimer
     disclaimer = """
-This tool generates a prune plan, fee estimate, and PSBT stub—NO BTC is sent here.
+This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
 Fund your address before run for live scan.
@@ -249,7 +246,7 @@ Fund your address before run for live scan.
     gci = 0.8
     
     shard_json = ""
-    psbt_b64 = ""
+    raw_hex_text = ""
     bp_json = ""
     seed_json = ""
     
@@ -336,7 +333,7 @@ Fund your address before run for live scan.
     send_usd = round(send_amount * btc_usd, 2)
     
     if not confirm_proceed:
-        output_parts.append(f'\nTotal Tx Value: {total_tx_value:.8f} BTC (${total_tx_usd}), Fee: {pruned_fee:.8f} BTC (${pruned_fee_usd}) (includes 5% DAO pool cut), Net Send: {send_amount:.8f} BTC (${send_usd})')
+        output_parts.append(f'\nTotal Tx Value: {total_tx_value:.8f} BTC (${total_tx_usd}), Fee: {pruned_fee:.8f} BTC (${pruned_fee_usd}), Net Send (pre-DAO): {send_amount:.8f} BTC (${send_usd})')
         output_parts.append('Confirm to proceed.')
         shard = {
             'utxos': pruned_utxos,
@@ -362,60 +359,57 @@ Fund your address before run for live scan.
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
         return "\n".join(output_parts), "", "", "", f"GCI: {gci:.3f} - Fidelity Hold: 0.99", ""
     
-    output_parts.append('Accepted - Generating PSBT')
+    output_parts.append('Accepted - Generating Unsigned Raw TX')
     output_parts.append(f'Savings vs No Pruner: ${savings_usd:.2f} USD (Raw ${raw_fee_usd} → Pruned ${pruned_fee_usd})')
     
-    # DAO Cut (from net send)
+    # DAO Cut
     dao_cut = 0.05 * send_amount
-    send_amount -= dao_cut  # Now send_amount is net to dest (95%)
+    send_amount -= dao_cut
     send_usd = round(send_amount * btc_usd, 2)
     dao_cut_usd = round(dao_cut * btc_usd, 2)
     output_parts.append(f'5% DAO Cut Integrated: {dao_cut:.8f} BTC (${dao_cut_usd}) to DAO Pool - Adjusted Net Send: {send_amount:.8f} BTC (${send_usd})')
     
-    # Fetch prev tx hex for each input (required for PSBT)
-    for u in pruned_utxos:
-        try:
-            prev_hex_response = requests.get(f'https://blockstream.info/api/tx/{u["txid"]}/hex', timeout=10)
-            prev_hex_response.raise_for_status()
-            u['prev_tx_hex'] = prev_hex_response.text
-            print(f'Fetched prev TX for {u["txid"][:10]}...')
-        except Exception as e:
-            output_parts.append(f'Error fetching prev TX for {u["txid"][:10]}...: {e} - Skipping PSBT gen')
-            return "\n".join(output_parts), "", "", "", f"GCI: {gci:.3f} - Fidelity Hold: 0.99", ""
-    
-    # Generate PSBT (unsigned, with pre-selected pruned UTXOs)
-    psbt_b64 = None
+    # Raw TX stub for display
+    dao_cut_flag = '_dao_cut' if dao_cut > 0 else ''
+    psbt_stub = f'hex_rawtx_{len(pruned_utxos)}_inputs_to_{dest_addr[:10]}..._fee_{pruned_fee:.8f}{dao_cut_flag}'
+    output_parts.append(f'Raw TX Stub: {psbt_stub} - Inputs pre-specified in hex below.')
+
+    # Auto-Raw TX Generation (Confirm Branch) - Fixed output amounts
+    raw_hex = None
     try:
-        psbt_obj = PSBT()
+        from bitcoinlib.transactions import Transaction
+
+        tx = Transaction()
         
-        # Add inputs (with prev TX for validation)
+        # Add pruned UTXOs as inputs (unsigned)
         for u in pruned_utxos:
-            psbt_obj.add_input(txid=u['txid'], index=u['vout'], non_witness_utxo=u['prev_tx_hex'])
+            tx.add_input(prev_txid=u['txid'], output_n=u['vout'], unlocking_script=b'')
         
-        # Add outputs (total outputs = total inputs - fee)
-        psbt_obj.add_output(int(send_amount * 1e8), dest_addr)  # Net to dest
-        psbt_obj.add_output(int(dao_cut * 1e8), dao_cut_addr)   # DAO cut
+        # Add outputs - Fixed: send_amount (net to dest) + dao_cut
+        tx.add_output(value=int(send_amount * 1e8), address=dest_addr)  # Net send to dest
+        tx.add_output(value=int(dao_cut * 1e8), address=dao_cut_addr)  # DAO cut
         
-        # Serialize to base64 (unsigned PSBT)
-        psbt_b64 = psbt_obj.b64encode()
-        output_parts.append(f'PSBT Generated: {len(pruned_utxos)} inputs pre-selected. Copy base64 below & import into wallet (Electrum: Tools > Load > From text).')
+        # Set fee
+        tx.fee = int(pruned_fee * 1e8)
+        
+        # Serialize as raw hex (unsigned)
+        raw_hex = tx.raw_hex()
+        output_parts.append(f'Unsigned Raw TX Generated: Copy hex below. In Electrum: Tools > Load transaction > From hex. Inputs auto-matched to your pruned UTXOs—no manual selection needed. Preview, sign, broadcast.')
     except Exception as e:
-        psbt_b64 = f'PSBT Gen Error ({e}): Fallback to stub - {len(pruned_utxos)}_inputs_to_{dest_addr[:10]}..._fee_{pruned_fee:.8f}_dao_cut'
-        output_parts.append(f'PSBT Gen Error ({e}): Use stub for manual setup.')
+        raw_hex = psbt_stub
+        output_parts.append(f'Raw TX Gen Error ({e}): Use stub for manual setup in wallet.')
     
     instructions = """
 === Next Steps ===
-1. Copy the PSBT base64 below.
-2. In Electrum: Tools > Load transaction > From text > Paste base64 > OK (inputs auto-loaded!).
-3. Sign the transaction with your private keys (non-custodial—wallet handles this).
-4. Broadcast and monitor for confirmation. Re-run for RBF if fees surge.
+1. Copy the raw TX hex below & save as .hex file (or direct paste).
+2. In Electrum: Tools > Load transaction > From hex > Paste/Upload > OK. The pruned UTXOs will auto-load as inputs (wallet matches txid:vout).
+3. Preview to confirm inputs/outputs/fee, then Sign (wallet fills scripts).
+4. Broadcast and monitor. Re-run for RBF if fees surge.
 === Proceed Securely ===
 """
     output_parts.append(instructions)
     
-    # Shard (updated for PSBT)
-    dao_cut_flag = '_dao_cut' if dao_cut > 0 else ''
-    psbt_stub = f'psbt_b64_{len(pruned_utxos)}_inputs_to_{dest_addr[:10]}..._fee_{pruned_fee:.8f}{dao_cut_flag}'
+    # Shard
     shard = {
         'utxos': pruned_utxos,
         's_rho': 0.292,
@@ -444,8 +438,9 @@ Fund your address before run for live scan.
     bp_json = full_bp
     with open(seed_file, 'r') as f:
         seed_json = f.read()
+    raw_hex_text = raw_hex if raw_hex else psbt_stub
     
-    return "\n".join(output_parts), shard_json, psbt_b64, bp_json, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_json
+    return "\n".join(output_parts), shard_json, raw_hex_text, bp_json, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_json
 
 # Gradio Interface (Now at End – After All Functions Defined)
 with gr.Blocks(title="Omega DAO Pruner v8") as demo:
@@ -453,7 +448,7 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     
     # Disclaimer: Always Visible Above Inputs
     gr.Markdown("""
-This tool generates a prune plan, fee estimate, and PSBT stub—NO BTC is sent here.
+This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
 Fund your address before run for live scan.
@@ -473,11 +468,11 @@ Fund your address before run for live scan.
     output_text = gr.Textbox(label="Output Log", lines=20)
     
     # Hidden Button: "Generate Raw TX" (Appears After Preview)
-    generate_btn = gr.Button("Generate PSBT", visible=False)
+    generate_btn = gr.Button("Generate Unsigned Raw TX", visible=False)
     
     # Hidden Rows: Downloads & Outputs (Shown After Generate)
     with gr.Row(visible=False) as downloads_row1:
-        psbt_text = gr.Textbox(label="PSBT Base64 (Copy & Import to Wallet)", lines=10)
+        raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex (Copy & Load in Wallet)", lines=10)
         shard_text = gr.Textbox(label="Shard Blueprint JSON (Copy to file)", lines=20)
     with gr.Row(visible=False) as downloads_row2:
         blueprint_text = gr.Textbox(label="Full Blueprint JSON (Copy to file)", lines=20)
@@ -489,7 +484,7 @@ Fund your address before run for live scan.
         # After preview run, show generate button
         return gr.update(visible=True)
 
-    def generate_psbt(user_addr, prune_choice, dest_addr):
+    def generate_raw_tx(user_addr, prune_choice, dest_addr):
         # Trigger full generation (confirm=True)
         return main_flow(user_addr, prune_choice, dest_addr, True)
 
@@ -511,11 +506,11 @@ Fund your address before run for live scan.
         outputs=generate_btn
     )
 
-    # Second Step: Generate PSBT (confirm=True) - Full outputs
+    # Second Step: Generate Raw TX (confirm=True) - Full outputs
     generate_btn.click(
-        fn=generate_psbt,
+        fn=generate_raw_tx,
         inputs=[user_addr, prune_choice, dest_addr],
-        outputs=[output_text, shard_text, psbt_text, blueprint_text, gci_text, seed_text]
+        outputs=[output_text, shard_text, raw_tx_text, blueprint_text, gci_text, seed_text]
     ).then(
         fn=show_downloads,
         outputs=[downloads_row1, downloads_row2, downloads_row3]
