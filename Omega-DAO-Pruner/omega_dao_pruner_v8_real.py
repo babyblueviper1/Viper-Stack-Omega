@@ -416,48 +416,62 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
         output_text = gr.Textbox(label="Output Log", lines=20)
         shard_json = gr.JSON(label="Shard Blueprint")
     
-    # Hidden Checkbox: Appears After First Run
-    confirm_proceed = gr.Checkbox(label="Generate PSBT", value=False, visible=False)
+    # Hidden Button: "Generate PSBT" (Appears After Preview)
+    generate_btn = gr.Button("Generate PSBT", visible=False)
     
-    # Hidden Rows: PSBT & Full Outputs (Shown Only on Generate)
+    # Hidden Rows: PSBT & Full Outputs (Shown After Generate)
     with gr.Row(visible=False) as psbt_row1:
-        psbt_out = gr.Textbox(label="PSBT Stub", visible=False)
-        blueprint_json = gr.JSON(label="Full Blueprint", visible=False)
+        psbt_out = gr.Textbox(label="PSBT Stub")
+        blueprint_json = gr.JSON(label="Full Blueprint")
     with gr.Row(visible=False) as psbt_row2:
-        gci_text = gr.Textbox(label="GCI Metrics", visible=False)
-        seed_file = gr.File(label="Exported Seeds", visible=False)
+        gci_text = gr.Textbox(label="GCI Metrics")
+        seed_file = gr.File(label="Exported Seeds")
 
-    def update_after_preview(confirm_proceed):
-        # After first run, show checkbox if UTXOs found (or always for simplicity)
-        show_checkbox = True  # Or condition on all_utxos from main_flow if passed back
-        return gr.update(visible=show_checkbox, label="Generate PSBT")
+    def show_generate_btn():
+        # After preview run, show generate button
+        return gr.update(visible=True)
 
-    def update_for_generate(confirm_proceed):
-        # Show PSBT rows & outputs only if generate checked
-        row_vis = confirm_proceed
-        out_vis = confirm_proceed
+    def generate_psbt(user_addr, prune_choice, dest_addr):
+        # Trigger full generation (confirm=True)
+        return main_flow(user_addr, prune_choice, dest_addr, True)
+
+    def show_psbt_outputs():
+        # After generate, show rows
         return [
-            gr.update(visible=row_vis),  # psbt_row1
-            gr.update(visible=out_vis),  # psbt_out
-            gr.update(visible=out_vis),  # blueprint_json
-            gr.update(visible=row_vis),  # psbt_row2
-            gr.update(visible=out_vis),  # gci_text
-            gr.update(visible=out_vis),  # seed_file
+            gr.update(visible=True),  # psbt_row1
+            gr.update(visible=True),  # psbt_row2
         ]
 
-    # Button click: Run main_flow, then update checkbox visibility, then PSBT visibility
+    # First Run: Preview (confirm=False)
     submit_btn.click(
         fn=main_flow,
-        inputs=[user_addr, prune_choice, dest_addr, confirm_proceed],
+        inputs=[user_addr, prune_choice, dest_addr, gr.State(False)],  # Force False for preview
         outputs=[output_text, shard_json, psbt_out, blueprint_json, gci_text, seed_file]
     ).then(
-        fn=update_after_preview,
-        inputs=confirm_proceed,
-        outputs=confirm_proceed  # Updates checkbox visibility/label
+        fn=show_generate_btn,
+        outputs=generate_btn
+    )
+
+    # Second Step: Generate PSBT (confirm=True)
+    generate_btn.click(
+        fn=generate_psbt,
+        inputs=[user_addr, prune_choice, dest_addr],
+        outputs=[output_text, shard_json, psbt_out, blueprint_json, gci_text, seed_file]
     ).then(
-        fn=update_for_generate,
-        inputs=confirm_proceed,
-        outputs=[psbt_row1, psbt_out, blueprint_json, psbt_row2, gci_text, seed_file]
+        fn=show_psbt_outputs,
+        outputs=[psbt_row1, psbt_row2]
+    )
+
+# Render Launch: share=True for cloud bypass
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=port,
+        share=True,  # Public Gradio.live URL in logs
+        debug=False,
+        root_path="/",
+        show_error=True
     )
 
 # Render Launch: share=True for cloud bypass
@@ -473,15 +487,3 @@ if __name__ == "__main__":
     )
 # HF Detection Boosters
 demo.queue(api_open=True)
-
-# Render Launch: Use share=True for cloud bypass
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 7860))
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=port,
-        share=True,  # Generates public Gradio.live URL in logs
-        debug=False,
-        root_path="/",
-        show_error=True
-    )
