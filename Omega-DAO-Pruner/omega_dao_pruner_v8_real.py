@@ -3,6 +3,8 @@ import json
 import numpy as np
 import requests
 import os
+import base64
+import tempfile
 
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -269,7 +271,7 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        return "\n".join(output_parts), json.dumps(shard, indent=2), psbt, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
+        return "\n".join(output_parts), json.dumps(shard, indent=2), None, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
@@ -346,7 +348,7 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Preview)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        return "\n".join(output_parts), json.dumps(shard, indent=2), psbt, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
+        return "\n".join(output_parts), json.dumps(shard, indent=2), None, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
     
     output_parts.append('Accepted - Generating PSBT')
     output_parts.append(f'Savings vs No Pruner: ${savings_usd:.2f} USD (Raw ${raw_fee_usd} → Pruned ${pruned_fee_usd})')
@@ -358,13 +360,45 @@ Fund your address before run for live scan.
     dao_cut_usd = round(dao_cut * btc_usd, 2)
     output_parts.append(f'5% DAO Cut Integrated: {dao_cut:.8f} BTC (${dao_cut_usd}) to DAO Pool - Adjusted Net Send: {send_amount:.8f} BTC (${send_usd})')
     
-    # PSBT
+    # PSBT stub for display
     dao_cut_flag = '_dao_cut' if dao_cut > 0 else ''
-    psbt = f'base64_psbt_{len(pruned_utxos)}_inputs_to_{dest_addr[:10]}..._fee_{pruned_fee:.8f}{dao_cut_flag}'
-    output_parts.append(f'PSBT Generated: {psbt} - Sign w/ Cosigner 1 (Hot), Relay to Cosigner 2 for Sig2 → Broadcast via Electrum RPC')
+    psbt_stub = f'base64_psbt_{len(pruned_utxos)}_inputs_to_{dest_addr[:10]}..._fee_{pruned_fee:.8f}{dao_cut_flag}'
+    output_parts.append(f'PSBT Generated: {psbt_stub} - Sign w/ Cosigner 1 (Hot), Relay to Cosigner 2 for Sig2 → Broadcast via Electrum RPC')
     output_parts.append('Broadcast Mock: Tx Confirmed - RBF Batch Primed for Surge')
+
+    # Auto-PSBT Generation (Confirm Branch)
+    psbt_download = None
+    try:
+        from bitcoinlib.transactions import Transaction, Output
+        from bitcoinlib.services.services import Service
+
+        # Fetch current fee rate (reuse from earlier)
+        service = Service()
+        tx = Transaction()
+        
+        # Add pruned UTXOs as inputs
+        for u in pruned_utxos:
+            tx.add_input(prev_txid=u['txid'], output_n=u['vout'], unlocking_script=b'')  # Unsigned
+        
+        # Add outputs
+        net_send_after_dao = send_amount + dao_cut  # Total before DAO
+        tx.add_output(value=int(net_send_after_dao * 1e8), address=dest_addr)  # Main output
+        tx.add_output(value=int(dao_cut * 1e8), address=dao_cut_addr)  # DAO cut output
+        
+        # Set fee
+        tx.fee = int(pruned_fee * 1e8)
+        
+        # Sign & serialize as PSBT (unsigned)
+        psbt = tx.serialize(format='psbt')
+        psbt_b64 = base64.b64encode(psbt).decode('utf-8')
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.psbt', delete=False, encoding='utf-8') as tmp:
+            tmp.write(psbt_b64)
+        psbt_download = tmp.name
+        output_parts.append(f'Auto-PSBT Generated: Download below (unsigned—sign in wallet).')
+    except Exception as e:
+        psbt_download = None
+        output_parts.append(f'PSBT Gen Error ({e}): Use stub for manual setup.')
     
-    # Instructions
     instructions = """
 === Next Steps ===
 1. Copy the PSBT stub above into your wallet (Tools > Load Transaction > From PSBT).
@@ -394,13 +428,13 @@ Fund your address before run for live scan.
         'dest_addr': dest_addr,
         'dao_cut': float(dao_cut),
         'dao_cut_addr': dao_cut_addr,
-        'psbt_stub': psbt
+        'psbt_stub': psbt_stub
     }
     
     # Run Phases (Full for Confirm)
-    gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
+    gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt_stub, user_addr, dest_addr, dao_cut)
     
-    return "\n".join(output_parts), json.dumps(shard, indent=2), psbt, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
+    return "\n".join(output_parts), json.dumps(shard, indent=2), psbt_download, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
 
 # Gradio Interface (Now at End – After All Functions Defined)
 with gr.Blocks(title="Omega DAO Pruner v8") as demo:
@@ -434,7 +468,7 @@ Fund your address before run for live scan.
     
     # Hidden Rows: PSBT & Full Outputs (Shown After Generate)
     with gr.Row(visible=False) as psbt_row1:
-        psbt_out = gr.Textbox(label="PSBT Stub")
+        psbt_out = gr.File(label="PSBT File Download")
         blueprint_json = gr.JSON(label="Full Blueprint")
     with gr.Row(visible=False) as psbt_row2:
         gci_text = gr.Textbox(label="GCI Metrics")
