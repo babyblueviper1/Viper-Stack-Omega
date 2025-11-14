@@ -374,13 +374,12 @@ Fund your address before run for live scan.
 
         tx = Transaction()
         
-        # Add pruned UTXOs as inputs (unsigned) - Enhanced with value and script_type
+        # Add pruned UTXOs as inputs (unsigned) - Removed unlocking_script as it's not a valid param
         for u in pruned_utxos:
             script_type = 'p2wpkh' if u['address'].startswith('bc1') else 'p2pkh'
             tx.add_input(
                 prev_txid=u['txid'], 
                 output_n=u['vout'], 
-                unlocking_script=b'',
                 value=int(u['amount'] * 1e8),
                 address=u['address'],
                 script_type=script_type
