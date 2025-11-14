@@ -432,7 +432,7 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
 # HF Detection Boosters
 demo.queue(api_open=True)
 
-# Render/Host Compatibility: Launch with dynamic PORT & localhost bypass
+# Render Launch: Bypass localhost with root_path
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
     demo.launch(
@@ -440,6 +440,6 @@ if __name__ == "__main__":
         server_port=port,
         share=False,
         debug=False,
-        root_path="/",  # Mount at root to bypass localhost/share force
-        show_error=True  # Log errors without crash
+        root_path="/",
+        show_error=True
     )
