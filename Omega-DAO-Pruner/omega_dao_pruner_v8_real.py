@@ -412,21 +412,37 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     confirm_proceed = gr.Checkbox(label="Confirm & Generate PSBT (Irreversible Step)", value=False)
     submit_btn = gr.Button("Run Pruner")
     
+    # Always Visible Outputs (Preview Log, Shard)
     with gr.Row():
         output_text = gr.Textbox(label="Output Log", lines=20)
         shard_json = gr.JSON(label="Shard Blueprint")
-    with gr.Row():
+    
+    # Hidden Until Confirm: PSBT, Blueprint, GCI, Seed File
+    with gr.Row(visible=False) as psbt_row1:
         psbt_out = gr.Textbox(label="PSBT Stub")
         blueprint_json = gr.JSON(label="Full Blueprint")
-    with gr.Row():
+    with gr.Row(visible=False) as psbt_row2:
         gci_text = gr.Textbox(label="GCI Metrics")
         seed_file = gr.File(label="Exported Seeds")
 
+    def update_outputs(confirm_proceed):
+        # Toggle visibility based on confirm
+        return [
+            gr.update(visible=confirm_proceed),  # psbt_row1
+            gr.update(visible=confirm_proceed),  # psbt_row2
+        ]
+
+    # Button click: Run main_flow + toggle visibility
     submit_btn.click(
         fn=main_flow,
         inputs=[user_addr, prune_choice, dest_addr, confirm_proceed],
         outputs=[output_text, shard_json, psbt_out, blueprint_json, gci_text, seed_file]
+    ).then(
+        fn=update_outputs,
+        inputs=confirm_proceed,
+        outputs=[psbt_row1, psbt_row2]
     )
+
 
 
 # HF Detection Boosters
