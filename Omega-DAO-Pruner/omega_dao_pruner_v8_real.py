@@ -212,12 +212,12 @@ Fund your address before run for live scan.
     output_parts.append(disclaimer)
     
     if not user_addr:
-        return "\n".join(output_parts) + "\nNo address provided.", None, None, None, "", None
+        return "\n".join(output_parts) + "\nNo address provided.", "", "", "", f"", ""
     
     # Validate Addr
     hrp, data = bech32_decode(user_addr)
     if hrp != 'bc' and not user_addr.startswith('1') and not user_addr.startswith('3'):
-        return "\n".join(output_parts) + "\nInvalid address. Use bc1q... or legacy 1/3.", None, None, None, "", None
+        return "\n".join(output_parts) + "\nInvalid address. Use bc1q... or legacy 1/3.", "", "", "", f"", ""
     
     # Live BTC/USD
     try:
@@ -245,13 +245,10 @@ Fund your address before run for live scan.
     psbt = 'abort_psbt'
     gci = 0.8
     
-    shard_path = None
-    psbt_path = None
-    bp_path = None
-    seed_path = None
-    
-    files_dir = 'generated_files'
-    os.makedirs(files_dir, exist_ok=True)
+    shard_json = ""
+    psbt_hex = ""
+    bp_json = ""
+    seed_json = ""
     
     if not all_utxos:
         output_parts.append('No UTXOs Found - Fund Addr (0.001+ BTC) & Re-Run (6+ Confs)')
@@ -279,23 +276,11 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        
-        # Write shard
-        shard_path = os.path.join(files_dir, 'shard_blueprint.json')
-        with open(shard_path, 'w') as f:
-            json.dump(shard, f, indent=2)
-        
-        # Write bp
-        bp_path = os.path.join(files_dir, 'full_blueprint.json')
-        with open(bp_path, 'w') as f:
-            f.write(full_bp)
-        
-        # Copy seed
-        seed_path = os.path.join(files_dir, 'seed_blueprints_v8.json')
-        import shutil
-        shutil.copy2(seed_file, seed_path)
-        
-        return "\n".join(output_parts), shard_path, None, bp_path, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_path
+        shard_json = json.dumps(shard, indent=2)
+        bp_json = full_bp
+        with open(seed_file, 'r') as f:
+            seed_json = f.read()
+        return "\n".join(output_parts), shard_json, "", bp_json, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_json
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
@@ -372,7 +357,7 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Preview)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        return "\n".join(output_parts), None, None, None, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", None
+        return "\n".join(output_parts), "", "", "", f"GCI: {gci:.3f} - Fidelity Hold: 0.99", ""
     
     output_parts.append('Accepted - Generating Raw TX')
     output_parts.append(f'Savings vs No Pruner: ${savings_usd:.2f} USD (Raw ${raw_fee_usd} → Pruned ${pruned_fee_usd})')
@@ -411,14 +396,14 @@ Fund your address before run for live scan.
         
         # Serialize as raw hex (unsigned)
         raw_hex = tx.raw_hex()
-        output_parts.append(f'Auto-Raw TX Generated: Download below (unsigned hex—import into wallet for signing).')
+        output_parts.append(f'Auto-Raw TX Generated: Copy below (unsigned hex—import into wallet for signing).')
     except Exception as e:
-        raw_hex = None
-        output_parts.append(f'Raw TX Gen Error ({e}): Use stub for manual setup.')
+        raw_hex = psbt_stub
+        output_parts.append(f'Raw TX Gen Error ({e}): Use stub below for manual setup.')
     
     instructions = """
 === Next Steps ===
-1. Copy the raw TX hex (from file or stub) into your wallet (Tools > Load Transaction > From Hex).
+1. Copy the raw TX hex (from below) into your wallet (Tools > Load Transaction > From Hex).
 2. Select the pruned UTXOs from the exported prune_blueprint_v8.json as inputs.
 3. Sign the transaction with your private keys (non-custodial—wallet handles this).
 4. Broadcast and monitor for confirmation. Re-run for RBF if fees surge.
@@ -451,26 +436,13 @@ Fund your address before run for live scan.
     # Run Phases (Full for Confirm)
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt_stub, user_addr, dest_addr, dao_cut)
     
-    # Write files to generated_files dir
-    shard_path = os.path.join(files_dir, 'shard_blueprint.json')
-    with open(shard_path, 'w') as f:
-        json.dump(shard, f, indent=2)
+    shard_json = json.dumps(shard, indent=2)
+    bp_json = full_bp
+    with open(seed_file, 'r') as f:
+        seed_json = f.read()
+    psbt_hex = raw_hex
     
-    bp_path = os.path.join(files_dir, 'full_blueprint.json')
-    with open(bp_path, 'w') as f:
-        f.write(full_bp)
-    
-    seed_path = os.path.join(files_dir, 'seed_blueprints_v8.json')
-    import shutil
-    shutil.copy2(seed_file, seed_path)
-    
-    psbt_path = None
-    if raw_hex:
-        psbt_path = os.path.join(files_dir, 'unsigned_raw_tx.hex')
-        with open(psbt_path, 'w') as f:
-            f.write(raw_hex)
-    
-    return "\n".join(output_parts), shard_path, psbt_path, bp_path, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_path
+    return "\n".join(output_parts), shard_json, psbt_hex, bp_json, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_json
 
 # Gradio Interface (Now at End – After All Functions Defined)
 with gr.Blocks(title="Omega DAO Pruner v8") as demo:
@@ -502,11 +474,11 @@ Fund your address before run for live scan.
     
     # Hidden Rows: Downloads & Outputs (Shown After Generate)
     with gr.Row(visible=False) as downloads_row1:
-        psbt_out = gr.File(label="Unsigned Raw TX Hex Download")
-        shard_file = gr.File(label="Shard Blueprint Download", file_types=[".json"])
+        psbt_text = gr.Textbox(label="Unsigned Raw TX Hex (Copy to file)", lines=5)
+        shard_text = gr.Textbox(label="Shard Blueprint JSON (Copy to file)", lines=20)
     with gr.Row(visible=False) as downloads_row2:
-        blueprint_file = gr.File(label="Full Blueprint Download", file_types=[".json"])
-        seed_file_out = gr.File(label="Exported Seeds")
+        blueprint_text = gr.Textbox(label="Full Blueprint JSON (Copy to file)", lines=20)
+        seed_text = gr.Textbox(label="Exported Seeds JSON (Copy to file)", lines=20)
     with gr.Row(visible=False) as downloads_row3:
         gci_text = gr.Textbox(label="GCI Metrics")
 
@@ -540,7 +512,7 @@ Fund your address before run for live scan.
     generate_btn.click(
         fn=generate_psbt,
         inputs=[user_addr, prune_choice, dest_addr],
-        outputs=[output_text, shard_file, psbt_out, blueprint_file, gci_text, seed_file_out]
+        outputs=[output_text, shard_text, psbt_text, blueprint_text, gci_text, seed_text]
     ).then(
         fn=show_downloads,
         outputs=[downloads_row1, downloads_row2, downloads_row3]
