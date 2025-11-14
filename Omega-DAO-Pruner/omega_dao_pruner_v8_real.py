@@ -212,12 +212,12 @@ Fund your address before run for live scan.
     output_parts.append(disclaimer)
     
     if not user_addr:
-        return "\n".join(output_parts) + "\nNo address provided.", "", "", "", f"", ""
+        return "\n".join(output_parts) + "\nNo address provided.", ""
     
     # Validate Addr
     hrp, data = bech32_decode(user_addr)
     if hrp != 'bc' and not user_addr.startswith('1') and not user_addr.startswith('3'):
-        return "\n".join(output_parts) + "\nInvalid address. Use bc1q... or legacy 1/3.", "", "", "", f"", ""
+        return "\n".join(output_parts) + "\nInvalid address. Use bc1q... or legacy 1/3.", ""
     
     # Live BTC/USD
     try:
@@ -245,10 +245,7 @@ Fund your address before run for live scan.
     psbt = 'abort_psbt'
     gci = 0.8
     
-    shard_json = ""
     raw_hex_text = ""
-    bp_json = ""
-    seed_json = ""
     
     if not all_utxos:
         output_parts.append('No UTXOs Found - Fund Addr (0.001+ BTC) & Re-Run (6+ Confs)')
@@ -276,11 +273,7 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        shard_json = json.dumps(shard, indent=2)
-        bp_json = full_bp
-        with open(seed_file, 'r') as f:
-            seed_json = f.read()
-        return "\n".join(output_parts), shard_json, "", bp_json, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_json
+        return "\n".join(output_parts), ""
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
@@ -357,7 +350,7 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Preview)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        return "\n".join(output_parts), "", "", "", f"GCI: {gci:.3f} - Fidelity Hold: 0.99", ""
+        return "\n".join(output_parts), ""
     
     output_parts.append('Accepted - Generating Unsigned Raw TX')
     output_parts.append(f'Savings vs No Pruner: ${savings_usd:.2f} USD (Raw ${raw_fee_usd} → Pruned ${pruned_fee_usd})')
@@ -394,17 +387,17 @@ Fund your address before run for live scan.
         
         # Serialize as raw hex (unsigned)
         raw_hex = tx.raw_hex()
-        output_parts.append(f'Unsigned Raw TX Generated: Copy hex below. In Electrum: Tools > Load transaction > From hex. Inputs auto-matched to your pruned UTXOs—no manual selection needed. Preview, sign, broadcast.')
+        output_parts.append(f'Unsigned Raw TX Generated: Copy the ENTIRE hex below into Electrum (Tools > Load transaction > From hex). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
     except Exception as e:
         raw_hex = psbt_stub
         output_parts.append(f'Raw TX Gen Error ({e}): Use stub for manual setup in wallet.')
     
     instructions = """
 === Next Steps ===
-1. Copy the raw TX hex below & save as .hex file (or direct paste).
-2. In Electrum: Tools > Load transaction > From hex > Paste/Upload > OK. The pruned UTXOs will auto-load as inputs (wallet matches txid:vout).
-3. Preview to confirm inputs/outputs/fee, then Sign (wallet fills scripts).
-4. Broadcast and monitor. Re-run for RBF if fees surge.
+1. Copy the ENTIRE raw TX hex below.
+2. In Electrum: Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs.
+3. Preview to confirm, then Sign.
+4. Broadcast and monitor. Re-run for RBF if needed.
 === Proceed Securely ===
 """
     output_parts.append(instructions)
@@ -434,13 +427,9 @@ Fund your address before run for live scan.
     # Run Phases (Full for Confirm)
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt_stub, user_addr, dest_addr, dao_cut)
     
-    shard_json = json.dumps(shard, indent=2)
-    bp_json = full_bp
-    with open(seed_file, 'r') as f:
-        seed_json = f.read()
     raw_hex_text = raw_hex if raw_hex else psbt_stub
     
-    return "\n".join(output_parts), shard_json, raw_hex_text, bp_json, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_json
+    return "\n".join(output_parts), raw_hex_text
 
 # Gradio Interface (Now at End – After All Functions Defined)
 with gr.Blocks(title="Omega DAO Pruner v8") as demo:
@@ -464,56 +453,39 @@ Fund your address before run for live scan.
         dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
     submit_btn = gr.Button("Run Pruner")
     
-    # Always Visible: Only Output Log (Shard hidden until end)
+    # Always Visible: Output Log
     output_text = gr.Textbox(label="Output Log", lines=20)
     
-    # Hidden Button: "Generate Raw TX" (Appears After Preview)
-    generate_btn = gr.Button("Generate Unsigned Raw TX", visible=False)
+    # Hidden: Raw TX Hex (Only after Generate)
+    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex - Copy Entire Content Below for Electrum", lines=10, visible=False)
     
-    # Hidden Rows: Downloads & Outputs (Shown After Generate)
-    with gr.Row(visible=False) as downloads_row1:
-        raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex (Copy & Load in Wallet)", lines=10)
-        shard_text = gr.Textbox(label="Shard Blueprint JSON (Copy to file)", lines=20)
-    with gr.Row(visible=False) as downloads_row2:
-        blueprint_text = gr.Textbox(label="Full Blueprint JSON (Copy to file)", lines=20)
-        seed_text = gr.Textbox(label="Exported Seeds JSON (Copy to file)", lines=20)
-    with gr.Row(visible=False) as downloads_row3:
-        gci_text = gr.Textbox(label="GCI Metrics")
+    # Hidden Button: "Generate Unsigned Raw TX" (Appears After Preview)
+    generate_btn = gr.Button("Generate Unsigned Raw TX", visible=False)
 
     def show_generate_btn():
         # After preview run, show generate button
-        return gr.update(visible=True)
+        return gr.update(visible=True), gr.update(visible=False)
 
     def generate_raw_tx(user_addr, prune_choice, dest_addr):
         # Trigger full generation (confirm=True)
-        return main_flow(user_addr, prune_choice, dest_addr, True)
-
-    def show_downloads():
-        # After generate, show rows
-        return [
-            gr.update(visible=True),  # downloads_row1
-            gr.update(visible=True),  # downloads_row2
-            gr.update(visible=True),  # downloads_row3
-        ]
+        log, hex_content = main_flow(user_addr, prune_choice, dest_addr, True)
+        return log, hex_content, gr.update(visible=True)
 
     # First Run: Preview (confirm=False) - Only log
     submit_btn.click(
         fn=lambda u, p, d: main_flow(u, p, d, False),
         inputs=[user_addr, prune_choice, dest_addr],
-        outputs=[output_text]
+        outputs=[output_text, raw_tx_text]
     ).then(
         fn=show_generate_btn,
-        outputs=generate_btn
+        outputs=[generate_btn, raw_tx_text]
     )
 
-    # Second Step: Generate Raw TX (confirm=True) - Full outputs
+    # Second Step: Generate Raw TX (confirm=True) - Log + Hex
     generate_btn.click(
         fn=generate_raw_tx,
         inputs=[user_addr, prune_choice, dest_addr],
-        outputs=[output_text, shard_text, raw_tx_text, blueprint_text, gci_text, seed_text]
-    ).then(
-        fn=show_downloads,
-        outputs=[downloads_row1, downloads_row2, downloads_row3]
+        outputs=[output_text, raw_tx_text, generate_btn]
     )
 
 # Render Launch: share=True for cloud bypass
