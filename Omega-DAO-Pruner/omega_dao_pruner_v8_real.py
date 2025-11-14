@@ -275,15 +275,15 @@ Fund your addr (0.001+ BTC) before run for live scan.
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
-# Prune Choice Mapping (Gradio Dropdown to choice key)
-prune_map = {
-    "Conservative (70% Pruned -- 30% Kept)": "1", 
-    "Balanced (60% Pruned -- 40% Kept)": "2", 
-    "Aggressive (50% Pruned -- 50% Kept)": "3"
-}
-choice = prune_map.get(prune_choice, "2")
-selected_ratio = prune_choices[choice]['ratio']  # Keep ratio for calc (keep fraction)
-output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - selected_ratio)*100:.0f}% -- Kept: {selected_ratio*100:.0f}%)')
+    # Prune Choice Mapping (Gradio Dropdown to choice key)
+    prune_map = {
+        "Conservative (70% Pruned -- 30% Kept)": "1", 
+        "Balanced (60% Pruned -- 40% Kept)": "2", 
+        "Aggressive (50% Pruned -- 50% Kept)": "3"
+    }
+    choice = prune_map.get(prune_choice, "2")
+    selected_ratio = prune_choices[choice]['ratio']  # Keep ratio for calc (keep fraction)
+    output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - selected_ratio)*100:.0f}% -- Kept: {selected_ratio*100:.0f}%)')
     
     # Prune Logic
     all_utxos.sort(key=lambda x: x['amount'], reverse=True)
@@ -369,11 +369,10 @@ output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - 
     # Instructions
     instructions = """
 === Next Steps for Pruning & Broadcasting ===
-1. Copy the PSBT stub above into your Electrum wallet (Tools > Load Transaction > From PSBT).
+1. Copy the PSBT stub above into your wallet (Tools > Load Transaction > From PSBT).
 2. Select the pruned UTXOs from the exported prune_blueprint_v8.json as inputs.
 3. Sign the transaction with your private keys (non-custodial—wallet handles this).
-4. Review the 5% DAO cut to the pool address, then broadcast via Electrum.
-5. Monitor on Blockstream.info for confirmation. Re-run for RBF if fees surge.
+4. Broadcast amd monitor for confirmation. Re-run for RBF if fees surge.
 === Proceed Securely ===
 """
     output_parts.append(instructions)
@@ -415,6 +414,8 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
 This tool generates a prune plan, fee estimate, and PSBT stub—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
+Fund your addr (0.001+ BTC) before run for live scan.
+=== End Disclaimer ===
 """)
     
     with gr.Row():
@@ -489,5 +490,6 @@ if __name__ == "__main__":
         root_path="/",
         show_error=True
     )
+
 # HF Detection Boosters
 demo.queue(api_open=True)
