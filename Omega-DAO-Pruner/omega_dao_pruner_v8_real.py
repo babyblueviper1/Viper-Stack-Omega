@@ -474,16 +474,5 @@ if __name__ == "__main__":
         show_error=True
     )
 
-# Render Launch: share=True for cloud bypass
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=port,
-        share=True,  # Public Gradio.live URL in logs
-        debug=False,
-        root_path="/",
-        show_error=True
-    )
 # HF Detection Boosters
 demo.queue(api_open=True)
