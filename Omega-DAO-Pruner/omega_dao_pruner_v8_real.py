@@ -408,16 +408,22 @@ output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - 
 # Gradio Interface (Now at End – After All Functions Defined)
 with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     gr.Markdown("# Omega DAO Pruner v8 - BTC UTXO Optimizer")
+    
+    # Disclaimer: Always Visible Above Inputs
+    gr.Markdown("""
+=== Omega DAO Pruner v8 Disclaimer ===
+This tool generates a prune plan, fee estimate, and PSBT stub—NO BTC is sent here.
+Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
+Non-custodial: Script reads pub UTXOs only; you control keys/relay.
+""")
+    
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
         prune_choice = gr.Dropdown(
-    choices=["Conservative (70% Pruned -- 30% Kept)", "Balanced (60% Pruned -- 40% Kept)", "Aggressive (50% Pruned -- 50% Kept)"], 
-    value="Balanced (60% Pruned -- 40% Kept)", 
-    label="Prune Strategy"
-), 
-    value="Balanced (40% Keep)", 
-    label="Prune Strategy"
-)
+            choices=["Conservative (70% Pruned -- 30% Kept)", "Balanced (60% Pruned -- 40% Kept)", "Aggressive (50% Pruned -- 50% Kept)"], 
+            value="Balanced (60% Pruned -- 40% Kept)", 
+            label="Prune Strategy"
+        )
         dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
     submit_btn = gr.Button("Run Pruner")
     
@@ -483,6 +489,5 @@ if __name__ == "__main__":
         root_path="/",
         show_error=True
     )
-
 # HF Detection Boosters
 demo.queue(api_open=True)
