@@ -256,7 +256,7 @@ Fund your address before run for live scan.
             's_rho': 0.292,
             's_tuned': 0.611,
             'gci': gci,
-            'timestamp': '2025-11-13T22:41:00-03:00',
+            'timestamp': '2025-11-14T00:00:00-03:00',
             'pruned_fee': float(pruned_fee),
             'raw_fee': float(raw_fee),
             'pruned_fee_usd': pruned_fee_usd,
@@ -333,7 +333,7 @@ Fund your address before run for live scan.
             's_rho': 0.292,
             's_tuned': 0.611,
             'gci': gci,
-            'timestamp': '2025-11-13T22:41:00-03:00',
+            'timestamp': '2025-11-14T00:00:00-03:00',
             'pruned_fee': float(pruned_fee),
             'raw_fee': float(raw_fee),
             'pruned_fee_usd': pruned_fee_usd,
@@ -374,15 +374,24 @@ Fund your address before run for live scan.
 
         tx = Transaction()
         
-        # Add pruned UTXOs as inputs (unsigned)
+        # Add pruned UTXOs as inputs (unsigned) - Enhanced with value and script_type
         for u in pruned_utxos:
-            tx.add_input(prev_txid=u['txid'], output_n=u['vout'], unlocking_script=b'')
+            script_type = 'p2wpkh' if u['address'].startswith('bc1') else 'p2pkh'
+            tx.add_input(
+                prev_txid=u['txid'], 
+                output_n=u['vout'], 
+                unlocking_script=b'',
+                value=int(u['amount'] * 1e8),
+                address=u['address'],
+                script_type=script_type
+            )
         
         # Add outputs - Fixed: send_amount (net to dest) + dao_cut
         tx.add_output(value=int(send_amount * 1e8), address=dest_addr)  # Net send to dest
-        tx.add_output(value=int(dao_cut * 1e8), address=dao_cut_addr)  # DAO cut
+        if dao_cut > 0:
+            tx.add_output(value=int(dao_cut * 1e8), address=dao_cut_addr)  # DAO cut
         
-        # Set fee
+        # Set fee (optional, since outputs balance to inputs - fee)
         tx.fee = int(pruned_fee * 1e8)
         
         # Serialize as raw hex (unsigned)
@@ -408,7 +417,7 @@ Fund your address before run for live scan.
         's_rho': 0.292,
         's_tuned': 0.611,
         'gci': 0.92,
-        'timestamp': '2025-11-13T22:41:00-03:00',
+        'timestamp': '2025-11-14T00:00:00-03:00',
         'pruned_fee': float(pruned_fee),
         'raw_fee': float(raw_fee),
         'pruned_fee_usd': pruned_fee_usd,
@@ -463,13 +472,14 @@ Fund your address before run for live scan.
     generate_btn = gr.Button("Generate Unsigned Raw TX", visible=False)
 
     def show_generate_btn():
-        # After preview run, show generate button
+        # After preview run, show generate button, keep raw_tx_text hidden
         return gr.update(visible=True), gr.update(visible=False)
 
     def generate_raw_tx(user_addr, prune_choice, dest_addr):
         # Trigger full generation (confirm=True)
         log, hex_content = main_flow(user_addr, prune_choice, dest_addr, True)
-        return log, hex_content, gr.update(visible=True)
+        # Return updates: log, raw_tx_text with value and visible=True, generate_btn hidden
+        return log, gr.update(value=hex_content, visible=True), gr.update(visible=False)
 
     # First Run: Preview (confirm=False) - Only log
     submit_btn.click(
@@ -490,6 +500,7 @@ Fund your address before run for live scan.
 
 # Render Launch: share=True for cloud bypass
 if __name__ == "__main__":
+    demo.queue(api_open=True)
     port = int(os.environ.get("PORT", 10000))
     demo.launch(
         server_name="0.0.0.0",
@@ -499,6 +510,5 @@ if __name__ == "__main__":
         root_path="/",
         show_error=True
     )
-
 # HF Detection Boosters
 demo.queue(api_open=True)
