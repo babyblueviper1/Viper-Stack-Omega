@@ -412,39 +412,54 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     confirm_proceed = gr.Checkbox(label="Confirm & Generate PSBT (Irreversible Step)", value=False)
     submit_btn = gr.Button("Run Pruner")
     
-    # Always Visible Outputs (Preview Log, Shard)
+    # Always Visible: Preview Log & Shard
     with gr.Row():
         output_text = gr.Textbox(label="Output Log", lines=20)
         shard_json = gr.JSON(label="Shard Blueprint")
     
-    # Hidden Until Confirm: PSBT, Blueprint, GCI, Seed File
+    # Hidden Rows: PSBT & Full Outputs (Shown Only on Confirm)
     with gr.Row(visible=False) as psbt_row1:
-        psbt_out = gr.Textbox(label="PSBT Stub")
-        blueprint_json = gr.JSON(label="Full Blueprint")
+        psbt_out = gr.Textbox(label="PSBT Stub", visible=False)
+        blueprint_json = gr.JSON(label="Full Blueprint", visible=False)
     with gr.Row(visible=False) as psbt_row2:
-        gci_text = gr.Textbox(label="GCI Metrics")
-        seed_file = gr.File(label="Exported Seeds")
+        gci_text = gr.Textbox(label="GCI Metrics", visible=False)
+        seed_file = gr.File(label="Exported Seeds", visible=False)
 
-    def update_outputs(confirm_proceed):
-        # Toggle visibility based on confirm
+    def update_visibility(confirm_proceed):
+        # Show PSBT rows & outputs only if confirm is true
+        row_vis = confirm_proceed
+        out_vis = confirm_proceed
         return [
-            gr.update(visible=confirm_proceed),  # psbt_row1
-            gr.update(visible=confirm_proceed),  # psbt_row2
+            gr.update(visible=row_vis),  # psbt_row1
+            gr.update(visible=out_vis),  # psbt_out
+            gr.update(visible=out_vis),  # blueprint_json
+            gr.update(visible=row_vis),  # psbt_row2
+            gr.update(visible=out_vis),  # gci_text
+            gr.update(visible=out_vis),  # seed_file
         ]
 
-    # Button click: Run main_flow + toggle visibility
+    # Button click: Run main_flow, then update visibility based on confirm
     submit_btn.click(
         fn=main_flow,
         inputs=[user_addr, prune_choice, dest_addr, confirm_proceed],
         outputs=[output_text, shard_json, psbt_out, blueprint_json, gci_text, seed_file]
     ).then(
-        fn=update_outputs,
+        fn=update_visibility,
         inputs=confirm_proceed,
-        outputs=[psbt_row1, psbt_row2]
+        outputs=[psbt_row1, psbt_out, blueprint_json, psbt_row2, gci_text, seed_file]
     )
 
-
-
+# Render Launch: share=True for cloud bypass
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=port,
+        share=True,  # Public Gradio.live URL in logs
+        debug=False,
+        root_path="/",
+        show_error=True
+    )
 # HF Detection Boosters
 demo.queue(api_open=True)
 
