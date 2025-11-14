@@ -245,10 +245,10 @@ Fund your address before run for live scan.
     psbt = 'abort_psbt'
     gci = 0.8
     
-    shard_bytes = None
-    psbt_bytes = None
-    bp_bytes = None
-    seed_bytes = None
+    shard_io = None
+    psbt_io = None
+    bp_io = None
+    seed_io = None
     
     if not all_utxos:
         output_parts.append('No UTXOs Found - Fund Addr (0.001+ BTC) & Re-Run (6+ Confs)')
@@ -280,7 +280,10 @@ Fund your address before run for live scan.
         bp_bytes = full_bp.encode('utf-8')
         with open(seed_file, 'r') as f:
             seed_bytes = f.read().encode('utf-8')
-        return "\n".join(output_parts), shard_bytes, psbt_bytes, bp_bytes, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_bytes
+        shard_io = io.BytesIO(shard_bytes)
+        bp_io = io.BytesIO(bp_bytes)
+        seed_io = io.BytesIO(seed_bytes)
+        return "\n".join(output_parts), shard_io, psbt_io, bp_io, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_io
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
@@ -395,8 +398,7 @@ Fund your address before run for live scan.
         tx.fee = int(pruned_fee * 1e8)
         
         # Serialize as raw hex (unsigned)
-        raw_tx = tx.raw_hex()
-        raw_hex = raw_tx
+        raw_hex = tx.raw_hex()
         output_parts.append(f'Auto-Raw TX Generated: Download below (unsigned hex—import into wallet for signing).')
     except Exception as e:
         raw_hex = None
@@ -436,14 +438,18 @@ Fund your address before run for live scan.
     
     # Run Phases (Full for Confirm)
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt_stub, user_addr, dest_addr, dao_cut)
-    # Prepare bytes
+    # Prepare BytesIO
     shard_bytes = json.dumps(shard, indent=2).encode('utf-8')
     bp_bytes = full_bp.encode('utf-8')
     with open(seed_file, 'r') as f:
         seed_bytes = f.read().encode('utf-8')
     psbt_bytes = raw_hex.encode('utf-8') if raw_hex else None
+    shard_io = io.BytesIO(shard_bytes)
+    bp_io = io.BytesIO(bp_bytes)
+    seed_io = io.BytesIO(seed_bytes)
+    psbt_io = io.BytesIO(psbt_bytes) if psbt_bytes else None
     
-    return "\n".join(output_parts), shard_bytes, psbt_bytes, bp_bytes, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_bytes
+    return "\n".join(output_parts), shard_io, psbt_io, bp_io, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_io
 
 # Gradio Interface (Now at End – After All Functions Defined)
 with gr.Blocks(title="Omega DAO Pruner v8") as demo:
