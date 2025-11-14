@@ -271,17 +271,7 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        if confirm_proceed:
-            seed_file_path = os.path.abspath(seed_file)
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_shard:
-                json.dump(shard, tmp_shard, indent=2)
-            shard_file = tmp_shard.name
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_bp:
-                tmp_bp.write(full_bp)
-            bp_file = tmp_bp.name
-            return "\n".join(output_parts), shard_file, None, bp_file, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file_path
-        else:
-            return "\n".join(output_parts), None, None, None, "", None
+        return "\n".join(output_parts), None, None, None, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", None
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
@@ -358,9 +348,9 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Preview)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        return "\n".join(output_parts), None, None, None, "", None
+        return "\n".join(output_parts), None, None, None, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", None
     
-    output_parts.append('Accepted - Generating PSBT')
+    output_parts.append('Accepted - Generating Raw TX')
     output_parts.append(f'Savings vs No Pruner: ${savings_usd:.2f} USD (Raw ${raw_fee_usd} → Pruned ${pruned_fee_usd})')
     
     # DAO Cut
@@ -370,20 +360,17 @@ Fund your address before run for live scan.
     dao_cut_usd = round(dao_cut * btc_usd, 2)
     output_parts.append(f'5% DAO Cut Integrated: {dao_cut:.8f} BTC (${dao_cut_usd}) to DAO Pool - Adjusted Net Send: {send_amount:.8f} BTC (${send_usd})')
     
-    # PSBT stub for display
+    # Raw TX stub for display
     dao_cut_flag = '_dao_cut' if dao_cut > 0 else ''
-    psbt_stub = f'base64_psbt_{len(pruned_utxos)}_inputs_to_{dest_addr[:10]}..._fee_{pruned_fee:.8f}{dao_cut_flag}'
-    output_parts.append(f'PSBT Generated: {psbt_stub} - Sign w/ Cosigner 1 (Hot), Relay to Cosigner 2 for Sig2 → Broadcast via Electrum RPC')
+    psbt_stub = f'hex_rawtx_{len(pruned_utxos)}_inputs_to_{dest_addr[:10]}..._fee_{pruned_fee:.8f}{dao_cut_flag}'
+    output_parts.append(f'Raw TX Generated: {psbt_stub} - Sign w/ Cosigner 1 (Hot), Relay to Cosigner 2 for Sig2 → Broadcast via Electrum RPC')
     output_parts.append('Broadcast Mock: Tx Confirmed - RBF Batch Primed for Surge')
 
-    # Auto-PSBT Generation (Confirm Branch)
+    # Auto-Raw TX Generation (Confirm Branch)
     psbt_download = None
     try:
-        from bitcoinlib.transactions import Transaction, Output
-        from bitcoinlib.services.services import Service
+        from bitcoinlib.transactions import Transaction
 
-        # Fetch current fee rate (reuse from earlier)
-        service = Service()
         tx = Transaction()
         
         # Add pruned UTXOs as inputs
@@ -398,23 +385,23 @@ Fund your address before run for live scan.
         # Set fee
         tx.fee = int(pruned_fee * 1e8)
         
-        # Sign & serialize as PSBT (unsigned)
-        psbt = tx.serialize(format='psbt')
-        psbt_b64 = base64.b64encode(psbt).decode('utf-8')
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.psbt', delete=False, encoding='utf-8') as tmp:
-            tmp.write(psbt_b64)
+        # Serialize as raw hex (unsigned)
+        raw_tx = tx.raw()
+        raw_hex = raw_tx.hex()
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.hex', delete=False, encoding='utf-8') as tmp:
+            tmp.write(raw_hex)
         psbt_download = tmp.name
-        output_parts.append(f'Auto-PSBT Generated: Download below (unsigned—sign in wallet).')
+        output_parts.append(f'Auto-Raw TX Generated: Download below (unsigned hex—import into wallet for signing).')
     except Exception as e:
         psbt_download = None
-        output_parts.append(f'PSBT Gen Error ({e}): Use stub for manual setup.')
+        output_parts.append(f'Raw TX Gen Error ({e}): Use stub for manual setup.')
     
     instructions = """
 === Next Steps ===
-1. Copy the PSBT stub above into your wallet (Tools > Load Transaction > From PSBT).
+1. Copy the raw TX hex (from file or stub) into your wallet (Tools > Load Transaction > From Hex).
 2. Select the pruned UTXOs from the exported prune_blueprint_v8.json as inputs.
 3. Sign the transaction with your private keys (non-custodial—wallet handles this).
-4. Broadcast amd monitor for confirmation. Re-run for RBF if fees surge.
+4. Broadcast and monitor for confirmation. Re-run for RBF if fees surge.
 === Proceed Securely ===
 """
     output_parts.append(instructions)
@@ -480,11 +467,11 @@ Fund your address before run for live scan.
     output_text = gr.Textbox(label="Output Log", lines=20)
     
     # Hidden Button: "Generate PSBT" (Appears After Preview)
-    generate_btn = gr.Button("Generate PSBT", visible=False)
+    generate_btn = gr.Button("Generate Raw TX", visible=False)
     
     # Hidden Rows: Downloads & Outputs (Shown After Generate)
     with gr.Row(visible=False) as downloads_row1:
-        psbt_out = gr.File(label="PSBT File Download")
+        psbt_out = gr.File(label="Unsigned Raw TX Hex Download")
         shard_file = gr.File(label="Shard Blueprint Download", file_types=[".json"])
     with gr.Row(visible=False) as downloads_row2:
         blueprint_file = gr.File(label="Full Blueprint Download", file_types=[".json"])
@@ -512,7 +499,7 @@ Fund your address before run for live scan.
     submit_btn.click(
         fn=lambda u, p, d: main_flow(u, p, d, False),
         inputs=[user_addr, prune_choice, dest_addr],
-        outputs=[output_text, gr.State(None), gr.State(None), gr.State(None), gr.State(""), gr.State(None)]
+        outputs=[output_text]
     ).then(
         fn=show_generate_btn,
         outputs=generate_btn
@@ -525,7 +512,7 @@ Fund your address before run for live scan.
         outputs=[output_text, shard_file, psbt_out, blueprint_file, gci_text, seed_file_out]
     ).then(
         fn=show_downloads,
-        outputs=[downloads_row1, downloads_row2, gr.Row(visible=False)]  # Last is gci row
+        outputs=[downloads_row1, downloads_row2, gr.Row(visible=False)]  # Last is gci row, but since it's with Row(visible=False), adjust
     )
 
 # Render Launch: share=True for cloud bypass
