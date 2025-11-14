@@ -276,11 +276,15 @@ Fund your addr (0.001+ BTC) before run for live scan.
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
-    # Prune Choice
-    prune_map = {"Conservative": "1", "Balanced": "2", "Aggressive": "3"}
-    choice = prune_map.get(prune_choice, "2")
-    selected_ratio = prune_choices[choice]['ratio']
-    output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Ratio: {selected_ratio*100}%)')
+  # Prune Choice Mapping (Gradio Dropdown to choice key)
+prune_map = {
+    "Conservative (30% Keep)": "1", 
+    "Balanced (40% Keep)": "2", 
+    "Aggressive (50% Keep)": "3"
+}
+choice = prune_map.get(prune_choice, "2")
+selected_ratio = prune_choices[choice]['ratio']
+output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Ratio: {selected_ratio*100}%)')
     
     # Prune Logic
     all_utxos.sort(key=lambda x: x['amount'], reverse=True)
@@ -407,7 +411,11 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     gr.Markdown("# Omega DAO Pruner v8 - BTC UTXO Optimizer")
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
-        prune_choice = gr.Dropdown(choices=["Conservative", "Balanced", "Aggressive"], value="Balanced", label="Prune Strategy")
+        prune_choice = gr.Dropdown(
+    choices=["Conservative (30% Keep)", "Balanced (40% Keep)", "Aggressive (50% Keep)"], 
+    value="Balanced (40% Keep)", 
+    label="Prune Strategy"
+)
         dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
     submit_btn = gr.Button("Run Pruner")
     
