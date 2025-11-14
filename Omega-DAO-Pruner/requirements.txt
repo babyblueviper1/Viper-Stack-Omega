@@ -3,3 +3,4 @@ qutip
 numpy
 requests
 audioop-lts
+pydantic==2.10.6
