@@ -212,12 +212,12 @@ Fund your address before run for live scan.
     output_parts.append(disclaimer)
     
     if not user_addr:
-        return "\n".join(output_parts) + "\nNo address provided.", "", "", "", "", ""
+        return "\n".join(output_parts) + "\nNo address provided.", None, None, None, "", None
     
     # Validate Addr
     hrp, data = bech32_decode(user_addr)
     if hrp != 'bc' and not user_addr.startswith('1') and not user_addr.startswith('3'):
-        return "\n".join(output_parts) + "\nInvalid address. Use bc1q... or legacy 1/3.", "", "", "", "", ""
+        return "\n".join(output_parts) + "\nInvalid address. Use bc1q... or legacy 1/3.", None, None, None, "", None
     
     # Live BTC/USD
     try:
@@ -271,7 +271,15 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        return "\n".join(output_parts), json.dumps(shard, indent=2), None, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
+        seed_file = os.path.abspath(seed_file)
+        # Save shard and full_bp to temp files
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_shard:
+            json.dump(shard, tmp_shard, indent=2)
+        shard_file = tmp_shard.name
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_bp:
+            tmp_bp.write(full_bp)
+        bp_file = tmp_bp.name
+        return "\n".join(output_parts), shard_file, None, bp_file, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
@@ -348,7 +356,15 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Preview)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        return "\n".join(output_parts), json.dumps(shard, indent=2), None, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
+        seed_file = os.path.abspath(seed_file)
+        # Save shard and full_bp to temp files
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_shard:
+            json.dump(shard, tmp_shard, indent=2)
+        shard_file = tmp_shard.name
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_bp:
+            tmp_bp.write(full_bp)
+        bp_file = tmp_bp.name
+        return "\n".join(output_parts), shard_file, None, bp_file, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
     
     output_parts.append('Accepted - Generating PSBT')
     output_parts.append(f'Savings vs No Pruner: ${savings_usd:.2f} USD (Raw ${raw_fee_usd} → Pruned ${pruned_fee_usd})')
@@ -433,8 +449,16 @@ Fund your address before run for live scan.
     
     # Run Phases (Full for Confirm)
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt_stub, user_addr, dest_addr, dao_cut)
+    seed_file = os.path.abspath(seed_file)
+    # Save shard and full_bp to temp files
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_shard:
+        json.dump(shard, tmp_shard, indent=2)
+    shard_file = tmp_shard.name
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_bp:
+        tmp_bp.write(full_bp)
+    bp_file = tmp_bp.name
     
-    return "\n".join(output_parts), json.dumps(shard, indent=2), psbt_download, full_bp, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
+    return "\n".join(output_parts), shard_file, psbt_download, bp_file, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file
 
 # Gradio Interface (Now at End – After All Functions Defined)
 with gr.Blocks(title="Omega DAO Pruner v8") as demo:
@@ -458,10 +482,10 @@ Fund your address before run for live scan.
         dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
     submit_btn = gr.Button("Run Pruner")
     
-    # Always Visible: Preview Log & Shard
+    # Always Visible: Preview Log & Shard (now File for download)
     with gr.Row():
         output_text = gr.Textbox(label="Output Log", lines=20)
-        shard_json = gr.JSON(label="Shard Blueprint")
+        shard_file = gr.File(label="Shard Blueprint Download", file_types=[".json"])
     
     # Hidden Button: "Generate PSBT" (Appears After Preview)
     generate_btn = gr.Button("Generate PSBT", visible=False)
@@ -469,10 +493,10 @@ Fund your address before run for live scan.
     # Hidden Rows: PSBT & Full Outputs (Shown After Generate)
     with gr.Row(visible=False) as psbt_row1:
         psbt_out = gr.File(label="PSBT File Download")
-        blueprint_json = gr.JSON(label="Full Blueprint")
+        blueprint_file = gr.File(label="Full Blueprint Download", file_types=[".json"])
     with gr.Row(visible=False) as psbt_row2:
         gci_text = gr.Textbox(label="GCI Metrics")
-        seed_file = gr.File(label="Exported Seeds")
+        seed_file_out = gr.File(label="Exported Seeds")
 
     def show_generate_btn():
         # After preview run, show generate button
@@ -493,7 +517,7 @@ Fund your address before run for live scan.
     submit_btn.click(
         fn=main_flow,
         inputs=[user_addr, prune_choice, dest_addr, gr.State(False)],  # Force False for preview
-        outputs=[output_text, shard_json, psbt_out, blueprint_json, gci_text, seed_file]
+        outputs=[output_text, shard_file, psbt_out, blueprint_file, gci_text, seed_file_out]
     ).then(
         fn=show_generate_btn,
         outputs=generate_btn
@@ -503,7 +527,7 @@ Fund your address before run for live scan.
     generate_btn.click(
         fn=generate_psbt,
         inputs=[user_addr, prune_choice, dest_addr],
-        outputs=[output_text, shard_json, psbt_out, blueprint_json, gci_text, seed_file]
+        outputs=[output_text, shard_file, psbt_out, blueprint_file, gci_text, seed_file_out]
     ).then(
         fn=show_psbt_outputs,
         outputs=[psbt_row1, psbt_row2]
