@@ -65,8 +65,46 @@ def convertbits(data, frombits, tobits, pad=True):
         return None
     return ret
 
+# Base58 decode for legacy addresses
+BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+def base58_decode(addr):
+    n = 0
+    for c in addr:
+        n = n * 58 + BASE58_ALPHABET.index(c)
+    # Remove leading zeros
+    leading_zeros = len(addr) - len(addr.lstrip(BASE58_ALPHABET[0]))
+    byte_length = (n.bit_length() + 7) // 8
+    bytes_decoded = n.to_bytes(byte_length, 'big')
+    return b'\x00' * leading_zeros + bytes_decoded
+
+def address_to_script_pubkey(addr):
+    if addr.startswith('bc1q'):
+        hrp, data5 = bech32_decode(addr)
+        if hrp == 'bc' and data5 and data5[0] == 0:
+            data8 = convertbits(data5[1:], 5, 8, False)
+            if data8:
+                if len(data8) == 20:
+                    # P2WPKH: OP_0 PUSH20 <pubkeyhash>
+                    return bytes([0x00, 0x14]) + data8
+                elif len(data8) == 32:
+                    # P2WSH: OP_0 PUSH32 <scripthash>
+                    return bytes([0x00, 0x20]) + data8
+    elif addr.startswith('1'):
+        # P2PKH
+        decoded = base58_decode(addr)
+        if len(decoded) == 25 and decoded[0] == 0x00:
+            payload = decoded[1:21]  # 20-byte hash160
+            return bytes([0x76, 0xa9, 0x14]) + payload + bytes([0x88, 0xac])
+    elif addr.startswith('3'):
+        # P2SH
+        decoded = base58_decode(addr)
+        if len(decoded) == 22 and decoded[0] == 0x05:  # Note: P2SH version is 5 (0x05)
+            payload = decoded[1:21]  # 20-byte script hash
+            return bytes([0xa9, 0x14]) + payload + bytes([0x87])
+    raise ValueError(f"Unsupported or invalid address: {addr}")
+
 # Fixed DAO Addr1 (5% Cut Destination - Swarm Fuel)
-dao_cut_addr = 'bc1qwnj2zumaf67d34k6cm2l6gr3uvt5pp2hdrtvt3ckc4aunhmr53cselkpty'  # DAO Pool #1
+dao_cut_addr = 'bc1qwnj2zumaf67d34k6cm2l6gr3uvt5pp2hdrtvt3ckc4aunhmr53cselkpty'  # DAO Pool #1 (P2WSH)
 
 def get_utxos(addr):
     try:
@@ -99,6 +137,109 @@ prune_choices = {
     '2': {'label': 'Balanced (60% Pruned -- 40% Kept - v8 Default, Opt Prune)', 'ratio': 0.4},
     '3': {'label': 'Aggressive (50% Pruned -- 50% Kept - Max Prune, High Savings)', 'ratio': 0.5}
 }
+
+# Pure Python TX Builder
+def encode_int(i, nbytes, encoding='little'):
+    return i.to_bytes(nbytes, encoding)
+
+def encode_varint(i):
+    if i < 0xfd:
+        return bytes([i])
+    elif i < 0x10000:
+        return b'\xfd' + encode_int(i, 2, 'little')
+    elif i < 0x100000000:
+        return b'\xfe' + encode_int(i, 4, 'little')
+    elif i < 0x10000000000000000:
+        return b'\xff' + encode_int(i, 8, 'little')
+    else:
+        raise ValueError(f"integer too large: {i}")
+
+from dataclasses import dataclass
+from typing import List, Union
+
+@dataclass
+class Script:
+    cmds: List[Union[int, bytes]] = None
+
+    def __post_init__(self):
+        if self.cmds is None:
+            self.cmds = []
+
+    def encode(self):
+        out = []
+        for cmd in self.cmds:
+            if isinstance(cmd, int):
+                out.append(encode_int(cmd, 1))
+            elif isinstance(cmd, bytes):
+                length = len(cmd)
+                if length < 75:
+                    out.append(encode_int(length, 1))
+                    out.append(cmd)
+                else:
+                    raise ValueError("Script too long")
+        ret = b''.join(out)
+        return encode_varint(len(ret)) + ret
+
+@dataclass
+class TxIn:
+    prev_tx: bytes  # Reversed txid
+    prev_index: int
+    script_sig: Script = None
+    sequence: int = 0xffffffff
+
+    def __post_init__(self):
+        if self.script_sig is None:
+            self.script_sig = Script([])  # Empty for unsigned
+
+    def encode(self):
+        out = [
+            self.prev_tx,  # Already reversed
+            encode_int(self.prev_index, 4, 'little'),
+            self.script_sig.encode(),
+            encode_int(self.sequence, 4, 'little')
+        ]
+        return b''.join(out)
+
+@dataclass
+class TxOut:
+    amount: int
+    script_pubkey: bytes = None  # Raw bytes now, for simplicity
+
+    def __post_init__(self):
+        if self.script_pubkey is None:
+            self.script_pubkey = b''
+
+    def encode(self):
+        script_encoded = encode_varint(len(self.script_pubkey)) + self.script_pubkey
+        out = [
+            encode_int(self.amount, 8, 'little'),
+            script_encoded
+        ]
+        return b''.join(out)
+
+@dataclass
+class Tx:
+    version: int = 1
+    tx_ins: List[TxIn] = None
+    tx_outs: List[TxOut] = None
+    locktime: int = 0
+
+    def __post_init__(self):
+        if self.tx_ins is None:
+            self.tx_ins = []
+        if self.tx_outs is None:
+            self.tx_outs = []
+
+    def encode(self):
+        out = [
+            encode_int(self.version, 4, 'little'),
+            encode_varint(len(self.tx_ins))
+        ]
+        out += [txin.encode() for txin in self.tx_ins]
+        out += [encode_varint(len(self.tx_outs))]
+        out += [txout.encode() for txout in self.tx_outs]
+        out += [encode_int(self.locktime, 4, 'little')]
+        return b''.join(out)
 
 # HELPER: PHASE 1-3 Logic (Duplicated to Avoid Bloat)
 def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut):
@@ -362,39 +503,35 @@ Fund your address before run for live scan.
     dao_cut_usd = round(dao_cut * btc_usd, 2)
     output_parts.append(f'5% DAO Cut Integrated: {dao_cut:.8f} BTC (${dao_cut_usd}) to DAO Pool - Adjusted Net Send: {send_amount:.8f} BTC (${send_usd})')
     
-    # Raw TX stub for display
-    dao_cut_flag = '_dao_cut' if dao_cut > 0 else ''
-    psbt_stub = f'hex_rawtx_{len(pruned_utxos)}_inputs_to_{dest_addr[:10]}..._fee_{pruned_fee:.8f}{dao_cut_flag}'
-    output_parts.append(f'Raw TX Stub: {psbt_stub} - Inputs pre-specified in hex below.')
-
-    # Auto-Raw TX Generation (Confirm Branch) - Fixed output amounts
+    # Auto-Raw TX Generation (Pure Python with Full scriptPubKeys)
     raw_hex = None
     try:
-        from bitcoinlib.transactions import Transaction
-
-        tx = Transaction(network='bitcoin')
+        # Derive real scriptPubKeys
+        script_dest = address_to_script_pubkey(dest_addr)
+        script_dao = address_to_script_pubkey(dao_cut_addr)
         
-        # Add pruned UTXOs as inputs (unsigned) - Minimal params with value
+        tx = Tx(tx_ins=[], tx_outs=[])
+        
+        # Add pruned UTXOs as inputs (unsigned, empty script_sig)
         for u in pruned_utxos:
-            tx.add_input(
-                prev_txid=u['txid'], 
-                output_n=u['vout'], 
-                value=int(u['amount'] * 1e8)
-            )
+            prev_tx_bytes = bytes.fromhex(u['txid'])[::-1]  # Little-endian reversal
+            txin = TxIn(prev_tx=prev_tx_bytes, prev_index=u['vout'])
+            tx.tx_ins.append(txin)
         
-        # Add outputs - Fixed: send_amount (net to dest) + dao_cut
-        tx.add_output(value=int(send_amount * 1e8), address=dest_addr)  # Net send to dest
+        # Add outputs with real scripts
+        tx.tx_outs.append(TxOut(amount=int(send_amount * 1e8), script_pubkey=script_dest))  # Net send to dest
         if dao_cut > 0:
-            tx.add_output(value=int(dao_cut * 1e8), address=dao_cut_addr)  # DAO cut
+            tx.tx_outs.append(TxOut(amount=int(dao_cut * 1e8), script_pubkey=script_dao))  # DAO cut
         
-        # Fee is implicit (sum inputs - sum outputs)
-        
-        # Serialize as raw hex (unsigned)
-        raw_hex = tx.raw_hex()
-        output_parts.append(f'Unsigned Raw TX Generated: Copy the ENTIRE hex below into Electrum (Tools > Load transaction > From hex). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
+        # Serialize as raw hex (unsigned; fee implicit via input/output delta)
+        raw_hex = tx.encode().hex()
+        output_parts.append(f'Unsigned Raw TX Generated ({len(tx.tx_ins)} inputs): Copy the ENTIRE hex below into Electrum (Tools > Load transaction > From hex). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
+        output_parts.append(f'Dest ScriptPubKey: {script_dest.hex()[:20]}... (full derived)')
+        if dao_cut > 0:
+            output_parts.append(f'DAO ScriptPubKey: {script_dao.hex()[:20]}... (full derived)')
     except Exception as e:
-        raw_hex = psbt_stub
-        output_parts.append(f'Raw TX Gen Error ({e}): Use stub for manual setup in wallet.')
+        raw_hex = f"Error in TX gen: {e}"
+        output_parts.append(f'Raw TX Gen Error ({e}): Check console for details.')
     
     instructions = """
 === Next Steps ===
@@ -425,13 +562,13 @@ Fund your address before run for live scan.
         'dest_addr': dest_addr,
         'dao_cut': float(dao_cut),
         'dao_cut_addr': dao_cut_addr,
-        'psbt_stub': psbt_stub
+        'psbt_stub': raw_hex[:50] + '...' if raw_hex else 'error'
     }
     
     # Run Phases (Full for Confirm)
-    gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt_stub, user_addr, dest_addr, dao_cut)
+    gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, raw_hex or 'error', user_addr, dest_addr, dao_cut)
     
-    raw_hex_text = raw_hex if raw_hex else psbt_stub
+    raw_hex_text = raw_hex if raw_hex else "TX Generation Failed - See Log"
     
     return "\n".join(output_parts), raw_hex_text
 
