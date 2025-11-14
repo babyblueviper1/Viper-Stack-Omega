@@ -409,7 +409,6 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
         prune_choice = gr.Dropdown(choices=["Conservative", "Balanced", "Aggressive"], value="Balanced", label="Prune Strategy")
         dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
-    confirm_proceed = gr.Checkbox(label="Confirm & Generate PSBT (Irreversible Step)", value=False)
     submit_btn = gr.Button("Run Pruner")
     
     # Always Visible: Preview Log & Shard
@@ -417,7 +416,10 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
         output_text = gr.Textbox(label="Output Log", lines=20)
         shard_json = gr.JSON(label="Shard Blueprint")
     
-    # Hidden Rows: PSBT & Full Outputs (Shown Only on Confirm)
+    # Hidden Checkbox: Appears After First Run
+    confirm_proceed = gr.Checkbox(label="Generate PSBT", value=False, visible=False)
+    
+    # Hidden Rows: PSBT & Full Outputs (Shown Only on Generate)
     with gr.Row(visible=False) as psbt_row1:
         psbt_out = gr.Textbox(label="PSBT Stub", visible=False)
         blueprint_json = gr.JSON(label="Full Blueprint", visible=False)
@@ -425,8 +427,13 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
         gci_text = gr.Textbox(label="GCI Metrics", visible=False)
         seed_file = gr.File(label="Exported Seeds", visible=False)
 
-    def update_visibility(confirm_proceed):
-        # Show PSBT rows & outputs only if confirm is true
+    def update_after_preview(confirm_proceed):
+        # After first run, show checkbox if UTXOs found (or always for simplicity)
+        show_checkbox = True  # Or condition on all_utxos from main_flow if passed back
+        return gr.update(visible=show_checkbox, label="Generate PSBT")
+
+    def update_for_generate(confirm_proceed):
+        # Show PSBT rows & outputs only if generate checked
         row_vis = confirm_proceed
         out_vis = confirm_proceed
         return [
@@ -438,13 +445,17 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
             gr.update(visible=out_vis),  # seed_file
         ]
 
-    # Button click: Run main_flow, then update visibility based on confirm
+    # Button click: Run main_flow, then update checkbox visibility, then PSBT visibility
     submit_btn.click(
         fn=main_flow,
         inputs=[user_addr, prune_choice, dest_addr, confirm_proceed],
         outputs=[output_text, shard_json, psbt_out, blueprint_json, gci_text, seed_file]
     ).then(
-        fn=update_visibility,
+        fn=update_after_preview,
+        inputs=confirm_proceed,
+        outputs=confirm_proceed  # Updates checkbox visibility/label
+    ).then(
+        fn=update_for_generate,
         inputs=confirm_proceed,
         outputs=[psbt_row1, psbt_out, blueprint_json, psbt_row2, gci_text, seed_file]
     )
