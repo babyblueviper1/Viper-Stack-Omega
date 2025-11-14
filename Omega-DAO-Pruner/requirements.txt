@@ -3,4 +3,3 @@ qutip
 numpy
 requests
 audioop-lts
-huggingface_hub==0.23.4
