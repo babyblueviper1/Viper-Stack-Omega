@@ -92,11 +92,10 @@ def get_utxos(addr):
         print(f'API Decoherence for {addr[:10]}...: {e} - Fallback Empty')
         return []
 
-# FIXED: Define prune_choices globally
 prune_choices = {
-    '1': {'label': 'Conservative (30% Keep - Low Risk, Mod Savings)', 'ratio': 0.3},
-    '2': {'label': 'Balanced (40% Keep - v8 Default, Opt Prune)', 'ratio': 0.4},
-    '3': {'label': 'Aggressive (50% Keep - Max Prune, High Savings)', 'ratio': 0.5}
+    '1': {'label': 'Conservative (70% Pruned -- 30% Kept - Low Risk, Mod Savings)', 'ratio': 0.3},
+    '2': {'label': 'Balanced (60% Pruned -- 40% Kept - v8 Default, Opt Prune)', 'ratio': 0.4},
+    '3': {'label': 'Aggressive (50% Pruned -- 50% Kept - Max Prune, High Savings)', 'ratio': 0.5}
 }
 
 # HELPER: PHASE 1-3 Logic (Duplicated to Avoid Bloat)
@@ -276,15 +275,15 @@ Fund your addr (0.001+ BTC) before run for live scan.
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
-    # Prune Choice Mapping (Gradio Dropdown to choice key)
-    prune_map = {
-        "Conservative (30% Keep)": "1", 
-        "Balanced (40% Keep)": "2", 
-        "Aggressive (50% Keep)": "3"
-    }
-    choice = prune_map.get(prune_choice, "2")
-    selected_ratio = prune_choices[choice]['ratio']
-    output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Ratio: {selected_ratio*100}%)')
+# Prune Choice Mapping (Gradio Dropdown to choice key)
+prune_map = {
+    "Conservative (70% Pruned -- 30% Kept)": "1", 
+    "Balanced (60% Pruned -- 40% Kept)": "2", 
+    "Aggressive (50% Pruned -- 50% Kept)": "3"
+}
+choice = prune_map.get(prune_choice, "2")
+selected_ratio = prune_choices[choice]['ratio']  # Keep ratio for calc (keep fraction)
+output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - selected_ratio)*100:.0f}% -- Kept: {selected_ratio*100:.0f}%)')
     
     # Prune Logic
     all_utxos.sort(key=lambda x: x['amount'], reverse=True)
@@ -412,7 +411,10 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
         prune_choice = gr.Dropdown(
-    choices=["Conservative (30% Keep)", "Balanced (40% Keep)", "Aggressive (50% Keep)"], 
+    choices=["Conservative (70% Pruned -- 30% Kept)", "Balanced (60% Pruned -- 40% Kept)", "Aggressive (50% Pruned -- 50% Kept)"], 
+    value="Balanced (60% Pruned -- 40% Kept)", 
+    label="Prune Strategy"
+), 
     value="Balanced (40% Keep)", 
     label="Prune Strategy"
 )
