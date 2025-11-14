@@ -202,12 +202,10 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
     
     # Disclaimer
     disclaimer = """
-=== Omega DAO Pruner v8 Disclaimer ===
 This tool generates a prune plan, fee estimate, and PSBT stub—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
-Fund your addr (0.001+ BTC) before run for live scan.
-=== End Disclaimer ===
+Fund your address before run for live scan.
 """
     output_parts.append(disclaimer)
     
@@ -368,7 +366,7 @@ Fund your addr (0.001+ BTC) before run for live scan.
     
     # Instructions
     instructions = """
-=== Next Steps for Pruning & Broadcasting ===
+=== Next Steps ===
 1. Copy the PSBT stub above into your wallet (Tools > Load Transaction > From PSBT).
 2. Select the pruned UTXOs from the exported prune_blueprint_v8.json as inputs.
 3. Sign the transaction with your private keys (non-custodial—wallet handles this).
@@ -410,12 +408,10 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     
     # Disclaimer: Always Visible Above Inputs
     gr.Markdown("""
-=== Omega DAO Pruner v8 Disclaimer ===
 This tool generates a prune plan, fee estimate, and PSBT stub—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
-Fund your addr (0.001+ BTC) before run for live scan.
-=== End Disclaimer ===
+Fund your address before run for live scan.
 """)
     
     with gr.Row():
