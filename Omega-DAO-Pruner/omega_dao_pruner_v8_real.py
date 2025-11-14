@@ -4,7 +4,7 @@ import numpy as np
 import requests
 import os
 import base64
-import tempfile
+import io
 
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -245,6 +245,11 @@ Fund your address before run for live scan.
     psbt = 'abort_psbt'
     gci = 0.8
     
+    shard_bytes = None
+    psbt_bytes = None
+    bp_bytes = None
+    seed_bytes = None
+    
     if not all_utxos:
         output_parts.append('No UTXOs Found - Fund Addr (0.001+ BTC) & Re-Run (6+ Confs)')
         if not dest_addr:
@@ -271,7 +276,11 @@ Fund your address before run for live scan.
         }
         # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
-        return "\n".join(output_parts), None, None, None, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", None
+        shard_bytes = json.dumps(shard, indent=2).encode('utf-8')
+        bp_bytes = full_bp.encode('utf-8')
+        with open(seed_file, 'r') as f:
+            seed_bytes = f.read().encode('utf-8')
+        return "\n".join(output_parts), shard_bytes, psbt_bytes, bp_bytes, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_bytes
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
@@ -367,7 +376,7 @@ Fund your address before run for live scan.
     output_parts.append('Broadcast Mock: Tx Confirmed - RBF Batch Primed for Surge')
 
     # Auto-Raw TX Generation (Confirm Branch)
-    psbt_download = None
+    raw_hex = None
     try:
         from bitcoinlib.transactions import Transaction
 
@@ -386,14 +395,11 @@ Fund your address before run for live scan.
         tx.fee = int(pruned_fee * 1e8)
         
         # Serialize as raw hex (unsigned)
-        raw_tx = tx.raw()
-        raw_hex = raw_tx.hex()
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.hex', delete=False, encoding='utf-8') as tmp:
-            tmp.write(raw_hex)
-        psbt_download = tmp.name
+        raw_tx = tx.raw_hex()
+        raw_hex = raw_tx
         output_parts.append(f'Auto-Raw TX Generated: Download below (unsigned hex—import into wallet for signing).')
     except Exception as e:
-        psbt_download = None
+        raw_hex = None
         output_parts.append(f'Raw TX Gen Error ({e}): Use stub for manual setup.')
     
     instructions = """
@@ -430,16 +436,14 @@ Fund your address before run for live scan.
     
     # Run Phases (Full for Confirm)
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt_stub, user_addr, dest_addr, dao_cut)
-    seed_file_path = os.path.abspath(seed_file)
-    # Save shard and full_bp to temp files
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_shard:
-        json.dump(shard, tmp_shard, indent=2)
-    shard_file = tmp_shard.name
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False, encoding='utf-8') as tmp_bp:
-        tmp_bp.write(full_bp)
-    bp_file = tmp_bp.name
+    # Prepare bytes
+    shard_bytes = json.dumps(shard, indent=2).encode('utf-8')
+    bp_bytes = full_bp.encode('utf-8')
+    with open(seed_file, 'r') as f:
+        seed_bytes = f.read().encode('utf-8')
+    psbt_bytes = raw_hex.encode('utf-8') if raw_hex else None
     
-    return "\n".join(output_parts), shard_file, psbt_download, bp_file, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_file_path
+    return "\n".join(output_parts), shard_bytes, psbt_bytes, bp_bytes, f"GCI: {gci:.3f} - Fidelity Hold: 0.99", seed_bytes
 
 # Gradio Interface (Now at End – After All Functions Defined)
 with gr.Blocks(title="Omega DAO Pruner v8") as demo:
@@ -466,7 +470,7 @@ Fund your address before run for live scan.
     # Always Visible: Only Output Log (Shard hidden until end)
     output_text = gr.Textbox(label="Output Log", lines=20)
     
-    # Hidden Button: "Generate PSBT" (Appears After Preview)
+    # Hidden Button: "Generate Raw TX" (Appears After Preview)
     generate_btn = gr.Button("Generate Raw TX", visible=False)
     
     # Hidden Rows: Downloads & Outputs (Shown After Generate)
@@ -476,7 +480,7 @@ Fund your address before run for live scan.
     with gr.Row(visible=False) as downloads_row2:
         blueprint_file = gr.File(label="Full Blueprint Download", file_types=[".json"])
         seed_file_out = gr.File(label="Exported Seeds")
-    with gr.Row(visible=False):
+    with gr.Row(visible=False) as downloads_row3:
         gci_text = gr.Textbox(label="GCI Metrics")
 
     def show_generate_btn():
@@ -492,7 +496,7 @@ Fund your address before run for live scan.
         return [
             gr.update(visible=True),  # downloads_row1
             gr.update(visible=True),  # downloads_row2
-            gr.update(visible=True),  # gci row
+            gr.update(visible=True),  # downloads_row3
         ]
 
     # First Run: Preview (confirm=False) - Only log
@@ -505,14 +509,14 @@ Fund your address before run for live scan.
         outputs=generate_btn
     )
 
-    # Second Step: Generate PSBT (confirm=True) - Full outputs
+    # Second Step: Generate Raw TX (confirm=True) - Full outputs
     generate_btn.click(
         fn=generate_psbt,
         inputs=[user_addr, prune_choice, dest_addr],
         outputs=[output_text, shard_file, psbt_out, blueprint_file, gci_text, seed_file_out]
     ).then(
         fn=show_downloads,
-        outputs=[downloads_row1, downloads_row2, gr.Row(visible=False)]  # Last is gci row, but since it's with Row(visible=False), adjust
+        outputs=[downloads_row1, downloads_row2, downloads_row3]
     )
 
 # Render Launch: share=True for cloud bypass
