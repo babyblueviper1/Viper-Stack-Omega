@@ -276,15 +276,15 @@ Fund your addr (0.001+ BTC) before run for live scan.
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
-  # Prune Choice Mapping (Gradio Dropdown to choice key)
-prune_map = {
-    "Conservative (30% Keep)": "1", 
-    "Balanced (40% Keep)": "2", 
-    "Aggressive (50% Keep)": "3"
-}
-choice = prune_map.get(prune_choice, "2")
-selected_ratio = prune_choices[choice]['ratio']
-output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Ratio: {selected_ratio*100}%)')
+    # Prune Choice Mapping (Gradio Dropdown to choice key)
+    prune_map = {
+        "Conservative (30% Keep)": "1", 
+        "Balanced (40% Keep)": "2", 
+        "Aggressive (50% Keep)": "3"
+    }
+    choice = prune_map.get(prune_choice, "2")
+    selected_ratio = prune_choices[choice]['ratio']
+    output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Ratio: {selected_ratio*100}%)')
     
     # Prune Logic
     all_utxos.sort(key=lambda x: x['amount'], reverse=True)
