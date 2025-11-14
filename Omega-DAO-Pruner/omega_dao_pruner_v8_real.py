@@ -372,17 +372,14 @@ Fund your address before run for live scan.
     try:
         from bitcoinlib.transactions import Transaction
 
-        tx = Transaction()
+        tx = Transaction(network='bitcoin')
         
-        # Add pruned UTXOs as inputs (unsigned) - Removed unlocking_script as it's not a valid param
+        # Add pruned UTXOs as inputs (unsigned) - Minimal params with value
         for u in pruned_utxos:
-            script_type = 'p2wpkh' if u['address'].startswith('bc1') else 'p2pkh'
             tx.add_input(
                 prev_txid=u['txid'], 
                 output_n=u['vout'], 
-                value=int(u['amount'] * 1e8),
-                address=u['address'],
-                script_type=script_type
+                value=int(u['amount'] * 1e8)
             )
         
         # Add outputs - Fixed: send_amount (net to dest) + dao_cut
@@ -390,8 +387,7 @@ Fund your address before run for live scan.
         if dao_cut > 0:
             tx.add_output(value=int(dao_cut * 1e8), address=dao_cut_addr)  # DAO cut
         
-        # Set fee (optional, since outputs balance to inputs - fee)
-        tx.fee = int(pruned_fee * 1e8)
+        # Fee is implicit (sum inputs - sum outputs)
         
         # Serialize as raw hex (unsigned)
         raw_hex = tx.raw_hex()
