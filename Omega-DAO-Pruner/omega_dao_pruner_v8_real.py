@@ -197,7 +197,7 @@ class TxIn:
     prev_tx: bytes  # Reversed txid
     prev_index: int
     script_sig: Script = None
-    sequence: int = 0xffffffff
+    sequence: int = 0xfffffffd  # RBF-enabled (was 0xffffffff)
 
     def __post_init__(self):
         if self.script_sig is None:
@@ -568,10 +568,11 @@ This is not financial advice. Use at your own risk.
         
         # Serialize as raw hex (unsigned; fee implicit via input/output delta)
         raw_hex = tx.encode().hex()
-        output_parts.append(f'Unsigned Raw TX Generated ({len(tx.tx_ins)} inputs, {len(tx.tx_outs)} outputs: net send to dest + DAO incentive). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
+        output_parts.append(f'Unsigned Raw TX Generated ({len(tx.tx_ins)} inputs, {len(tx.tx_outs)} outputs: net send to dest + DAO incentive): Copy the ENTIRE hex below into Electrum (Tools > Load transaction > From hex). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
         output_parts.append(f'Dest ScriptPubKey: {script_dest.hex()[:20]}... (full derived)')
         if dao_cut > 546 / 1e8:
             output_parts.append(f'DAO ScriptPubKey: {script_dao.hex()[:20]}... (full derived)')
+        output_parts.append('This transaction is RBF-enabled (sequence: 0xfffffffd), allowing you to bump the fee in your wallet if it gets stuck in the mempool.')
     except Exception as e:
         raw_hex = f"Error in TX gen: {e}"
         output_parts.append(f'Raw TX Gen Error ({e}): Check console for details.')
@@ -580,8 +581,8 @@ This is not financial advice. Use at your own risk.
 === Next Steps ===
 1. Copy the ENTIRE raw TX hex below.
 2. In Electrum: Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs, net send + DAO incentive auto-load as outputs.
-3. Preview to confirm, then Sign.
-4. Broadcast and monitor. Re-run for RBF if needed.
+3. Preview to confirm, (TX is RBF-enabled: sequence signals allow fee bumps without re-signing). Sign.
+4. Broadcast and monitor.  If unconfirmed (low fee/mempool full), right-click TX in Electrum > "Increase fee" for RBF bump (auto-higher rate; DAO unchanged). Re-run tool for major tweaks (e.g., new UTXOs/strategy—will recalc fees/DAO).
 === Proceed Securely ===
 """
     output_parts.append(instructions)
@@ -646,7 +647,7 @@ This is not financial advice. Use at your own risk.
     output_text = gr.Textbox(label="Output Log", lines=20)
     
     # Hidden: Raw TX Hex (Only after Generate)
-    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex - Copy Entire Content Below", lines=10, visible=False)
+    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex - Copy Entire Content Below for Electrum", lines=10, visible=False)
     
     # Hidden Button: "Generate Unsigned Raw TX" (Appears After Preview)
     generate_btn = gr.Button("Generate Pruned TX Hex (DAO Pool Incentive Included)", visible=False)
