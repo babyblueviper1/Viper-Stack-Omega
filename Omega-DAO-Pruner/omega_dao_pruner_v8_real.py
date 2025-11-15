@@ -646,7 +646,7 @@ This is not financial advice. Use at your own risk.
     output_text = gr.Textbox(label="Output Log", lines=20)
     
     # Hidden: Raw TX Hex (Only after Generate)
-    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex - Copy Entire Content Below for Electrum", lines=10, visible=False)
+    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex - Copy Entire Content Below", lines=10, visible=False)
     
     # Hidden Button: "Generate Unsigned Raw TX" (Appears After Preview)
     generate_btn = gr.Button("Generate Pruned TX Hex (DAO Pool Incentive Included)", visible=False)
