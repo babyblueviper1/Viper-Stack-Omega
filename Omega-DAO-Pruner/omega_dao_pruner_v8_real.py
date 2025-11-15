@@ -133,9 +133,9 @@ def get_utxos(addr):
         return []
 
 prune_choices = {
-    '1': {'label': 'Conservative (70% Pruned -- 30% Kept - Low Risk, Mod Savings)', 'ratio': 0.3},
-    '2': {'label': 'Balanced (60% Pruned -- 40% Kept - v8 Default, Opt Prune)', 'ratio': 0.4},
-    '3': {'label': 'Aggressive (50% Pruned -- 50% Kept - Max Prune, High Savings)', 'ratio': 0.5}
+    '1': {'label': 'Conservative (70% Pruned / 30% Retained - Low Risk, Moderate Savings)', 'ratio': 0.3},
+    '2': {'label': 'Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)', 'ratio': 0.4},
+    '3': {'label': 'Aggressive (50% Pruned / 50% Retained - Max Consolidation, High Savings)', 'ratio': 0.5}
 }
 
 # Pure Python TX Builder
@@ -348,7 +348,6 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
-Fund your address before run for live scan.
 """
     output_parts.append(disclaimer)
     
@@ -536,7 +535,7 @@ Fund your address before run for live scan.
     instructions = """
 === Next Steps ===
 1. Copy the ENTIRE raw TX hex below.
-2. In Electrum: Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs.
+2. In Electrum (or similar): Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs.
 3. Preview to confirm, then Sign.
 4. Broadcast and monitor. Re-run for RBF if needed.
 === Proceed Securely ===
@@ -581,14 +580,13 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
-Fund your address before run for live scan.
 """)
     
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
         prune_choice = gr.Dropdown(
-            choices=["Conservative (70% Pruned -- 30% Kept)", "Balanced (60% Pruned -- 40% Kept)", "Aggressive (50% Pruned -- 50% Kept)"], 
-            value="Balanced (60% Pruned -- 40% Kept)", 
+            choices=["Conservative (70% Pruned / 30% Retained - Low Risk, Moderate Savings)", "Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)", "Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)"], 
+            value="Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)", 
             label="Prune Strategy"
         )
         dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
