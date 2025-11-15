@@ -568,7 +568,7 @@ This is not financial advice. Use at your own risk.
         
         # Serialize as raw hex (unsigned; fee implicit via input/output delta)
         raw_hex = tx.encode().hex()
-        output_parts.append(f'Unsigned Raw TX Generated ({len(tx.tx_ins)} inputs): Copy the ENTIRE hex below into Electrum (Tools > Load transaction > From hex). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
+        output_parts.append(f'Unsigned Raw TX Generated ({len(tx.tx_ins)} inputs, {len(tx.tx_outs)} outputs: net send to dest + DAO incentive): Copy the ENTIRE hex below into Electrum (Tools > Load transaction > From hex). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
         output_parts.append(f'Dest ScriptPubKey: {script_dest.hex()[:20]}... (full derived)')
         if dao_cut > 546 / 1e8:
             output_parts.append(f'DAO ScriptPubKey: {script_dao.hex()[:20]}... (full derived)')
@@ -579,7 +579,7 @@ This is not financial advice. Use at your own risk.
     instructions = """
 === Next Steps ===
 1. Copy the ENTIRE raw TX hex below.
-2. In Electrum: Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs.
+2. In Electrum: Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs, net send + DAO incentive auto-load as outputs.
 3. Preview to confirm, then Sign.
 4. Broadcast and monitor. Re-run for RBF if needed.
 === Proceed Securely ===
