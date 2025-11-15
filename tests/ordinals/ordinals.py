@@ -126,19 +126,34 @@ def get_utxos(addr):
         current_height = tip_response.json()
         utxo_response = api_get(f'https://blockstream.info/api/address/{addr}/utxo')
         utxos_raw = utxo_response.json()
+        
+        # NEW: Ordinals API fetch (Hiro for inscription UTXOs)
+        ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={addr}&limit=100')
+        inscriptions = ordinals_response.json().get('results', [])
+        
+        # Merge: Flag UTXOs with inscriptions (dust if <0.0001 BTC or spam-like)
         filtered_utxos = []
         for utxo in utxos_raw:
             if utxo['status']['confirmed']:
                 confs = current_height - utxo['status']['block_height'] + 1
                 if confs > 6 and utxo['value'] > 546:
+                    # Check if UTXO has inscription (match txid/vout)
+                    inscription_flag = any(ins['tx_id'] == utxo['txid'] and ins['output'] == utxo['vout'] for ins in inscriptions)
                     filtered_utxos.append({
                         'txid': utxo['txid'],
                         'vout': utxo['vout'],
                         'amount': utxo['value'] / 1e8,
                         'address': addr,
-                        'confs': confs
+                        'confs': confs,
+                        'is_inscription': inscription_flag,  # NEW: For priority sorting
+                        'dust_risk': utxo['value'] < 10000  # sats threshold for "dusty"
                     })
-        print(f'API Success for {addr[:10]}...: {len(filtered_utxos)} UTXOs (>6 confs)')
+        
+        # Sort: Prioritize inscription dust (NEW: Inscriptions first)
+        filtered_utxos.sort(key=lambda u: (u['is_inscription'], u['amount']), reverse=True)
+        
+        inscription_count = sum(1 for u in filtered_utxos if u['is_inscription'])
+        print(f'API Success for {addr[:10]}...: {len(filtered_utxos)} UTXOs ({inscription_count} inscriptions) >6 confs')
         return filtered_utxos
     except Exception as e:
         print(f'API Decoherence for {addr[:10]}...: {e} - Fallback Empty')
@@ -446,13 +461,17 @@ Contact: omegadaov8@proton.me
     selected_ratio = prune_choices[choice]['ratio']  # Keep ratio for calc (keep fraction)
     output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - selected_ratio)*100:.0f}% / Retained: {selected_ratio*100:.0f}%)')
     
-    # Prune Logic
-    all_utxos.sort(key=lambda x: x['amount'], reverse=True)
+    # Prune Logic - Enhanced Sort (NEW: Inscriptions prioritized)
+    all_utxos.sort(key=lambda x: (x.get('is_inscription', False), x['amount']), reverse=True)
     prune_count = max(1, int(len(all_utxos) * selected_ratio))
     pruned_utxos = all_utxos[:prune_count]
     pruned_amounts = [round(u['amount'], 4) for u in pruned_utxos]
     pruned_usd = [round(amt * btc_usd, 2) for amt in pruned_amounts]
     output_parts.append(f'Pruned UTXOs: [{", ".join(f"{amt} BTC (${usd})" for amt, usd in zip(pruned_amounts, pruned_usd))}]')
+    # NEW: Ordinals/Inscription Tease
+    inscription_count = sum(1 for u in pruned_utxos if u.get('is_inscription', False))
+    if inscription_count > 0:
+        output_parts.append(f'Inscribed UTXOs Pruned: {inscription_count} (Ordinals/BRC-20 dust prioritized)')
     
     # Fee Estimate (Address-type aware: SegWit vs Legacy)
     try:
