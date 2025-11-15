@@ -373,6 +373,10 @@ This is not financial advice. Use at your own risk.
     if hrp != 'bc' and not user_addr.startswith('1') and not user_addr.startswith('3'):
         return "\n".join(output_parts) + "\nInvalid address. Use bc1q... or legacy 1/3.", ""
     
+    # Detect address type for vB calculation
+    is_segwit = user_addr.startswith('bc1q')
+    addr_type = "SegWit P2WPKH" if is_segwit else "Legacy P2PKH/P2SH"
+    
     # Live BTC/USD (with retry)
     try:
         price_response = api_get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
@@ -382,7 +386,7 @@ This is not financial advice. Use at your own risk.
         output_parts.append('Price API Timeout - Using Fallback BTC/USD: $98,500')
     output_parts.append(f'Live BTC/USD: ${btc_usd:,.2f} (CoinGecko Echo)')
     
-    output_parts.append(f'Loaded User Addr: {user_addr[:10]}...')
+    output_parts.append(f'Loaded User Addr: {user_addr[:10]}... ({addr_type})')
     
     all_utxos = get_utxos(user_addr)
     
@@ -410,7 +414,7 @@ This is not financial advice. Use at your own risk.
             's_rho': 0.292,
             's_tuned': 0.611,
             'gci': gci,
-            'timestamp': '2025-11-14T00:00:00-03:00',
+            'timestamp': '2025-11-15T00:00:00-03:00',
             'pruned_fee': float(pruned_fee),
             'raw_fee': float(raw_fee),
             'pruned_fee_usd': pruned_fee_usd,
@@ -449,7 +453,7 @@ This is not financial advice. Use at your own risk.
     pruned_usd = [round(amt * btc_usd, 2) for amt in pruned_amounts]
     output_parts.append(f'Pruned UTXOs: [{", ".join(f"{amt} BTC (${usd})" for amt, usd in zip(pruned_amounts, pruned_usd))}]')
     
-    # Fee Estimate (Fixed: 2 outputs for pruned TX, savings % reflects prune reduction)
+    # Fee Estimate (Address-type aware: SegWit vs Legacy)
     try:
         fee_response = api_get('https://blockstream.info/api/fee-estimates/6')
         fee_rate_sat = fee_response.json()
@@ -458,18 +462,27 @@ This is not financial advice. Use at your own risk.
         fee_rate_sat = 10
         fee_rate = 10 * 1e-8
         output_parts.append('Fee API Timeout - Using Fallback 10 sat/vB')
-    raw_vb = 148 * len(all_utxos) + 34
-    pruned_vb = 148 * len(pruned_utxos) + 34 * 2  # Fixed: Assume 2 outputs (dest + DAO)
+    
+    # vB weights based on address type
+    if is_segwit:
+        input_vb = 67.25  # Signed P2WPKH input
+        output_vb = 31    # P2WPKH output
+        addr_note = "(SegWit P2WPKH)"
+    else:
+        input_vb = 148    # Legacy input
+        output_vb = 34    # Legacy output
+        addr_note = "(Legacy P2PKH/P2SH)"
+    overhead_vb = 10
+    
+    raw_vb = overhead_vb + input_vb * len(all_utxos) + output_vb * 1  # Raw: all inputs, 1 output
+    pruned_vb = overhead_vb + input_vb * len(pruned_utxos) + output_vb * 2  # Pruned: few inputs, 2 outputs (dest + DAO)
+    
     raw_fee = raw_vb * fee_rate
     pruned_fee = pruned_vb * fee_rate
     raw_fee_usd = round(raw_fee * btc_usd, 2)
     pruned_fee_usd = round(pruned_fee * btc_usd, 2)
     savings = raw_fee - pruned_fee
     savings_usd = round(savings * btc_usd, 2)
-    output_parts.append(f'\nFee Estimate @ {fee_rate_sat:.0f} sat/vB:')
-    output_parts.append(f'Raw Tx ({len(all_utxos)} UTXOs): {raw_fee:.8f} BTC (${raw_fee_usd}) ({raw_vb} vB)')
-    output_parts.append(f'Pruned Tx ({len(pruned_utxos)} UTXOs): {pruned_fee:.8f} BTC (${pruned_fee_usd}) ({pruned_vb} vB)')
-    output_parts.append(f'Fee Savings: {savings:.8f} BTC (${savings_usd}) ({(1 - selected_ratio)*100:.0f}%)')  # Fixed: Pruned % for savings
     
     if not dest_addr:
         dest_addr = user_addr
@@ -481,6 +494,11 @@ This is not financial advice. Use at your own risk.
     # Preview DAO Cut (Fixed: 5% of fee savings, not tx value)
     preview_dao_cut = 0.05 * savings
     preview_dao_cut_usd = round(preview_dao_cut * btc_usd, 2)
+    output_parts.append(f'\nFee Estimate @ {fee_rate_sat:.0f} sat/vB for transaction ({total_tx_value:.8f} BTC (${total_tx_usd:,.2f})) {addr_note}:')
+    output_parts.append(f'Raw Tx ({len(all_utxos)} UTXOs): {raw_fee:.8f} BTC (${raw_fee_usd}) ({raw_vb:.1f} vB)')
+    output_parts.append(f'Pruned Tx ({len(pruned_utxos)} UTXOs): {pruned_fee:.8f} BTC (${pruned_fee_usd}) ({pruned_vb:.1f} vB)')
+    output_parts.append(f'Fee Savings: {savings:.8f} BTC (${savings_usd}) ({(1 - selected_ratio)*100:.0f}%)')  # Fixed: Pruned % for savings
+    
     output_parts.append(f'DAO Incentive (5% of Fee Savings): {preview_dao_cut:.8f} BTC (${preview_dao_cut_usd})')
     
     if not confirm_proceed:
@@ -498,7 +516,7 @@ This is not financial advice. Use at your own risk.
             's_rho': 0.292,
             's_tuned': 0.611,
             'gci': gci,
-            'timestamp': '2025-11-14T00:00:00-03:00',
+            'timestamp': '2025-11-15T00:00:00-03:00',
             'pruned_fee': float(pruned_fee),
             'raw_fee': float(raw_fee),
             'pruned_fee_usd': pruned_fee_usd,
@@ -574,7 +592,7 @@ This is not financial advice. Use at your own risk.
         's_rho': 0.292,
         's_tuned': 0.611,
         'gci': 0.92,
-        'timestamp': '2025-11-14T00:00:00-03:00',
+        'timestamp': '2025-11-15T00:00:00-03:00',
         'pruned_fee': float(pruned_fee),
         'raw_fee': float(raw_fee),
         'pruned_fee_usd': pruned_fee_usd,
