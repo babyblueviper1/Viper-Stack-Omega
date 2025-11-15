@@ -470,7 +470,7 @@ Fund your address before run for live scan.
     preview_dao_cut_usd = round(preview_dao_cut * btc_usd, 2)
     output_parts.append(f'DAO Pool Cut: {preview_dao_cut:.8f} BTC (${preview_dao_cut_usd})')
     
-   if not confirm_proceed:
+    if not confirm_proceed:
         # Calculate post-DAO net for preview
         preview_send_amount = total_tx_value - pruned_fee
         preview_dao_cut = 0.05 * preview_send_amount
@@ -656,5 +656,3 @@ if __name__ == "__main__":
         root_path="/",
         show_error=True
     )
-# HF Detection Boosters
-demo.queue(api_open=True)
