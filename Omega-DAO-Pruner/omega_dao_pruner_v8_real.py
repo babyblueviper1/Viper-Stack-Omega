@@ -436,7 +436,7 @@ Fund your address before run for live scan.
     pruned_usd = [round(amt * btc_usd, 2) for amt in pruned_amounts]
     output_parts.append(f'Pruned UTXOs: [{", ".join(f"{amt} BTC (${usd})" for amt, usd in zip(pruned_amounts, pruned_usd))}]')
     
-    # Fee Estimate
+    # Fee Estimate (Fixed: 2 outputs for pruned TX, savings % reflects prune reduction)
     try:
         fee_response = requests.get('https://blockstream.info/api/fee-estimates/6', timeout=10)
         fee_response.raise_for_status()
@@ -446,7 +446,7 @@ Fund your address before run for live scan.
         fee_rate_sat = 10
         fee_rate = 10 * 1e-8
     raw_vb = 148 * len(all_utxos) + 34
-    pruned_vb = 148 * len(pruned_utxos) + 34
+    pruned_vb = 148 * len(pruned_utxos) + 34 * 2  # Fixed: Assume 2 outputs (dest + DAO)
     raw_fee = raw_vb * fee_rate
     pruned_fee = pruned_vb * fee_rate
     raw_fee_usd = round(raw_fee * btc_usd, 2)
@@ -456,7 +456,7 @@ Fund your address before run for live scan.
     output_parts.append(f'\nFee Estimate @ {fee_rate_sat:.0f} sat/vB:')
     output_parts.append(f'Raw Tx ({len(all_utxos)} UTXOs): {raw_fee:.8f} BTC (${raw_fee_usd}) ({raw_vb} vB)')
     output_parts.append(f'Pruned Tx ({len(pruned_utxos)} UTXOs): {pruned_fee:.8f} BTC (${pruned_fee_usd}) ({pruned_vb} vB)')
-    output_parts.append(f'Savings: {savings:.8f} BTC (${savings_usd}) ({selected_ratio*100}%)')
+    output_parts.append(f'Fee Savings: {savings:.8f} BTC (${savings_usd}) ({(1 - selected_ratio)*100:.0f}%)')  # Fixed: Pruned % for savings
     
     if not dest_addr:
         dest_addr = user_addr
@@ -465,19 +465,19 @@ Fund your address before run for live scan.
     send_amount = total_tx_value - pruned_fee
     send_usd = round(send_amount * btc_usd, 2)
 
-    # Preview DAO Cut
-    preview_dao_cut = 0.05 * send_amount
+    # Preview DAO Cut (Fixed: 5% of fee savings, not tx value)
+    preview_dao_cut = 0.05 * savings
     preview_dao_cut_usd = round(preview_dao_cut * btc_usd, 2)
-    output_parts.append(f'DAO Pool Cut: {preview_dao_cut:.8f} BTC (${preview_dao_cut_usd})')
+    output_parts.append(f'DAO Incentive (5% of Fee Savings): {preview_dao_cut:.8f} BTC (${preview_dao_cut_usd})')
     
     if not confirm_proceed:
         # Calculate post-DAO net for preview
         preview_send_amount = total_tx_value - pruned_fee
-        preview_dao_cut = 0.05 * preview_send_amount
-        total_fee_incl_dao = pruned_fee + preview_dao_cut
+        preview_dao_cut = 0.05 * savings
+        total_cost_incl_dao = pruned_fee + preview_dao_cut
         preview_net_usd = round((preview_send_amount - preview_dao_cut) * btc_usd, 2)
         output_parts.append(f'\nTotal Tx Value: {total_tx_value:.8f} BTC (${total_tx_usd})')
-        output_parts.append(f'Total Fee (incl. DAO Cut): {total_fee_incl_dao:.8f} BTC (${round(total_fee_incl_dao * btc_usd, 2)})')
+        output_parts.append(f'Total Cost (Miner Fee + DAO Incentive): {total_cost_incl_dao:.8f} BTC (${round(total_cost_incl_dao * btc_usd, 2)})')
         output_parts.append(f'Net Send (to Dest): {preview_send_amount - preview_dao_cut:.8f} BTC (${preview_net_usd})')
         output_parts.append('Confirm to proceed.')
         shard = {
@@ -506,12 +506,12 @@ Fund your address before run for live scan.
     
     output_parts.append('Accepted - Generating Unsigned Raw TX')
     
-    # DAO Cut
-    dao_cut = 0.05 * send_amount
+    # DAO Cut (Fixed: 5% of fee savings)
+    dao_cut = 0.05 * savings
     send_amount -= dao_cut
     send_usd = round(send_amount * btc_usd, 2)
     dao_cut_usd = round(dao_cut * btc_usd, 2)
-    output_parts.append(f'5% DAO Cut Integrated: {dao_cut:.8f} BTC (${dao_cut_usd}) to DAO Pool - Adjusted Net Send: {send_amount:.8f} BTC (${send_usd})')
+    output_parts.append(f'5% DAO Incentive Integrated: {dao_cut:.8f} BTC (${dao_cut_usd}) to DAO Pool - Adjusted Net Send: {send_amount:.8f} BTC (${send_usd})')
     
     # Auto-Raw TX Generation (Pure Python with Full scriptPubKeys)
     raw_hex = None
@@ -530,14 +530,16 @@ Fund your address before run for live scan.
         
         # Add outputs with real scripts
         tx.tx_outs.append(TxOut(amount=int(send_amount * 1e8), script_pubkey=script_dest))  # Net send to dest
-        if dao_cut > 0:
-            tx.tx_outs.append(TxOut(amount=int(dao_cut * 1e8), script_pubkey=script_dao))  # DAO cut
+        if dao_cut > 546 / 1e8:  # Dust limit check
+            tx.tx_outs.append(TxOut(amount=int(dao_cut * 1e8), script_pubkey=script_dao))  # DAO incentive
+        else:
+            output_parts.append('DAO Incentive Below Dust Limit - Skipped Output')
         
         # Serialize as raw hex (unsigned; fee implicit via input/output delta)
         raw_hex = tx.encode().hex()
         output_parts.append(f'Unsigned Raw TX Generated ({len(tx.tx_ins)} inputs): Copy the ENTIRE hex below into Electrum (Tools > Load transaction > From hex). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
         output_parts.append(f'Dest ScriptPubKey: {script_dest.hex()[:20]}... (full derived)')
-        if dao_cut > 0:
+        if dao_cut > 546 / 1e8:
             output_parts.append(f'DAO ScriptPubKey: {script_dao.hex()[:20]}... (full derived)')
     except Exception as e:
         raw_hex = f"Error in TX gen: {e}"
@@ -615,7 +617,7 @@ Fund your address before run for live scan.
     raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex - Copy Entire Content Below for Electrum", lines=10, visible=False)
     
     # Hidden Button: "Generate Unsigned Raw TX" (Appears After Preview)
-    generate_btn = gr.Button("Generate Pruned TX Hex (DAO Pool Cut Included)", visible=False)
+    generate_btn = gr.Button("Generate Pruned TX Hex (DAO Pool Incentive Included)", visible=False)
 
     def show_generate_btn():
         # After preview run, show generate button, keep raw_tx_text hidden
