@@ -5,6 +5,7 @@ import requests
 import os
 import base64
 import io
+import time  # Added for retries
 
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -106,13 +107,24 @@ def address_to_script_pubkey(addr):
 # Fixed DAO Addr1 (5% Cut Destination - Swarm Fuel)
 dao_cut_addr = 'bc1qwnj2zumaf67d34k6cm2l6gr3uvt5pp2hdrtvt3ckc4aunhmr53cselkpty'  # DAO Pool #1 (P2WSH)
 
+# Added retry wrapper for API calls
+def api_get(url, timeout=30, retries=3):
+    for i in range(retries):
+        try:
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+            return response
+        except Exception as e:
+            print(f'API Retry {i+1}/{retries} for {url}: {e}')
+            if i < retries - 1:
+                time.sleep(2 ** i)  # Exponential backoff
+    raise Exception(f'API failed after {retries} retries: {url}')
+
 def get_utxos(addr):
     try:
-        tip_response = requests.get('https://blockstream.info/api/blocks/tip/height', timeout=10)
-        tip_response.raise_for_status()
+        tip_response = api_get('https://blockstream.info/api/blocks/tip/height')
         current_height = tip_response.json()
-        utxo_response = requests.get(f'https://blockstream.info/api/address/{addr}/utxo', timeout=10)
-        utxo_response.raise_for_status()
+        utxo_response = api_get(f'https://blockstream.info/api/address/{addr}/utxo')
         utxos_raw = utxo_response.json()
         filtered_utxos = []
         for utxo in utxos_raw:
@@ -361,13 +373,13 @@ This is not financial advice. Use at your own risk.
     if hrp != 'bc' and not user_addr.startswith('1') and not user_addr.startswith('3'):
         return "\n".join(output_parts) + "\nInvalid address. Use bc1q... or legacy 1/3.", ""
     
-    # Live BTC/USD
+    # Live BTC/USD (with retry)
     try:
-        price_response = requests.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', timeout=10)
-        price_response.raise_for_status()
+        price_response = api_get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
         btc_usd = price_response.json()['bitcoin']['usd']
     except:
         btc_usd = 98500
+        output_parts.append('Price API Timeout - Using Fallback BTC/USD: $98,500')
     output_parts.append(f'Live BTC/USD: ${btc_usd:,.2f} (CoinGecko Echo)')
     
     output_parts.append(f'Loaded User Addr: {user_addr[:10]}...')
@@ -439,13 +451,13 @@ This is not financial advice. Use at your own risk.
     
     # Fee Estimate (Fixed: 2 outputs for pruned TX, savings % reflects prune reduction)
     try:
-        fee_response = requests.get('https://blockstream.info/api/fee-estimates/6', timeout=10)
-        fee_response.raise_for_status()
+        fee_response = api_get('https://blockstream.info/api/fee-estimates/6')
         fee_rate_sat = fee_response.json()
         fee_rate = fee_rate_sat * 1e-8
     except:
         fee_rate_sat = 10
         fee_rate = 10 * 1e-8
+        output_parts.append('Fee API Timeout - Using Fallback 10 sat/vB')
     raw_vb = 148 * len(all_utxos) + 34
     pruned_vb = 148 * len(pruned_utxos) + 34 * 2  # Fixed: Assume 2 outputs (dest + DAO)
     raw_fee = raw_vb * fee_rate
