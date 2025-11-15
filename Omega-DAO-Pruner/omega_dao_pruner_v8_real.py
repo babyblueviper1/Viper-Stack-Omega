@@ -585,6 +585,7 @@ Contact: omegadaov8@proton.me
 3. Preview to confirm (TX is RBF-enabled: sequence signals allow fee bumps without re-signing).
 5. Sign.
 6. Broadcast and monitor.  If unconfirmed (low fee/mempool full), right-click TX in Electrum > "Increase fee" for RBF bump (auto-higher rate; DAO unchanged). Re-run pruner for major tweaks (e.g., new UTXOs/strategy—will recalc fees/DAO).
+7. Enjoy.
 === Proceed Securely ===
 """
     output_parts.append(instructions)
