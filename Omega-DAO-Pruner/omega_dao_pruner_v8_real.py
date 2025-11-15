@@ -348,6 +348,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
+Fund your address before run for live scan.
 """
     output_parts.append(disclaimer)
     
@@ -419,13 +420,13 @@ Non-custodial: Script reads pub UTXOs only; you control keys/relay.
     
     # Prune Choice Mapping (Gradio Dropdown to choice key)
     prune_map = {
-        "Conservative (70% Pruned -- 30% Kept)": "1", 
-        "Balanced (60% Pruned -- 40% Kept)": "2", 
-        "Aggressive (50% Pruned -- 50% Kept)": "3"
+        "Conservative (70% Pruned / 30% Retained - Low Risk, Moderate Savings)": "1", 
+        "Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)": "2", 
+        "Aggressive (50% Pruned / 50% Retained - Max Consolidation, High Savings)": "3"
     }
     choice = prune_map.get(prune_choice, "2")
     selected_ratio = prune_choices[choice]['ratio']  # Keep ratio for calc (keep fraction)
-    output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - selected_ratio)*100:.0f}% -- Kept: {selected_ratio*100:.0f}%)')
+    output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - selected_ratio)*100:.0f}% / Retained: {selected_ratio*100:.0f}%)')
     
     # Prune Logic
     all_utxos.sort(key=lambda x: x['amount'], reverse=True)
@@ -456,7 +457,6 @@ Non-custodial: Script reads pub UTXOs only; you control keys/relay.
     output_parts.append(f'Raw Tx ({len(all_utxos)} UTXOs): {raw_fee:.8f} BTC (${raw_fee_usd}) ({raw_vb} vB)')
     output_parts.append(f'Pruned Tx ({len(pruned_utxos)} UTXOs): {pruned_fee:.8f} BTC (${pruned_fee_usd}) ({pruned_vb} vB)')
     output_parts.append(f'Savings: {savings:.8f} BTC (${savings_usd}) ({selected_ratio*100}%)')
-    output_parts.append(f'Savings vs No Pruner: ${savings_usd:.2f} USD (Raw ${raw_fee_usd} → Pruned ${pruned_fee_usd})')
     
     if not dest_addr:
         dest_addr = user_addr
@@ -493,7 +493,6 @@ Non-custodial: Script reads pub UTXOs only; you control keys/relay.
         return "\n".join(output_parts), ""
     
     output_parts.append('Accepted - Generating Unsigned Raw TX')
-    output_parts.append(f'Savings vs No Pruner: ${savings_usd:.2f} USD (Raw ${raw_fee_usd} → Pruned ${pruned_fee_usd})')
     
     # DAO Cut
     dao_cut = 0.05 * send_amount
@@ -535,7 +534,7 @@ Non-custodial: Script reads pub UTXOs only; you control keys/relay.
     instructions = """
 === Next Steps ===
 1. Copy the ENTIRE raw TX hex below.
-2. In Electrum (or similar): Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs.
+2. In Electrum: Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs.
 3. Preview to confirm, then Sign.
 4. Broadcast and monitor. Re-run for RBF if needed.
 === Proceed Securely ===
@@ -580,12 +579,17 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
 Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
+Fund your address before run for live scan.
 """)
     
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
         prune_choice = gr.Dropdown(
-            choices=["Conservative (70% Pruned / 30% Retained - Low Risk, Moderate Savings)", "Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)", "Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)"], 
+            choices=[
+                "Conservative (70% Pruned / 30% Retained - Low Risk, Moderate Savings)",
+                "Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)",
+                "Aggressive (50% Pruned / 50% Retained - Max Consolidation, High Savings)"
+            ], 
             value="Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)", 
             label="Prune Strategy"
         )
@@ -599,7 +603,7 @@ Non-custodial: Script reads pub UTXOs only; you control keys/relay.
     raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex - Copy Entire Content Below for Electrum", lines=10, visible=False)
     
     # Hidden Button: "Generate Unsigned Raw TX" (Appears After Preview)
-    generate_btn = gr.Button("Generate Unsigned Raw TX", visible=False)
+    generate_btn = gr.Button("Generate Pruned TX Hex (DAO Pool Cut Included)", visible=False)
 
     def show_generate_btn():
         # After preview run, show generate button, keep raw_tx_text hidden
