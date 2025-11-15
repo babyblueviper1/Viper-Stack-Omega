@@ -464,9 +464,21 @@ Fund your address before run for live scan.
     total_tx_usd = round(total_tx_value * btc_usd, 2)
     send_amount = total_tx_value - pruned_fee
     send_usd = round(send_amount * btc_usd, 2)
+
+    # Preview DAO Cut
+    preview_dao_cut = 0.05 * send_amount
+    preview_dao_cut_usd = round(preview_dao_cut * btc_usd, 2)
+    output_parts.append(f'DAO Pool Cut: {preview_dao_cut:.8f} BTC (${preview_dao_cut_usd})')
     
-    if not confirm_proceed:
-        output_parts.append(f'\nTotal Tx Value: {total_tx_value:.8f} BTC (${total_tx_usd}), Fee: {pruned_fee:.8f} BTC (${pruned_fee_usd}), Net Send (pre-DAO): {send_amount:.8f} BTC (${send_usd})')
+   if not confirm_proceed:
+        # Calculate post-DAO net for preview
+        preview_send_amount = total_tx_value - pruned_fee
+        preview_dao_cut = 0.05 * preview_send_amount
+        total_fee_incl_dao = pruned_fee + preview_dao_cut
+        preview_net_usd = round((preview_send_amount - preview_dao_cut) * btc_usd, 2)
+        output_parts.append(f'\nTotal Tx Value: {total_tx_value:.8f} BTC (${total_tx_usd})')
+        output_parts.append(f'Total Fee (incl. DAO Cut): {total_fee_incl_dao:.8f} BTC (${round(total_fee_incl_dao * btc_usd, 2)})')
+        output_parts.append(f'Net Send (to Dest): {preview_send_amount - preview_dao_cut:.8f} BTC (${preview_net_usd})')
         output_parts.append('Confirm to proceed.')
         shard = {
             'utxos': pruned_utxos,
@@ -484,12 +496,12 @@ Fund your address before run for live scan.
             'prune_label': prune_choices[choice]['label'],
             'user_addr': user_addr,
             'dest_addr': dest_addr,
-            'dao_cut': float(dao_cut),
+            'dao_cut': float(preview_dao_cut),
             'dao_cut_addr': dao_cut_addr,
             'psbt_stub': psbt
         }
         # Run Phases (Full for Preview)
-        gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
+        gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, preview_dao_cut)
         return "\n".join(output_parts), ""
     
     output_parts.append('Accepted - Generating Unsigned Raw TX')
