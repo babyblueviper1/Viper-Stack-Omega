@@ -362,6 +362,7 @@ Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
 Fund your address before run for live scan.
 This is not financial advice. Use at your own risk.
+Contact: omegadaov8@proton.me
 """
     output_parts.append(disclaimer)
     
@@ -628,6 +629,7 @@ Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
 Fund your address before run for live scan.
 This is not financial advice. Use at your own risk.
+Contact: omegadaov8@proton.me
 """)
     
     with gr.Row():
