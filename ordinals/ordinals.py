@@ -400,15 +400,15 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
     shard = {}
     
     # Disclaimer
-disclaimer = """
-This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
-Taproot (bc1p) and Ordinals-compatible for modern stacks.
-Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
-Non-custodial: Script reads pub UTXOs only; you control keys/relay.
-Fund your address before run for live scan.
-This is not financial advice. Use at your own risk.
-Contact: omegadaov8@proton.me
-"""
+    disclaimer = """
+    This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
+    Taproot (bc1p) and Ordinals-compatible for modern stacks.
+    Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
+    Non-custodial: Script reads pub UTXOs only; you control keys/relay.
+    Fund your address before run for live scan.
+    This is not financial advice. Use at your own risk.
+    Contact: omegadaov8@proton.me
+    """
     output_parts.append(disclaimer)
     
     if not user_addr:
