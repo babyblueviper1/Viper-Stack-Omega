@@ -41,9 +41,48 @@ def bech32_decode(addr):
         if value == -1:
             return None, None
         data.append(value)
-    if not bech32_verify_checksum(hrp, data):
+    # Route to Bech32 or Bech32m based on witness version ('q' = v0, 'p' = v1)
+    if addr[pos+1] == 'q':
+        if not bech32_verify_checksum(hrp, data):
+            return None, None
+    elif addr[pos+1] == 'p':
+        if not bech32m_verify_checksum(hrp, data):
+            return None, None
+    else:
         return None, None
     return hrp, data[:-6]
+
+# NEW: Bech32m Decoder for Taproot (BIP-350)
+def bech32m_decode(addr):
+    if ' ' in addr or len(addr) < 8:
+        return None, None
+    pos = addr.rfind('1')
+    if pos < 1 or pos + 7 > len(addr) or len(addr) > 90:
+        return None, None
+    hrp = addr[:pos]
+    if not all(ord(x) >> 8 == 0 for x in hrp) or not all(ord(x) >> 8 == 0 for x in addr[pos+1:]):
+        return None, None
+    data = []
+    for char in addr[pos+1:]:
+        value = CHARSET.find(char)
+        if value == -1:
+            return None, None
+        data.append(value)
+    if not bech32_verify_checksum(hrp, data):  # Uses same verify, but GEN adjusted below
+        return None, None
+    return hrp, data[:-6]
+
+# Updated verify for Bech32m (flip GEN[4] bit for Taproot)
+def bech32m_verify_checksum(hrp, data):
+    # Bech32m GEN: Flip 5th GEN bit (0x2a1462b3 ^ (1 << 31) = 0xaa1462b3)
+    GEN_M = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0xaa1462b3]
+    chk = 1
+    for v in bech32_hrp_expand(hrp) + data:
+        b = (chk >> 25)
+        chk = (chk & 0x1ffffff) << 5 ^ v
+        for i in range(5):
+            chk ^= GEN_M[i] if ((b >> i) & 1) else 0
+    return chk == 1  # Bech32m constant is 1 (same as Bech32)
 
 def convertbits(data, frombits, tobits, pad=True):
     acc = 0
