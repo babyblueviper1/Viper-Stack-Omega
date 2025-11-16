@@ -1,3 +1,4 @@
+```python
 import gradio as gr
 import json
 import numpy as np
@@ -137,10 +138,11 @@ def api_get(url, timeout=30, retries=3):
                 time.sleep(2 ** i)  # Exponential backoff
     raise Exception(f'API failed after {retries} retries: {url}')
 
-def get_utxos(addr):
+def get_utxos(addr, dust_threshold=546, current_height=None):  # UPDATED: Optional current_height for reuse
     try:
-        tip_response = api_get('https://blockstream.info/api/blocks/tip/height')
-        current_height = tip_response.json()
+        if current_height is None:
+            tip_response = api_get('https://blockstream.info/api/blocks/tip/height')
+            current_height = tip_response.json()
         utxo_response = api_get(f'https://blockstream.info/api/address/{addr}/utxo')
         utxos_raw = utxo_response.json()
         
@@ -153,7 +155,7 @@ def get_utxos(addr):
         for utxo in utxos_raw:
             if utxo['status'] == 'confirmed':
                 confs = current_height - utxo['status']['block_height'] + 1
-                if confs > 6 and utxo['value'] > 546:
+                if confs > 6 and utxo['value'] > dust_threshold:  # UPDATED: Dynamic threshold
                     # Check if UTXO has inscription (match txid/vout)
                     inscription_flag = any(ins['tx_id'] == utxo['txid'] and ins['output'] == utxo['vout'] for ins in inscriptions)
                     filtered_utxos.append({
@@ -163,7 +165,7 @@ def get_utxos(addr):
                         'address': addr,
                         'confs': confs,
                         'is_inscription': inscription_flag,  # NEW: For priority sorting
-                        'dust_risk': utxo['value'] < 10000  # sats threshold for "dusty"
+                        'dust_risk': utxo['value'] < (dust_threshold * 1.1)  # UPDATED: Relative to threshold
                     })
         
         # Sort: Prioritize inscription dust (NEW: Inscriptions first)
@@ -171,10 +173,10 @@ def get_utxos(addr):
         
         inscription_count = sum(1 for u in filtered_utxos if u['is_inscription'])
         print(f'API Success for {addr[:10]}...: {len(filtered_utxos)} UTXOs ({inscription_count} inscriptions) >6 confs')
-        return filtered_utxos
+        return filtered_utxos, current_height
     except Exception as e:
         print(f'API Decoherence for {addr[:10]}...: {e} - Fallback Empty')
-        return []
+        return [], None
 
 prune_choices = {
     '1': {'label': 'Conservative (70% Pruned / 30% Retained - Low Risk, Moderate Savings)', 'ratio': 0.3},
@@ -383,14 +385,14 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
 
     return gci, json.dumps(full_blueprint, indent=2), seed_file
 
-def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
+def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):  # UPDATED: Add param
     output_parts = []
     shard = {}
     
     # Disclaimer
     disclaimer = """
     This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
-    Taproot (bc1p) and Ordinals-compatible for modern stacks.
+    Taproot (bc1p) and Ordinals-compatible for modern stacks. Dust threshold: Configurable (default 546 sats) to exclude/batch tiny UTXOs—lower for aggressive inscription consolidation when fees are low (<2 sat/vB).
     Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
     Non-custodial: Script reads pub UTXOs only; you control keys/relay.
     Fund your address before run for live scan.
@@ -425,7 +427,27 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
     
     output_parts.append(f'Loaded User Addr: {user_addr[:10]}... ({addr_type})')
     
-    all_utxos = get_utxos(user_addr)
+    # NEW: Fetch raw for dust calc
+    try:
+        tip_response = api_get('https://blockstream.info/api/blocks/tip/height')
+        current_height = tip_response.json()
+        utxo_response = api_get(f'https://blockstream.info/api/address/{user_addr}/utxo')
+        utxos_raw = utxo_response.json()
+        ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={user_addr}&limit=100')
+        inscriptions = ordinals_response.json().get('results', [])
+    except Exception as e:
+        output_parts.append(f'API Error for raw fetch: {e} - Dust calc skipped')
+        utxos_raw = []
+        inscriptions = []
+        current_height = 0
+    
+    # Calculate dust stats
+    dust_utxos = [u for u in utxos_raw if u.get('status') == 'confirmed' and (current_height - u['status']['block_height'] + 1 > 6) and u['value'] <= dust_threshold]
+    dust_count = len(dust_utxos)
+    dust_value = sum(u['value'] for u in dust_utxos)
+    dust_inscriptions = sum(1 for ins in inscriptions if any(u['txid'] == ins['tx_id'] and u['vout'] == ins['output'] for u in dust_utxos))
+    
+    all_utxos, _ = get_utxos(user_addr, dust_threshold, current_height)  # UPDATED: Pass current_height to avoid refetch
     
     # Defaults
     pruned_utxos = []
@@ -464,7 +486,8 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
             'dest_addr': dest_addr,
             'dao_cut': float(dao_cut),
             'dao_cut_addr': dao_cut_addr,
-            'psbt_stub': psbt
+            'psbt_stub': psbt,
+            'dust_threshold': dust_threshold  # NEW: Log it
         }
         # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
@@ -491,8 +514,32 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
     output_parts.append(f'Pruned UTXOs: [{", ".join(f"{amt} BTC (${usd})" for amt, usd in zip(pruned_amounts, pruned_usd))}]')
     # NEW: Ordinals/Inscription Tease
     inscription_count = sum(1 for u in pruned_utxos if u.get('is_inscription', False))
-    if inscription_count > 0:
-        output_parts.append(f'Inscribed UTXOs Pruned: {inscription_count} (Ordinals/BRC-20 dust prioritized)')
+    if inscription_count > 0 or dust_count > 0:
+        output_parts.append(f'Inscribed UTXOs Pruned: {inscription_count} (Ordinals/BRC-20 dust prioritized at {dust_threshold} sat threshold)')
+        # UPDATED: Dust Threshold Disclaimer (contextual)
+        output_parts.append(f'''
+⚠️ Dust Threshold: Set to {dust_threshold} sats. Lower values batch more tiny inscriptions for optimization (e.g., when fees <2 sat/vB), but risk net losses if fees spike. Excluded Dust UTXOs: {dust_count} (handle manually in Sparrow/Electrum). Not financial advice—sim fees first!
+        ''')
+        # NEW: Quick vB Calc for Dust Batch Cost
+        try:
+            fee_response = api_get('https://blockstream.info/api/fee-estimates/6')
+            fee_rate_sat = fee_response.json()
+        except:
+            fee_rate_sat = 10
+        if is_segwit:
+            input_vb = 67.25
+            output_vb = 31
+        else:
+            input_vb = 148
+            output_vb = 34
+        overhead_vb = 10
+        dust_batch_vb = overhead_vb + input_vb * dust_count + output_vb * 1  # Batch to 1 output
+        dust_batch_fee = dust_batch_vb * (fee_rate_sat * 1e-8)
+        dust_batch_fee_sats = int(dust_batch_fee * 1e8)
+        dust_value_sats = int(dust_value)
+        output_parts.append(f'💡 Est. Dust Batch Cost: {dust_batch_vb:.1f} vB ({dust_batch_fee_sats} sats @ {fee_rate_sat:.0f} sat/vB) for {dust_count} UTXOs ({dust_inscriptions} inscribed). Total dust value: {dust_value_sats} sats. Net worth it if future fee savings > batch cost!')
+    elif dust_count > 0:
+        output_parts.append(f'Dust UTXOs Detected (but not pruned): {dust_count} below {dust_threshold} sats threshold.')
     
     # Fee Estimate (Address-type aware: SegWit vs Legacy)
     try:
@@ -570,7 +617,8 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
             'dest_addr': dest_addr,
             'dao_cut': float(preview_dao_cut),
             'dao_cut_addr': dao_cut_addr,
-            'psbt_stub': psbt
+            'psbt_stub': psbt,
+            'dust_threshold': dust_threshold  # NEW
         }
         # Run Phases (Full for Preview)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, preview_dao_cut)
@@ -649,7 +697,8 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
         'dest_addr': dest_addr,
         'dao_cut': float(dao_cut),
         'dao_cut_addr': dao_cut_addr,
-        'psbt_stub': raw_hex[:50] + '...' if raw_hex else 'error'
+        'psbt_stub': raw_hex[:50] + '...' if raw_hex else 'error',
+        'dust_threshold': dust_threshold  # NEW
     }
     
     # Run Phases (Full for Confirm)
@@ -666,7 +715,7 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     # Disclaimer: Always Visible Above Inputs
     gr.Markdown("""
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
-Taproot (bc1p) and Ordinals-compatible for modern stacks.
+Taproot (bc1p) and Ordinals-compatible for modern stacks. Dust threshold: Configurable (default 546 sats) to exclude/batch tiny UTXOs—lower for aggressive inscription consolidation when fees are low (<2 sat/vB).
 Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
 Fund your address before run for live scan.
@@ -685,6 +734,8 @@ Contact: omegadaov8@proton.me
             value="Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)", 
             label="Prune Strategy"
         )
+        # NEW: Dust Threshold Slider (place here, after prune_choice)
+        dust_threshold = gr.Slider(minimum=0, maximum=2000, value=546, step=1, label="Dust Threshold (sats) - Lower = Batch More Inscriptions")
         dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
     submit_btn = gr.Button("Run Pruner")
     
@@ -701,26 +752,24 @@ Contact: omegadaov8@proton.me
         # After preview run, show generate button, keep raw_tx_text hidden
         return gr.update(visible=True), gr.update(visible=False)
 
-    def generate_raw_tx(user_addr, prune_choice, dest_addr):
-        # Trigger full generation (confirm=True)
-        log, hex_content = main_flow(user_addr, prune_choice, dest_addr, True)
-        # Return updates: log, raw_tx_text with value and visible=True, generate_btn hidden
+    def generate_raw_tx(user_addr, prune_choice, dust_threshold, dest_addr):
+        log, hex_content = main_flow(user_addr, prune_choice, dest_addr, True, dust_threshold)
         return log, gr.update(value=hex_content, visible=True), gr.update(visible=False)
 
-    # First Run: Preview (confirm=False) - Only log
+    # First Run: Preview (confirm=False) - Only log (UPDATED: Include dust_threshold)
     submit_btn.click(
-        fn=lambda u, p, d: main_flow(u, p, d, False),
-        inputs=[user_addr, prune_choice, dest_addr],
+        fn=lambda u, p, dt, d: main_flow(u, p, d, False, dt),
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
         outputs=[output_text, raw_tx_text]
     ).then(
         fn=show_generate_btn,
         outputs=[generate_btn, raw_tx_text]
     )
 
-    # Second Step: Generate Raw TX (confirm=True) - Log + Hex
+    # Second Step: Generate Raw TX (confirm=True) - Log + Hex (UPDATED: Include dust_threshold)
     generate_btn.click(
         fn=generate_raw_tx,
-        inputs=[user_addr, prune_choice, dest_addr],
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
         outputs=[output_text, raw_tx_text, generate_btn]
     )
 
@@ -736,3 +785,4 @@ if __name__ == "__main__":
         root_path="/",
         show_error=True
     )
+```
