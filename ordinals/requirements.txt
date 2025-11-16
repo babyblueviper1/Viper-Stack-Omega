@@ -1,8 +1,8 @@
-gradio>=5.46.0,<6.0.0
-huggingface_hub>=0.33.5,<2.0
-qutip
-numpy
-requests
-audioop-lts
+gradio==5.46.0
+huggingface_hub==0.33.5
+qutip==5.0.4
+numpy==2.1.1
+requests==2.32.3
 pydantic==2.10.6
-bitcoinlib
+bitcoinlib==0.6.15
+audioop-lts==1.1.0
