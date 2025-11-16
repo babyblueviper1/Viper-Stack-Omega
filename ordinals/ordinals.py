@@ -163,7 +163,7 @@ def get_utxos(addr):
         # Merge: Flag UTXOs with inscriptions (dust if <0.0001 BTC or spam-like)
         filtered_utxos = []
         for utxo in utxos_raw:
-            if utxo['status']['confirmed']:
+            if utxo['status'] == 'confirmed':
                 confs = current_height - utxo['status']['block_height'] + 1
                 if confs > 6 and utxo['value'] > 546:
                     # Check if UTXO has inscription (match txid/vout)
