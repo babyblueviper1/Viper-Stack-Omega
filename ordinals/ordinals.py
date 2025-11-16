@@ -41,7 +41,7 @@ def bech32_decode(addr):
         if value == -1:
             return None, None
         data.append(value)
-    # Route to Bech32 or Bech32m based on witness version ('q' = v0, 'p' = v1)
+    # Route to Bech32 or Bech32m based on first char after '1' ('q' = v0, 'p' = v1 Taproot)
     if addr[pos+1] == 'q':
         if not bech32_verify_checksum(hrp, data):
             return None, None
@@ -49,26 +49,6 @@ def bech32_decode(addr):
         if not bech32m_verify_checksum(hrp, data):
             return None, None
     else:
-        return None, None
-    return hrp, data[:-6]
-
-# NEW: Bech32m Decoder for Taproot (BIP-350)
-def bech32m_decode(addr):
-    if ' ' in addr or len(addr) < 8:
-        return None, None
-    pos = addr.rfind('1')
-    if pos < 1 or pos + 7 > len(addr) or len(addr) > 90:
-        return None, None
-    hrp = addr[:pos]
-    if not all(ord(x) >> 8 == 0 for x in hrp) or not all(ord(x) >> 8 == 0 for x in addr[pos+1:]):
-        return None, None
-    data = []
-    for char in addr[pos+1:]:
-        value = CHARSET.find(char)
-        if value == -1:
-            return None, None
-        data.append(value)
-    if not bech32_verify_checksum(hrp, data):  # Uses same verify, but GEN adjusted below
         return None, None
     return hrp, data[:-6]
 
@@ -83,6 +63,9 @@ def bech32m_verify_checksum(hrp, data):
         for i in range(5):
             chk ^= GEN_M[i] if ((b >> i) & 1) else 0
     return chk == 1  # Bech32m constant is 1 (same as Bech32)
+
+def bech32m_verify_checksum(hrp, data):
+    return bech32_polymod(bech32_hrp_expand(hrp) + data) == 0x2bc830a3  # Bech32m constant
 
 def convertbits(data, frombits, tobits, pad=True):
     acc = 0
@@ -124,21 +107,26 @@ def address_to_script_pubkey(addr):
             data8 = convertbits(data5[1:], 5, 8, False)
             if data8:
                 if len(data8) == 20:
+                    # P2WPKH: OP_0 PUSH20 <pubkeyhash>
                     return bytes([0x00, 0x14]) + bytes(data8)
                 elif len(data8) == 32:
+                    # P2WSH: OP_0 PUSH32 <scripthash>
                     return bytes([0x00, 0x20]) + bytes(data8)
     elif addr.startswith('bc1p'):
-        hrp, data5 = bech32_decode(addr)  # Uses m-aware decode from snippet
+        hrp, data5 = bech32_decode(addr)  # Uses m-mode for 'p'
         if hrp == 'bc' and data5 and data5[0] == 1:
             data8 = convertbits(data5[1:], 5, 8, False)
             if data8 and len(data8) == 32:
-                return bytes([0x51, 0x20]) + bytes(data8)  # OP_1 PUSH32 <key>
+                # P2TR: OP_1 PUSH32 <32-byte x-only pubkey>
+                return bytes([0x51, 0x20]) + bytes(data8)
     elif addr.startswith('1'):
+        # P2PKH
         decoded = base58_decode(addr)
         if len(decoded) == 25 and decoded[0] == 0x00:
             payload = decoded[1:21]
             return bytes([0x76, 0xa9, 0x14]) + payload + bytes([0x88, 0xac])
     elif addr.startswith('3'):
+        # P2SH
         decoded = base58_decode(addr)
         if len(decoded) == 25 and decoded[0] == 0x05:
             payload = decoded[1:21]
