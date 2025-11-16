@@ -140,9 +140,9 @@ def api_get(url, timeout=30, retries=3):
 def get_utxos(addr, dust_threshold=546, current_height=None):  # UPDATED: Optional current_height for reuse
     try:
         if current_height is None:
-            tip_response = api_get('https://blockstream.info/api/blocks/tip/height')
+            tip_response = api_get('https://mempool.space/api/blocks/tip/height')
             current_height = tip_response.json()
-        utxo_response = api_get(f'https://blockstream.info/api/address/{addr}/utxo')
+        utxo_response = api_get(f'https://mempool.space/api/address/{addr}/utxos')
         utxos_raw = utxo_response.json()
         
         # NEW: Ordinals API fetch (Hiro for inscription UTXOs)
@@ -152,7 +152,7 @@ def get_utxos(addr, dust_threshold=546, current_height=None):  # UPDATED: Option
         # Merge: Flag UTXOs with inscriptions (dust if <0.0001 BTC or spam-like)
         filtered_utxos = []
         for utxo in utxos_raw:
-            if utxo['status'] == 'confirmed':
+            if utxo['status']['confirmed']:
                 confs = current_height - utxo['status']['block_height'] + 1
                 if confs > 6 and utxo['value'] > dust_threshold:  # UPDATED: Dynamic threshold
                     # Check if UTXO has inscription (match txid/vout)
@@ -401,13 +401,19 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
     
     # Disclaimer
     disclaimer = """
-    This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
-    Taproot (bc1p) and Ordinals-compatible for modern stacks. Dust threshold: Configurable (default 546 sats) to exclude/batch tiny UTXOs—lower for risk-tolerant inscription consolidation when fees are low (<2 sat/vB).
-    Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
-    Non-custodial: Script reads pub UTXOs only; you control keys/relay.
-    Fund your address before run for live scan.
-    This is not financial advice. Use at your own risk.
-    Contact: omegadaov8@proton.me
+This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
+
+Taproot (bc1p) and Ordinals-compatible for modern stacks. Dust threshold: Configurable (default 546 sats) to exclude/batch tiny UTXOs—lower for risk-tolerant inscription consolidation when fees are low (<2 sat/vB).
+
+Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
+
+Non-custodial: Script reads pub UTXOs only; you control keys/relay.
+
+Fund your address before run for live scan.
+
+This is not financial advice. Use at your own risk.
+
+Contact: omegadaov8@proton.me
     """
     output_parts.append(disclaimer)
     
@@ -439,9 +445,9 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
     
     # NEW: Fetch raw for dust calc
     try:
-        tip_response = api_get('https://blockstream.info/api/blocks/tip/height')
+        tip_response = api_get('https://mempool.space/api/blocks/tip/height')
         current_height = tip_response.json()
-        utxo_response = api_get(f'https://blockstream.info/api/address/{user_addr}/utxo')
+        utxo_response = api_get(f'https://mempool.space/api/address/{user_addr}/utxos')
         utxos_raw = utxo_response.json()
         ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={user_addr}&limit=100')
         inscriptions = ordinals_response.json().get('results', [])
@@ -452,7 +458,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         current_height = 0
     
     # Calculate dust stats
-    dust_utxos = [u for u in utxos_raw if u.get('status') == 'confirmed' and (current_height - u['status']['block_height'] + 1 > 6) and u['value'] <= dust_threshold]
+    dust_utxos = [u for u in utxos_raw if u.get('status', {}).get('confirmed', True) and (current_height - u.get('status', {}).get('block_height', 0) + 1 > 6) and u['value'] <= dust_threshold]
     dust_count = len(dust_utxos)
     dust_value = sum(u['value'] for u in dust_utxos)
     dust_inscriptions = sum(1 for ins in inscriptions if any(u['txid'] == ins['tx_id'] and u['vout'] == ins['output'] for u in dust_utxos))
@@ -725,11 +731,17 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     # Disclaimer: Always Visible Above Inputs
     gr.Markdown("""
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
+
 Taproot (bc1p) and Ordinals-compatible for modern stacks. Dust threshold: Configurable (default 546 sats) to exclude/batch tiny UTXOs—lower for risk-tolerant inscription consolidation when fees are low (<2 sat/vB).
+
 Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
+
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
+
 Fund your address before run for live scan.
+
 This is not financial advice. Use at your own risk.
+
 Contact: omegadaov8@proton.me
 """)
     
