@@ -90,6 +90,13 @@ def address_to_script_pubkey(addr):
                 elif len(data8) == 32:
                     # P2WSH: OP_0 PUSH32 <scripthash>
                     return bytes([0x00, 0x20]) + bytes(data8)
+        elif addr.startswith('bc1p'):
+        hrp, data5 = bech32_decode(addr)
+        if hrp == 'bc' and data5 and data5[0] == 1:  # Taproot v1 witness
+            data8 = convertbits(data5[1:], 5, 8, False)
+            if data8 and len(data8) == 32:
+                # P2TR: OP_1 PUSH32 <32-byte x-only pubkey>
+                return bytes([0x51, 0x20]) + bytes(data8)
     elif addr.startswith('1'):
         # P2PKH
         decoded = base58_decode(addr)
