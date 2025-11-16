@@ -42,8 +42,6 @@ Omega DAO Pruner v8.1 is Viper Stack's sovereign vault—a live, non-custodial G
    ```
    *$0.70/txn net; txid stub: 7f4d2073... (RBF ~1min).*  
 
-**Demos**: [Colab v8.1](https://colab.research.google.com/drive/1sL6V57osIdYKG27FlwE5mkEWJ3FtjjNi) | [HF Spaces](https://huggingface.co/spaces/babyblueviper1/omega-pruner-v8) | [Electrum Stub](https://colab.research.google.com/github/babyblueviper1/Viper-Stack-Omega/blob/main/demos/v8/electrum_rpc_v8_stub.ipynb)  
-
 **Wallet**: Electrum/Sparrow daemon (`electrum daemon start`, localhost:50001 RPC).  
 
 ## 📈 v8 → v8.1 Evolution (Synced Eternal)
