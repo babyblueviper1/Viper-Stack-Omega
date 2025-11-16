@@ -757,8 +757,8 @@ Contact: omegadaov8@proton.me
     return "\n".join(output_parts), raw_hex_text
 
 # Gradio Interface (unchanged)
-with gr.Blocks(title="Omega DAO Pruner v8.1") as demo:
-    gr.Markdown("# Omega DAO Pruner v8.1 - BTC UTXO Optimizer (Taproot + Ordinals Fixed)")
+with gr.Blocks(title="Omega DAO Pruner v8") as demo:
+    gr.Markdown("# Omega DAO Pruner v8 - BTC UTXO Optimizer")
     
     # Disclaimer: Always Visible Above Inputs
     gr.Markdown("""
