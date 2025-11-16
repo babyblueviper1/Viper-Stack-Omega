@@ -1,8 +1,6 @@
 services:
   - type: web
-    name: ordinals  # Match your service name
+    name: ordinals  # Your service name
     env: python
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt --no-cache-dir --index-url https://pypi.org/simple/
-    startCommand: python ordinals.py  # e.g., app.py
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt --no-cache-dir
+    startCommand: python ordinals.py  # Your script file
