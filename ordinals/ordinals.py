@@ -400,9 +400,10 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed):
     shard = {}
     
     # Disclaimer
-    disclaimer = """
+disclaimer = """
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
-Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
+Taproot (bc1p) and Ordinals-compatible for modern stacks.
+Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
 Fund your address before run for live scan.
 This is not financial advice. Use at your own risk.
@@ -421,6 +422,9 @@ Contact: omegadaov8@proton.me
     # Detect address type for vB calculation
     is_segwit = user_addr.startswith('bc1q')
     addr_type = "SegWit P2WPKH" if is_segwit else "Legacy P2PKH/P2SH"
+
+    if is_segwit and user_addr.startswith('bc1p'):
+        output_parts.append(f'Taproot (bc1p) Detected: Ordinals/Inscription-Ready')
     
     # Live BTC/USD (with retry)
     try:
@@ -480,7 +484,7 @@ Contact: omegadaov8@proton.me
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
-    # Prune Choice Mapping (Gradio Dropdown to choice key)
+    # Update prune_map keys to match
     prune_map = {
         "Conservative (70% Pruned / 30% Retained - Low Risk, Moderate Savings)": "1", 
         "Efficient (60% Pruned / 40% Retained - v8 Default, Optimal Savings)": "2", 
@@ -672,9 +676,10 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     gr.Markdown("# Omega DAO Pruner v8 - BTC UTXO Optimizer")
     
     # Disclaimer: Always Visible Above Inputs
-    gr.Markdown("""
+gr.Markdown("""
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
-Requires a UTXO-capable wallet (e.g., Electrum) for signing/broadcasting.
+Taproot (bc1p) and Ordinals-compatible for modern stacks.
+Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
 Non-custodial: Script reads pub UTXOs only; you control keys/relay.
 Fund your address before run for live scan.
 This is not financial advice. Use at your own risk.
