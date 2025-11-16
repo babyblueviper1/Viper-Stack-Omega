@@ -2,6 +2,7 @@ gradio==4.44.0
 qutip
 numpy
 requests
+audioop-lts
 huggingface_hub==0.24.5
 pydantic==2.10.6
 bitcoinlib
