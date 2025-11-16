@@ -1,4 +1,3 @@
-```python
 import gradio as gr
 import json
 import numpy as np
@@ -785,4 +784,3 @@ if __name__ == "__main__":
         root_path="/",
         show_error=True
     )
-```
