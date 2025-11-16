@@ -178,9 +178,9 @@ def get_utxos(addr, dust_threshold=546, current_height=None):  # UPDATED: Option
         return [], None
 
 prune_choices = {
-    '1': {'label': 'Conservative: 70% Pruned / 30% Retained (Low Risk, Moderate Savings)', 'ratio': 0.3},
-    '2': {'label': 'Efficient: 60% Pruned / 40% Retained (v8 Default, Optimal Savings)', 'ratio': 0.4},
-    '3': {'label': 'Aggressive: 50% Pruned / 50% Retained (Max Consolidation, High Savings)', 'ratio': 0.5}
+    '1': {'label': 'Conservative: 70/30 Prune (Low Risk)', 'ratio': 0.3},
+    '2': {'label': 'Efficient: 60/40 Prune (Default)', 'ratio': 0.4},
+    '3': {'label': 'Aggressive: 50/50 Prune (Max Savings)', 'ratio': 0.5}
 }
 
 # Pure Python TX Builder
@@ -494,11 +494,11 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
-    # Update prune_map keys to match (UPDATED: Shorter labels for readability)
+    # Update prune_map keys to match (UPDATED: Even shorter for dropdown readability)
     prune_map = {
-        "Conservative: 70% Pruned / 30% Retained (Low Risk, Moderate Savings)": "1", 
-        "Efficient: 60% Pruned / 40% Retained (v8 Default, Optimal Savings)": "2", 
-        "Aggressive: 50% Pruned / 50% Retained (Max Consolidation, High Savings)": "3"
+        "Conservative: 70/30 Prune (Low Risk)": "1", 
+        "Efficient: 60/40 Prune (Default)": "2", 
+        "Aggressive: 50/50 Prune (Max Savings)": "3"
     }
     choice = prune_map.get(prune_choice, "2")
     selected_ratio = prune_choices[choice]['ratio']  # Keep ratio for calc (keep fraction)
@@ -726,11 +726,11 @@ Contact: omegadaov8@proton.me
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
         prune_choice = gr.Dropdown(
             choices=[
-                "Conservative: 70% Pruned / 30% Retained (Low Risk, Moderate Savings)",
-                "Efficient: 60% Pruned / 40% Retained (v8 Default, Optimal Savings)",
-                "Aggressive: 50% Pruned / 50% Retained (Max Consolidation, High Savings)"
+                "Conservative: 70/30 Prune (Low Risk)",
+                "Efficient: 60/40 Prune (Default)",
+                "Aggressive: 50/50 Prune (Max Savings)"
             ], 
-            value="Efficient: 60% Pruned / 40% Retained (v8 Default, Optimal Savings)", 
+            value="Efficient: 60/40 Prune (Default)", 
             label="Prune Strategy"
         )
         # UPDATED: Dust Threshold Slider (reworded to avoid "aggressive")
