@@ -1,6 +1,5 @@
 gradio==5.46.0
 huggingface_hub==0.33.5
-qutip==5.0.4
 numpy==2.1.1
 requests==2.32.3
 pydantic==2.10.6
