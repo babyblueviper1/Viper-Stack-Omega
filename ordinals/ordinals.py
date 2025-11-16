@@ -505,11 +505,11 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
     
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
     
-    # Update prune_map keys to match (UPDATED: Even shorter for dropdown readability)
+    # Update prune_map in main_flow() to match short labels:
     prune_map = {
-        "Conservative: 70/30 Prune (Low Risk)": "1", 
-        "Efficient: 60/40 Prune (Default)": "2", 
-        "Aggressive: 50/50 Prune (Max Savings)": "3"
+        "Conservative (70/30, Low Risk)": "1", 
+        "Efficient (60/40, Default)": "2", 
+        "Aggressive (50/50, Max Savings)": "3"
     }
     choice = prune_map.get(prune_choice, "2")
     selected_ratio = prune_choices[choice]['ratio']  # Keep ratio for calc (keep fraction)
@@ -737,11 +737,11 @@ Contact: omegadaov8@proton.me
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
         prune_choice = gr.Dropdown(
             choices=[
-                "Conservative: 70/30 Prune (Low Risk)",
-                "Efficient: 60/40 Prune (Default)",
-                "Aggressive: 50/50 Prune (Max Savings)"
+                "Conservative (70/30, Low Risk)",
+                "Efficient (60/40, Default)",
+                "Aggressive (50/50, Max Savings)"
             ], 
-            value="Efficient: 60/40 Prune (Default)", 
+            value="Efficient (60/40, Default)", 
             label="Prune Strategy"
         )
         # UPDATED: Dust Threshold Slider (reworded to avoid "aggressive")
