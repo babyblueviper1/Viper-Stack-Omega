@@ -52,18 +52,6 @@ def bech32_decode(addr):
         return None, None
     return hrp, data[:-6]
 
-# Updated verify for Bech32m (flip GEN[4] bit for Taproot)
-def bech32m_verify_checksum(hrp, data):
-    # Bech32m GEN: Flip 5th GEN bit (0x2a1462b3 ^ (1 << 31) = 0xaa1462b3)
-    GEN_M = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0xaa1462b3]
-    chk = 1
-    for v in bech32_hrp_expand(hrp) + data:
-        b = (chk >> 25)
-        chk = (chk & 0x1ffffff) << 5 ^ v
-        for i in range(5):
-            chk ^= GEN_M[i] if ((b >> i) & 1) else 0
-    return chk == 1  # Bech32m constant is 1 (same as Bech32)
-
 def bech32m_verify_checksum(hrp, data):
     return bech32_polymod(bech32_hrp_expand(hrp) + data) == 0x2bc830a3  # Bech32m constant
 
@@ -676,7 +664,7 @@ with gr.Blocks(title="Omega DAO Pruner v8") as demo:
     gr.Markdown("# Omega DAO Pruner v8 - BTC UTXO Optimizer")
     
     # Disclaimer: Always Visible Above Inputs
-gr.Markdown("""
+    gr.Markdown("""
 This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
 Taproot (bc1p) and Ordinals-compatible for modern stacks.
 Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
