@@ -442,7 +442,7 @@ Fund your address before run for live scan.
 
 This is not financial advice. Use at your own risk.
 
-⚠️ Processing Note: For addresses with many UTXOs (e.g., 50+), fetching and analysis may take 1-3+ minutes (up to 200s on busy networks). Be patient. If stuck >5 min, refresh and try again. 
+⚠️ Processing Note: For addresses with a lot of UTXOs (e.g., 50+), fetching and analysis may take 1-3+ minutes (up to 200s on busy networks). Be patient. If stuck >5 min, refresh and try again. 
 
 Contact: omegadaov8@proton.me
     """
@@ -774,7 +774,7 @@ Fund your address before run for live scan.
 
 This is not financial advice. Use at your own risk.
 
-⚠️ Processing Note: For addresses with many UTXOs (e.g., 50+), fetching and analysis may take 1-3+ minutes (up to 200s on busy networks). Be patient. If stuck >5 min, refresh and try again. 
+⚠️ Processing Note: For addresses with a lot of UTXOs (e.g., 50+), fetching and analysis may take 1-3+ minutes (up to 200s on busy networks). Be patient. If stuck >5 min, refresh and try again. 
 
 Contact: omegadaov8@proton.me
 """)
