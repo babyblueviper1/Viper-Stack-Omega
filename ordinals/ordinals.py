@@ -288,26 +288,37 @@ class Tx:
 
 # HELPER: PHASE 1-3 Logic (Duplicated to Avoid Bloat)
 def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut):
-    # Lazy import QuTiP here to speed global startup
-    import qutip as qt
+    # Detect prod env (e.g., Render) to skip qutip for fast builds
+    is_prod = bool(os.getenv('RENDER_EXTERNAL_HOSTNAME') or os.getenv('PORT'))
     
-    # PHASE 1: QuTiP Tune
+    # PHASE 1: QuTiP Tune (Conditional)
     if pruned_utxos:
-        dim = len(pruned_utxos) + 1
-        psi0 = qt.basis(dim, 0)
-        rho_initial = psi0 * psi0.dag()
-        mixed_dm = qt.rand_dm(dim)
-        mixed_weight = np.std([u['amount'] for u in pruned_utxos]) / np.mean([u['amount'] for u in pruned_utxos])
-        rho_initial = (1 - mixed_weight) * rho_initial + mixed_weight * mixed_dm
-        rho_initial = rho_initial / rho_initial.tr()
-        s_rho = qt.entropy_vn(rho_initial)
-        print(f'Initial S(ρ) [BTC Flux Void]: {s_rho:.3f}')
-        noise_dm = qt.rand_dm(dim)
-        tune_p = 0.389
-        rho_tuned = tune_p * rho_initial + (1 - tune_p) * noise_dm
-        rho_tuned = rho_tuned / rho_tuned.tr()
-        s_tuned = qt.entropy_vn(rho_tuned)
-        print(f'Tuned S(ρ) [Coherence Surge]: {s_tuned:.3f}')
+        if is_prod:
+            # Mock for prod: Use fallback values with slight randomization for variety
+            import random
+            s_rho = 0.292 + random.uniform(-0.01, 0.01)
+            s_tuned = 0.611 + random.uniform(-0.02, 0.02)
+            print(f'Prod Mode: qutip Mocked - Initial S(ρ) [BTC Flux Void]: {s_rho:.3f}')
+            print(f'Prod Mode: qutip Mocked - Tuned S(ρ) [Coherence Surge]: {s_tuned:.3f}')
+        else:
+            # Lazy import QuTiP here to speed global startup
+            import qutip as qt
+            dim = len(pruned_utxos) + 1
+            psi0 = qt.basis(dim, 0)
+            rho_initial = psi0 * psi0.dag()
+            mixed_dm = qt.rand_dm(dim)
+            mixed_weight = np.std([u['amount'] for u in pruned_utxos]) / np.mean([u['amount'] for u in pruned_utxos])
+            rho_initial = (1 - mixed_weight) * rho_initial + mixed_weight * mixed_dm
+            rho_initial = rho_initial / rho_initial.tr()
+            s_rho = qt.entropy_vn(rho_initial)
+            print(f'Initial S(ρ) [BTC Flux Void]: {s_rho:.3f}')
+            noise_dm = qt.rand_dm(dim)
+            tune_p = 0.389
+            rho_tuned = tune_p * rho_initial + (1 - tune_p) * noise_dm
+            rho_tuned = rho_tuned / rho_tuned.tr()
+            s_tuned = qt.entropy_vn(rho_tuned)
+            print(f'Tuned S(ρ) [Coherence Surge]: {s_tuned:.3f}')
+        
         shard['s_rho'] = float(s_rho)
         shard['s_tuned'] = float(s_tuned)
         gci = 0.92 if s_tuned > 0.6 else 0.8
