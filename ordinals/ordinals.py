@@ -472,5 +472,5 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=int(os.getenv("PORT", 7860)),
         share=False,
-        root_path=os.getenv("RENDER_EXTERNAL_URL", "")   # Render sets this automatically if you have a custom domain, otherwise empty = root
+        allowed_paths=["./"]   # this is the missing key for 4.4.1 on Render
     )
