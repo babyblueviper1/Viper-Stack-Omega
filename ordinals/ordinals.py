@@ -187,8 +187,8 @@ def get_utxos(addr, dust_threshold=546, current_height=None):
             ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={addr}&limit=50', timeout=60)
             inscriptions = ordinals_response.json().get('results', [])
             print(f'Inscriptions Fetched (Hiro): {len(inscriptions)}')
-     except Exception as e:
-        print(f'Hiro Ordinals Fail for {addr[:10]}...: {e} - No Flags')
+        except Exception as e:
+            print(f'Hiro Ordinals Fail for {addr[:10]}...: {e} - No Flags')
 
     # Filter + Flag
     filtered_utxos = []
