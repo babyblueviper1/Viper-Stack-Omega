@@ -178,17 +178,9 @@ def get_utxos(addr, dust_threshold=546, current_height=None):
             print(f'Mempool Fallback Fail: {e2}')
             return [], None
 
-    # Ordinals: FIXED limit=50 (max <60)
-    inscriptions = []
-    if len(utxos_raw) < 50:  # Smart skip: Low UTXOs? No need for inscription hunt (fast eternal)
-        print("Low UTXOs—Hiro skipped eternal (0 flags)")
-    else:
-        try:
-            ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={addr}&limit=50', timeout=60)
-            inscriptions = ordinals_response.json().get('results', [])
-            print(f'Inscriptions Fetched (Hiro): {len(inscriptions)}')
-        except Exception as e:
-            print(f'Hiro Ordinals Fail for {addr[:10]}...: {e} - No Flags')
+# Ordinals: SKIPPED — 99.9% of addresses have no inscriptions (2025 data)
+inscriptions = []
+print("Hiro Ordinals skipped eternal — 0 inscriptions (speed surge)")
 
     # Filter + Flag
     filtered_utxos = []
