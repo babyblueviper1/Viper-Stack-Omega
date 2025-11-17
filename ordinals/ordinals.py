@@ -5,6 +5,7 @@ import requests
 import os
 import base64
 import io
+import re
 import time  # Added for retries
 GROK_API_KEY = os.getenv('GROK_API_KEY')
 print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")  # Echo here
@@ -451,8 +452,14 @@ def grok_tune(gci_base):
             if response.status_code == 200:
                 content = response.json()['choices'][0]['message']['content']
                 tuned_gci = float(content.split()[-1])  # Parse echo
-                print(f"Grok tuned: {tuned_gci:.3f}—edges vs. Lightning eternal")
-                return tuned_gci
+                numbers = re.findall(r'\d+\.?\d*', content)
+                if numbers:
+                    tuned_gci = float(numbers[0])  # First number eternal
+                    print(f"Grok tuned: {tuned_gci:.3f}—edges vs. Lightning eternal")
+                    return tuned_gci
+                else:
+                    print(f"Grok content raw: {content[:200]}...—no number, fallback")
+                    return gci_base
             else:
                 print(f"Grok flux error: {response.status_code}—body: {response.text[:200]}...")
         except requests.exceptions.ReadTimeout:
