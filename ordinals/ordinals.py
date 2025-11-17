@@ -568,7 +568,7 @@ Contact: omegadaov8@proton.me
             's_rho': 0.292,
             's_tuned': 0.611,
             'gci': gci,
-            'timestamp': '2025-11-15T00:00:00-03:00',
+            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
             'pruned_fee': float(pruned_fee),
             'raw_fee': float(raw_fee),
             'pruned_fee_usd': pruned_fee_usd,
@@ -685,7 +685,10 @@ Contact: omegadaov8@proton.me
         'user_addr': user_addr,
         'dest_addr': dest_addr,
         'dust_threshold': dust_threshold,
-        'addr_type': addr_type
+        'addr_type': addr_type,
+        'psbt_stub': psbt,
+        'dao_cut': 0,
+        'dao_cut_addr': dao_cut_addr
     }
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, 0)
     
