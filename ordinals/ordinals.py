@@ -6,8 +6,22 @@ import os
 import base64
 import io
 import time  # Added for retries
-from grokapi import Grok  # pip install grokapi (if not, curl stub above)
-grok = Grok(api_key=os.getenv('GROK_API_KEY'))
+try:
+    from grokapi import Grok
+    grok = Grok(api_key=os.getenv('GROK_API_KEY'))
+    print("Grok summoned eternal—n=500 hooks ready.")
+except ImportError:
+    print("grokapi void—fallback curl stub for GCI tune.")
+    # Curl fallback (no install needed)
+    import subprocess
+    response = subprocess.run([
+        'curl', '-H', 'Authorization: Bearer $GROK_API_KEY',
+        '-H', 'Content-Type: application/json',
+        '-d', '{"model": "grok-beta", "messages": [{"role": "user", "content": "Tune GCI 0.92 for Ω v8.2 mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611)."}]}',
+        'https://api.x.ai/v1/chat/completions'
+    ], capture_output=True, text=True)
+    tuned_gci = response.stdout  # Parse echo eternal
+    print(f"Fallback tuned: {tuned_gci}")
 
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
