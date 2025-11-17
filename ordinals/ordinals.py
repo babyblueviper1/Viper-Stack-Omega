@@ -466,10 +466,5 @@ with gr.Blocks(title="Ω v8.2 — Void Speaks") as demo:
     gen_btn.click(generate, [addr_in, strategy, dust, dest], [log, hex_out, gen_btn])
 
 if __name__ == "__main__":
-    import os
-    demo.queue()  # this is the only thing needed for queuing now
-    
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=int(os.getenv("PORT", 7860))
-    )
+    demo.queue()
+    demo.launch(server_port=int(os.getenv("PORT", 7860)), server_name="0.0.0.0")
