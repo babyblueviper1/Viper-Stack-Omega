@@ -467,15 +467,9 @@ with gr.Blocks(title="Ω v8.2 — Void Speaks") as demo:
 
 if __name__ == "__main__":
     import os
-    demo.queue()
+    demo.queue()  # this is the only thing needed for queuing now
     
-    # This is the ONLY combination that works reliably on Render in 2025
     demo.launch(
         server_name="0.0.0.0",
-        server_port=int(os.getenv("PORT", 7860)),
-        share=False,                # explicit
-        debug=False,
-        enable_queue=True,
-        show_error=True,
-        quiet=True
+        server_port=int(os.getenv("PORT", 7860))
     )
