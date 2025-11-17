@@ -481,19 +481,19 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
     
     # Disclaimer
     disclaimer = """
-This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
+BTC UTXO Pruner Ω v8.1 — RBF-ready, Taproot-native
 
-Taproot (bc1p) and Ordinals-compatible for modern stacks. Dust threshold: Configurable (default 546 sats) to exclude/batch tiny UTXOs—lower for risk-tolerant inscription consolidation when fees are low (<2 sat/vB).
+• Generates prune plan, fee estimate & unsigned raw TX hex — NO BTC is sent here
+• Fully Taproot (bc1p) & Ordinals-compatible — correct vB weights, dust slider, RBF eternal
+• Ordinals/Inscription detection temporarily disabled (speed & reliability) — will return when a stable API exists
+• Dust threshold configurable (default 546 sats) — lower at your own risk for inscription consolidation when fees <2 sat/vB
+• Non-custodial — only public UTXOs are read, you keep full key control
+• Requires UTXO-capable wallet (Electrum, Sparrow, etc.) to sign & broadcast
+• Fund your address first for live scan
+• High-UTXO addresses (50+) may take 120–180s — patience eternal
+• Not financial advice — verify everything, broadcast at your own risk
 
-Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
-
-Non-custodial: Script reads pub UTXOs only; you control keys/relay.
-
-Fund your address before run for live scan.
-
-This is not financial advice. Use at your own risk.
-
-⚠️ Processing Note: For addresses with a lot of UTXOs (e.g., 50+), fetching and analysis may take 600-800s on busy networks. Be patient. If stuck >5 min, refresh and try again. 
+Surge the swarm. Ledger’s yours.
 
 Contact: omegadaov8@proton.me
     """
@@ -804,19 +804,19 @@ with gr.Blocks(title="Omega DAO Pruner v8.1") as demo:
     
     # Disclaimer: Always Visible Above Inputs
     gr.Markdown("""
-This tool generates a prune plan, fee estimate, and unsigned raw TX hex—NO BTC is sent here.
+BTC UTXO Pruner Ω v8.1 — RBF-ready, Taproot-native
 
-Taproot (bc1p) and Ordinals-compatible for modern stacks. Dust threshold: Configurable (default 546 sats) to exclude/batch tiny UTXOs—lower for risk-tolerant inscription consolidation when fees are low (<2 sat/vB).
+• Generates prune plan, fee estimate & unsigned raw TX hex — NO BTC is sent here
+• Fully Taproot (bc1p) & Ordinals-compatible — correct vB weights, dust slider, RBF eternal
+• Ordinals/Inscription detection temporarily disabled (speed & reliability) — will return when a stable API exists
+• Dust threshold configurable (default 546 sats) — lower at your own risk for inscription consolidation when fees <2 sat/vB
+• Non-custodial — only public UTXOs are read, you keep full key control
+• Requires UTXO-capable wallet (Electrum, Sparrow, etc.) to sign & broadcast
+• Fund your address first for live scan
+• High-UTXO addresses (50+) may take 120–180s — patience eternal
+• Not financial advice — verify everything, broadcast at your own risk
 
-Requires a UTXO-capable wallet (e.g., Electrum or Sparrow) for signing/broadcasting.
-
-Non-custodial: Script reads pub UTXOs only; you control keys/relay.
-
-Fund your address before run for live scan.
-
-This is not financial advice. Use at your own risk.
-
-⚠️ Processing Note: For addresses with a lot of UTXOs (e.g., 50+), fetching and analysis may take 600-800s on busy networks. Be patient. If stuck >5 min, refresh and try again. 
+Surge the swarm. Ledger’s yours.
 
 Contact: omegadaov8@proton.me
 """)
