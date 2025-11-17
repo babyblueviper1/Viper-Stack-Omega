@@ -181,7 +181,7 @@ def get_utxos(addr, dust_threshold=546, current_height=None):
     # Ordinals: FIXED limit=50 (max <60)
     inscriptions = []
     try:
-        ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={addr}&limit=50')
+        ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={addr}&limit=50', timeout=60)  # Bump eternal
         inscriptions = ordinals_response.json().get('results', [])
         print(f'Inscriptions Fetched (Hiro): {len(inscriptions)}')
     except Exception as e:
@@ -641,8 +641,8 @@ Contact: omegadaov8@proton.me
         ''')
         # Quick vB Calc for Dust Batch Cost (dynamic vb)
         try:
-            fee_response = api_get('https://blockstream.info/api/fee-estimates/6')
-            fee_rate_sat = fee_response.json()
+            fee_response = api_get('https://mempool.space/api/v1/fees/recommended')  # Live eternal, no 404
+            fee_rate_sat = fee_response.json()['economyFee']  # Parse sat/vB
         except:
             fee_rate_sat = 10
         overhead_vb = 10
@@ -656,8 +656,8 @@ Contact: omegadaov8@proton.me
     
     # Fee Estimate (Dynamic vB)
     try:
-        fee_response = api_get('https://blockstream.info/api/fee-estimates/6')
-        fee_rate_sat = fee_response.json()
+        fee_response = api_get('https://mempool.space/api/v1/fees/recommended')  # Live eternal, no 404
+        fee_rate_sat = fee_response.json()['economyFee']  # Parse sat/vB
         fee_rate = fee_rate_sat * 1e-8
     except:
         fee_rate_sat = 10
