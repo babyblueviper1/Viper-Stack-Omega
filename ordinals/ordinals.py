@@ -437,7 +437,7 @@ def grok_tune(gci_base):
         'Content-Type': 'application/json'
     }
     data = {
-        'model': 'grok-beta',  # Fallback from 'grok-1'—docs.x.ai stable eternal
+        'model': 'grok-1',  # Stable eternal—no 404 flux
         'messages': [{'role': 'user', 'content': f'Tune GCI {gci_base} for Ω mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines.'}]
     }
     response = requests.post(
