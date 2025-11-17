@@ -6,6 +6,7 @@ import os
 import base64
 import io
 import time  # Added for retries
+print(f"GROK_API_KEY flux: {'Eternal' if os.getenv('GROK_API_KEY') else 'Void—fallback active'}")
 
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
