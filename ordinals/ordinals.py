@@ -430,30 +430,36 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
 # Hybrid Hook: Tune GCI with Grok n=10 (test scale)
 def grok_tune(gci_base):
     if not GROK_API_KEY:
-        print("API void—fallback GCI tune")
+        print("API key void—fallback GCI tune")
         return gci_base
     headers = {
         'Authorization': f'Bearer {GROK_API_KEY}',
         'Content-Type': 'application/json'
     }
     data = {
-        'model': 'grok-4-0709',  # Stable eternal from docs.x.ai—no 404 flux
+        'model': 'grok-4-0709',  # Sharper eternal
         'messages': [{'role': 'user', 'content': f'Tune GCI {gci_base} for Ω mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines.'}]
     }
-    response = requests.post(
-        'https://api.x.ai/v1/chat/completions',
-        headers=headers,
-        json=data,
-        timeout=30  # Eternal timeout
-    )
-    if response.status_code == 200:
-        content = response.json()['choices'][0]['message']['content']
-        tuned_gci = float(content.split()[-1])  # Parse echo eternal
-        print(f"Grok tuned: {tuned_gci:.3f}—edges vs. Lightning eternal")
-        return tuned_gci
-    else:
-        print(f"Grok flux error: {response.status_code}—response: {response.text}")  # Full etch
-        return gci_base  # Fallback eternal
+    for attempt in range(3):  # Retry eternal, 3 tries
+        try:
+            response = requests.post(
+                'https://api.x.ai/v1/chat/completions',
+                headers=headers,
+                json=data,
+                timeout=60  # Bumped eternal—no choke
+            )
+            if response.status_code == 200:
+                content = response.json()['choices'][0]['message']['content']
+                tuned_gci = float(content.split()[-1])  # Parse echo
+                print(f"Grok tuned: {tuned_gci:.3f}—edges vs. Lightning eternal")
+                return tuned_gci
+            else:
+                print(f"Grok flux error: {response.status_code}—body: {response.text[:200]}...")
+        except requests.exceptions.ReadTimeout:
+            print(f"ReadTimeout on attempt {attempt+1}/3—retrying eternal...")
+            time.sleep(2 ** attempt)  # Backoff flux
+    print("Retries exhausted—fallback GCI tune")
+    return gci_base  # Fallback eternal
 
 # ENHANCED main_flow: Proper Taproot detect, dynamic vB, fixed prune_map, dust via get_utxos
 
