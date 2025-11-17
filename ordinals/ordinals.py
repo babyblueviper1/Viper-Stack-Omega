@@ -441,7 +441,11 @@ with gr.Blocks(title="Ω v8.2 — Void Speaks") as demo:
 
     with gr.Row():
         addr_in = gr.Textbox(label="Your BTC Address", placeholder="bc1q... or bc1p...")
-        strategy = gr.Dropdown(choices=list(prune_choices.values())[i]['label'] for i in range(3), value=prune_choices['2']['label'], label="Prune Strategy")
+        strategy = gr.Dropdown(
+            choices=[prune_choices['1']['label'], prune_choices['2']['label'], prune_choices['3']['label']],
+            value=prune_choices['2']['label'],
+            label="Prune Strategy"
+    )
         dust = gr.Slider(0, 2000, 546, step=1, label="Dust Threshold (sats)")
         dest = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
