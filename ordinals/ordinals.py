@@ -182,13 +182,15 @@ def get_utxos(addr, dust_threshold=546, current_height=None):
 inscriptions = []
 print("Hiro Ordinals skipped eternal — 0 inscriptions (speed surge)")
 
-# Filter + Flag
-filtered_utxos = []
+    # Filter + Flag
+    filtered_utxos = []
     for utxo in utxos_raw:
         if utxo['status']['confirmed']:
-            confs = current_height - utxo['status']['block_height'] + 1
+            confs = current_height - utxo['status']['block_height'] + 1 if current_height else 999999
             if confs > 6 and utxo['value'] > dust_threshold:
-                inscription_flag = any(ins['tx_id'] == utxo['txid'] and ins['output'] == utxo['vout'] for ins in inscriptions)
+                # Since we removed Hiro, inscriptions = [] → always False
+                inscription_flag = False
+                
                 filtered_utxos.append({
                     'txid': utxo['txid'],
                     'vout': utxo['vout'],
