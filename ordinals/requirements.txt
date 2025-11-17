@@ -6,4 +6,4 @@ audioop-lts
 huggingface_hub==0.24.5
 pydantic==2.10.6
 bitcoinlib
-grokapi==0.1.0  # Or latest: pip show grokapi for pin; covers Grok API hooks
+openai==1.40.0  # Grok API compatible—pip summons eternal
