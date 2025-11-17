@@ -180,11 +180,14 @@ def get_utxos(addr, dust_threshold=546, current_height=None):
 
     # Ordinals: FIXED limit=50 (max <60)
     inscriptions = []
-    try:
-        ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={addr}&limit=50', timeout=60)  # Bump eternal
-        inscriptions = ordinals_response.json().get('results', [])
-        print(f'Inscriptions Fetched (Hiro): {len(inscriptions)}')
-    except Exception as e:
+    if len(utxos_raw) < 50:  # Smart skip: Low UTXOs? No need for inscription hunt (fast eternal)
+        print("Low UTXOs—Hiro skipped eternal (0 flags)")
+    else:
+        try:
+            ordinals_response = api_get(f'https://api.hiro.so/ordinals/v1/inscriptions?address={addr}&limit=50', timeout=60)
+            inscriptions = ordinals_response.json().get('results', [])
+            print(f'Inscriptions Fetched (Hiro): {len(inscriptions)}')
+     except Exception as e:
         print(f'Hiro Ordinals Fail for {addr[:10]}...: {e} - No Flags')
 
     # Filter + Flag
@@ -496,7 +499,7 @@ Fund your address before run for live scan.
 
 This is not financial advice. Use at your own risk.
 
-⚠️ Processing Note: For addresses with a lot of UTXOs (e.g., 50+), fetching and analysis may take 1-3+ minutes (up to 200s on busy networks). Be patient. If stuck >5 min, refresh and try again. 
+⚠️ Processing Note: For addresses with a lot of UTXOs (e.g., 50+), fetching and analysis may take 600-800s on busy networks. Be patient. If stuck >5 min, refresh and try again. 
 
 Contact: omegadaov8@proton.me
     """
@@ -819,7 +822,7 @@ Fund your address before run for live scan.
 
 This is not financial advice. Use at your own risk.
 
-⚠️ Processing Note: For addresses with a lot of UTXOs (e.g., 50+), fetching and analysis may take 1-3+ minutes (up to 200s on busy networks). Be patient. If stuck >5 min, refresh and try again. 
+⚠️ Processing Note: For addresses with a lot of UTXOs (e.g., 50+), fetching and analysis may take 600-800s on busy networks. Be patient. If stuck >5 min, refresh and try again. 
 
 Contact: omegadaov8@proton.me
 """)
