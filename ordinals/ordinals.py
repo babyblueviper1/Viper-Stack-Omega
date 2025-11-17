@@ -450,7 +450,7 @@ def grok_tune(gci_base):
                 'https://api.x.ai/v1/chat/completions',
                 headers=headers,
                 json=data,
-                timeout=60  # Bumped eternal—no choke
+                timeout=120  # Bumped eternal—holds 50s lags
             )
             if response.status_code == 200:
                 content = response.json()['choices'][0]['message']['content']
