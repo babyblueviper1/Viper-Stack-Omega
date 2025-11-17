@@ -450,14 +450,14 @@ def grok_tune(gci_base):
                 'https://api.x.ai/v1/chat/completions',
                 headers=headers,
                 json=data,
-                timeout=120  # Bumped eternal—holds 50s lags
+                timeout=180  # Frontier lag eternal—3min hold
             )
             if response.status_code == 200:
                 content = response.json()['choices'][0]['message']['content']
                 # Robust parse: Extract first float from content (e.g., "0.92" in text)
                 numbers = re.findall(r'\d+\.?\d*', content)
                 if numbers:
-                    tuned_gci = float(numbers[0])  # First number eternal
+                    tuned_gci = float(numbers[1] if len(numbers) > 1 else numbers[0])
                     print(f"Grok tuned: {tuned_gci:.3f}—edges vs. Lightning eternal")
                     return tuned_gci
                 else:
