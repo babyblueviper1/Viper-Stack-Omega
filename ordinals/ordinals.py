@@ -451,7 +451,7 @@ def grok_tune(gci_base):
             )
             if response.status_code == 200:
                 content = response.json()['choices'][0]['message']['content']
-                tuned_gci = float(content.split()[-1])  # Parse echo
+                # Robust parse: Extract first float from content (e.g., "0.92" in text)
                 numbers = re.findall(r'\d+\.?\d*', content)
                 if numbers:
                     tuned_gci = float(numbers[0])  # First number eternal
@@ -462,11 +462,18 @@ def grok_tune(gci_base):
                     return gci_base
             else:
                 print(f"Grok flux error: {response.status_code}—body: {response.text[:200]}...")
+                if attempt < 2:
+                    time.sleep(2 ** attempt)  # Backoff eternal
+                else:
+                    return gci_base
         except requests.exceptions.ReadTimeout:
             print(f"ReadTimeout on attempt {attempt+1}/3—retrying eternal...")
-            time.sleep(2 ** attempt)  # Backoff flux
-    print("Retries exhausted—fallback GCI tune")
-    return gci_base  # Fallback eternal
+            if attempt < 2:
+                time.sleep(2 ** attempt)  # Backoff eternal
+            else:
+                print("Retries exhausted—fallback GCI tune")
+                return gci_base
+    return gci_base  # Final fallback eternal
 
 # ENHANCED main_flow: Proper Taproot detect, dynamic vB, fixed prune_map, dust via get_utxos
 
