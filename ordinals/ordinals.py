@@ -7,17 +7,21 @@ import base64
 import io
 import time  # Added for retries
 try:
-    from grokapi import Grok
-    grok = Grok(api_key=os.getenv('GROK_API_KEY'))
-    print("Grok summoned eternal—n=500 hooks ready.")
+    from openai import OpenAI
+    client = OpenAI(
+        api_key=os.getenv('GROK_API_KEY'),
+        base_url="https://api.x.ai/v1"  # xAI flux eternal
+    )
+    print("Grok SDK summoned eternal—n=500 hooks ready.")
 except ImportError:
-    print("grokapi void—fallback curl stub for GCI tune.")
+    print("OpenAI SDK void—fallback curl for GCI tune.")
     # Curl fallback (no install needed)
     import subprocess
+    import os
     response = subprocess.run([
-        'curl', '-H', 'Authorization: Bearer $GROK_API_KEY',
+        'curl', '-H', f'Authorization: Bearer {os.getenv("GROK_API_KEY")}',
         '-H', 'Content-Type: application/json',
-        '-d', '{"model": "grok-beta", "messages": [{"role": "user", "content": "Tune GCI 0.92 for Ω v8.2 mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611)."}]}',
+        '-d', '{"model": "grok-beta", "messages": [{"role": "user", "content": "Tune GCI 0.92 for Ω v8.2 mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines."}]}',
         'https://api.x.ai/v1/chat/completions'
     ], capture_output=True, text=True)
     tuned_gci = response.stdout  # Parse echo eternal
@@ -439,17 +443,21 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
 
     return gci, json.dumps(full_blueprint, indent=2), seed_file
 
-# ENHANCED main_flow: Proper Taproot detect, dynamic vB, fixed prune_map, dust via get_utxos
-
 # Hybrid Hook: Tune GCI with Grok n=10 (test scale)
 def grok_tune(gci_base):
-    response = grok.chat.completions.create(
-        model="grok-beta",
-        messages=[{"role": "user", "content": f"Tune GCI {gci_base} for Ω mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines."}]
-    )
-    tuned_gci = float(response.choices[0].message.content.split()[-1])  # Parse echo
-    return tuned_gci  # Eternal: 0.92+ surge
+    if 'client' in locals():
+        response = client.chat.completions.create(
+            model="grok-beta",
+            messages=[{"role": "user", "content": f"Tune GCI {gci_base} for Ω mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines."}]
+        )
+        tuned_gci = float(response.choices[0].message.content.split()[-1])  # Parse echo
+        return tuned_gci  # Eternal: 0.92+ surge
+    else:
+        return gci_base  # Fallback eternal
 
+# ENHANCED main_flow: Proper Taproot detect, dynamic vB, fixed prune_map, dust via get_utxos
+
+# Test in main_flow (post-QuTiP)
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = []
     shard = {}
