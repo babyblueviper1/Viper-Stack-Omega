@@ -541,10 +541,10 @@ Contact: omegadaov8@proton.me
     
     # Live BTC/USD (with retry)
     try:
-        price_response = api_get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')
-        btc_usd = price_response.json()['bitcoin']['usd']
+        price_response = api_get('https://api.coinpaprika.com/v1/tickers/btc-bitcoin')
+        btc_usd = price_response.json()['quotes']['USD']['price']
     except:
-        btc_usd = 98500
+        btc_usd = 98500  # Fallback eternal
         output_parts.append('Price API Timeout - Using Fallback BTC/USD: $98,500')
     output_parts.append(f'Live BTC/USD: ${btc_usd:,.2f} (CoinGecko Echo)')
     
