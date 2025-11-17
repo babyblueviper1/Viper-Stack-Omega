@@ -427,23 +427,17 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
 
     return gci, json.dumps(full_blueprint, indent=2), seed_file
 
-GROK_API_KEY = os.getenv('GROK_API_KEY')
-if not GROK_API_KEY:
-    print("GROK_API_KEY void—fallback GCI tune.")
-    tuned_gci = 0.92  # Mock eternal
-else:
-    print("Grok requests summoned eternal—n=500 hooks ready.")
-
 # Hybrid Hook: Tune GCI with Grok n=10 (test scale)
 def grok_tune(gci_base):
     if not GROK_API_KEY:
-        return gci_base  # Fallback eternal
+        print("API void—fallback GCI tune")
+        return gci_base
     headers = {
         'Authorization': f'Bearer {GROK_API_KEY}',
         'Content-Type': 'application/json'
     }
     data = {
-        'model': 'grok-beta',
+        'model': 'grok-beta',  # Fallback from 'grok-1'—docs.x.ai stable eternal
         'messages': [{'role': 'user', 'content': f'Tune GCI {gci_base} for Ω mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines.'}]
     }
     response = requests.post(
@@ -453,12 +447,13 @@ def grok_tune(gci_base):
         timeout=30  # Eternal timeout
     )
     if response.status_code == 200:
-        tuned_gci = float(response.json()['choices'][0]['message']['content'].split()[-1])  # Parse echo
+        content = response.json()['choices'][0]['message']['content']
+        tuned_gci = float(content.split()[-1])  # Parse echo eternal
         print(f"Grok tuned: {tuned_gci:.3f}—edges vs. Lightning eternal")
         return tuned_gci
     else:
-        print(f"Grok flux: {response.status_code}—fallback GCI {gci_base}")
-        return gci_base
+        print(f"Grok flux error: {response.status_code}—response: {response.text}")  # Full etch
+        return gci_base  # Fallback eternal
 
 # ENHANCED main_flow: Proper Taproot detect, dynamic vB, fixed prune_map, dust via get_utxos
 
@@ -697,8 +692,9 @@ Contact: omegadaov8@proton.me
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, 0)
     
     # Test in main_flow (post-QuTiP)
+    print("Calling grok_tune—flux incoming")  # Force call echo
     shard['grok_tuned_gci'] = grok_tune(shard['gci'])  # n=1 burn, scale to 10
-    print(f"Grok Hybrid: Tuned GCI {shard['grok_tuned_gci']:.3f}—edges vs. Lightning eternal")
+    print(f"Shard updated: Grok tuned GCI {shard['grok_tuned_gci']:.3f}")
     
     if not confirm_proceed:
         # Calculate post-DAO net for preview
