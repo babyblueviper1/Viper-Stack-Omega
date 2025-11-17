@@ -6,7 +6,10 @@ import os
 import base64
 import io
 import time  # Added for retries
-print(f"GROK_API_KEY flux: {'Eternal' if os.getenv('GROK_API_KEY') else 'Void—fallback active'}")
+GROK_API_KEY = os.getenv('GROK_API_KEY')
+print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")  # Echo here
+if GROK_API_KEY:
+    print("Grok requests summoned eternal—n=500 hooks ready.")  # Your line, forced
 
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
