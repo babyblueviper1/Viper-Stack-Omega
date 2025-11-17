@@ -472,5 +472,5 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=int(os.getenv("PORT", 7860)),
         share=False,
-        allowed_paths=["./"]   # this is the missing key for 4.4.1 on Render
+        allowed_paths=["."]   # <-- this is the golden ticket for 4.44.1 on Render
     )
