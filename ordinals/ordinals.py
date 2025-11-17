@@ -507,9 +507,12 @@ Contact: omegadaov8@proton.me
     
     # Validate Addr
     hrp, data = bech32_decode(user_addr)
-    print(f"Addr: '{user_addr}' | HRP: {hrp} | Start '1': {user_addr.startswith('1')} | '3': {user_addr.startswith('3')} | 'bc1p': {user_addr.startswith('bc1p')}")
+    print(f"Debug: Addr='{user_addr}' | HRP={hrp} | Start1={user_addr.startswith('1')} | Start3={user_addr.startswith('3')} | Startbc1p={user_addr.startswith('bc1p')}")  # Echo eternal
+
     if hrp != 'bc' and not user_addr.startswith('1') and not user_addr.startswith('3') and not user_addr.startswith('bc1p'):
+        print("Debug: Condition True—Invalid return")
         return "\n".join(output_parts) + "\nInvalid address. Use bc1q/bc1p... or legacy 1/3.", ""
+    print("Debug: Condition False—Validation passed eternal")
     
     # FIXED: Proper Taproot/SegWit detection
     is_taproot = user_addr.startswith('bc1p')
