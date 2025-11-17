@@ -7,13 +7,16 @@ import base64
 import io
 import re
 import time  # Added for retries
+
 GROK_API_KEY = os.getenv('GROK_API_KEY')
 print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")  # Echo here
 if GROK_API_KEY:
     print("Grok requests summoned eternal—n=500 hooks ready.")  # Your line, forced
 
+
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+
 
 def bech32_polymod(values):
     GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
@@ -25,15 +28,19 @@ def bech32_polymod(values):
             chk ^= GEN[i] if ((b >> i) & 1) else 0
     return chk
 
+
 def bech32_hrp_expand(s):
     return [ord(x) >> 5 for x in s] + [0] + [ord(x) & 31 for x in s]
+
 
 def bech32_verify_checksum(hrp, data):
     return bech32_polymod(bech32_hrp_expand(hrp) + data) == 1
 
+
 # FIXED: Define bech32m_verify_checksum BEFORE bech32_decode to avoid NameError
 def bech32m_verify_checksum(hrp, data):
     return bech32_polymod(bech32_hrp_expand(hrp) + data) == 0x2bc830a3  # Bech32m constant
+
 
 def bech32_decode(addr):
     if ' ' in addr or len(addr) < 8:
@@ -42,24 +49,25 @@ def bech32_decode(addr):
     if pos < 1 or pos + 7 > len(addr) or len(addr) > 90:
         return None, None
     hrp = addr[:pos]
-    if not all(ord(x) >> 8 == 0 for x in hrp) or not all(ord(x) >> 8 == 0 for x in addr[pos+1:]):
+    if not all(ord(x) >> 8 == 0 for x in hrp) or not all(ord(x) >> 8 == 0 for x in addr[pos + 1:]):
         return None, None
     data = []
-    for char in addr[pos+1:]:
+    for char in addr[pos + 1:]:
         value = CHARSET.find(char)
         if value == -1:
             return None, None
         data.append(value)
     # Route to Bech32 or Bech32m based on first char after '1' ('q' = v0, 'p' = v1 Taproot)
-    if addr[pos+1] == 'q':
+    if addr[pos + 1] == 'q':
         if not bech32_verify_checksum(hrp, data):
             return None, None
-    elif addr[pos+1] == 'p':
+    elif addr[pos + 1] == 'p':
         if not bech32m_verify_checksum(hrp, data):
             return None, None
     else:
         return None, None
     return hrp, data[:-6]
+
 
 def convertbits(data, frombits, tobits, pad=True):
     acc = 0
@@ -82,8 +90,11 @@ def convertbits(data, frombits, tobits, pad=True):
         return None
     return ret
 
+
 # Base58 decode for legacy addresses
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+
 def base58_decode(addr):
     n = 0
     for c in addr:
@@ -93,6 +104,7 @@ def base58_decode(addr):
     byte_length = (n.bit_length() + 7) // 8
     bytes_decoded = n.to_bytes(byte_length, 'big')
     return b'\x00' * leading_zeros + bytes_decoded
+
 
 # ENHANCED: address_to_script_pubkey returns (script, vb_weights dict)
 def address_to_script_pubkey(addr):
@@ -136,8 +148,10 @@ def address_to_script_pubkey(addr):
             return script, weights
     raise ValueError(f"Unsupported or invalid address: {addr}")
 
+
 # Fixed DAO Addr1 (5% Cut Destination - Swarm Fuel)
 dao_cut_addr = 'bc1qwnj2zumaf67d34k6cm2l6gr3uvt5pp2hdrtvt3ckc4aunhmr53cselkpty'  # DAO Pool #1 (P2WSH)
+
 
 # Added retry wrapper for API calls
 def api_get(url, timeout=30, retries=3):
@@ -147,10 +161,11 @@ def api_get(url, timeout=30, retries=3):
             response.raise_for_status()
             return response
         except Exception as e:
-            print(f'API Retry {i+1}/{retries} for {url}: {e}')
+            print(f'API Retry {i + 1}/{retries} for {url}: {e}')
             if i < retries - 1:
                 time.sleep(2 ** i)  # Exponential backoff
     raise Exception(f'API failed after {retries} retries: {url}')
+
 
 # ROBUST get_utxos: Blockstream primary, Mempool fallback, Hiro fixed limit=50
 def get_utxos(addr, dust_threshold=546, current_height=None):
@@ -178,9 +193,9 @@ def get_utxos(addr, dust_threshold=546, current_height=None):
             print(f'Mempool Fallback Fail: {e2}')
             return [], None
 
-# Ordinals: SKIPPED — 99.9% of addresses have no inscriptions (2025 data)
-inscriptions = []
-print("Hiro Ordinals skipped eternal — 0 inscriptions (speed surge)")
+    # Ordinals: SKIPPED — 99.9% of addresses have no inscriptions (2025 data)
+    inscriptions = []
+    print("Hiro Ordinals skipped eternal — 0 inscriptions (speed surge)")
 
     # Filter + Flag
     filtered_utxos = []
@@ -190,7 +205,7 @@ print("Hiro Ordinals skipped eternal — 0 inscriptions (speed surge)")
             if confs > 6 and utxo['value'] > dust_threshold:
                 # Since we removed Hiro, inscriptions = [] → always False
                 inscription_flag = False
-                
+
                 filtered_utxos.append({
                     'txid': utxo['txid'],
                     'vout': utxo['vout'],
@@ -202,10 +217,11 @@ print("Hiro Ordinals skipped eternal — 0 inscriptions (speed surge)")
                 })
     # Sort: Prioritize inscriptions
     filtered_utxos.sort(key=lambda u: (u['is_inscription'], u['amount']), reverse=True)
-    
+
     inscription_count = sum(1 for u in filtered_utxos if u['is_inscription'])
     print(f'API Success for {addr[:10]}...: {len(filtered_utxos)} UTXOs ({inscription_count} inscriptions) >6 confs (from {len(utxos_raw)} raw)')
     return filtered_utxos, current_height
+
 
 prune_choices = {
     '1': {'label': 'Conservative: 70/30 Prune (Low Risk)', 'ratio': 0.3},
@@ -213,9 +229,11 @@ prune_choices = {
     '3': {'label': 'Aggressive: 50/50 Prune (Max Savings)', 'ratio': 0.5}
 }
 
+
 # Pure Python TX Builder (unchanged)
 def encode_int(i, nbytes, encoding='little'):
     return i.to_bytes(nbytes, encoding)
+
 
 def encode_varint(i):
     if i < 0xfd:
@@ -229,8 +247,10 @@ def encode_varint(i):
     else:
         raise ValueError(f"integer too large: {i}")
 
+
 from dataclasses import dataclass
 from typing import List, Union
+
 
 @dataclass
 class Script:
@@ -255,6 +275,7 @@ class Script:
         ret = b''.join(out)
         return encode_varint(len(ret)) + ret
 
+
 @dataclass
 class TxIn:
     prev_tx: bytes  # Reversed txid
@@ -275,6 +296,7 @@ class TxIn:
         ]
         return b''.join(out)
 
+
 @dataclass
 class TxOut:
     amount: int
@@ -291,6 +313,7 @@ class TxOut:
             script_encoded
         ]
         return b''.join(out)
+
 
 @dataclass
 class Tx:
@@ -316,11 +339,12 @@ class Tx:
         out += [encode_int(self.locktime, 4, 'little')]
         return b''.join(out)
 
+
 # HELPER: PHASE 1-3 Logic (unchanged)
 def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut):
     # Detect prod env (e.g., Render) to skip qutip for fast builds
     is_prod = bool(os.getenv('RENDER_EXTERNAL_HOSTNAME') or os.getenv('PORT'))
-    
+
     # PHASE 1: QuTiP Tune (Conditional)
     if pruned_utxos:
         if is_prod:
@@ -348,7 +372,7 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
             rho_tuned = rho_tuned / rho_tuned.tr()
             s_tuned = qt.entropy_vn(rho_tuned)
             print(f'Tuned S(ρ) [Coherence Surge]: {s_tuned:.3f}')
-        
+
         shard['s_rho'] = float(s_rho)
         shard['s_tuned'] = float(s_tuned)
         gci = 0.92 if s_tuned > 0.6 else 0.8
@@ -380,7 +404,7 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
     v8_grid = {'n': 500, 'hooks': 'grok4', 'rbf_batch': True}
 
     full_blueprint = {
-        'id': f'omega_v8_btc_user_{int(np.random.rand()*1e6)}',
+        'id': f'omega_v8_btc_user_{int(np.random.rand() * 1e6)}',
         'shard': shard_data,
         'fusions': {
             'layer3_epistemic': layer3_epistemic,
@@ -391,7 +415,7 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
             'fidelity': layer3_epistemic['coherence_metrics']['fidelity'],
             'gci_surge': shard_data["gci"] > 0.92
         },
-        'prune_target': f'{selected_ratio*100}%'
+        'prune_target': f'{selected_ratio * 100}%'
     }
 
     if full_blueprint['coherence']['fidelity'] > 0.98:
@@ -418,12 +442,13 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
         json.dump(seeds, f, indent=4)
 
     print(f'SYNC COMPLETE: Blueprint Appended to {seed_file}')
-    print(f'UTXO Echo: {len(shard_data["utxos"])} Pruned | GCI Tuned: {shard_data["gci"]:.3f} | Prune Ratio: {selected_ratio*100}%')
+    print(f'UTXO Echo: {len(shard_data["utxos"])} Pruned | GCI Tuned: {shard_data["gci"]:.3f} | Prune Ratio: {selected_ratio * 100}%')
     print('Horizon Ready: RBF Batch Eternal | Chainlink v8.1 BTC Nudge')
     print('\n--- Sample Blueprint Echo (Truncated) ---')
     print(json.dumps(full_blueprint, indent=2)[:800] + '\n... [Full in seed_blueprints_v8.json]')
 
     return gci, json.dumps(full_blueprint, indent=2), seed_file
+
 
 # Hybrid Hook: Tune GCI with Grok n=10 (test scale)
 def grok_tune(gci_base):
@@ -464,7 +489,7 @@ def grok_tune(gci_base):
                 else:
                     return gci_base
         except requests.exceptions.ReadTimeout:
-            print(f"ReadTimeout on attempt {attempt+1}/3—retrying eternal...")
+            print(f"ReadTimeout on attempt {attempt + 1}/3—retrying eternal...")
             if attempt < 2:
                 time.sleep(2 ** attempt)  # Backoff eternal
             else:
@@ -472,13 +497,12 @@ def grok_tune(gci_base):
                 return gci_base
     return gci_base  # Final fallback eternal
 
-# ENHANCED main_flow: Proper Taproot detect, dynamic vB, fixed prune_map, dust via get_utxos
 
-# Test in main_flow (post-QuTiP)
+# ENHANCED main_flow: Proper Taproot detect, dynamic vB, fixed prune_map, dust via get_utxos
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = []
     shard = {}
-    
+
     # Disclaimer
     disclaimer = """
 BTC UTXO Pruner Ω v8.1 — RBF-ready, Taproot-native
@@ -498,10 +522,10 @@ Surge the swarm. Ledger’s yours.
 Contact: omegadaov8@proton.me
     """
     output_parts.append(disclaimer)
-    
+
     if not user_addr:
         return "\n".join(output_parts) + "\nNo address provided.", ""
-    
+
     # Validate Addr
     hrp, data = bech32_decode(user_addr)
     print(f"Debug: Addr='{user_addr}' | HRP={hrp} | Start1={user_addr.startswith('1')} | Start3={user_addr.startswith('3')} | Startbc1p={user_addr.startswith('bc1p')}")  # Echo eternal
@@ -510,7 +534,7 @@ Contact: omegadaov8@proton.me
         print("Debug: Condition True—Invalid return")
         return "\n".join(output_parts) + "\nInvalid address. Use bc1q/bc1p... or legacy 1/3.", ""
     print("Debug: Condition False—Validation passed eternal")
-    
+
     # FIXED: Proper Taproot/SegWit detection
     is_taproot = user_addr.startswith('bc1p')
     is_segwit = user_addr.startswith('bc1q')
@@ -521,7 +545,7 @@ Contact: omegadaov8@proton.me
         addr_type = "SegWit P2WPKH/P2WSH"
     else:
         addr_type = "Legacy P2PKH/P2SH"
-    
+
     # Derive weights for user_addr
     try:
         _, user_vb_weights = address_to_script_pubkey(user_addr)
@@ -535,7 +559,7 @@ Contact: omegadaov8@proton.me
             input_vb, output_vb = 67.25, 31
         else:
             input_vb, output_vb = 148, 34
-    
+
     # Live BTC/USD (with retry)
     try:
         price_response = api_get('https://api.coinpaprika.com/v1/tickers/btc-bitcoin')
@@ -544,41 +568,33 @@ Contact: omegadaov8@proton.me
         btc_usd = 98500  # Fallback eternal
         output_parts.append('Price API Timeout - Using Fallback BTC/USD: $98,500')
     output_parts.append(f'Live BTC/USD: ${btc_usd:,.2f} (CoinGecko Echo)')
-    
+
     output_parts.append(f'Loaded User Addr: {user_addr[:10]}... ({addr_type})')
-    
+
     # REUSED: Fetch via get_utxos for consistency (robust now)
     all_utxos, current_height = get_utxos(user_addr, dust_threshold)
-    
+
     # ENHANCED Dust Stats: Refetch raw (dust_threshold=0) to count excluded
     raw_utxos, _ = get_utxos(user_addr, 0, current_height)
     dust_utxos = []
-    inscriptions = []  # From Hiro in get_utxos, but for dust: assume from raw
-    # Simple: Filter raw_utxos for <=dust_threshold, >6 confs
+    dust_value = 0
     for u in raw_utxos:
         confs = current_height - u['status']['block_height'] + 1 if 'status' in u else 0
         if confs > 6 and u['value'] <= dust_threshold:
             dust_utxos.append(u)
+            dust_value += u['value']
     dust_count = len(dust_utxos)
-    dust_value = sum(u['value'] for u in dust_utxos)
-    # Dust inscriptions: Placeholder (full impl would refetch Hiro)
-    dust_inscriptions = 0  # For now; extend if needed
-    
+    dust_inscriptions = 0  # Placeholder
+
     # Defaults
     pruned_utxos = []
     selected_ratio = 0.4
     choice = '2'
-    raw_fee = 0
-    pruned_fee = 0
-    raw_fee_usd = 0
-    pruned_fee_usd = 0
-    savings_usd = 0
-    dao_cut = 0
+    raw_fee = pruned_fee = raw_fee_usd = pruned_fee_usd = savings_usd = dao_cut = 0
     psbt = 'abort_psbt'
     gci = 0.8
-    
     raw_hex_text = ""
-    
+
     if not all_utxos:
         output_parts.append('No UTXOs Found - Fund Addr (0.001+ BTC) & Re-Run (6+ Confs)')
         if not dest_addr:
@@ -605,22 +621,21 @@ Contact: omegadaov8@proton.me
             'dust_threshold': dust_threshold,
             'addr_type': addr_type
         }
-        # Run Phases (Full for Consistency)
         gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut)
         return "\n".join(output_parts), ""
-    
+
     output_parts.append(f'Live Scan: {len(all_utxos)} Total UTXOs Found')
-    
+
     # FIXED prune_map for short labels
     prune_map = {
-        "Conservative (70/30, Low Risk)": "1", 
-        "Efficient (60/40, Default)": "2", 
+        "Conservative (70/30, Low Risk)": "1",
+        "Efficient (60/40, Default)": "2",
         "Aggressive (50/50, Max Savings)": "3"
     }
     choice = prune_map.get(prune_choice, "2")
     selected_ratio = prune_choices[choice]['ratio']
-    output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - selected_ratio)*100:.0f}% / Retained: {selected_ratio*100:.0f}%)')
-    
+    output_parts.append(f'Selected: {prune_choices[choice]["label"]} (Pruned: {(1 - selected_ratio) * 100:.0f}% / Retained: {selected_ratio * 100:.0f}%)')
+
     # Prune Logic - Enhanced Sort (Inscriptions prioritized)
     all_utxos.sort(key=lambda x: (x.get('is_inscription', False), x['amount']), reverse=True)
     prune_count = max(1, int(len(all_utxos) * selected_ratio))
@@ -628,51 +643,46 @@ Contact: omegadaov8@proton.me
     pruned_amounts = [round(u['amount'], 4) for u in pruned_utxos]
     pruned_usd = [round(amt * btc_usd, 2) for amt in pruned_amounts]
     output_parts.append(f'Pruned UTXOs: [{", ".join(f"{amt} BTC (${usd})" for amt, usd in zip(pruned_amounts, pruned_usd))}]')
-    # Ordinals/Inscription Tease
+
     inscription_count = sum(1 for u in pruned_utxos if u.get('is_inscription', False))
     if inscription_count > 0 or dust_count > 0:
         output_parts.append(f'Inscribed UTXOs Pruned: {inscription_count} (Ordinals/BRC-20 dust prioritized at {dust_threshold} sat threshold)')
-        # Dust Threshold Disclaimer
         output_parts.append(f'''
 ⚠️ Dust Threshold: Set to {dust_threshold} sats. Lower values batch more tiny inscriptions for optimization (e.g., when fees <2 sat/vB), but risk net losses if fees spike. Excluded Dust UTXOs: {dust_count} (handle manually in Sparrow/Electrum). Not financial advice—sim fees first!
         ''')
-        # Quick vB Calc for Dust Batch Cost (dynamic vb)
         try:
-            fee_response = api_get('https://mempool.space/api/v1/fees/recommended')  # Live eternal, no 404
-            fee_rate_sat = fee_response.json()['economyFee']  # Parse sat/vB
+            fee_response = api_get('https://mempool.space/api/v1/fees/recommended')
+            fee_rate_sat = fee_response.json()['economyFee']
         except:
             fee_rate_sat = 10
         overhead_vb = 10
-        dust_batch_vb = overhead_vb + input_vb * dust_count + output_vb * 1  # Batch to 1 output
-        dust_batch_fee = dust_batch_vb * (fee_rate_sat * 1e-8)
-        dust_batch_fee_sats = int(dust_batch_fee * 1e8)
-        dust_value_sats = int(dust_value)
-        output_parts.append(f'💡 Est. Dust Batch Cost: {dust_batch_vb:.1f} vB ({dust_batch_fee_sats} sats @ {fee_rate_sat:.0f} sat/vB) for {dust_count} UTXOs ({dust_inscriptions} inscribed). Total dust value: {dust_value_sats} sats. Net worth it if future fee savings > batch cost!')
+        dust_batch_vb = overhead_vb + input_vb * dust_count + output_vb * 1
+        dust_batch_fee_sats = int(dust_batch_vb * fee_rate_sat)
+        output_parts.append(f'💡 Est. Dust Batch Cost: {dust_batch_vb:.1f} vB ({dust_batch_fee_sats} sats @ {fee_rate_sat:.0f} sat/vB) for {dust_count} UTXOs. Total dust value: {int(dust_value)} sats.')
     elif dust_count > 0:
         output_parts.append(f'Dust UTXOs Detected (but not pruned): {dust_count} below {dust_threshold} sats threshold.')
-    
+
     # Fee Estimate (Dynamic vB)
     try:
-        fee_response = api_get('https://mempool.space/api/v1/fees/recommended')  # Live eternal, no 404
-        fee_rate_sat = fee_response.json()['economyFee']  # Parse sat/vB
+        fee_response = api_get('https://mempool.space/api/v1/fees/recommended')
+        fee_rate_sat = fee_response.json()['economyFee']
         fee_rate = fee_rate_sat * 1e-8
     except:
         fee_rate_sat = 10
         fee_rate = 10 * 1e-8
         output_parts.append('Fee API Timeout - Using Fallback 10 sat/vB')
-    
-    addr_note = f"({addr_type})"
+
     overhead_vb = 10
-    raw_vb = overhead_vb + input_vb * len(all_utxos) + output_vb * 1  # Raw: all inputs, 1 output
-    pruned_vb = overhead_vb + input_vb * len(pruned_utxos) + output_vb * 2  # Pruned: few inputs, 2 outputs (dest + DAO)
-    
+    raw_vb = overhead_vb + input_vb * len(all_utxos) + output_vb * 1
+    pruned_vb = overhead_vb + input_vb * len(pruned_utxos) + output_vb * 2
+
     raw_fee = raw_vb * fee_rate
     pruned_fee = pruned_vb * fee_rate
     raw_fee_usd = round(raw_fee * btc_usd, 2)
     pruned_fee_usd = round(pruned_fee * btc_usd, 2)
     savings = raw_fee - pruned_fee
     savings_usd = round(savings * btc_usd, 2)
-    
+
     if not dest_addr:
         dest_addr = user_addr
     total_tx_value = sum(u['amount'] for u in pruned_utxos)
@@ -680,17 +690,15 @@ Contact: omegadaov8@proton.me
     send_amount = total_tx_value - pruned_fee
     send_usd = round(send_amount * btc_usd, 2)
 
-    # Preview DAO Cut (Fixed: 5% of fee savings, not tx value)
     preview_dao_cut = 0.05 * savings
     preview_dao_cut_usd = round(preview_dao_cut * btc_usd, 2)
-    output_parts.append(f'\nFee Estimate @ {fee_rate_sat:.0f} sat/vB for transaction ({total_tx_value:.8f} BTC (${total_tx_usd:,.2f})) {addr_note}:')
+    output_parts.append(f'\nFee Estimate @ {fee_rate_sat:.0f} sat/vB for transaction ({total_tx_value:.8f} BTC (${total_tx_usd:,.2f})) {addr_type}:')
     output_parts.append(f'Raw Tx ({len(all_utxos)} UTXOs): {raw_fee:.8f} BTC (${raw_fee_usd}) ({raw_vb:.1f} vB)')
     output_parts.append(f'Pruned Tx ({len(pruned_utxos)} UTXOs): {pruned_fee:.8f} BTC (${pruned_fee_usd}) ({pruned_vb:.1f} vB)')
-    output_parts.append(f'Fee Savings: {savings:.8f} BTC (${savings_usd}) ({(1 - selected_ratio)*100:.0f}%)')
-    
+    output_parts.append(f'Fee Savings: {savings:.8f} BTC (${savings_usd}) ({(1 - selected_ratio) * 100:.0f}%)')
     output_parts.append(f'DAO Incentive (5% of Fee Savings): {preview_dao_cut:.8f} BTC (${preview_dao_cut_usd})')
-    
-    # Run Phases first to set shard['gci']
+
+    # Build shard and run phases
     shard = {
         'utxos': pruned_utxos,
         'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
@@ -711,116 +719,83 @@ Contact: omegadaov8@proton.me
         'dao_cut_addr': dao_cut_addr
     }
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, 0)
-    
-    # Test in main_flow (post-QuTiP)
-    print("Calling grok_tune—flux incoming")  # Force call echo
-    shard['grok_tuned_gci'] = grok_tune(shard['gci'])  # n=1 burn, scale to 10
+
+    print("Calling grok_tune—flux incoming")
+    shard['grok_tuned_gci'] = grok_tune(shard['gci'])
     print(f"Shard updated: Grok tuned GCI {shard['grok_tuned_gci']:.3f}")
-    
+
     if not confirm_proceed:
-        # Calculate post-DAO net for preview
-        preview_send_amount = total_tx_value - pruned_fee
-        preview_dao_cut = 0.05 * savings
-        total_cost_incl_dao = pruned_fee + preview_dao_cut
-        preview_net_usd = round((preview_send_amount - preview_dao_cut) * btc_usd, 2)
+        preview_send_amount = total_tx_value - pruned_fee - preview_dao_cut
+        preview_net_usd = round(preview_send_amount * btc_usd, 2)
         output_parts.append(f'\nTotal Tx Value: {total_tx_value:.8f} BTC (${total_tx_usd})')
-        output_parts.append(f'Total Cost (Miner Fee + DAO Incentive): {total_cost_incl_dao:.8f} BTC (${round(total_cost_incl_dao * btc_usd, 2)})')
-        output_parts.append(f'Net Send (to Dest): {preview_send_amount - preview_dao_cut:.8f} BTC (${preview_net_usd})')
+        output_parts.append(f'Total Cost (Miner Fee + DAO Incentive): {pruned_fee + preview_dao_cut:.8f} BTC (${round((pruned_fee + preview_dao_cut) * btc_usd, 2)})')
+        output_parts.append(f'Net Send (to Dest): {preview_send_amount:.8f} BTC (${preview_net_usd})')
         output_parts.append('Confirm to proceed.')
-        shard['dao_cut'] = float(preview_dao_cut)
-        shard['dao_cut_addr'] = dao_cut_addr
-        shard['psbt_stub'] = psbt
         return "\n".join(output_parts), ""
-    
+
     output_parts.append('Accepted - Generating Unsigned Raw TX')
-    
-    # DAO Cut (Fixed: 5% of fee savings)
+
     dao_cut = 0.05 * savings
     send_amount -= dao_cut
     send_usd = round(send_amount * btc_usd, 2)
     dao_cut_usd = round(dao_cut * btc_usd, 2)
     output_parts.append(f'5% DAO Incentive Integrated: {dao_cut:.8f} BTC (${dao_cut_usd}) to DAO Pool - Adjusted Net Send: {send_amount:.8f} BTC (${send_usd})')
-    
-    # Auto-Raw TX Generation (Pure Python with Full scriptPubKeys)
+
+    # Auto-Raw TX Generation
     raw_hex = None
     try:
-        # Derive real scriptPubKeys (unpack weights if needed, but not for TX)
         script_dest, _ = address_to_script_pubkey(dest_addr)
         script_dao, _ = address_to_script_pubkey(dao_cut_addr)
-        
+
         tx = Tx(tx_ins=[], tx_outs=[])
-        
-        # Add pruned UTXOs as inputs (unsigned, empty script_sig)
+
         for u in pruned_utxos:
-            prev_tx_bytes = bytes.fromhex(u['txid'])[::-1]  # Little-endian reversal
+            prev_tx_bytes = bytes.fromhex(u['txid'])[::-1]
             txin = TxIn(prev_tx=prev_tx_bytes, prev_index=u['vout'])
             tx.tx_ins.append(txin)
-        
-        # Add outputs with real scripts
-        tx.tx_outs.append(TxOut(amount=int(send_amount * 1e8), script_pubkey=script_dest))  # Net send to dest
-        if dao_cut > 546 / 1e8:  # Dust limit check
-            tx.tx_outs.append(TxOut(amount=int(dao_cut * 1e8), script_pubkey=script_dao))  # DAO incentive
+
+        tx.tx_outs.append(TxOut(amount=int(send_amount * 1e8), script_pubkey=script_dest))
+        if dao_cut > 546 / 1e8:
+            tx.tx_outs.append(TxOut(amount=int(dao_cut * 1e8), script_pubkey=script_dao))
         else:
             output_parts.append('DAO Incentive Below Dust Limit - Skipped Output')
-        
-        # Serialize as raw hex (unsigned; fee implicit via input/output delta)
+
         raw_hex = tx.encode().hex()
-        output_parts.append(f'Unsigned Raw TX Generated ({len(tx.tx_ins)} inputs, {len(tx.tx_outs)} outputs: net send to dest + DAO incentive): Copy the ENTIRE hex below into Electrum (Tools > Load transaction > From hex). Pruned UTXOs auto-matched—no manual selection needed. Preview, sign, broadcast.')
+        output_parts.append(f'Unsigned Raw TX Generated ({len(tx.tx_ins)} inputs, {len(tx.tx_outs)} outputs):')
         output_parts.append(f'Dest ScriptPubKey: {script_dest.hex()[:20]}... (full derived)')
         if dao_cut > 546 / 1e8:
             output_parts.append(f'DAO ScriptPubKey: {script_dao.hex()[:20]}... (full derived)')
-        output_parts.append('This transaction is RBF-enabled (sequence: 0xfffffffd), allowing you to bump the fee in your wallet if it gets stuck in the mempool.')
+        output_parts.append('This transaction is RBF-enabled (sequence: 0xfffffffd).')
     except Exception as e:
         raw_hex = f"Error in TX gen: {e}"
         output_parts.append(f'Raw TX Gen Error ({e}): Check console for details.')
-    
+
     instructions = """
 === Next Steps ===
 1. Copy the ENTIRE raw TX hex below.
-2. In Electrum: Tools > Load transaction > From hex > Paste > OK. Pruned UTXOs auto-load as inputs, net send + DAO incentive auto-load as outputs.
-3. Preview to confirm (TX is RBF-enabled: sequence signals allow fee bumps without re-signing).
-5. Sign.
-6. Broadcast and monitor.  If unconfirmed (low fee/mempool full), right-click TX in Electrum > "Increase fee" for RBF bump (auto-higher rate; DAO unchanged). Re-run pruner for major tweaks (e.g., new UTXOs/strategy—will recalc fees/DAO).
-7. Enjoy.
+2. In Electrum: Tools > Load transaction > From hex > Paste > OK.
+3. Preview, sign, broadcast.
+4. If stuck, use "Increase fee" for RBF bump.
 === Proceed Securely ===
 """
     output_parts.append(instructions)
-    
-    # Shard
+
     shard['dao_cut'] = float(dao_cut)
     shard['dao_cut_addr'] = dao_cut_addr
-    shard['psbt_stub'] = raw_hex[:50] + '...' if raw_hex else 'error'
-    
-    # Run Phases (Full for Confirm)
+    shard['psbt_stub'] = raw_hex[:50] + '...' if raw_hex and len(raw_hex) > 50 else 'error'
+
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, raw_hex or 'error', user_addr, dest_addr, dao_cut)
-    
-    raw_hex_text = raw_hex if raw_hex else "TX Generation Failed - See Log"
-    
+
+    raw_hex_text = raw_hex if raw_hex and "Error" not in raw_hex else "TX Generation Failed - See Log"
+
     return "\n".join(output_parts), raw_hex_text
 
-# Gradio Interface (unchanged)
+
+# Gradio Interface
 with gr.Blocks(title="Omega DAO Pruner v8.1") as demo:
     gr.Markdown("# Omega DAO Pruner v8.1 - BTC UTXO Optimizer")
-    
-    # Disclaimer: Always Visible Above Inputs
-    gr.Markdown("""
-BTC UTXO Pruner Ω v8.1 — RBF-ready, Taproot-native
+    gr.Markdown(disclaimer)
 
-• Generates prune plan, fee estimate & unsigned raw TX hex — NO BTC is sent here
-• Fully Taproot (bc1p) & Ordinals-compatible — correct vB weights, dust slider, RBF eternal
-• Ordinals/Inscription detection temporarily disabled (speed & reliability) — will return when a stable API exists
-• Dust threshold configurable (default 546 sats) — lower at your own risk for inscription consolidation when fees <2 sat/vB
-• Non-custodial — only public UTXOs are read, you keep full key control
-• Requires UTXO-capable wallet (Electrum, Sparrow, etc.) to sign & broadcast
-• Fund your address first for live scan
-• High-UTXO addresses (50+) may take 120–180s — patience eternal
-• Not financial advice — verify everything, broadcast at your own risk
-
-Surge the swarm. Ledger’s yours.
-
-Contact: omegadaov8@proton.me
-""")
-    
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
         prune_choice = gr.Dropdown(
@@ -828,33 +803,25 @@ Contact: omegadaov8@proton.me
                 "Conservative (70/30, Low Risk)",
                 "Efficient (60/40, Default)",
                 "Aggressive (50/50, Max Savings)"
-            ], 
-            value="Efficient (60/40, Default)", 
+            ],
+            value="Efficient (60/40, Default)",
             label="Prune Strategy"
         )
-        # Dust Threshold Slider
-        dust_threshold = gr.Slider(minimum=0, maximum=2000, value=546, step=1, label="Dust Threshold (sats) - Lower = Include More Dust (Riskier Batching)")
+        dust_threshold = gr.Slider(minimum=0, maximum=2000, value=546, step=1, label="Dust Threshold (sats)")
         dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
+
     submit_btn = gr.Button("Run Pruner")
-    
-    # Always Visible: Output Log
     output_text = gr.Textbox(label="Output Log", lines=20)
-    
-    # Hidden: Raw TX Hex (Only after Generate)
-    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex - Copy Entire Content Below for Electrum", lines=10, visible=False)
-    
-    # Hidden Button: "Generate Unsigned Raw TX" (Appears After Preview)
+    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=10, visible=False)
     generate_btn = gr.Button("Generate Pruned TX Hex (DAO Pool Incentive Included)", visible=False)
 
     def show_generate_btn():
-        # After preview run, show generate button, keep raw_tx_text hidden
         return gr.update(visible=True), gr.update(visible=False)
 
     def generate_raw_tx(user_addr, prune_choice, dust_threshold, dest_addr):
         log, hex_content = main_flow(user_addr, prune_choice, dest_addr, True, dust_threshold)
         return log, gr.update(value=hex_content, visible=True), gr.update(visible=False)
 
-    # First Run: Preview (confirm=False) - Only log
     submit_btn.click(
         fn=lambda u, p, dt, d: main_flow(u, p, d, False, dt),
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
@@ -864,21 +831,20 @@ Contact: omegadaov8@proton.me
         outputs=[generate_btn, raw_tx_text]
     )
 
-    # Second Step: Generate Raw TX (confirm=True) - Log + Hex
     generate_btn.click(
         fn=generate_raw_tx,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
         outputs=[output_text, raw_tx_text, generate_btn]
     )
 
-# Render Launch: share=True for cloud bypass
+
 if __name__ == "__main__":
     demo.queue(api_open=True)
     port = int(os.environ.get("PORT", 10000))
     demo.launch(
         server_name="0.0.0.0",
         server_port=port,
-        share=True,  # Public Gradio.live URL in logs
+        share=True,
         debug=False,
         root_path="/",
         show_error=True
