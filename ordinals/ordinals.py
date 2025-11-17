@@ -466,9 +466,11 @@ with gr.Blocks(title="Ω v8.2 — Void Speaks") as demo:
     gen_btn.click(generate, [addr_in, strategy, dust, dest], [log, hex_out, gen_btn])
 
 if __name__ == "__main__":
+    import os
     demo.queue()
+    
+    # Render expects this EXACT pattern — no share=True, no root_path tricks
     demo.launch(
         server_name="0.0.0.0",
-        server_port=int(os.getenv("PORT", 7860)),
-        root_path="/"
+        server_port=int(os.getenv("PORT", 7860))
     )
