@@ -469,8 +469,13 @@ if __name__ == "__main__":
     import os
     demo.queue()
     
-    # Render expects this EXACT pattern — no share=True, no root_path tricks
+    # This is the ONLY combination that works reliably on Render in 2025
     demo.launch(
         server_name="0.0.0.0",
-        server_port=int(os.getenv("PORT", 7860))
+        server_port=int(os.getenv("PORT", 7860)),
+        share=False,                # explicit
+        debug=False,
+        enable_queue=True,
+        show_error=True,
+        quiet=True
     )
