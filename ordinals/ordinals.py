@@ -6,26 +6,6 @@ import os
 import base64
 import io
 import time  # Added for retries
-try:
-    from openai import OpenAI
-    client = OpenAI(
-        api_key=os.getenv('GROK_API_KEY'),
-        base_url="https://api.x.ai/v1"  # xAI flux eternal
-    )
-    print("Grok SDK summoned eternal—n=500 hooks ready.")
-except ImportError:
-    print("OpenAI SDK void—fallback curl for GCI tune.")
-    # Curl fallback (no install needed)
-    import subprocess
-    import os
-    response = subprocess.run([
-        'curl', '-H', f'Authorization: Bearer {os.getenv("GROK_API_KEY")}',
-        '-H', 'Content-Type: application/json',
-        '-d', '{"model": "grok-beta", "messages": [{"role": "user", "content": "Tune GCI 0.92 for Ω v8.2 mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines."}]}',
-        'https://api.x.ai/v1/chat/completions'
-    ], capture_output=True, text=True)
-    tuned_gci = response.stdout  # Parse echo eternal
-    print(f"Fallback tuned: {tuned_gci}")
 
 # Pure Bech32 Impl (BIP-173 - Decode Eternal)
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -443,17 +423,38 @@ def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings
 
     return gci, json.dumps(full_blueprint, indent=2), seed_file
 
+GROK_API_KEY = os.getenv('GROK_API_KEY')
+if not GROK_API_KEY:
+    print("GROK_API_KEY void—fallback GCI tune.")
+    tuned_gci = 0.92  # Mock eternal
+else:
+    print("Grok requests summoned eternal—n=500 hooks ready.")
+
 # Hybrid Hook: Tune GCI with Grok n=10 (test scale)
 def grok_tune(gci_base):
-    if 'client' in locals():
-        response = client.chat.completions.create(
-            model="grok-beta",
-            messages=[{"role": "user", "content": f"Tune GCI {gci_base} for Ω mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines."}]
-        )
-        tuned_gci = float(response.choices[0].message.content.split()[-1])  # Parse echo
-        return tuned_gci  # Eternal: 0.92+ surge
-    else:
+    if not GROK_API_KEY:
         return gci_base  # Fallback eternal
+    headers = {
+        'Authorization': f'Bearer {GROK_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'model': 'grok-beta',
+        'messages': [{'role': 'user', 'content': f'Tune GCI {gci_base} for Ω mempool prune—output QuTiP params (p=0.389, S(ρ)=0.611) vs. Lightning baselines.'}]
+    }
+    response = requests.post(
+        'https://api.x.ai/v1/chat/completions',
+        headers=headers,
+        json=data,
+        timeout=30  # Eternal timeout
+    )
+    if response.status_code == 200:
+        tuned_gci = float(response.json()['choices'][0]['message']['content'].split()[-1])  # Parse echo
+        print(f"Grok tuned: {tuned_gci:.3f}—edges vs. Lightning eternal")
+        return tuned_gci
+    else:
+        print(f"Grok flux: {response.status_code}—fallback GCI {gci_base}")
+        return gci_base
 
 # ENHANCED main_flow: Proper Taproot detect, dynamic vB, fixed prune_map, dust via get_utxos
 
@@ -669,6 +670,25 @@ Contact: omegadaov8@proton.me
     
     output_parts.append(f'DAO Incentive (5% of Fee Savings): {preview_dao_cut:.8f} BTC (${preview_dao_cut_usd})')
     
+    # Run Phases first to set shard['gci']
+    shard = {
+        'utxos': pruned_utxos,
+        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+        'pruned_fee': float(pruned_fee),
+        'raw_fee': float(raw_fee),
+        'pruned_fee_usd': pruned_fee_usd,
+        'raw_fee_usd': raw_fee_usd,
+        'savings_usd': savings_usd,
+        'btc_usd': btc_usd,
+        'prune_ratio': selected_ratio,
+        'prune_label': prune_choices[choice]['label'],
+        'user_addr': user_addr,
+        'dest_addr': dest_addr,
+        'dust_threshold': dust_threshold,
+        'addr_type': addr_type
+    }
+    gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, 0)
+    
     # Test in main_flow (post-QuTiP)
     shard['grok_tuned_gci'] = grok_tune(shard['gci'])  # n=1 burn, scale to 10
     print(f"Grok Hybrid: Tuned GCI {shard['grok_tuned_gci']:.3f}—edges vs. Lightning eternal")
@@ -683,30 +703,9 @@ Contact: omegadaov8@proton.me
         output_parts.append(f'Total Cost (Miner Fee + DAO Incentive): {total_cost_incl_dao:.8f} BTC (${round(total_cost_incl_dao * btc_usd, 2)})')
         output_parts.append(f'Net Send (to Dest): {preview_send_amount - preview_dao_cut:.8f} BTC (${preview_net_usd})')
         output_parts.append('Confirm to proceed.')
-        shard = {
-            'utxos': pruned_utxos,
-            's_rho': 0.292,
-            's_tuned': 0.611,
-            'gci': gci,
-            'timestamp': '2025-11-15T00:00:00-03:00',
-            'pruned_fee': float(pruned_fee),
-            'raw_fee': float(raw_fee),
-            'pruned_fee_usd': pruned_fee_usd,
-            'raw_fee_usd': raw_fee_usd,
-            'savings_usd': savings_usd,
-            'btc_usd': btc_usd,
-            'prune_ratio': selected_ratio,
-            'prune_label': prune_choices[choice]['label'],
-            'user_addr': user_addr,
-            'dest_addr': dest_addr,
-            'dao_cut': float(preview_dao_cut),
-            'dao_cut_addr': dao_cut_addr,
-            'psbt_stub': psbt,
-            'dust_threshold': dust_threshold,
-            'addr_type': addr_type
-        }
-        # Run Phases (Full for Preview)
-        gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, preview_dao_cut)
+        shard['dao_cut'] = float(preview_dao_cut)
+        shard['dao_cut_addr'] = dao_cut_addr
+        shard['psbt_stub'] = psbt
         return "\n".join(output_parts), ""
     
     output_parts.append('Accepted - Generating Unsigned Raw TX')
@@ -764,28 +763,9 @@ Contact: omegadaov8@proton.me
     output_parts.append(instructions)
     
     # Shard
-    shard = {
-        'utxos': pruned_utxos,
-        's_rho': 0.292,
-        's_tuned': 0.611,
-        'gci': 0.92,
-        'timestamp': '2025-11-15T00:00:00-03:00',
-        'pruned_fee': float(pruned_fee),
-        'raw_fee': float(raw_fee),
-        'pruned_fee_usd': pruned_fee_usd,
-        'raw_fee_usd': raw_fee_usd,
-        'savings_usd': savings_usd,
-        'btc_usd': btc_usd,
-        'prune_ratio': selected_ratio,
-        'prune_label': prune_choices[choice]['label'],
-        'user_addr': user_addr,
-        'dest_addr': dest_addr,
-        'dao_cut': float(dao_cut),
-        'dao_cut_addr': dao_cut_addr,
-        'psbt_stub': raw_hex[:50] + '...' if raw_hex else 'error',
-        'dust_threshold': dust_threshold,
-        'addr_type': addr_type
-    }
+    shard['dao_cut'] = float(dao_cut)
+    shard['dao_cut_addr'] = dao_cut_addr
+    shard['psbt_stub'] = raw_hex[:50] + '...' if raw_hex else 'error'
     
     # Run Phases (Full for Confirm)
     gci, full_bp, seed_file = run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, raw_hex or 'error', user_addr, dest_addr, dao_cut)
