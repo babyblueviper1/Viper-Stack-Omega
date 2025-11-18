@@ -472,5 +472,6 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=int(os.getenv("PORT", 7860)),
         share=False,
-        allowed_paths=["."]   # <-- this is the golden ticket for 4.44.1 on Render
+        allowed_paths=["."],        # critical for 4.44.1 static files
+        server_protocol="http"      # forces correct asset URLs behind Render proxy
     )
