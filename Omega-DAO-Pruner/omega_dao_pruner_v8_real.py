@@ -17,7 +17,7 @@ if GROK_API_KEY:
 # GLOBAL DISCLAIMER (fixed NameError)
 # ==============================
 disclaimer = """
-BTC UTXO Pruner Ω v8.1 — RBF-ready, Taproot-native
+BTC UTXO Pruner Ω v8.2 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
 
 • Generates prune plan, fee estimate & unsigned raw TX hex — NO BTC is sent here
 • Fully Taproot (bc1p) & Ordinals-compatible — correct vB weights, dust slider, RBF eternal
@@ -314,8 +314,8 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 # ==============================
 # Gradio Interface
 # ==============================
-with gr.Blocks(title="Omega DAO Pruner v8.1") as demo:
-    gr.Markdown("# Omega DAO Pruner v8.1 - BTC UTXO Optimizer")
+with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
+    gr.Markdown("# Omega DAO Pruner v8.2 - BTC UTXO Optimizer")
     gr.Markdown(disclaimer)
 
     with gr.Row():
