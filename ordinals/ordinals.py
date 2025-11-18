@@ -14,7 +14,7 @@ if GROK_API_KEY:
     print("Grok requests summoned eternal—n=500 hooks ready.")
 
 # ==============================
-# Global disclaimer (fixed NameError)
+# GLOBAL DISCLAIMER (fixed NameError)
 # ==============================
 disclaimer = """
 BTC UTXO Pruner Ω v8.1 — RBF-ready, Taproot-native
@@ -117,7 +117,7 @@ def address_to_script_pubkey(addr):
             return bytes([0x00, 0x14]) + bytes(prog), {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WPKH'}
         if len(prog) == 32:
             return bytes([0x00, 0x20]) + bytes(prog), {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WSH'}
-    elif addr.startswith('B c1p'):
+    elif addr.startswith('bc1p'):
         hrp, data = bech32_decode(addr)
         if hrp == 'bc' and data and data[0] == 1:
             prog = convertbits(data[1:], 5, 8, False)
@@ -172,10 +172,9 @@ def get_utxos(addr, dust_threshold=546, current_height=None):
                     'txid': u['txid'],
                     'vout': u['vout'],
                     'amount': u['value'] / 1e8,
-                    'confs': confs,
-                    'is_inscription': False
+                    'confs': confs
                 })
-    utxos.sort(key=lambda x: (x['is_inscription'], x['amount']), reverse=True)
+    utxos.sort(key=lambda x: x['amount'], reverse=True)
     return utxos, current_height
 
 prune_choices = {
@@ -185,7 +184,7 @@ prune_choices = {
 }
 
 # ==============================
-# TX Builder
+# Real TX Builder
 # ==============================
 def encode_int(i, nbytes, encoding='little'):
     return i.to_bytes(nbytes, encoding)
@@ -246,20 +245,11 @@ class Tx:
         return b''.join(out)
 
 # ==============================
-# run_phases, grok_tune, main_flow (simplified for deploy)
+# main_flow — REAL TX GEN
 # ==============================
-def run_phases(shard, pruned_utxos, selected_ratio, raw_fee, pruned_fee, savings_usd, btc_usd, choice, gci, psbt, user_addr, dest_addr, dao_cut):
-    # Simple version for deploy — full quantum later
-    shard['s_rho'] = 0.292
-    shard['s_tuned'] = 0.611
-    shard['gci'] = 0.92
-    return 0.92, "{}", "data/seed.json"
-
-def grok_tune(gci_base):
-    return gci_base
-
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = [disclaimer]
+
     if not user_addr:
         return "\n".join(output_parts) + "\nNo address provided.", ""
 
@@ -272,22 +262,54 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 
     all_utxos, _ = get_utxos(user_addr, dust_threshold)
     if not all_utxos:
-        return "\n".join(output_parts) + "\nNo UTXOs found.", ""
+        return "\n".join(output_parts) + "\nNo confirmed UTXOs found above dust threshold.", ""
 
-    choice = {'Conservative (70/30, Low Risk)': '1', 'Efficient (60/40, Default)': '2', 'Aggressive (50/50, Max Savings)': '3'}.get(prune_choice, '2')
+    prune_map = {"Conservative (70/30, Low Risk)": "1", "Efficient (60/40, Default)": "2", "Aggressive (50/50, Max Savings)": "3"}
+    choice = prune_map.get(prune_choice, "2")
     ratio = prune_choices[choice]['ratio']
-    pruned_utxos = all_utxos[:max(1, int(len(all_utxos) * (1 - ratio)))]
+    keep_count = max(1, int(len(all_utxos) * (1 - ratio)))
+    pruned_utxos = all_utxos[:keep_count]
 
-    output_parts.append(f"Pruned {len(pruned_utxos)} UTXOs with {prune_choices[choice]['label']}")
+    output_parts.append(f"Live Scan: {len(all_utxos)} UTXOs → Pruned: {len(pruned_utxos)} ({prune_choices[choice]['label']})")
 
     if not confirm_proceed:
-        output_parts.append("\nClick 'Generate Pruned TX Hex' to continue")
+        output_parts.append("\nClick 'Generate Pruned TX Hex' to build real unsigned transaction")
         return "\n".join(output_parts), ""
 
-    # Simple TX gen for demo
-    raw_hex = "010000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff01010000000000000000000000000000"
-    output_parts.append("\nUnsigned Raw TX (demo):")
-    output_parts.append(raw_hex)
+    # REAL TX GENERATION
+    try:
+        dest_addr = dest_addr or user_addr
+        dest_script, _ = address_to_script_pubkey(dest_addr)
+        dao_script, _ = address_to_script_pubkey(dao_cut_addr)
+
+        tx = Tx()
+        total_in = 0
+        for u in pruned_utxos:
+            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
+            total_in += int(u['amount'] * 1e8)
+
+        # Conservative fee estimate (10 sat/vB)
+        est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2
+        fee = int(est_vb * 10)
+        dao_cut = int(fee * 0.05)
+        send_amount = total_in - fee - dao_cut
+
+        if send_amount <= 0:
+            return "\n".join(output_parts) + "\nNot enough to cover fee + DAO cut", ""
+
+        tx.tx_outs.append(TxOut(send_amount, dest_script))
+        if dao_cut > 546:
+            tx.tx_outs.append(TxOut(dao_cut, dao_script))
+
+        raw_hex = tx.encode().hex()
+        output_parts.append(f"\nUnsigned Raw TX ({len(tx.tx_ins)} inputs → {len(tx.tx_outs)} outputs):")
+        output_parts.append(f"Estimated fee: ~{fee} sats | DAO cut: {dao_cut} sats")
+        output_parts.append(raw_hex)
+        output_parts.append("\nCopy the ENTIRE hex above into Electrum → Tools → Load transaction → From text")
+
+    except Exception as e:
+        raw_hex = ""
+        output_parts.append(f"TX build error: {e}")
 
     return "\n".join(output_parts), raw_hex
 
@@ -299,23 +321,19 @@ with gr.Blocks(title="Omega DAO Pruner v8.1") as demo:
     gr.Markdown(disclaimer)
 
     with gr.Row():
-        user_addr = gr.Textbox(label="User BTC Address", placeholder="bc1q...")
+        user_addr = gr.Textbox(label="User BTC Address", placeholder="3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6")
         prune_choice = gr.Dropdown(
-            choices=[
-                "Conservative (70/30, Low Risk)",
-                "Efficient (60/40, Default)",
-                "Aggressive (50/50, Max Savings)"
-            ],
+            choices=["Conservative (70/30, Low Risk)", "Efficient (60/40, Default)", "Aggressive (50/50, Max Savings)"],
             value="Efficient (60/40, Default)",
             label="Prune Strategy"
         )
         dust_threshold = gr.Slider(0, 2000, 546, step=1, label="Dust Threshold (sats)")
-        dest_addr = gr.Textbox(label="Destination Address (Optional)", placeholder="Same as User Addr")
+        dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     submit_btn = gr.Button("Run Pruner")
-    output_text = gr.Textbox(label="Output Log", lines=20)
-    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=10, visible=False)
-    generate_btn = gr.Button("Generate Pruned TX Hex (DAO Pool Incentive Included)", visible=False)
+    output_text = gr.Textbox(label="Output Log", lines=25)
+    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex (paste into Electrum)", lines=12, visible=False)
+    generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
     def show_generate_btn():
         return gr.update(visible=True), gr.update(visible=False)
