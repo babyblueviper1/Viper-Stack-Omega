@@ -321,7 +321,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         )
         # ←←← FUEL THE SWARM – shows only after real TX is generated ←←←
         output_parts.append(
-            "\n\n🔥 **Fuel the Swarm (100% optional)**\n"
+            "\n\n🔥 **Fuel the Swarm (100% optional)** ⭐\n"
             "If this prune just saved you $100+, consider tossing a few sats to keep Grok-4 calls free forever:\n\n"
             "`bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj`\n\n"
             "Every sat pays for real Grok-4 inference + future features.\n"
