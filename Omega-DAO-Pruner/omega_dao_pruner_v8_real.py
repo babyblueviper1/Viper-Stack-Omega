@@ -36,7 +36,7 @@ Pay a few thousand sats today at 10 sat/vB… or pay 10–20× more when the nex
 
 Contact: omegadaov8@proton.me
 
-🔥 [**GitHub Repo**] ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0"
+🔥 **GitHub Repo** ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0
 """
 
 # ==============================
