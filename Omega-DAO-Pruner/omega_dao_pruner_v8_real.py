@@ -132,7 +132,7 @@ def address_to_script_pubkey(addr):
     raise ValueError(f"Unsupported or invalid address: {addr}")
 
 # Fixed DAO Addr1 (5% Cut Destination - Swarm Fuel)
-dao_cut_addr = 'bc1qwnj2zumaf67d34k6cm2l6gr3uvt5pp2hdrtvt3ckc4aunhmr53cselkpty'  # DAO Pool #1 (P2WSH)
+dao_cut_addr = 'bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj'  # DAO Pool #1 (P2WSH)
 
 # Added retry wrapper for API calls
 def api_get(url, timeout=30, retries=3):
