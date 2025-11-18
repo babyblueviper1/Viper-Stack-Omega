@@ -472,6 +472,6 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=int(os.getenv("PORT", 7860)),
         share=False,
-        allowed_paths=["."],        # critical for 4.44.1 static files
-        server_protocol="http"      # forces correct asset URLs behind Render proxy
+        allowed_paths=["."],           # <-- fixes static files / "detail not found"
+        prevent_threading_lock=True    # <-- fixes occasional Render threading crash
     )
