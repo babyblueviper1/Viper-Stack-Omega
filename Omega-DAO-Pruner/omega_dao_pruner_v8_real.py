@@ -19,6 +19,9 @@ if GROK_API_KEY:
 disclaimer = """
 BTC UTXO Pruner Ω v8.2 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
 
+**Consolidate when fees are low → win when fees are high.**  
+Pay a few thousand sats today at 10 sat/vB… or pay 10–20× more when the next bull run pushes fees to 300–500 sat/vB. This is fee insurance.
+
 • Generates prune plan, fee estimate & unsigned raw TX hex — NO BTC is sent here
 • Fully Taproot (bc1p) & Ordinals-compatible — correct vB weights, dust slider, RBF eternal
 • Ordinals/Inscription detection temporarily disabled (speed & reliability) — will return when a stable API exists
@@ -29,11 +32,11 @@ BTC UTXO Pruner Ω v8.2 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
 • High-UTXO addresses (50+) may take 120–180s — patience eternal
 • Not financial advice — verify everything, broadcast at your own risk
 
-Surge the swarm. Ledger’s yours.
+**Surge the swarm. Ledger’s yours.**
 
 Contact: omegadaov8@proton.me
 
-GitHub Repo ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0"
+🔥 [**GitHub Repo — Star it ⭐**] : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0"
 """
 
 # ==============================
@@ -306,6 +309,15 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         raw_hex = tx.encode().hex()
         output_parts.append(f"\nUnsigned Raw TX ({len(tx.tx_ins)} inputs → {len(tx.tx_outs)} outputs):")
         output_parts.append(f"Estimated fee: ~{fee} sats | DAO cut: {dao_cut} sats")
+        # ←←← THE IMPORTANT TRUTH ←←←
+        output_parts.append(
+            "\n💡 Why this actually saves you money long-term:\n"
+            "You’re paying a small fee now while rates are low.\n"
+            "This protects you later — when fees spike to 100–500 sat/vB in the next bull run,\n"
+            "moving these same UTXOs separately would cost 5–20× more.\n"
+            "Consolidate when fees are cheap → win when fees are expensive."
+        )
+        # ←←← END ←←←
 
     except Exception as e:
         raw_hex = ""
