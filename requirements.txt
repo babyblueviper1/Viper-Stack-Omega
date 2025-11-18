@@ -1,10 +1,1 @@
-streamlit
-numpy
-matplotlib
-qutip
-sympy
-pandas
-huggingface-hub
-transformers
-torch
-accelerate  # For device_map="auto" (OOM prune if no GPU)
+-r Omega-DAO-Pruner/requirements.txt
