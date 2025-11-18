@@ -32,6 +32,8 @@ BTC UTXO Pruner Ω v8.2 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
 Surge the swarm. Ledger’s yours.
 
 Contact: omegadaov8@proton.me
+
+GitHub Repo ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0"
 """
 
 # ==============================
@@ -319,7 +321,6 @@ with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
     gr.Markdown(disclaimer)
 
     with gr.Row():
-        gr.Markdown("[GitHub Repo ⭐](https://github.com/babyblueviper1/Viper-Stack-Omega) • Open-source • Apache 2.0")
         user_addr = gr.Textbox(label="User BTC Address", placeholder="3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6")
         prune_choice = gr.Dropdown(
             choices=["Conservative (70/30, Low Risk)", "Efficient (60/40, Default)", "Aggressive (50/50, Max Savings)"],
