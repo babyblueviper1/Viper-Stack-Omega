@@ -598,9 +598,9 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
-        share=False,                                      # must stay False on Render
-        root_path=os.environ.get("GRADIO_ROOT_PATH", ""), # fixes 404s on static files
-        prevent_threading=True,                           # THIS IS THE KEY LINE FOR RENDER
+        share=False,
+        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),  # fixes static/manifest 404s
+        prevent_thread_lock=True,                          # ← THIS IS THE CORRECT NAME NOW
         show_error=True,
         favicon_path="static/icons/icon-192.png"
     )
