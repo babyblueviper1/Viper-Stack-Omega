@@ -43,7 +43,9 @@ Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free
 100% open-source • non-custodial • voluntary “Fuel the Swarm” donations cover Grok-4 costs
 
 **DAO / Fuel the Swarm address**
+
 bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+
 Every sat pays for inference + future features. Thank you 🜂
 
 [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0  
@@ -482,14 +484,14 @@ with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
                 "⚡ Send Sats → Keep Omega Free",
                 variant="primary",
                 size="lg",
+                elem_classes="big-button",
                 link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"
+            ).style(
+                height=80,          # ← vertical height (you can go 80–100)
+                border_radius=12,
+                font_size=18
             )
-            gr.Markdown(
-                "<small style='text-align:center;'>Every sat pays for real Grok-4 inference<br>"
-                "Thank you 🜂</small>"
-            )
-
-
+           
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6")
         prune_choice = gr.Dropdown(
