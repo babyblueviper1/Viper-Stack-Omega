@@ -277,7 +277,7 @@ class Tx:
         out += [encode_int(self.locktime, 4)]
         return b''.join(out)
 
-@staticmethod
+    @staticmethod
     def decode(data: bytes):
         """Simple decode for RBF — only needs to parse enough to modify outputs"""
         pos = 0
@@ -316,8 +316,7 @@ class Tx:
 
         tx = Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
         return tx
-
-
+        
 def rbf_bump(raw_hex, bump_sats_per_vb=50):
     try:
         tx = Tx.decode(bytes.fromhex(raw_hex))
