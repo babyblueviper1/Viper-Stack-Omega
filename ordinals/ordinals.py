@@ -472,7 +472,25 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 
 # ==================== BIG FUEL BUTTON TOP-RIGHT ====================
 
-with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
+# Custom CSS + Blocks definition (ONLY ONE BLOCKS DEFINITION!)
+demo = gr.Blocks(
+    title="Omega Pruner Ω v8.3 — Grok-4 Live 🜂",
+    css="""
+        .big-fuel-button button {
+            height: 80px !important;
+            font-size: 18px !important;
+            border-radius: 12px !important;
+            padding: 20px !important;
+        }
+        .big-fuel-button button:hover {
+            height: 84px !important;
+            font-size: 19px !important;
+        }
+    """
+)
+
+with demo:
+
     with gr.Row():
         with gr.Column(scale=4):
             gr.Markdown("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂")
@@ -484,12 +502,8 @@ with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
                 "⚡ Send Sats → Keep Omega Free",
                 variant="primary",
                 size="lg",
-                elem_classes="big-button",
+                elem_classes="big-fuel-button"
                 link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"
-            ).style(
-                height=80,          # ← vertical height (you can go 80–100)
-                border_radius=12,
-                font_size=18
             )
            
     with gr.Row():
