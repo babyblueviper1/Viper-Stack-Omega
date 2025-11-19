@@ -122,36 +122,51 @@ def base58_decode(s):
 def address_to_script_pubkey(addr):
     if not addr or not addr.strip():
         return None
-    addr = addr.strip().lower()
+
+    addr = addr.strip()
+
+    # P2PKH (1...)
+    if addr.startswith('1'):
+        try:
+            decoded = base58_decode(addr)
+            if len(decoded) == 25 and decoded[0] == 0x00:
+                payload = decoded[1:21]
+                script = bytes([0x76, 0xa9, 0x14]) + payload + bytes([0x88, 0xac])
+                return script, {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
+        except:
+            return None
+
+    # P2SH (3...)
+    if addr.startswith('3'):
+        try:
+            decoded = base58_decode(addr)
+            if len(decoded) == 25 and decoded[0] == 0x05:
+                payload = decoded[1:21]
+                script = bytes([0xa9, 0x14]) + payload + bytes([0x87])
+                return script, {'input_vb': 148, 'output_vb': 34, 'type': 'P2SH'}
+        except:
+            return None
+
+    # SegWit Bech32 (bc1q...)
     if addr.startswith('bc1q'):
         hrp, data = bech32_decode(addr)
-        if hrp != 'bc' or not data or data[0] != 0:
-            return None
-        prog = convertbits(data[1:], 5, 8, False)
-        if len(prog) == 20:
-            return bytes([0x00, 0x14]) + bytes(prog), {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WPKH'}
-        if len(prog) == 32:
-            return bytes([0x00, 0x20]) + bytes(prog), {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WSH'}
-    elif addr.startswith('bc1p'):
-        hrp, data = bech32_decode(addr)
-        if hrp == 'bc' and data and data[0] == 1:
+        if hrp == 'bc' and data and data[0] == 0:
             prog = convertbits(data[1:], 5, 8, False)
-            if len(prog) == 32:
-                return bytes([0x51, 0x20]) + bytes(prog), {'input_vb': 57.25, 'output_vb': 43, 'type': 'P2TR'}
-    elif addr.startswith('1'):
-        try:
-            dec = base58_decode(addr)
-            if len(dec) == 25 and dec[0] == 0x00:
-                return bytes([0x76,0xa9,0x14]) + dec[1:21] + bytes([0x88,0xac]), {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
-        except:
-            return None
-    elif addr.startswith('3'):
-        try:
-            dec = base58_decode(addr)
-            if len(dec) == 25 and dec[0] == 0x05:
-                return bytes([0xa9,0x14]) + dec[1:21] + bytes([0x87]), {'input_vb': 148, 'output_vb': 34, 'type': 'P2SH'}
-        except:
-            return None
+            if prog and len(prog) in (20, 32):
+                op = 0x00 if len(prog) == 20 else 0x00  # both use same vB in practice
+                length = 0x14 if len(prog) == 20 else 0x20
+                script = bytes([op, length]) + bytes(prog)
+                return script, {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WSH/P2WPKH'}
+        return None
+
+    # Taproot (bc1p...)
+    if addr.startswith('bc1p'):
+        hrp, data = bech32_decode(addr)
+        if hrp == 'bc' and data and data[0] == 1 and len(convertbits(data[1:], 5, 8, False)) == 32:
+            prog = convertbits(data[1:], 5, 8, False)
+            script = bytes([0x51, 0x20]) + bytes(prog)
+            return script, {'input_vb': 57.25, 'output_vb': 43, 'type': 'P2TR'}
+
     return None
 
 dao_cut_addr = 'bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj'
@@ -350,7 +365,7 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = []
     output_parts.append("Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n")
-    output_parts.append(f"*Entropy profile loaded for {user_addr.strip()}\n")
+    output_parts.append(f"Entropy profile loaded for {user_addr.strip()}\n")
     
     if not user_addr or not user_addr.strip():
         return "\n".join(output_parts) + "\nNo address provided.", ""
