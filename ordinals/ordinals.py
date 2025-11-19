@@ -349,24 +349,13 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
 # ==============================
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = []
-    output_parts.append("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n\n")
-    output_parts.append("**Consolidate when fees are low → win when fees are high.**")
-    output_parts.append("Pay a few thousand sats today… or 10–20× more next cycle. This is fee insurance.\n")
+    output_parts.append("Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n")
 
-    output_parts.append("**One-click dusty wallet cleanup**")
-    output_parts.append("• Paste any address (legacy · SegWit · Taproot)")
-    output_parts.append("• Grok-4 instantly tunes the optimal prune (real xAI API)")
-    output_parts.append("• Get real, RBF-ready raw TX hex in <15 seconds")
-    output_parts.append("• Sign & broadcast with your own wallet — zero custody, zero keys shared\n")
-
+    
     output_parts.append("**Stuck transaction?**")
     output_parts.append("Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free.\n")
 
-    output_parts.append("100% open-source • non-custodial • voluntary “Fuel the Swarm” donations cover Grok-4 costs\n")
 
-    output_parts.append("🔥 [**GitHub — Star it ⭐**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0")
-    output_parts.append("Contact: omegadaov8@proton.me\n")
-    output_parts.append("**Surge the swarm. Ledger’s yours.** 🜂")
     if not user_addr or not user_addr.strip():
         return "\n".join(output_parts) + "\nNo address provided.", ""
 
@@ -434,6 +423,9 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         raw_hex = tx.encode().hex()
         output_parts.append(f"\nUnsigned Raw TX ({len(tx.tx_ins)} inputs → {len(tx.tx_outs)} outputs):")
         output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
+        output_parts.append("**Consolidate when fees are low → win when fees are high.**")
+        
+        output_parts.append("Surge the swarm. Ledger’s yours.\n🜂")
 
         output_parts.append(
             "\n\n🔥 **Fuel the Swarm (100% optional)** ⭐\n"
@@ -444,7 +436,6 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         )
 
         output_parts.append(
-            "\n💡 You just paid today's low fee — next bull run this same move would cost 10–20× more.\n"
             "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
         )
 
