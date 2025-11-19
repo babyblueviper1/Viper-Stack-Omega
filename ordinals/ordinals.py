@@ -467,9 +467,28 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 # ==============================
 # Gradio Interface
 # ==============================
+
+# ==================== BIG FUEL BUTTON TOP-RIGHT ====================
+
 with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
-    gr.Markdown("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n\n")
-    gr.Markdown(disclaimer)
+    with gr.Row():
+        with gr.Column(scale=4):
+            gr.Markdown("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂")
+            gr.Markdown(disclaimer)
+
+        with gr.Column(scale=1, min_width=260):
+            gr.Markdown("### 🔥 Fuel the Swarm")
+            gr.Button(
+                "⚡ Send Sats → Keep Omega Free",
+                variant="primary",
+                size="lg",
+                link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"
+            )
+            gr.Markdown(
+                "<small style='text-align:center;'>Every sat pays for real Grok-4 inference<br>"
+                "Thank you 🜂</small>"
+            )
+
 
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6")
