@@ -322,23 +322,24 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append("\nClick 'Generate Pruned TX Hex' to build real unsigned transaction")
         return "\n".join(output_parts), ""
 
-        # Auto-Raw TX Generation — SAFE VERSION (no more NoneType crash)
+ # Auto-Raw TX Generation — BULLETPROOF (no more NoneType crash)
     raw_hex = None
     try:
-        dest_addr_to_use = dest_addr.strip() if dest_addr else user_addr
+        dest_addr_to_use = (dest_addr.strip() if dest_addr and dest_addr.strip() else user_addr).strip()
 
-        # Validate both addresses first
-        dest_script_info = address_to_script_pubkey(dest_addr_to_use)
-        if dest_script_info is None:
-            raise ValueError(f"Invalid destination address: {dest_addr_to_use}")
+        # Validate addresses FIRST — this is what was missing
+        dest_result = address_to_script_pubkey(dest_addr_to_use)
+        if dest_result is None:
+            raise ValueError(f"Invalid or unsupported destination address: {dest_addr_to_use}")
 
-        dao_script_info = address_to_script_pubkey(dao_cut_addr)
-        if dao_script_info is None:
-            raise ValueError("Internal error — DAO address invalid")
+        dao_result = address_to_script_pubkey(dao_cut_addr)
+        if dao_result is None:
+            raise ValueError("Internal error — DAO address invalid (this shouldn't happen)")
 
-        dest_script, _ = dest_script_info
-        dao_script, _ = dao_script_info
+        dest_script, _ = dest_result
+        dao_script, _ = dao_result
 
+        # Build the transaction
         tx = Tx(tx_ins=[], tx_outs=[])
         total_in = 0
         for u in pruned_utxos:
