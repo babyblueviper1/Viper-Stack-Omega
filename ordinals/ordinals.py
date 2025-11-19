@@ -599,9 +599,9 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
-        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),   # fixes PWA/icons/manifest
-        allowed_paths=["./static"],                                 # serves your icons + manifest.json
-        server_protocol="http",                              # THIS KILLS THE LOCALHOST CHECK
+        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),
+        allowed_paths=["static"],                 # serves everything in /static
+        share_server_protocol="http",             # kills the localhost error
         show_error=True,
-        favicon_path="static/icons/icon-192.png"
+        favicon_path="static/icon-192.png"        # ← fixed path
     )
