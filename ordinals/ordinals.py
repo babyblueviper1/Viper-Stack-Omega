@@ -2,6 +2,8 @@ import gradio as gr
 import json
 import numpy as np
 import requests
+import time
+time.sleep(1)   # ← gives Render time to settle on cold start
 import os
 import re
 import time
