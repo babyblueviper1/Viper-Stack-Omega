@@ -365,18 +365,20 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = []
     output_parts.append("Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n")
-    output_parts.append(f"Entropy profile loaded for {user_addr.strip()}\n")
     
     if not user_addr or not user_addr.strip():
         return "\n".join(output_parts) + "\nNo address provided.", ""
 
+    # Validate address FIRST — no entropy message if invalid
     try:
         _, vb = address_to_script_pubkey(user_addr.strip())
         input_vb = vb['input_vb']
         output_vb = vb['output_vb']
+        # ← Only show entropy line if address is valid
+        output_parts.append(f"Entropy profile loaded for`{user_addr.strip()}`\n")
     except:
-        return "\n".join(output_parts) + "\nInvalid user address.", ""
-
+        return "\n".join(output_parts) + "\n⚠️ Invalid Bitcoin address. Please check and try again.", ""
+        
     all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
     if not all_utxos:
         return "\n".join(output_parts) + "\nNo confirmed UTXOs found above dust threshold.", ""
@@ -436,11 +438,10 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
 
         output_parts.append(
-            f"\nNote: The **5% DAO cut (~{dao_cut:,} sats)** → fuels real Grok-4 inference + future features "
+            f"\nNote: The 5% DAO cut (~{dao_cut:,} sats) fuels real Grok-4 inference + future features "
             "(mobile app, Lightning sweeps, inscription protection, etc.)\n"
             "Public vault: `bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj`\n"
-            "Current balance: ~0.021 BTC\n"
-            "Your coins stay yours. Your cut fuels the swarm. Thank you. 🜂"
+            "Your coins stay yours. The cut fuels the swarm. Thank you. 🜂\n\n"
         )
     
 
@@ -448,7 +449,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
             "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
         )
 
-        output_parts.append("Surge the swarm. Ledger’s yours. 🜂")
+        output_parts.append("Surge the swarm. Ledger’s yours. 🜂\n\n")
 
     except Exception as e:
         raw_hex = ""
