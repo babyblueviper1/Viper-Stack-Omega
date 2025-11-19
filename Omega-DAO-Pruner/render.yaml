@@ -1,8 +1,6 @@
 services:
   - type: web
-    name: Omega DAO Pruner v8  # Your service name
+    name: ordinals  # Your service name
     env: python
-    repo: https://github.com/babyblueviper1/Viper-Stack-Omega
-    rootDirectory: Omega-DAO-Pruner
-    buildCommand: pip install -r requirements.txt
-    startCommand: python omega_dao_pruner_v8_real.py
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt --no-cache-dir
+    startCommand: python omega_dao_pruner_v8.py  # Your script file
