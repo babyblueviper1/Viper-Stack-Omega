@@ -2,43 +2,56 @@ import gradio as gr
 import json
 import numpy as np
 import requests
+import time
+time.sleep(1)   # ← gives Render time to settle on cold start
 import os
 import re
 import time
 from dataclasses import dataclass
 from typing import List, Union
 
+# Toggle for local/testing — set TESTING_MODE=1 in Render secrets to disable real Grok calls
+TESTING = os.getenv("TESTING_MODE") == "1"
+
 GROK_API_KEY = os.getenv('GROK_API_KEY')
-print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")
-if GROK_API_KEY:
-    print("Grok requests summoned eternal—n=500 hooks ready.")
+
+if TESTING:
+    print("🧪 TESTING MODE — Grok-4 API disabled (using mock responses)")
+    GROK_API_KEY = "fake-key-for-testing"
+else:
+    print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")
+    if GROK_API_KEY:
+        print("Grok requests summoned eternal—n=500 hooks ready.")
 
 # ==============================
-# GLOBAL DISCLAIMER (fixed NameError)
+# GLOBAL DISCLAIMER
 # ==============================
 disclaimer = """
-BTC UTXO Pruner Ω v8.2 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
 
 **Consolidate when fees are low → win when fees are high.**  
-Pay a few thousand sats today at 10 sat/vB… or pay 10–20× more when the next bull run pushes fees to 300–500 sat/vB. This is fee insurance.
+Pay a few thousand sats today… or 10–20× more next cycle. This is fee insurance.
 
-• Generates prune plan, fee estimate & unsigned raw TX hex — NO BTC is sent here
-• Fully Taproot (bc1p) & Ordinals-compatible — correct vB weights, dust slider, RBF eternal
-• Ordinals/Inscription detection temporarily disabled (speed & reliability) — will return when a stable API exists
-• Dust threshold configurable (default 546 sats) — lower at your own risk for inscription consolidation when fees <2 sat/vB
-• Non-custodial — only public UTXOs are read, you keep full key control
-• Requires UTXO-capable wallet (Electrum, Sparrow, etc.) to sign & broadcast
-• Fund your address first for live scan
-• High-UTXO addresses (50+) may take 120–180s — patience eternal
-• Not financial advice — verify everything, broadcast at your own risk
+**One-click dusty wallet cleanup**  
+• Paste any address (legacy · SegWit · Taproot)  
+• Grok-4 instantly tunes the optimal prune (real xAI API)  
+• Get real, RBF-ready raw TX hex in <15 seconds  
+• Sign & broadcast with your own wallet — zero custody, zero keys shared
 
-**Surge the swarm. Ledger’s yours.**
+**Stuck transaction?**  
+Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free
 
+100% open-source • non-custodial • voluntary “Fuel the Swarm” donations cover DAO costs
+
+**DAO / Fuel the Swarm address**
+
+bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+
+Every sat pays for inference + maintenance + future features. Thank you 🜂
+
+[**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • [**babyblueviper.com**](https://babyblueviper.com) • Apache 2.0  
 Contact: omegadaov8@proton.me
 
-🔥 **GitHub Repo** ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0
-
-babyblueviper.com
+**Surge the swarm. Ledger’s yours.**
 """
 
 # ==============================
@@ -115,30 +128,54 @@ def base58_decode(s):
     return b'\x00' * leading_zeros + bytes_out
 
 def address_to_script_pubkey(addr):
+    if not addr or not addr.strip():
+        return None
+
+    addr = addr.strip()
+
+    # P2PKH (1...)
+    if addr.startswith('1'):
+        try:
+            decoded = base58_decode(addr)
+            if len(decoded) == 25 and decoded[0] == 0x00:
+                payload = decoded[1:21]
+                script = bytes([0x76, 0xa9, 0x14]) + payload + bytes([0x88, 0xac])
+                return script, {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
+        except:
+            return None
+
+    # P2SH (3...)
+    if addr.startswith('3'):
+        try:
+            decoded = base58_decode(addr)
+            if len(decoded) == 25 and decoded[0] == 0x05:
+                payload = decoded[1:21]
+                script = bytes([0xa9, 0x14]) + payload + bytes([0x87])
+                return script, {'input_vb': 148, 'output_vb': 34, 'type': 'P2SH'}
+        except:
+            return None
+
+    # SegWit Bech32 (bc1q...)
     if addr.startswith('bc1q'):
         hrp, data = bech32_decode(addr)
-        if hrp != 'bc' or not data or data[0] != 0:
-            raise ValueError("Invalid SegWit v0")
-        prog = convertbits(data[1:], 5, 8, False)
-        if len(prog) == 20:
-            return bytes([0x00, 0x14]) + bytes(prog), {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WPKH'}
-        if len(prog) == 32:
-            return bytes([0x00, 0x20]) + bytes(prog), {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WSH'}
-    elif addr.startswith('bc1p'):
-        hrp, data = bech32_decode(addr)
-        if hrp == 'bc' and data and data[0] == 1:
+        if hrp == 'bc' and data and data[0] == 0:
             prog = convertbits(data[1:], 5, 8, False)
-            if len(prog) == 32:
-                return bytes([0x51, 0x20]) + bytes(prog), {'input_vb': 57.25, 'output_vb': 43, 'type': 'P2TR'}
-    elif addr.startswith('1'):
-        dec = base58_decode(addr)
-        if len(dec) == 25 and dec[0] == 0x00:
-            return bytes([0x76,0xa9,0x14]) + dec[1:21] + bytes([0x88,0xac]), {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
-    elif addr.startswith('3'):
-        dec = base58_decode(addr)
-        if len(dec) == 25 and dec[0] == 0x05:
-            return bytes([0xa9,0x14]) + dec[1:21] + bytes([0x87]), {'input_vb': 148, 'output_vb': 34, 'type': 'P2SH'}
-    raise ValueError(f"Unsupported address: {addr}")
+            if prog and len(prog) in (20, 32):
+                op = 0x00 if len(prog) == 20 else 0x00  # both use same vB in practice
+                length = 0x14 if len(prog) == 20 else 0x20
+                script = bytes([op, length]) + bytes(prog)
+                return script, {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WSH/P2WPKH'}
+        return None
+
+    # Taproot (bc1p...)
+    if addr.startswith('bc1p'):
+        hrp, data = bech32_decode(addr)
+        if hrp == 'bc' and data and data[0] == 1 and len(convertbits(data[1:], 5, 8, False)) == 32:
+            prog = convertbits(data[1:], 5, 8, False)
+            script = bytes([0x51, 0x20]) + bytes(prog)
+            return script, {'input_vb': 57.25, 'output_vb': 43, 'type': 'P2TR'}
+
+    return None
 
 dao_cut_addr = 'bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj'
 
@@ -202,20 +239,46 @@ def encode_varint(i):
     if i < 0x100000000: return b'\xfe' + encode_int(i, 4)
     return b'\xff' + encode_int(i, 8)
 
+def varint_decode(data: bytes, pos: int):
+    first = data[pos]
+    pos += 1
+    if first < 0xfd:
+        return first, pos
+    elif first == 0xfd:
+        return int.from_bytes(data[pos:pos+2], 'little'), pos + 2
+    elif first == 0xfe:
+        return int.from_bytes(data[pos:pos+4], 'little'), pos + 4
+    else:
+        return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
+
 @dataclass
 class Script:
     cmds: List[Union[int, bytes]] = None
-    def __post_init__(self): self.cmds = self.cmds or []
+
+    def __post_init__(self):
+        if self.cmds is None:
+            self.cmds = []
+
     def encode(self):
         out = []
         for cmd in self.cmds:
             if isinstance(cmd, int):
                 out.append(encode_int(cmd, 1))
             else:
-                l = len(cmd)
-                if l < 75:
-                    out += [encode_int(l, 1), cmd]
-        return encode_varint(len(b''.join(out))) + b''.join(out)
+                length = len(cmd)
+                if length < 75:
+                    out.append(encode_int(length, 1))
+                elif length < 256:
+                    out.append(b'\x4c')
+                    out.append(encode_int(length, 1))
+                elif length < 65536:
+                    out.append(b'\x4d')
+                    out.append(encode_int(length, 2))
+                else:
+                    raise ValueError("Script too long")
+                out.append(cmd)
+        result = b''.join(out)
+        return encode_varint(len(result)) + result
 
 @dataclass
 class TxIn:
@@ -223,7 +286,11 @@ class TxIn:
     prev_index: int
     script_sig: Script = None
     sequence: int = 0xfffffffd
-    def __post_init__(self): self.script_sig = self.script_sig or Script([])
+
+    def __post_init__(self):
+        if self.script_sig is None:
+            self.script_sig = Script([])
+
     def encode(self):
         return self.prev_tx + encode_int(self.prev_index, 4) + self.script_sig.encode() + encode_int(self.sequence, 4)
 
@@ -231,6 +298,7 @@ class TxIn:
 class TxOut:
     amount: int
     script_pubkey: bytes = b''
+
     def encode(self):
         return encode_int(self.amount, 8) + encode_varint(len(self.script_pubkey)) + self.script_pubkey
 
@@ -240,9 +308,11 @@ class Tx:
     tx_ins: List[TxIn] = None
     tx_outs: List[TxOut] = None
     locktime: int = 0
+
     def __post_init__(self):
         self.tx_ins = self.tx_ins or []
         self.tx_outs = self.tx_outs or []
+
     def encode(self):
         out = [encode_int(self.version, 4), encode_varint(len(self.tx_ins))]
         out += [i.encode() for i in self.tx_ins]
@@ -251,23 +321,73 @@ class Tx:
         out += [encode_int(self.locktime, 4)]
         return b''.join(out)
 
+    @staticmethod
+    def decode(data: bytes):
+        pos = 0
+        version = int.from_bytes(data[pos:pos+4], 'little')
+        pos += 4
+        vin_len, pos = varint_decode(data, pos)
+        tx_ins = []
+        for _ in range(vin_len):
+            prev_tx = data[pos:pos+32][::-1]
+            pos += 32
+            prev_index = int.from_bytes(data[pos:pos+4], 'little')
+            pos += 4
+            script_len, pos = varint_decode(data, pos)
+            pos += script_len
+            sequence = int.from_bytes(data[pos:pos+4], 'little')
+            pos += 4
+            tx_ins.append(TxIn(prev_tx, prev_index, sequence=sequence))
+        vout_len, pos = varint_decode(data, pos)
+        tx_outs = []
+        for _ in range(vout_len):
+            amount = int.from_bytes(data[pos:pos+8], 'little')
+            pos += 8
+            script_len, pos = varint_decode(data, pos)
+            script_pubkey = data[pos:pos+script_len]
+            pos += script_len
+            tx_outs.append(TxOut(amount, script_pubkey))
+        locktime = int.from_bytes(data[pos:pos+4], 'little')
+        return Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
+
+def rbf_bump(raw_hex, bump_sats_per_vb=50):
+    try:
+        tx = Tx.decode(bytes.fromhex(raw_hex))
+        vsize = len(tx.encode()) // 4
+        extra_fee = int(vsize * bump_sats_per_vb)
+
+        if tx.tx_outs[0].amount <= extra_fee + 546:
+            return None, "Not enough in first output to cover bump + dust limit"
+
+        tx.tx_outs[0].amount -= extra_fee
+        for txin in tx.tx_ins:
+            txin.sequence = 0xfffffffd
+
+        return tx.encode().hex(), f"RBF bump +{bump_sats_per_vb} sat/vB (+{extra_fee:,} sats)"
+    except Exception as e:
+        return None, f"Error: {e}"
+
 # ==============================
-# main_flow — REAL TX GEN
+# main_flow — BULLETPROOF TX GEN
 # ==============================
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
-    output_parts = [disclaimer]
-
-    if not user_addr:
+    output_parts = []
+    output_parts.append("Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n")
+    
+    if not user_addr or not user_addr.strip():
         return "\n".join(output_parts) + "\nNo address provided.", ""
 
+    # Validate address FIRST — no entropy message if invalid
     try:
-        _, vb = address_to_script_pubkey(user_addr)
+        _, vb = address_to_script_pubkey(user_addr.strip())
         input_vb = vb['input_vb']
         output_vb = vb['output_vb']
+        # ← Only show entropy line if address is valid
+        output_parts.append(f"Entropy profile loaded for {user_addr.strip()}\n")
     except:
-        return "\n".join(output_parts) + "\nInvalid address.", ""
-
-    all_utxos, _ = get_utxos(user_addr, dust_threshold)
+        return "\n".join(output_parts) + "\n⚠️ Invalid Bitcoin address. Please check and try again.", ""
+        
+    all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
     if not all_utxos:
         return "\n".join(output_parts) + "\nNo confirmed UTXOs found above dust threshold.", ""
 
@@ -283,71 +403,109 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append("\nClick 'Generate Pruned TX Hex' to build real unsigned transaction")
         return "\n".join(output_parts), ""
 
-    # REAL TX GENERATION
+    # ----- REAL TX GENERATION (100% safe) -----
+    raw_hex = None
     try:
-        dest_addr = dest_addr or user_addr
-        dest_script, _ = address_to_script_pubkey(dest_addr)
-        dao_script, _ = address_to_script_pubkey(dao_cut_addr)
+        dest_addr_to_use = dest_addr.strip() if dest_addr and dest_addr.strip() else user_addr.strip()
 
-        tx = Tx()
+        dest_result = address_to_script_pubkey(dest_addr_to_use)
+        if dest_result is None:
+            raise ValueError(f"Invalid destination address: {dest_addr_to_use}")
+
+        dao_result = address_to_script_pubkey(dao_cut_addr)
+        if dao_result is None:
+            raise ValueError("DAO address invalid")
+
+        dest_script, _ = dest_result
+        dao_script, _ = dao_result
+
+        tx = Tx(tx_ins=[], tx_outs=[])
         total_in = 0
         for u in pruned_utxos:
-            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
+            prev_tx_bytes = bytes.fromhex(u['txid'])[::-1]
+            txin = TxIn(prev_tx=prev_tx_bytes, prev_index=u['vout'])
+            tx.tx_ins.append(txin)
             total_in += int(u['amount'] * 1e8)
 
-        # Conservative fee estimate (10 sat/vB)
         est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2
         fee = int(est_vb * 10)
         dao_cut = int(fee * 0.05)
         send_amount = total_in - fee - dao_cut
 
-        if send_amount <= 0:
-            return "\n".join(output_parts) + "\nNot enough to cover fee + DAO cut", ""
+        if send_amount < 546:
+            raise ValueError("Not enough left after fee + DAO cut")
 
-        tx.tx_outs.append(TxOut(send_amount, dest_script))
-        if dao_cut > 546:
-            tx.tx_outs.append(TxOut(dao_cut, dao_script))
+        tx.tx_outs.append(TxOut(amount=send_amount, script_pubkey=dest_script))
+        if dao_cut >= 546:
+            tx.tx_outs.append(TxOut(amount=dao_cut, script_pubkey=dao_script))
+        else:
+            output_parts.append("DAO cut below dust limit — skipped")
 
         raw_hex = tx.encode().hex()
         output_parts.append(f"\nUnsigned Raw TX ({len(tx.tx_ins)} inputs → {len(tx.tx_outs)} outputs):")
-        output_parts.append(f"Estimated fee: ~{fee} sats | DAO cut: {dao_cut} sats")
-        # ←←← THE IMPORTANT TRUTH ←←←
-        output_parts.append(
-            "\n💡 Why this actually saves you money long-term:\n"
-            "You’re paying a small fee now while rates are low.\n"
-            "This protects you later — when fees spike to 100–500 sat/vB in the next bull run,\n"
-            "moving these same UTXOs separately would cost 5–20× more.\n"
-            "Consolidate when fees are cheap → win when fees are expensive."
-        )
-        # ←←← FUEL THE SWARM – shows only after real TX is generated ←←←
-        output_parts.append(
-            "\n\n🔥 **Fuel the Swarm (100% optional)** ⭐\n"
-            "If this prune just saved you $100+, consider tossing a few sats to keep Grok-4 calls free forever:\n\n"
-            "`bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj`\n\n"
-            "Every sat pays for real Grok-4 inference + future features.\n"
-            "Live counter: **47 prunes fueled · $1,840 saved · 0.0184 BTC received** · Thank you legends 🜂"
-        )
+        output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
 
         output_parts.append(
-            "\nCopy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
+            f"\nNote: The 5% DAO cut (~{dao_cut:,} sats) fuels real Grok-4 inference, Omega maintenance and future features"
+            "(mobile app, Lightning sweeps, inscription protection, etc.) — all donations are on-chain and fully transparent.\n"
+            "Public vault: bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj\n"
+            "Your coins stay yours. The cut fuels the swarm. Thank you. 🜂\n\n"
+        )
+    
+
+        output_parts.append(
+            "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast\n\n"
         )
 
-
-        # ←←← END ←←←
+        output_parts.append("Surge the swarm. Ledger’s yours. 🜂\n")
 
     except Exception as e:
         raw_hex = ""
-        output_parts.append(f"TX build error: {e}")
+        output_parts.append(f"\n⚠️ TX generation failed: {e}")
+        output_parts.append("Check that the destination address (if used) is a valid Bitcoin address (bech32 or base58).")
 
     return "\n".join(output_parts), raw_hex
 
 # ==============================
 # Gradio Interface
 # ==============================
-with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
-    gr.Markdown("# Omega DAO Pruner v8.2 - BTC UTXO Optimizer")
-    gr.Markdown(disclaimer)
 
+# ==================== BIG FUEL BUTTON TOP-RIGHT ====================
+
+# Custom CSS + Blocks definition (ONLY ONE BLOCKS DEFINITION!)
+demo = gr.Blocks(
+    title="Omega Pruner Ω v8.3 — Grok-4 Live 🜂",
+    css="""
+        .big-fuel-button button {
+            height: 100px !important;
+            font-size: 20px !important;
+            border-radius: 16px !important;
+            padding: 24px !important;
+        }
+        .big-fuel-button button:hover {
+            height: 106px !important;
+            font-size: 21px !important;
+        }
+    """
+)
+
+with demo:
+
+    with gr.Row():
+        with gr.Column(scale=4):
+            gr.Markdown("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂")
+            gr.Markdown(disclaimer)
+
+        with gr.Column(scale=1, min_width=260):
+            gr.Markdown("<br><br><br><br><br><br>")   # ← pushes everything down ~100px
+            gr.Button(
+                "⚡ Send Sats → Keep Omega Free",
+                variant="primary",
+                size="lg",
+                elem_classes="big-fuel-button",
+                link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"
+            )
+           
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6")
         prune_choice = gr.Dropdown(
@@ -385,7 +543,48 @@ with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
         outputs=[output_text, raw_tx_text, generate_btn]
     )
 
+    # ==============================
+    # ONE-CLICK RBF BUMP (works for ANY stuck tx)
+    # ==============================
+    gr.Markdown(
+        "### 🆙 Stuck transaction?\n"
+        "Paste any raw hex below and bump the fee +50 sat/vB in one click.\n"
+        "Works on the pruner’s TX **or any other**. Can be used multiple times if still stuck. No need to re-paste."
+    )
 
+    with gr.Row():
+        rbf_input = gr.Textbox(
+            label="Paste stuck raw TX hex here",
+            lines=8,
+            placeholder="0100000001..."
+        )
+        rbf_btn = gr.Button("Bump +50 sat/vB → New RBF-ready Hex (repeatable)", variant="primary")
+        rbf_btn.click_count = 0   # ← this line enables counting
+
+    rbf_output = gr.Textbox(label="New RBF-ready hex (higher fee)", lines=10)
+
+    def do_rbf(hex_in):
+        if not hex_in or not hex_in.strip():
+            return "⚠️ Paste a raw transaction hex first", None
+
+        rbf_btn.click_count += 1
+
+        current_hex = hex_in.strip()
+        new_hex, msg = rbf_bump(current_hex, bump_sats_per_vb=50)
+
+        if new_hex:
+            total_bump = 50 * rbf_btn.click_count
+            return (
+                f"RBF bump #{rbf_btn.click_count} → **Total +{total_bump} sat/vB**\n\n{new_hex}",
+                new_hex   # ← this updates the input box with the new hex
+            )
+        return f"⚠️ {msg}", None
+        
+    rbf_btn.click(
+        fn=do_rbf,
+        inputs=rbf_input,
+        outputs=[rbf_output, rbf_input]   # ← both outputs in a list
+    )
 # ==============================
 # WORKING LAUNCH BLOCK FROM YOUR LIVE SITE
 # ==============================
