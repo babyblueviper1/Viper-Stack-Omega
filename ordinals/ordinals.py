@@ -534,7 +534,7 @@ with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
             # Count how many +50 bumps have been applied so far
             total_bump = 50 * (rbf_btn.click_count + 1) if hasattr(rbf_btn, 'click_count') else 50
             return f"RBF bump #{total_bump//50} → **Total +{total_bump} sat/vB**\n\n{new_hex}"
-        return f"⚠️ {msg}
+        return f"⚠️ {msg}"
         
     rbf_btn.click(fn=do_rbf, inputs=rbf_input, outputs=rbf_output)
 # ==============================
