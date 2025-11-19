@@ -523,20 +523,23 @@ with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
     rbf_output = gr.Textbox(label="New RBF-ready hex (higher fee)", lines=10)
 
     def do_rbf(hex_in):
-        rbf_btn.click_count += 1   # ← increment on every click
         if not hex_in or not hex_in.strip():
-            return "⚠️ Paste a raw transaction hex first"
+            return "⚠️ Paste a raw transaction hex first", None
+
+        rbf_btn.click_count += 1
 
         current_hex = hex_in.strip()
         new_hex, msg = rbf_bump(current_hex, bump_sats_per_vb=50)
 
         if new_hex:
-            # Count how many +50 bumps have been applied so far
-            total_bump = 50 * (rbf_btn.click_count + 1) if hasattr(rbf_btn, 'click_count') else 50
-            return f"RBF bump #{total_bump//50} → **Total +{total_bump} sat/vB**\n\n{new_hex}"
-        return f"⚠️ {msg}"
+            total_bump = 50 * rbf_btn.click_count
+            return (
+                f"RBF bump #{rbf_btn.click_count} → **Total +{total_bump} sat/vB**\n\n{new_hex}",
+                new_hex   # ← this updates the input box with the new hex
+            )
+        return f"⚠️ {msg}", None
         
-    rbf_btn.click(fn=do_rbf, inputs=rbf_input, outputs=rbf_output)
+    rbf_btn.click(fn=do_rbf, inputs=rbf_input, outputs=rbf_output, rbf_input)
 # ==============================
 # WORKING LAUNCH BLOCK FROM YOUR LIVE SITE
 # ==============================
