@@ -40,7 +40,7 @@ Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free
 
 100% open-source • non-custodial • voluntary “Fuel the Swarm” donations cover Grok-4 costs
 
-🔥 [**GitHub — Star it ⭐**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0  
+[**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0  
 Contact: omegadaov8@proton.me
 
 **Surge the swarm. Ledger’s yours.**
