@@ -40,13 +40,13 @@ Pay a few thousand sats today… or 10–20× more next cycle. This is fee insur
 **Stuck transaction?**  
 Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free
 
-100% open-source • non-custodial • voluntary “Fuel the Swarm” donations cover Grok-4 costs
+100% open-source • non-custodial • voluntary “Fuel the Swarm” donations cover DAO costs
 
 **DAO / Fuel the Swarm address**
 
 bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
 
-Every sat pays for inference + future features. Thank you 🜂
+Every sat pays for inference + maintenance + future features. Thank you 🜂
 
 [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0  
 Contact: omegadaov8@proton.me
@@ -477,14 +477,14 @@ demo = gr.Blocks(
     title="Omega Pruner Ω v8.3 — Grok-4 Live 🜂",
     css="""
         .big-fuel-button button {
-            height: 80px !important;
-            font-size: 18px !important;
-            border-radius: 12px !important;
-            padding: 20px !important;
+            height: 100px !important;
+            font-size: 20px !important;
+            border-radius: 16px !important;
+            padding: 24px !important;
         }
         .big-fuel-button button:hover {
-            height: 84px !important;
-            font-size: 19px !important;
+            height: 106px !important;
+            font-size: 21px !important;
         }
     """
 )
@@ -497,7 +497,6 @@ with demo:
             gr.Markdown(disclaimer)
 
         with gr.Column(scale=1, min_width=260):
-            gr.Markdown("### 🔥 Fuel the Swarm")
             gr.Button(
                 "⚡ Send Sats → Keep Omega Free",
                 variant="primary",
