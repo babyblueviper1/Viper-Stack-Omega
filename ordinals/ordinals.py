@@ -433,7 +433,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
             "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
         )
 
-         output_parts.append("Surge the swarm. Ledger’s yours. 🜂")
+        output_parts.append("Surge the swarm. Ledger’s yours. 🜂")
 
     except Exception as e:
         raw_hex = ""
