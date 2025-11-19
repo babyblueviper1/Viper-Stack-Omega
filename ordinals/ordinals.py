@@ -230,17 +230,31 @@ def varint_decode(data: bytes, pos: int):
 @dataclass
 class Script:
     cmds: List[Union[int, bytes]] = None
-    def __post_init__(self): self.cmds = self.cmds or []
+
+    def __post_init__(self):
+        if self.cmds is None:
+            self.cmds = []
+
     def encode(self):
         out = []
         for cmd in self.cmds:
             if isinstance(cmd, int):
                 out.append(encode_int(cmd, 1))
             else:
-                l = len(cmd)
-                if l < 75:
-                    out += [encode_int(l, 1), cmd]
-        return encode_varint(len(b''.join(out)) + b''.join(out))
+                length = len(cmd)
+                if length < 75:
+                    out.append(encode_int(length, 1))
+                elif length < 256:
+                    out.append(b'\x4c')  # OP_PUSHDATA1
+                    out.append(encode_int(length, 1))
+                elif length < 65536:
+                    out.append(b'\x4d')  # OP_PUSHDATA2
+                    out.append(encode_int(length, 2))
+                else:
+                    raise ValueError("Script command too long")
+                out.append(cmd)
+        result = b''.join(out)
+        return encode_varint(len(result)) + result
 
 @dataclass
 class TxIn:
