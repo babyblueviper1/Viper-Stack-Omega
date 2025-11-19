@@ -214,6 +214,19 @@ def encode_varint(i):
     if i < 0x100000000: return b'\xfe' + encode_int(i, 4)
     return b'\xff' + encode_int(i, 8)
 
+def varint_decode(data: bytes, pos: int):
+    """Decode varint and return (value, new_pos)"""
+    first = data[pos]
+    pos += 1
+    if first < 0xfd:
+        return first, pos
+    elif first == 0xfd:
+        return int.from_bytes(data[pos:pos+2], 'little'), pos + 2
+    elif first == 0xfe:
+        return int.from_bytes(data[pos:pos+4], 'little'), pos + 4
+    else:
+        return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
+
 @dataclass
 class Script:
     cmds: List[Union[int, bytes]] = None
@@ -227,7 +240,7 @@ class Script:
                 l = len(cmd)
                 if l < 75:
                     out += [encode_int(l, 1), cmd]
-        return encode_varint(len(b''.join(out))) + b''.join(out)
+        return encode_varint(len(b''.join(out)) + b''.join(out)
 
 @dataclass
 class TxIn:
@@ -246,29 +259,17 @@ class TxOut:
     def encode(self):
         return encode_int(self.amount, 8) + encode_varint(len(self.script_pubkey)) + self.script_pubkey
 
-
-def varint_decode(data: bytes, pos: int):
-    """Decode varint and return (value, new_pos)"""
-    first = data[pos]
-    pos += 1
-    if first < 0xfd:
-        return first, pos
-    elif first == 0xfd:
-        return int.from_bytes(data[pos:pos+2], 'little'), pos + 2
-    elif first == 0xfe:
-        return int.from_bytes(data[pos:pos+4], 'little'), pos + 4
-    else:
-        return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
-
 @dataclass
 class Tx:
     version: int = 1
     tx_ins: List[TxIn] = None
     tx_outs: List[TxOut] = None
     locktime: int = 0
+
     def __post_init__(self):
         self.tx_ins = self.tx_ins or []
         self.tx_outs = self.tx_outs or []
+
     def encode(self):
         out = [encode_int(self.version, 4), encode_varint(len(self.tx_ins))]
         out += [i.encode() for i in self.tx_ins]
@@ -291,10 +292,10 @@ class Tx:
 
         tx_ins = []
         for _ in range(vin_len):
-            prev_tx = data[pos:pos+32][::-1].hex()  # we don't need it, just skip
-            pos += 32 + 4  # prev_tx + vout
+            prev_tx = data[pos:pos+32][::-1].hex()
+            pos += 32 + 4
             script_len, pos = varint_decode(data, pos)
-            pos += script_len  # script_sig
+            pos += script_len
             sequence = int.from_bytes(data[pos:pos+4], 'little')
             pos += 4
             tx_ins.append(TxIn(bytes.fromhex(prev_tx), 0, sequence=sequence))
@@ -311,11 +312,9 @@ class Tx:
             pos += script_len
             tx_outs.append(TxOut(amount, script_pubkey))
 
-        # locktime
         locktime = int.from_bytes(data[pos:pos+4], 'little')
 
-        tx = Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
-        return tx
+        return Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
         
 def rbf_bump(raw_hex, bump_sats_per_vb=50):
     try:
