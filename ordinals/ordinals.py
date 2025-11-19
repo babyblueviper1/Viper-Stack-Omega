@@ -246,6 +246,20 @@ class TxOut:
     def encode(self):
         return encode_int(self.amount, 8) + encode_varint(len(self.script_pubkey)) + self.script_pubkey
 
+
+def varint_decode(data: bytes, pos: int):
+    """Decode varint and return (value, new_pos)"""
+    first = data[pos]
+    pos += 1
+    if first < 0xfd:
+        return first, pos
+    elif first == 0xfd:
+        return int.from_bytes(data[pos:pos+2], 'little'), pos + 2
+    elif first == 0xfe:
+        return int.from_bytes(data[pos:pos+4], 'little'), pos + 4
+    else:
+        return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
+
 @dataclass
 class Tx:
     version: int = 1
@@ -263,7 +277,45 @@ class Tx:
         out += [encode_int(self.locktime, 4)]
         return b''.join(out)
 
+@staticmethod
+    def decode(data: bytes):
+        """Simple decode for RBF — only needs to parse enough to modify outputs"""
+        pos = 0
 
+        # version (4 bytes)
+        version = int.from_bytes(data[pos:pos+4], 'little')
+        pos += 4
+
+        # number of inputs (varint)
+        vin_len, pos = varint_decode(data, pos)
+
+        tx_ins = []
+        for _ in range(vin_len):
+            prev_tx = data[pos:pos+32][::-1].hex()  # we don't need it, just skip
+            pos += 32 + 4  # prev_tx + vout
+            script_len, pos = varint_decode(data, pos)
+            pos += script_len  # script_sig
+            sequence = int.from_bytes(data[pos:pos+4], 'little')
+            pos += 4
+            tx_ins.append(TxIn(bytes.fromhex(prev_tx), 0, sequence=sequence))
+
+        # number of outputs (varint)
+        vout_len, pos = varint_decode(data, pos)
+
+        tx_outs = []
+        for _ in range(vout_len):
+            amount = int.from_bytes(data[pos:pos+8], 'little')
+            pos += 8
+            script_len, pos = varint_decode(data, pos)
+            script_pubkey = data[pos:pos+script_len]
+            pos += script_len
+            tx_outs.append(TxOut(amount, script_pubkey))
+
+        # locktime
+        locktime = int.from_bytes(data[pos:pos+4], 'little')
+
+        tx = Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
+        return tx
 
 
 def rbf_bump(raw_hex, bump_sats_per_vb=50):
