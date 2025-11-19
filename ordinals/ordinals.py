@@ -7,6 +7,14 @@ import re
 import time
 from dataclasses import dataclass
 from typing import List, Union
+import os
+TESTING = os.getenv("TESTING_MODE") == "1"
+
+if TESTING:
+    print("🧪 TESTING MODE — Grok-4 API disabled")
+    # mock response
+else:
+    # real Grok call
 
 GROK_API_KEY = os.getenv('GROK_API_KEY')
 print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")
