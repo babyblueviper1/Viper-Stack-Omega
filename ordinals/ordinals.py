@@ -593,12 +593,15 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 # ==============================
 # FINAL RENDER.COM LAUNCH — WORKS 100% ON GRADIO 4.44+ (NOV 2025)
 # ==============================
-import uvicorn
-
 if __name__ == "__main__":
-    uvicorn.run(
-        demo,                                      # your Blocks object
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 7860)),
-        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),  # fixes icons/manifest 404s
+    demo.queue()
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        share=False,
+        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),
+        allowed_paths=["static"],        # ← this serves icons + manifest.json
+        block_threading=True,            # ← this kills the localhost check forever
+        show_error=True,
+        favicon_path="static/icons/icon-192.png"
     )
