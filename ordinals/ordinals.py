@@ -271,12 +271,21 @@ class Tx:
         self.tx_outs = self.tx_outs or []
 
     def encode(self):
-        out = [encode_int(self.version, 4), encode_varint(len(self.tx_ins))]
-        out += [i.encode() for i in self.tx_ins]
-        out += [encode_varint(len(self.tx_outs))]
-        out += [o.encode() for o in self.tx_outs]
-        out += [encode_int(self.locktime, 4)]
-        return b''.join(out)
+        out = []
+        for cmd in self.cmds:
+            if isinstance(cmd, int):
+                out.append(encode_int(cmd, 1))
+            else:
+                length = len(cmd)
+                if length < 75:
+                    out.append(encode_int(length, 1))
+                    out.append(cmd)
+                elif length < 256:
+                    out.append(b'\x4c') + encode_int(length, 1) + cmd
+                else:
+                    raise ValueError("Script command too long")
+        result = b''.join(out)
+        return encode_varint(len(result)) + result
 
     @staticmethod
     def decode(data: bytes):
