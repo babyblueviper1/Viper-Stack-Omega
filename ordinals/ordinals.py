@@ -424,7 +424,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append("`Public vault: bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj")
         output_parts.append("Current balance: ~0.021 BTC")
         output_parts.append("Your coins stay yours. Your cut fuels the swarm. Thank you. 🜂")
-        )
+    
 
         output_parts.append(
             "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
