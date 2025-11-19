@@ -442,7 +442,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 # Gradio Interface
 # ==============================
 with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
-    gr.Markdown("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n\n)
+    gr.Markdown("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n\n")
     gr.Markdown(disclaimer)
 
     with gr.Row():
