@@ -539,7 +539,11 @@ with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
             )
         return f"⚠️ {msg}", None
         
-    rbf_btn.click(fn=do_rbf, inputs=rbf_input, outputs=rbf_output, rbf_input)
+    rbf_btn.click(
+        fn=do_rbf,
+        inputs=rbf_input,
+        outputs=[rbf_output, rbf_input]   # ← both outputs in a list
+    )
 # ==============================
 # WORKING LAUNCH BLOCK FROM YOUR LIVE SITE
 # ==============================
