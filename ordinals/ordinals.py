@@ -591,16 +591,18 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     rbf_btn.click(do_rbf, rbf_input, [rbf_output, rbf_input])
 
 # ==============================
-# LAUNCH
+# RENDER.COM PRODUCTION LAUNCH — NO MORE LOCALHOST ERROR
 # ==============================
+from gradio.routes import mount_gradio_app
+import uvicorn
+
+app = uvicorn.Config(
+    demo,  # your Blocks object
+    host="0.0.0.0",
+    port=int(os.environ.get("PORT", 7860)),
+    root_path=os.environ.get("GRADIO_ROOT_PATH", "")  # fixes manifest/icons 404s
+).load()
+
 if __name__ == "__main__":
-    demo.queue()
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),
-        share=False,
-        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),  # fixes static/manifest 404s
-        prevent_thread_lock=True,                          # ← THIS IS THE CORRECT NAME NOW
-        show_error=True,
-        favicon_path="static/icons/icon-192.png"
-    )
+    # Add the env var GRADIO_ROOT_PATH = / in Render dashboard
+    uvicorn.run(app)
