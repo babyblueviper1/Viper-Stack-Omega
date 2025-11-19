@@ -290,8 +290,6 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
 
 
 
-python
-
 # ==============================
 # main_flow — BULLETPROOF TX GEN (no more NoneType crash)
 # ==============================
