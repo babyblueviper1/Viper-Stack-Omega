@@ -38,9 +38,13 @@ Pay a few thousand sats today… or 10–20× more next cycle. This is fee insur
 • Sign & broadcast with your own wallet — zero custody, zero keys shared
 
 **Stuck transaction?**  
-Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free.
+Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free
 
 100% open-source • non-custodial • voluntary “Fuel the Swarm” donations cover Grok-4 costs
+
+**DAO / Fuel the Swarm address**
+bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+Every sat pays for inference + future features. Thank you 🜂
 
 [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0  
 Contact: omegadaov8@proton.me
@@ -171,7 +175,7 @@ def address_to_script_pubkey(addr):
 
     return None
 
-dao_cut_addr = 'bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj'
+dao_cut_addr = bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
 
 # ==============================
 # API & UTXO Fetch
@@ -377,7 +381,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         input_vb = vb['input_vb']
         output_vb = vb['output_vb']
         # ← Only show entropy line if address is valid
-        output_parts.append(f"Entropy profile loaded for`{user_addr.strip()}`\n")
+        output_parts.append(f"Entropy profile loaded for {user_addr.strip()}\n")
     except:
         return "\n".join(output_parts) + "\n⚠️ Invalid Bitcoin address. Please check and try again.", ""
         
@@ -442,7 +446,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append(
             f"\nNote: The 5% DAO cut (~{dao_cut:,} sats) fuels real Grok-4 inference + future features "
             "(mobile app, Lightning sweeps, inscription protection, etc.)\n"
-            "Public vault: `bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj`\n"
+            "Public vault: bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj\n"
             "Your coins stay yours. The cut fuels the swarm. Thank you. 🜂\n\n"
         )
     
