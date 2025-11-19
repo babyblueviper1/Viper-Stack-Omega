@@ -446,8 +446,8 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
 
         output_parts.append(
-            f"\nNote: The 5% DAO cut (~{dao_cut:,} sats) fuels real Grok-4 inference + future features "
-            "(mobile app, Lightning sweeps, inscription protection, etc.)\n"
+            f"\nNote: The 5% DAO cut (~{dao_cut:,} sats) fuels real Grok-4 inference, Omega maintenance and future features"
+            "(mobile app, Lightning sweeps, inscription protection, etc.) — all donations are on-chain and fully transparent.\n"
             "Public vault: bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj\n"
             "Your coins stay yours. The cut fuels the swarm. Thank you. 🜂\n\n"
         )
@@ -502,7 +502,7 @@ with demo:
                 "⚡ Send Sats → Keep Omega Free",
                 variant="primary",
                 size="lg",
-                elem_classes="big-fuel-button"
+                elem_classes="big-fuel-button",
                 link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"
             )
            
