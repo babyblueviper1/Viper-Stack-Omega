@@ -46,6 +46,10 @@ Contact: omegadaov8@proton.me
 🔥 **GitHub Repo** ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0
 """
 
+gr.Markdown(
+    "**🔥 Stuck transaction?** Use the RBF bump tool below — paste any raw hex (even from other wallets), bump +50 sat/vB in one click. Works on the pruner’s TX or any other. Can be used multiple times if still stuck."
+)
+
 # ==============================
 # Bech32 + Address Logic
 # ==============================
@@ -494,7 +498,12 @@ with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
             lines=8,
             placeholder="0100000001..."
         )
-        rbf_btn = gr.Button("Bump Fee +50 sat/vB → New Hex", variant="primary")
+        rbf_btn = gr.Button("Bump +50 sat/vB → New RBF-ready Hex (repeatable)", variant="primary")
+
+    gr.Markdown(
+    "<small>Works on any stuck transaction — even ones not created by the pruner. "
+    "Click multiple times if still stuck.</small>"
+)
 
     rbf_output = gr.Textbox(label="New RBF-ready hex (higher fee)", lines=10)
 
