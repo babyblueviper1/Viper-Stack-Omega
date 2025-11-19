@@ -48,7 +48,7 @@ bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
 
 Every sat pays for inference + maintenance + future features. Thank you 🜂
 
-[**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0  
+[**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • [**babyblueviper.com**](https://babyblueviper.com) • Apache 2.0  
 Contact: omegadaov8@proton.me
 
 **Surge the swarm. Ledger’s yours.**
