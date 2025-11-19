@@ -7,7 +7,6 @@ import re
 import time
 from dataclasses import dataclass
 from typing import List, Union
-import os
 
 # Toggle for local/testing — set TESTING_MODE=1 in Render secrets to disable real Grok calls
 TESTING = os.getenv("TESTING_MODE") == "1"
@@ -16,17 +15,14 @@ GROK_API_KEY = os.getenv('GROK_API_KEY')
 
 if TESTING:
     print("🧪 TESTING MODE — Grok-4 API disabled (using mock responses)")
-    # You can optionally set a fake key so the rest of the code doesn't break
     GROK_API_KEY = "fake-key-for-testing"
 else:
     print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")
     if GROK_API_KEY:
         print("Grok requests summoned eternal—n=500 hooks ready.")
-    else:
-        print("No GROK_API_KEY — running in fallback mode")
 
 # ==============================
-# GLOBAL DISCLAIMER (fixed NameError)
+# GLOBAL DISCLAIMER
 # ==============================
 disclaimer = """
 BTC UTXO Pruner Ω v8.2 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
@@ -36,7 +32,6 @@ Pay a few thousand sats today at 10 sat/vB… or pay 10–20× more when the nex
 
 • Generates prune plan, fee estimate & unsigned raw TX hex — NO BTC is sent here
 • Fully Taproot (bc1p) & Ordinals-compatible — correct vB weights, dust slider, RBF eternal
-• Ordinals/Inscription detection temporarily disabled (speed & reliability) — will return when a stable API exists
 • Dust threshold configurable (default 546 sats) — lower at your own risk for inscription consolidation when fees <2 sat/vB
 • Non-custodial — only public UTXOs are read, you keep full key control
 • Requires UTXO-capable wallet (Electrum, Sparrow, etc.) to sign & broadcast
@@ -49,8 +44,6 @@ Pay a few thousand sats today at 10 sat/vB… or pay 10–20× more when the nex
 Contact: omegadaov8@proton.me
 
 🔥 **GitHub Repo** ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0
-
-babyblueviper.com
 """
 
 # ==============================
@@ -127,10 +120,13 @@ def base58_decode(s):
     return b'\x00' * leading_zeros + bytes_out
 
 def address_to_script_pubkey(addr):
+    if not addr or not addr.strip():
+        return None
+    addr = addr.strip().lower()
     if addr.startswith('bc1q'):
         hrp, data = bech32_decode(addr)
         if hrp != 'bc' or not data or data[0] != 0:
-            raise ValueError("Invalid SegWit v0")
+            return None
         prog = convertbits(data[1:], 5, 8, False)
         if len(prog) == 20:
             return bytes([0x00, 0x14]) + bytes(prog), {'input_vb': 67.25, 'output_vb': 31, 'type': 'P2WPKH'}
@@ -143,14 +139,20 @@ def address_to_script_pubkey(addr):
             if len(prog) == 32:
                 return bytes([0x51, 0x20]) + bytes(prog), {'input_vb': 57.25, 'output_vb': 43, 'type': 'P2TR'}
     elif addr.startswith('1'):
-        dec = base58_decode(addr)
-        if len(dec) == 25 and dec[0] == 0x00:
-            return bytes([0x76,0xa9,0x14]) + dec[1:21] + bytes([0x88,0xac]), {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
+        try:
+            dec = base58_decode(addr)
+            if len(dec) == 25 and dec[0] == 0x00:
+                return bytes([0x76,0xa9,0x14]) + dec[1:21] + bytes([0x88,0xac]), {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
+        except:
+            return None
     elif addr.startswith('3'):
-        dec = base58_decode(addr)
-        if len(dec) == 25 and dec[0] == 0x05:
-            return bytes([0xa9,0x14]) + dec[1:21] + bytes([0x87]), {'input_vb': 148, 'output_vb': 34, 'type': 'P2SH'}
-    raise ValueError(f"Unsupported address: {addr}")
+        try:
+            dec = base58_decode(addr)
+            if len(dec) == 25 and dec[0] == 0x05:
+                return bytes([0xa9,0x14]) + dec[1:21] + bytes([0x87]), {'input_vb': 148, 'output_vb': 34, 'type': 'P2SH'}
+        except:
+            return None
+    return None
 
 dao_cut_addr = 'bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj'
 
@@ -215,7 +217,6 @@ def encode_varint(i):
     return b'\xff' + encode_int(i, 8)
 
 def varint_decode(data: bytes, pos: int):
-    """Decode varint and return (value, new_pos)"""
     first = data[pos]
     pos += 1
     if first < 0xfd:
@@ -245,13 +246,13 @@ class Script:
                 if length < 75:
                     out.append(encode_int(length, 1))
                 elif length < 256:
-                    out.append(b'\x4c')  # OP_PUSHDATA1
+                    out.append(b'\x4c')
                     out.append(encode_int(length, 1))
                 elif length < 65536:
-                    out.append(b'\x4d')  # OP_PUSHDATA2
+                    out.append(b'\x4d')
                     out.append(encode_int(length, 2))
                 else:
-                    raise ValueError("Script command too long")
+                    raise ValueError("Script too long")
                 out.append(cmd)
         result = b''.join(out)
         return encode_varint(len(result)) + result
@@ -262,7 +263,11 @@ class TxIn:
     prev_index: int
     script_sig: Script = None
     sequence: int = 0xfffffffd
-    def __post_init__(self): self.script_sig = self.script_sig or Script([])
+
+    def __post_init__(self):
+        if self.script_sig is None:
+            self.script_sig = Script([])
+
     def encode(self):
         return self.prev_tx + encode_int(self.prev_index, 4) + self.script_sig.encode() + encode_int(self.sequence, 4)
 
@@ -270,6 +275,7 @@ class TxIn:
 class TxOut:
     amount: int
     script_pubkey: bytes = b''
+
     def encode(self):
         return encode_int(self.amount, 8) + encode_varint(len(self.script_pubkey)) + self.script_pubkey
 
@@ -285,47 +291,31 @@ class Tx:
         self.tx_outs = self.tx_outs or []
 
     def encode(self):
-        out = []
-        for cmd in self.cmds:
-            if isinstance(cmd, int):
-                out.append(encode_int(cmd, 1))
-            else:
-                length = len(cmd)
-                if length < 75:
-                    out.append(encode_int(length, 1))
-                    out.append(cmd)
-                elif length < 256:
-                    out.append(b'\x4c') + encode_int(length, 1) + cmd
-                else:
-                    raise ValueError("Script command too long")
-        result = b''.join(out)
-        return encode_varint(len(result)) + result
+        out = [encode_int(self.version, 4), encode_varint(len(self.tx_ins))]
+        out += [i.encode() for i in self.tx_ins]
+        out += [encode_varint(len(self.tx_outs))]
+        out += [o.encode() for o in self.tx_outs]
+        out += [encode_int(self.locktime, 4)]
+        return b''.join(out)
 
     @staticmethod
     def decode(data: bytes):
-        """Simple decode for RBF — only needs to parse enough to modify outputs"""
         pos = 0
-
-        # version (4 bytes)
         version = int.from_bytes(data[pos:pos+4], 'little')
         pos += 4
-
-        # number of inputs (varint)
         vin_len, pos = varint_decode(data, pos)
-
         tx_ins = []
         for _ in range(vin_len):
-            prev_tx = data[pos:pos+32][::-1].hex()
-            pos += 32 + 4
+            prev_tx = data[pos:pos+32][::-1]
+            pos += 32
+            prev_index = int.from_bytes(data[pos:pos+4], 'little')
+            pos += 4
             script_len, pos = varint_decode(data, pos)
             pos += script_len
             sequence = int.from_bytes(data[pos:pos+4], 'little')
             pos += 4
-            tx_ins.append(TxIn(bytes.fromhex(prev_tx), 0, sequence=sequence))
-
-        # number of outputs (varint)
+            tx_ins.append(TxIn(prev_tx, prev_index, sequence=sequence))
         vout_len, pos = varint_decode(data, pos)
-
         tx_outs = []
         for _ in range(vout_len):
             amount = int.from_bytes(data[pos:pos+8], 'little')
@@ -334,52 +324,43 @@ class Tx:
             script_pubkey = data[pos:pos+script_len]
             pos += script_len
             tx_outs.append(TxOut(amount, script_pubkey))
-
         locktime = int.from_bytes(data[pos:pos+4], 'little')
-
         return Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
-        
+
 def rbf_bump(raw_hex, bump_sats_per_vb=50):
     try:
         tx = Tx.decode(bytes.fromhex(raw_hex))
-        # Estimate current vsize (rough but safe)
         vsize = len(tx.encode()) // 4
         extra_fee = int(vsize * bump_sats_per_vb)
 
-        # Increase fee by reducing the first output
-        tx.tx_outs[0].amount -= extra_fee
-        if tx.tx_outs[0].amount < 546:
-            return None, "Not enough to cover bump + dust limit"
+        if tx.tx_outs[0].amount <= extra_fee + 546:
+            return None, "Not enough in first output to cover bump + dust limit"
 
-        # Ensure RBF is signalled
+        tx.tx_outs[0].amount -= extra_fee
         for txin in tx.tx_ins:
             txin.sequence = 0xfffffffd
 
-        new_hex = tx.encode().hex()
-        return new_hex, f"RBF bump +{bump_sats_per_vb} sat/vB (+{extra_fee:,} sats fee)"
-        
+        return tx.encode().hex(), f"RBF bump +{bump_sats_per_vb} sat/vB (+{extra_fee:,} sats)"
     except Exception as e:
         return None, f"Error: {e}"
 
-
-
 # ==============================
-# main_flow — BULLETPROOF TX GEN (no more NoneType crash)
+# main_flow — BULLETPROOF TX GEN
 # ==============================
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = [disclaimer]
 
-    if not user_addr:
+    if not user_addr or not user_addr.strip():
         return "\n".join(output_parts) + "\nNo address provided.", ""
 
     try:
-        _, vb = address_to_script_pubkey(user_addr)
+        _, vb = address_to_script_pubkey(user_addr.strip())
         input_vb = vb['input_vb']
         output_vb = vb['output_vb']
     except:
         return "\n".join(output_parts) + "\nInvalid user address.", ""
 
-    all_utxos, _ = get_utxos(user_addr, dust_threshold)
+    all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
     if not all_utxos:
         return "\n".join(output_parts) + "\nNo confirmed UTXOs found above dust threshold.", ""
 
@@ -398,16 +379,15 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
     # ----- REAL TX GENERATION (100% safe) -----
     raw_hex = None
     try:
-        dest_addr_to_use = dest_addr.strip() if dest_addr and dest_addr.strip() else user_addr
+        dest_addr_to_use = dest_addr.strip() if dest_addr and dest_addr.strip() else user_addr.strip()
 
-        # Validate both addresses — this is what was missing
         dest_result = address_to_script_pubkey(dest_addr_to_use)
         if dest_result is None:
             raise ValueError(f"Invalid destination address: {dest_addr_to_use}")
 
         dao_result = address_to_script_pubkey(dao_cut_addr)
         if dao_result is None:
-            raise ValueError("DAO address invalid — contact dev")
+            raise ValueError("DAO address invalid")
 
         dest_script, _ = dest_result
         dao_script, _ = dao_result
@@ -439,7 +419,6 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
         output_parts.append(raw_hex)
 
-        # Fuel the Swarm + insurance message
         output_parts.append(
             "\n\n🔥 **Fuel the Swarm (100% optional)** ⭐\n"
             "If this prune just saved you $100+, consider tossing a few sats to keep Grok-4 calls free forever:\n\n"
@@ -447,9 +426,10 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
             "Every sat pays for real Grok-4 inference + future features.\n"
             "Live counter: **47 prunes fueled · $1,840 saved · 0.0184 BTC received** · Thank you legends 🜂"
         )
+
         output_parts.append(
             "\n💡 You just paid today's low fee — next bull run this same move would cost 10–20× more.\n"
-            "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
+            "Copy the ENTIRE hex above → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
         )
 
     except Exception as e:
@@ -458,7 +438,6 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append("Check that the destination address (if used) is a valid Bitcoin address (bech32 or base58).")
 
     return "\n".join(output_parts), raw_hex
-
 
 # ==============================
 # Gradio Interface
@@ -503,19 +482,6 @@ with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
         outputs=[output_text, raw_tx_text, generate_btn]
     )
-
-    rbf_input = gr.Textbox(label="Paste stuck raw TX hex here to bump fee", visible=False)
-    rbf_output = gr.Textbox(label="New RBF-ready hex (higher fee)", lines=10, visible=False)
-    rbf_btn = gr.Button("Bump Fee +50 sat/vB → New Hex", visible=False)
-
-    def start_rbf():
-        return gr.update(visible=True), gr.update(visible=True), gr.update(visible=True), gr.update(visible=False)
-
-    def do_rbf(hex_in):
-        new_hex, msg = rbf_bump(hex_in)
-        if new_hex:
-            return msg + "\n\n" + new_hex, new_hex
-        return msg, ""
 
     # ==============================
     # ONE-CLICK RBF BUMP (works for ANY stuck tx)
