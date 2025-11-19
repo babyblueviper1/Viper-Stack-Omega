@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass
 from typing import List, Union
 
+<script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+
 # Toggle for local/testing — set TESTING_MODE=1 in Render secrets to disable real Grok calls
 TESTING = os.getenv("TESTING_MODE") == "1"
 
@@ -505,6 +507,13 @@ with demo:
                 elem_classes="big-fuel-button",
                 link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"
             )
+
+    <label class="qr-scan-btn" style="position:fixed; bottom:24px; right:24px; z-index:9999;">
+  <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
+  <div style="background:#f7931a; color:black; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:40px; box-shadow:0 4px 20px rgba(0,0,0,0.4); cursor:pointer;">
+    📷
+  </div>
+</label>
            
     with gr.Row():
         user_addr = gr.Textbox(label="User BTC Address", placeholder="3M219KR5vEneNb47ewrPfWyb5jQ2DjxRP6")
@@ -585,6 +594,33 @@ with demo:
         inputs=rbf_input,
         outputs=[rbf_output, rbf_input]   # ← both outputs in a list
     )
+
+
+document.getElementById('qr-camera').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const img = new Image();
+  img.onload = async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    const dataUrl = canvas.toDataURL('image/png');
+
+    // ZXing browser lib (already in most Gradio templates, or add via CDN)
+    const code = await ZXing.readBarcodeFromCanvas(canvas);
+    if (code) {
+      document.getElementById('address-input').value = code.text;  // whatever your address field ID is
+      document.getElementById('address-input').dispatchEvent(new Event('input'));
+      showToast("⚡ Address scanned!");
+    } else {
+      showToast("No QR found — try again");
+    }
+  };
+  img.src = URL.createObjectURL(file);
+});
+
 # ==============================
 # WORKING LAUNCH BLOCK FROM YOUR LIVE SITE
 # ==============================
