@@ -348,7 +348,7 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
 # main_flow — BULLETPROOF TX GEN
 # ==============================
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
-    
+    output_parts = []
     output_parts.append("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n\n")
     output_parts.append("**Consolidate when fees are low → win when fees are high.**")
     output_parts.append("Pay a few thousand sats today… or 10–20× more next cycle. This is fee insurance.\n")
