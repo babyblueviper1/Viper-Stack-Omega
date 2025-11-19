@@ -350,7 +350,7 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = []
     output_parts.append("Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n")
-    output_parts.append(f"*(Entropy profile loaded for {user_addr.strip()}`\n")
+    output_parts.append(f"*Entropy profile loaded for {user_addr.strip()}\n")
     
     if not user_addr or not user_addr.strip():
         return "\n".join(output_parts) + "\nNo address provided.", ""
@@ -419,24 +419,18 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         raw_hex = tx.encode().hex()
         output_parts.append(f"\nUnsigned Raw TX ({len(tx.tx_ins)} inputs → {len(tx.tx_outs)} outputs):")
         output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
-        output_parts.append("**Consolidate when fees are low → win when fees are high.**")
-        
-        output_parts.append("Surge the swarm. Ledger’s yours.\n🜂")
 
-        output_parts.append(
-            "\n\n🔥 **Fuel the Swarm (100% optional)** ⭐\n"
-            "Every prune sends a tiny 5% DAO cut straight to the swarm’s BTC vault.\n\n"
-            "`bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj`\n\n"
-            "Those sats pay for real Grok-4 inference and fund future features.\n"
-            "Live counter: **47 prunes fueled · $1,840 saved · 0.0184 BTC received** · Thank you legends 🜂"
+        output_parts.append("\n\Note: The *5% DAO cut (~{dao_cut:,} sats) → fuels real Grok-4 inference + future features (mobile app, Lightning sweeps, inscription protection, etc.)**\n")
+        output_parts.append("`Public vault: bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj")
+        output_parts.append("Current balance: ~0.021 BTC")
+        output_parts.append("Your coins stay yours. Your cut fuels the swarm. Thank you. 🜂")
         )
 
-
-        output_parts.append("**Stuck transaction?**")
-        output_parts.append("Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free.\n")
         output_parts.append(
             "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
         )
+
+         output_parts.append("Surge the swarm. Ledger’s yours. 🜂")
 
     except Exception as e:
         raw_hex = ""
