@@ -322,34 +322,56 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append("\nClick 'Generate Pruned TX Hex' to build real unsigned transaction")
         return "\n".join(output_parts), ""
 
-    # REAL TX GENERATION
+        # Auto-Raw TX Generation — SAFE VERSION
+    raw_hex = None
     try:
-        dest_addr = dest_addr or user_addr
-        dest_script, _ = address_to_script_pubkey(dest_addr)
-        dao_script, _ = address_to_script_pubkey(dao_cut_addr)
+        dest_addr_to_use = dest_addr or user_addr
 
-        tx = Tx()
+        # Validate both addresses first
+        try:
+            script_dest, _ = address_to_script_pubkey(dest_addr_to_use)
+        except Exception as e:
+            raise ValueError(f"Invalid destination address: {dest_addr_to_use} — {e}")
+
+        try:
+            script_dao, _ = address_to_script_pubkey(dao_cut_addr)
+        except Exception as e:
+            raise ValueError(f"Invalid DAO address (hardcoded): {e}")
+
+        tx = Tx(tx_ins=[], tx_outs=[])
         total_in = 0
         for u in pruned_utxos:
-            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
+            prev_tx_bytes = bytes.fromhex(u['txid'])[::-1]
+            txin = TxIn(prev_tx=prev_tx_bytes, prev_index=u['vout'])
+            tx.tx_ins.append(txin)
             total_in += int(u['amount'] * 1e8)
 
-        # Conservative fee estimate (10 sat/vB)
+        # Conservative fee estimate
         est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2
-        fee = int(est_vb * 10)
+        fee = int(est_vb * 10)  # 10 sat/vB base
         dao_cut = int(fee * 0.05)
         send_amount = total_in - fee - dao_cut
 
-        if send_amount <= 0:
-            return "\n".join(output_parts) + "\nNot enough to cover fee + DAO cut", ""
+        if send_amount < 546:
+            raise ValueError("Not enough funds left after fee + DAO cut (below dust limit)")
 
-        tx.tx_outs.append(TxOut(send_amount, dest_script))
-        if dao_cut > 546:
-            tx.tx_outs.append(TxOut(dao_cut, dao_script))
+        # Outputs
+        tx.tx_outs.append(TxOut(amount=send_amount, script_pubkey=script_dest))
+        if dao_cut >= 546:
+            tx.tx_outs.append(TxOut(amount=dao_cut, script_pubkey=script_dao))
+        else:
+            output_parts.append("DAO cut below dust limit — skipped")
 
         raw_hex = tx.encode().hex()
+
         output_parts.append(f"\nUnsigned Raw TX ({len(tx.tx_ins)} inputs → {len(tx.tx_outs)} outputs):")
-        output_parts.append(f"Estimated fee: ~{fee} sats | DAO cut: {dao_cut} sats")
+        output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
+        output_parts.append(raw_hex)
+
+    except Exception as e:
+        raw_hex = ""
+        output_parts.append(f"\n⚠️ TX generation failed: {e}")
+        output_parts.append("Check destination address format (must be valid bech32 or base58)")
         # ←←← THE IMPORTANT TRUTH ←←←
         output_parts.append(
             "\n💡 Why this actually saves you money long-term:\n"
