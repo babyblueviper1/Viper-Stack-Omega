@@ -487,10 +487,10 @@ with gr.Blocks(title="Omega DAO Pruner v8.3") as demo:
     # ONE-CLICK RBF BUMP (works for ANY stuck tx)
     # ==============================
    gr.Markdown(
-    "### 🆙 Stuck transaction?\n"
-    "Paste any raw hex below and bump the fee +50 sat/vB in one click.\n"
-    "Works on the pruner’s TX or any other. Can be used multiple times if still stuck. No need to re-paste."
-)
+       "### 🆙 Stuck transaction?\n"
+       "Paste any raw hex below and bump the fee +50 sat/vB in one click.\n"
+       "Works on the pruner’s TX or any other. Can be used multiple times if still stuck. No need to re-paste."
+   )
 
     with gr.Row():
         rbf_input = gr.Textbox(
