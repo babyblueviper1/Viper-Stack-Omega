@@ -8,18 +8,22 @@ import time
 from dataclasses import dataclass
 from typing import List, Union
 import os
+
+# Toggle for local/testing — set TESTING_MODE=1 in Render secrets to disable real Grok calls
 TESTING = os.getenv("TESTING_MODE") == "1"
 
-if TESTING:
-    print("🧪 TESTING MODE — Grok-4 API disabled")
-    # mock response
-else:
-    # real Grok call
-
 GROK_API_KEY = os.getenv('GROK_API_KEY')
-print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")
-if GROK_API_KEY:
-    print("Grok requests summoned eternal—n=500 hooks ready.")
+
+if TESTING:
+    print("🧪 TESTING MODE — Grok-4 API disabled (using mock responses)")
+    # You can optionally set a fake key so the rest of the code doesn't break
+    GROK_API_KEY = "fake-key-for-testing"
+else:
+    print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")
+    if GROK_API_KEY:
+        print("Grok requests summoned eternal—n=500 hooks ready.")
+    else:
+        print("No GROK_API_KEY — running in fallback mode")
 
 # ==============================
 # GLOBAL DISCLAIMER (fixed NameError)
