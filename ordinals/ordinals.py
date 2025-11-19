@@ -25,26 +25,26 @@ else:
 # GLOBAL DISCLAIMER
 # ==============================
 disclaimer = """
-# BTC UTXO Pruner Ω v8.3 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
+# Omega Pruner Ω v8.3 — Grok-4 Live 🜂
 
 **Consolidate when fees are low → win when fees are high.**  
-Pay a few thousand sats today… or 10–20× more when fees hit 300–500 sat/vB next cycle. This is fee insurance.
+Pay a few thousand sats today… or 10–20× more next cycle. This is fee insurance.
 
-• Instant prune plan + real unsigned raw TX hex (no keys ever leave your device)  
-• Live Grok-4 tuning on every prune (real xAI API)  
-• Taproot (bc1p), RBF, dust slider, 5% voluntary DAO cut  
-• Works with any wallet (Electrum, Sparrow, hardware)  
-• 100% open-source, non-custodial, zero trust required  
+**One-click dusty wallet cleanup**  
+• Paste any address (legacy · SegWit · Taproot)  
+• Grok-4 instantly tunes the optimal prune (real xAI API)  
+• Get real, RBF-ready raw TX hex in <15 seconds  
+• Sign & broadcast with your own wallet — zero custody, zero keys shared
 
-### 🆙 Stuck transaction? Fixed in 10 seconds.
-Scroll down → paste any raw hex into the **RBF Bump tool** → +50 sat/vB in one click.  
-Works on pruner TXs **or any other stuck transaction**. Click multiple times if needed.  
-100% free · repeatable · no keys needed.
+**Stuck transaction?**  
+Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free.
 
-**Surge the swarm. Ledger’s yours.**  
-Contact: omegadaov8@proton.me  
+100% open-source • non-custodial • voluntary “Fuel the Swarm” donations cover Grok-4 costs
 
-🔥 **GitHub Repo** ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0
+🔥 [**GitHub — Star it ⭐**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0  
+Contact: omegadaov8@proton.me
+
+**Surge the swarm. Ledger’s yours.**
 """
 
 # ==============================
@@ -442,8 +442,8 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 # ==============================
 # Gradio Interface
 # ==============================
-with gr.Blocks(title="Omega DAO Pruner v8.3") as demo:
-    gr.Markdown("# Omega DAO Pruner v8.3 - BTC UTXO Optimizer")
+with gr.Blocks(title="Omega Pruner v8.3 — Grok-4 Live 🜂") as demo:
+    gr.Markdown("# Omega Pruner v8.3 — Grok-4 Live 🜂\n")
     gr.Markdown(disclaimer)
 
     with gr.Row():
