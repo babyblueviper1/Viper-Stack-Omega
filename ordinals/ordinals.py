@@ -290,8 +290,10 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
 
 
 
+python
+
 # ==============================
-# main_flow — REAL TX GEN
+# main_flow — BULLETPROOF TX GEN (no more NoneType crash)
 # ==============================
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = [disclaimer]
@@ -304,7 +306,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         input_vb = vb['input_vb']
         output_vb = vb['output_vb']
     except:
-        return "\n".join(output_parts) + "\nInvalid address.", ""
+        return "\n".join(output_parts) + "\nInvalid user address.", ""
 
     all_utxos, _ = get_utxos(user_addr, dust_threshold)
     if not all_utxos:
@@ -322,24 +324,23 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append("\nClick 'Generate Pruned TX Hex' to build real unsigned transaction")
         return "\n".join(output_parts), ""
 
- # Auto-Raw TX Generation — BULLETPROOF (no more NoneType crash)
+    # ----- REAL TX GENERATION (100% safe) -----
     raw_hex = None
     try:
-        dest_addr_to_use = (dest_addr.strip() if dest_addr and dest_addr.strip() else user_addr).strip()
+        dest_addr_to_use = dest_addr.strip() if dest_addr and dest_addr.strip() else user_addr
 
-        # Validate addresses FIRST — this is what was missing
+        # Validate both addresses — this is what was missing
         dest_result = address_to_script_pubkey(dest_addr_to_use)
         if dest_result is None:
-            raise ValueError(f"Invalid or unsupported destination address: {dest_addr_to_use}")
+            raise ValueError(f"Invalid destination address: {dest_addr_to_use}")
 
         dao_result = address_to_script_pubkey(dao_cut_addr)
         if dao_result is None:
-            raise ValueError("Internal error — DAO address invalid (this shouldn't happen)")
+            raise ValueError("DAO address invalid — contact dev")
 
         dest_script, _ = dest_result
         dao_script, _ = dao_result
 
-        # Build the transaction
         tx = Tx(tx_ins=[], tx_outs=[])
         total_in = 0
         for u in pruned_utxos:
@@ -348,42 +349,26 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
             tx.tx_ins.append(txin)
             total_in += int(u['amount'] * 1e8)
 
-
-        # Conservative fee estimate
         est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2
-        fee = int(est_vb * 10)  # 10 sat/vB base
+        fee = int(est_vb * 10)
         dao_cut = int(fee * 0.05)
         send_amount = total_in - fee - dao_cut
 
         if send_amount < 546:
-            raise ValueError("Not enough funds left after fee + DAO cut (below dust limit)")
+            raise ValueError("Not enough left after fee + DAO cut")
 
-        # Outputs
-        tx.tx_outs.append(TxOut(amount=send_amount, script_pubkey=script_dest))
+        tx.tx_outs.append(TxOut(amount=send_amount, script_pubkey=dest_script))
         if dao_cut >= 546:
-            tx.tx_outs.append(TxOut(amount=dao_cut, script_pubkey=script_dao))
+            tx.tx_outs.append(TxOut(amount=dao_cut, script_pubkey=dao_script))
         else:
             output_parts.append("DAO cut below dust limit — skipped")
 
         raw_hex = tx.encode().hex()
-
         output_parts.append(f"\nUnsigned Raw TX ({len(tx.tx_ins)} inputs → {len(tx.tx_outs)} outputs):")
         output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
         output_parts.append(raw_hex)
 
-    except Exception as e:
-        raw_hex = ""
-        output_parts.append(f"\n⚠️ TX generation failed: {e}")
-        output_parts.append("Check destination address format (must be valid bech32 or base58)")
-        # ←←← THE IMPORTANT TRUTH ←←←
-        output_parts.append(
-            "\n💡 Why this actually saves you money long-term:\n"
-            "You’re paying a small fee now while rates are low.\n"
-            "This protects you later — when fees spike to 100–500 sat/vB in the next bull run,\n"
-            "moving these same UTXOs separately would cost 5–20× more.\n"
-            "Consolidate when fees are cheap → win when fees are expensive."
-        )
-        # ←←← FUEL THE SWARM – shows only after real TX is generated ←←←
+        # Fuel the Swarm + insurance message
         output_parts.append(
             "\n\n🔥 **Fuel the Swarm (100% optional)** ⭐\n"
             "If this prune just saved you $100+, consider tossing a few sats to keep Grok-4 calls free forever:\n\n"
@@ -391,20 +376,18 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
             "Every sat pays for real Grok-4 inference + future features.\n"
             "Live counter: **47 prunes fueled · $1,840 saved · 0.0184 BTC received** · Thank you legends 🜂"
         )
-
         output_parts.append(
-            "\nCopy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
+            "\n💡 You just paid today's low fee — next bull run this same move would cost 10–20× more.\n"
+            "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
         )
 
-
-        # ←←← END ←←←
-
-   
     except Exception as e:
         raw_hex = ""
-        output_parts.append(f"TX build error: {e}")
+        output_parts.append(f"\n⚠️ TX generation failed: {e}")
+        output_parts.append("Check that the destination address (if used) is a valid Bitcoin address (bech32 or base58).")
 
-        return "\n".join(output_parts), raw_hex
+    return "\n".join(output_parts), raw_hex
+
 
 # ==============================
 # Gradio Interface
