@@ -266,24 +266,25 @@ class Tx:
 
 
 
- def rbf_bump(raw_hex, bump_sats_per_vb=50):
+def rbf_bump(raw_hex, bump_sats_per_vb=50):
     try:
         tx = Tx.decode(bytes.fromhex(raw_hex))
-        # Estimate current vsize
-        vsize = len(tx.encode()) // 4  # rough but safe enough
+        # Estimate current vsize (rough but safe)
+        vsize = len(tx.encode()) // 4
         extra_fee = int(vsize * bump_sats_per_vb)
-        
+
         # Increase fee by reducing the first output
         tx.tx_outs[0].amount -= extra_fee
         if tx.tx_outs[0].amount < 546:
             return None, "Not enough to cover bump + dust limit"
-        
-        # Reset sequence to signal RBF (in case it was set to final)
+
+        # Ensure RBF is signalled
         for txin in tx.tx_ins:
             txin.sequence = 0xfffffffd
-        
+
         new_hex = tx.encode().hex()
-        return new_hex, f"RBF bump +{bump_sats_per_vb} sat/vB ≈ +{extra_fee:,} sats fee"
+        return new_hex, f"RBF bump +{bump_sats_per_vb} sat/vB (+{extra_fee:,} sats fee)"
+        
     except Exception as e:
         return None, f"Error: {e}"
 
