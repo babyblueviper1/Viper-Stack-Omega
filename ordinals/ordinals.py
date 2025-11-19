@@ -497,6 +497,7 @@ with demo:
             gr.Markdown(disclaimer)
 
         with gr.Column(scale=1, min_width=260):
+            gr.Markdown("<br><br><br>")   # ← pushes everything down ~60px
             gr.Button(
                 "⚡ Send Sats → Keep Omega Free",
                 variant="primary",
