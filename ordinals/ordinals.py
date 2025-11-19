@@ -175,7 +175,7 @@ def address_to_script_pubkey(addr):
 
     return None
 
-dao_cut_addr = bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+dao_cut_addr = 'bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj'
 
 # ==============================
 # API & UTXO Fetch
