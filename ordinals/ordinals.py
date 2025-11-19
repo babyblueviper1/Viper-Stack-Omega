@@ -240,7 +240,7 @@ class Script:
                 l = len(cmd)
                 if l < 75:
                     out += [encode_int(l, 1), cmd]
-        return encode_varint(len(b''.join(out)) + b''.join(out)
+        return encode_varint(len(b''.join(out)) + b''.join(out))
 
 @dataclass
 class TxIn:
