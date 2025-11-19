@@ -444,21 +444,30 @@ with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
             return msg + "\n\n" + new_hex, new_hex
         return msg, ""
 
-    # Add this button somewhere visible after the normal generate button
-    gr.Markdown("### Stuck transaction? → Click below to bump fee")
-    rbf_trigger_btn = gr.Button("🆙 One-Click RBF Bump (+50 sat/vB)")
+    # ==============================
+    # ONE-CLICK RBF BUMP (works for ANY stuck tx)
+    # ==============================
+    gr.Markdown("### 🆙 Stuck transaction? Paste the raw hex below and bump the fee")
 
-    rbf_trigger_btn.click(
-        fn=start_rbf,
-        outputs=[rbf_input, rbf_output, rbf_btn, rbf_trigger_btn]
-    )
+    with gr.Row():
+        rbf_input = gr.Textbox(
+            label="Paste stuck raw TX hex here",
+            lines=8,
+            placeholder="0100000001..."
+        )
+        rbf_btn = gr.Button("Bump Fee +50 sat/vB → New Hex", variant="primary")
 
-    rbf_btn.click(
-        fn=do_rbf,
-        inputs=rbf_input,
-        outputs=[rbf_output, rbf_output]  # shows message + hex
-    )
+    rbf_output = gr.Textbox(label="New RBF-ready hex (higher fee)", lines=10)
 
+    def do_rbf(hex_in):
+        if not hex_in or not hex_in.strip():
+            return "⚠️ Paste a raw transaction hex first"
+        new_hex, msg = rbf_bump(hex_in.strip())
+        if new_hex:
+            return f"{msg}\n\n{new_hex}"
+        return f"⚠️ {msg}"
+
+    rbf_btn.click(fn=do_rbf, inputs=rbf_input, outputs=rbf_output)
 
 # ==============================
 # WORKING LAUNCH BLOCK FROM YOUR LIVE SITE
