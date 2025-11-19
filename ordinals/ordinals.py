@@ -322,21 +322,22 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         output_parts.append("\nClick 'Generate Pruned TX Hex' to build real unsigned transaction")
         return "\n".join(output_parts), ""
 
-        # Auto-Raw TX Generation — SAFE VERSION
+        # Auto-Raw TX Generation — SAFE VERSION (no more NoneType crash)
     raw_hex = None
     try:
-        dest_addr_to_use = dest_addr or user_addr
+        dest_addr_to_use = dest_addr.strip() if dest_addr else user_addr
 
         # Validate both addresses first
-        try:
-            script_dest, _ = address_to_script_pubkey(dest_addr_to_use)
-        except Exception as e:
-            raise ValueError(f"Invalid destination address: {dest_addr_to_use} — {e}")
+        dest_script_info = address_to_script_pubkey(dest_addr_to_use)
+        if dest_script_info is None:
+            raise ValueError(f"Invalid destination address: {dest_addr_to_use}")
 
-        try:
-            script_dao, _ = address_to_script_pubkey(dao_cut_addr)
-        except Exception as e:
-            raise ValueError(f"Invalid DAO address (hardcoded): {e}")
+        dao_script_info = address_to_script_pubkey(dao_cut_addr)
+        if dao_script_info is None:
+            raise ValueError("Internal error — DAO address invalid")
+
+        dest_script, _ = dest_script_info
+        dao_script, _ = dao_script_info
 
         tx = Tx(tx_ins=[], tx_outs=[])
         total_in = 0
@@ -345,6 +346,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
             txin = TxIn(prev_tx=prev_tx_bytes, prev_index=u['vout'])
             tx.tx_ins.append(txin)
             total_in += int(u['amount'] * 1e8)
+
 
         # Conservative fee estimate
         est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2
