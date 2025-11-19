@@ -25,7 +25,6 @@ else:
 # GLOBAL DISCLAIMER
 # ==============================
 disclaimer = """
-# Omega Pruner Ω v8.3 — Grok-4 Live 🜂
 
 **Consolidate when fees are low → win when fees are high.**  
 Pay a few thousand sats today… or 10–20× more next cycle. This is fee insurance.
@@ -442,8 +441,8 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 # ==============================
 # Gradio Interface
 # ==============================
-with gr.Blocks(title="Omega Pruner v8.3 — Grok-4 Live 🜂") as demo:
-    gr.Markdown("# Omega Pruner v8.3 — Grok-4 Live 🜂\n")
+with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
+    gr.Markdown("# Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n\n)
     gr.Markdown(disclaimer)
 
     with gr.Row():
