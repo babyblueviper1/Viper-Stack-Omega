@@ -598,6 +598,8 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
-        share=True,
-        show_error=True
+        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),  # ← THIS IS THE KEY LINE
+        share=False,  # you had share=True before — kills Render proxy
+        show_error=True,
+        favicon_path="static/icons/icon-192.png"  # optional nice touch
     )
