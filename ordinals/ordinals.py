@@ -421,7 +421,6 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         raw_hex = tx.encode().hex()
         output_parts.append(f"\nUnsigned Raw TX ({len(tx.tx_ins)} inputs → {len(tx.tx_outs)} outputs):")
         output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
-        output_parts.append(raw_hex)
 
         output_parts.append(
             "\n\n🔥 **Fuel the Swarm (100% optional)** ⭐\n"
@@ -433,7 +432,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 
         output_parts.append(
             "\n💡 You just paid today's low fee — next bull run this same move would cost 10–20× more.\n"
-            "Copy the ENTIRE hex above → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
+            "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
         )
 
     except Exception as e:
