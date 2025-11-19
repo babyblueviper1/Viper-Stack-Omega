@@ -446,10 +446,10 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
     
 
         output_parts.append(
-            "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
+            "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast\n\n"
         )
 
-        output_parts.append("Surge the swarm. Ledger’s yours. 🜂\n\n")
+        output_parts.append("Surge the swarm. Ledger’s yours. 🜂\n")
 
     except Exception as e:
         raw_hex = ""
@@ -518,17 +518,24 @@ with gr.Blocks(title="Omega Pruner Ω v8.3 — Grok-4 Live") as demo:
             placeholder="0100000001..."
         )
         rbf_btn = gr.Button("Bump +50 sat/vB → New RBF-ready Hex (repeatable)", variant="primary")
+        rbf_btn.click_count = 0   # ← this line enables counting
 
     rbf_output = gr.Textbox(label="New RBF-ready hex (higher fee)", lines=10)
 
     def do_rbf(hex_in):
+        rbf_btn.click_count += 1   # ← increment on every click
         if not hex_in or not hex_in.strip():
             return "⚠️ Paste a raw transaction hex first"
-        new_hex, msg = rbf_bump(hex_in.strip())
-        if new_hex:
-            return f"{msg}\n\n{new_hex}"
-        return f"⚠️ {msg}"
 
+        current_hex = hex_in.strip()
+        new_hex, msg = rbf_bump(current_hex, bump_sats_per_vb=50)
+
+        if new_hex:
+            # Count how many +50 bumps have been applied so far
+            total_bump = 50 * (rbf_btn.click_count + 1) if hasattr(rbf_btn, 'click_count') else 50
+            return f"RBF bump #{total_bump//50} → **Total +{total_bump} sat/vB**\n\n{new_hex}"
+        return f"⚠️ {msg}
+        
     rbf_btn.click(fn=do_rbf, inputs=rbf_input, outputs=rbf_output)
 # ==============================
 # WORKING LAUNCH BLOCK FROM YOUR LIVE SITE
