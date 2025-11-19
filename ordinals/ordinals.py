@@ -350,12 +350,8 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
 def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
     output_parts = []
     output_parts.append("Omega Pruner Ω v8.3 — Grok-4 Live 🜂\n")
-
+    output_parts.append(f"*(Entropy profile loaded for {user_addr.strip()}`\n")
     
-    output_parts.append("**Stuck transaction?**")
-    output_parts.append("Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free.\n")
-
-
     if not user_addr or not user_addr.strip():
         return "\n".join(output_parts) + "\nNo address provided.", ""
 
@@ -429,12 +425,15 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 
         output_parts.append(
             "\n\n🔥 **Fuel the Swarm (100% optional)** ⭐\n"
-            "If this prune just saved you $100+, consider tossing a few sats to keep Grok-4 calls free forever:\n\n"
+            "Every prune sends a tiny 5% DAO cut straight to the swarm’s BTC vault.\n\n"
             "`bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj`\n\n"
-            "Every sat pays for real Grok-4 inference + future features.\n"
+            "Those sats pay for real Grok-4 inference and fund future features.\n"
             "Live counter: **47 prunes fueled · $1,840 saved · 0.0184 BTC received** · Thank you legends 🜂"
         )
 
+
+        output_parts.append("**Stuck transaction?**")
+        output_parts.append("Scroll down → paste raw hex → +50 sat/vB bump in one click. Repeatable. Free.\n")
         output_parts.append(
             "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast"
         )
