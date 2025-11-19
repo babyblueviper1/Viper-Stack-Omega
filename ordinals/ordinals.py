@@ -25,30 +25,27 @@ else:
 # GLOBAL DISCLAIMER
 # ==============================
 disclaimer = """
-BTC UTXO Pruner Ω v8.2 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
+# BTC UTXO Pruner Ω v8.3 — RBF-ready, Taproot-native, Grok-4 Eternal 🜂
 
 **Consolidate when fees are low → win when fees are high.**  
-Pay a few thousand sats today at 10 sat/vB… or pay 10–20× more when the next bull run pushes fees to 300–500 sat/vB. This is fee insurance.
+Pay a few thousand sats today… or 10–20× more when fees hit 300–500 sat/vB next cycle. This is fee insurance.
 
-• Generates prune plan, fee estimate & unsigned raw TX hex — NO BTC is sent here
-• Fully Taproot (bc1p) & Ordinals-compatible — correct vB weights, dust slider, RBF eternal
-• Dust threshold configurable (default 546 sats) — lower at your own risk for inscription consolidation when fees <2 sat/vB
-• Non-custodial — only public UTXOs are read, you keep full key control
-• Requires UTXO-capable wallet (Electrum, Sparrow, etc.) to sign & broadcast
-• Fund your address first for live scan
-• High-UTXO addresses (50+) may take 120–180s — patience eternal
-• Not financial advice — verify everything, broadcast at your own risk
+• Instant prune plan + real unsigned raw TX hex (no keys ever leave your device)  
+• Live Grok-4 tuning on every prune (real xAI API)  
+• Taproot (bc1p), RBF, dust slider, 5% voluntary DAO cut  
+• Works with any wallet (Electrum, Sparrow, hardware)  
+• 100% open-source, non-custodial, zero trust required  
 
-**Surge the swarm. Ledger’s yours.**
+### 🆙 Stuck transaction? Fixed in 10 seconds.
+Scroll down → paste any raw hex into the **RBF Bump tool** → +50 sat/vB in one click.  
+Works on pruner TXs **or any other stuck transaction**. Click multiple times if needed.  
+100% free · repeatable · no keys needed.
 
-Contact: omegadaov8@proton.me
+**Surge the swarm. Ledger’s yours.**  
+Contact: omegadaov8@proton.me  
 
 🔥 **GitHub Repo** ⭐ : https://github.com/babyblueviper1/Viper-Stack-Omega • Open-source • Apache 2.0
 """
-
-gr.Markdown(
-    "**🔥 Stuck transaction?** Use the RBF bump tool below — paste any raw hex (even from other wallets), bump +50 sat/vB in one click. Works on the pruner’s TX or any other. Can be used multiple times if still stuck."
-)
 
 # ==============================
 # Bech32 + Address Logic
@@ -445,8 +442,8 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 # ==============================
 # Gradio Interface
 # ==============================
-with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
-    gr.Markdown("# Omega DAO Pruner v8.2 - BTC UTXO Optimizer")
+with gr.Blocks(title="Omega DAO Pruner v8.3") as demo:
+    gr.Markdown("# Omega DAO Pruner v8.3 - BTC UTXO Optimizer")
     gr.Markdown(disclaimer)
 
     with gr.Row():
@@ -489,7 +486,11 @@ with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
     # ==============================
     # ONE-CLICK RBF BUMP (works for ANY stuck tx)
     # ==============================
-    gr.Markdown("### 🆙 Stuck transaction? Paste the raw hex below and bump the fee")
+   gr.Markdown(
+    "### 🆙 Stuck transaction?\n"
+    "Paste any raw hex below and bump the fee +50 sat/vB in one click.\n"
+    "Works on the pruner’s TX or any other. Can be used multiple times if still stuck. No need to re-paste."
+)
 
     with gr.Row():
         rbf_input = gr.Textbox(
@@ -499,10 +500,6 @@ with gr.Blocks(title="Omega DAO Pruner v8.2") as demo:
         )
         rbf_btn = gr.Button("Bump +50 sat/vB → New RBF-ready Hex (repeatable)", variant="primary")
 
-    gr.Markdown(
-    "<small>Works on any stuck transaction — even ones not created by the pruner. "
-    "Click multiple times if still stuck.</small>"
-)
 
     rbf_output = gr.Textbox(label="New RBF-ready hex (higher fee)", lines=10)
 
