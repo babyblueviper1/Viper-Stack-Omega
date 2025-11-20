@@ -592,6 +592,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 
 # ← THIS IS THE MAGIC LINE THAT MAKES PWA WORK ON THE GRADIO.LIVE TUNNEL
 # THIS IS THE FINAL, PERFECT PWA + NO ERRORS VERSION
+# PWA HEAD — orange Ω icon on iOS + Android
 gr.HTML("""
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icon-192.png">
@@ -601,7 +602,9 @@ gr.HTML("""
 <meta name="theme-color" content="#f7931a">
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
 }
 </script>
 """)
@@ -609,9 +612,9 @@ if ('serviceWorker' in navigator) {
 if __name__ == "__main__":
     demo.queue()
     demo.launch(
-        share=False,                                     # ← REAL URL, no tunnel
+        share=False,                                     # real onrender.com URL
         server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),
-        allowed_paths=["static"],                        # now works because static is inside ordinals/
+        server_port=int(os.environ.get("PORT", 7860)),   # Render happy
+        allowed_paths=["static"],                        # serves icons + manifest + sw.js
         show_error=True
     )
