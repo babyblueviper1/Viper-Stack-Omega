@@ -612,9 +612,11 @@ if ('serviceWorker' in navigator) {
 if __name__ == "__main__":
     demo.queue()
     demo.launch(
-        share=False,                                     # real onrender.com URL
+        share=False,
         server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),   # Render happy
-        allowed_paths=["static"],                        # serves icons + manifest + sw.js
+        server_port=int(os.environ.get("PORT", 7860)),
+        allowed_paths=["static"],
+        inbrowser=False,          # ← this stops the auto-open that triggers the localhost check
+        prevent_threading=True,   # ← extra safety belt (some 4.x versions still respect this)
         show_error=True
     )
