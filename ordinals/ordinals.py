@@ -393,31 +393,65 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
         except Exception as e:
             return None, f"Error: {e}"
 
-    def lightning_sweep_flow(pruned_utxos, invoice: str, input_vb, output_vb):
-        if not bolt11_decode:
-            return "Error: bolt11 library not available (Lightning sweep disabled)", ""
-        try:
-            decoded = bolt11_decode(invoice)
-            original_msats = decoded.amount_msat or 0
-            est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2 + 50
-            channel_fee_sats = int(est_vb * 15)
-            total_in_sats = sum(int(u['amount'] * 1e8) for u in pruned_utxos)
-            if total_in_sats < channel_fee_sats + 546:
-                raise ValueError("Not enough dust")
-            user_receive_sats = total_in_sats - channel_fee_sats
-            if abs(user_receive_sats * 1000 - original_msats) > 1_000_000:
-                raise ValueError(f"Invoice amount should be ~{user_receive_sats:,} sats")
-            if not getattr(decoded, 'payment_address', None):
-                raise ValueError("Invoice must have on-chain fallback address")
-            dest_script, _ = address_to_script_pubkey(decoded.payment_address)
-            tx = Tx(tx_ins=[], tx_outs=[])
-            for u in pruned_utxos:
-                tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
-            tx.tx_outs.append(TxOut(user_receive_sats * 100_000_000, dest_script))
-            return (f"Lightning sweep ready!\nYou receive {user_receive_sats:,} sats on Lightning\n"
-                    f"Channel open fee: ~{channel_fee_sats:,} sats\nSign & broadcast → instant balance ⚡"), tx.encode().hex()
-        except Exception as e:
-            return f"Lightning sweep failed: {e}", ""
+  def lightning_sweep_flow(pruned_utxos, invoice: str, input_vb, output_vb):
+    if not bolt11_decode:
+        return "Error: Lightning libraries not available (bolt11 missing)", ""
+
+    try:
+        decoded = bolt11_decode(invoice)
+        original_msats = decoded.amount_msat or 0
+
+        # Estimate miner channel-open fee (~15 sat/vB is safe)
+        est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2 + 50
+        miner_fee_sats = int(est_vb * 15)
+
+        total_in_sats = sum(int(u['amount'] * 1e8) for u in pruned_utxos)
+
+        # 5% DAO cut — keeps Omega alive and is fully transparent
+        dao_cut_sats = max(546, int(total_in_sats * 0.05))  # minimum dust if too small
+
+        user_receive_sats = total_in_sats - miner_fee_sats - dao_cut_sats
+
+        if user_receive_sats < 546:
+            raise ValueError("Not enough dust left after fees + DAO cut")
+
+        expected_msats = user_receive_sats * 1000
+        if abs(expected_msats - original_msats) > 2_000_000:  # ±2k msats tolerance
+            raise ValueError(f"Invoice amount should be ~{user_receive_sats:,} sats (±2k msats)")
+
+        if not getattr(decoded, 'payment_address', None):
+            raise ValueError("Invoice must have on-chain fallback (use Phoenix/Breez/Muun)")
+
+        dest_script, _ = address_to_script_pubkey(decoded.payment_address)
+        dao_script, _ = address_to_script_pubkey(dao_cut_addr)
+
+        tx = Tx(tx_ins=[], tx_outs=[])
+        for u in pruned_utxos:
+            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
+
+        # User gets their dust as Lightning balance
+        tx.tx_outs.append(TxOut(user_receive_sats * 100_000_000, dest_script))
+        # DAO gets fuel — on-chain, public, voluntary but automatic
+        tx.tx_outs.append(TxOut(dao_cut_sats * 100_000_000, dao_script))
+
+        raw_hex = tx.encode().hex()
+
+        # Beautiful output message
+        result_text = (
+            "⚡ Lightning Sweep Ready! ⚡\n\n"
+            f"Total dust consolidated: {total_in_sats:,} sats\n"
+            f"Miner channel-open fee: ~{miner_fee_sats:,} sats\n"
+            f"DAO fuel cut (5%): {dao_cut_sats:,} sats → keeps Omega Pruner alive 🜂\n"
+            f"You receive: {user_receive_sats:,} sats instantly spendable on Lightning!\n\n"
+            "Sign & broadcast this transaction → your wallet opens the channel automatically.\n"
+            "Zero custody. Full control. Dust → real money.\n\n"
+            "Surge the swarm. Ledger’s yours. 🜂"
+        )
+
+        return result_text, raw_hex
+
+    except Exception as e:
+        return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun wallet for invoices with on-chain fallback.", ""
 
     def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
         output_parts = ["Omega Pruner Ω v8.4 — Live 🜂\n"]
@@ -472,8 +506,16 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 
             raw_hex = tx.encode().hex()
             output_parts.append(f"\nUnsigned TX ready ({len(tx.tx_ins)}→{len(tx.tx_outs)})")
-            output_parts.append(f"Fee ~{fee:,} sats | DAO cut {dao_cut:,} sats")
-            output_parts.append("\nCopy hex → Electrum/Sparrow → Sign → Broadcast")
+            output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
+            output_parts.append("\nCopy the hex below → Load in Electrum / Sparrow → Sign → Broadcast")
+
+            output_parts.append(
+                "\nWant to turn this dust into spendable Lightning balance instantly? ⚡\n"
+                "Just check “Sweep to Lightning” above and paste a Lightning invoice\n"
+                "from Phoenix, Breez, Muun, Wallet of Satoshi, etc.\n"
+                "We’ll route your dust straight to your Lightning wallet — zero custody, zero trust.\n"
+                "The small on-chain channel-open fee is paid by you to the miners (shown clearly).\n"
+            )
             output_parts.append("Surge the swarm. Ledger’s yours. 🜂")
             return "\n".join(output_parts), raw_hex
         except Exception as e:
