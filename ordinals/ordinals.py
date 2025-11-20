@@ -591,16 +591,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     rbf_btn.click(do_rbf, rbf_input, [rbf_output, rbf_input])
 
 # ==============================
-# FINAL RENDER.COM LAUNCH — WORKS 100% ON GRADIO 4.44+ (NOV 2025)
-# ==============================
 if __name__ == "__main__":
     demo.queue()
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
-        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),   # PWA + icons + manifest work
-        allowed_paths=["static"],                           # serves static/icon-192.png + manifest.json
+        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),
+        allowed_paths=["static"],                # serves everything in /static
         show_error=True,
-        favicon_path="static/icon-192.png"
+        favicon_path="static/icon-192.png"       # ← correct path now
     )
