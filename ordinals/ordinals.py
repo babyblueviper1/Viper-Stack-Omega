@@ -667,7 +667,7 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 
    # Event handlers
     submit_btn.click(
-        fn=lambda u, p, dt, d, sweep, inv: main_flow(u, p, d, False, dt) if not sweep else lightning_sweep_flow(pruned_utxos, inv.strip(), input_vb, output_vb),
+        fn=lambda u, p, dt, d, sweep, inv: main_flow(u, p, d, False, dt) if not sweep or not inv.strip().startswith("lnbc") else lightning_sweep_flow(pruned_utxos, inv.strip(), input_vb, output_vb),
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice],
         outputs=[output_text, raw_tx_text]
     ).then(show_generate_btn, outputs=[generate_btn, raw_tx_text])
