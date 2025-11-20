@@ -5,7 +5,9 @@ services:
     buildCommand: |
       pip install -r requirements.txt
       cd .venv/lib/python*/site-packages/gradio
-      python scripts/build_frontend.py  # ← this builds the JS/CSS
+      python build_frontend.py   # ← THIS IS THE CORRECT SCRIPT NAME
       cd ../../../../..
     startCommand: python ordinals.py
+    envVars:
+      GRADIO_ROOT_PATH: /
     plan: free
