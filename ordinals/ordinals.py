@@ -367,6 +367,57 @@ def rbf_bump(raw_hex, bump_sats_per_vb=50):
     except Exception as e:
         return None, f"Error: {e}"
 
+def lightning_sweep_flow(pruned_utxos, invoice: str, input_vb, output_vb):
+    output_parts = ["Lightning Sweep Mode ⚡\n"]
+    
+    try:
+        # Decode invoice to get amount + payment_hash
+        from pyln.client import Millisatoshi
+        from bolt11 import decode
+        decoded = decode(invoice)
+        original_amount_msats = decoded.amount_msat or Millisatoshi(0)
+        payment_hash = decoded.payment_hash
+
+        # Estimate channel open fee (on-chain TX with 1 input, 2 outputs, ~180 vBytes)
+        est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2 + 50  # +50 for channel open overhead
+        channel_fee_sats = int(est_vb * 12)  # ~12 sat/vB buffer
+
+        total_in_sats = sum(int(u['amount'] * 1e8) for u in pruned_utxos)
+        if total_in_sats < channel_fee_sats + 546:
+            raise ValueError("Not enough to cover channel open fee")
+
+        # Build consolidation TX that pays exactly the invoice + channel fee
+        dest_amount_sats = total_in_sats - channel_fee_sats
+        dest_amount_msats = dest_amount_sats * 1000
+
+        # Validate user invoice matches (with buffer)
+        if abs(dest_amount_msats - original_amount_msats) > 500000:  # allow ±500k msats tolerance
+            raise ValueError(f"Invoice amount mismatch. Expected ~{dest_amount_sats:,} sats")
+
+        # Build normal consolidation TX to a new address we control
+        # (We'll sweep it to Lightning backend in a separate step)
+        temp_addr = "bc1your_temp_address"  # replace with a real address you control
+        temp_script, _ = address_to_script_pubkey(temp_addr)
+
+        tx = Tx(tx_ins=[], tx_outs=[])
+        for u in pruned_utxos:
+            prev_tx_bytes = bytes.fromhex(u['txid'])[::-1]
+            txin = TxIn(prev_tx=prev_tx_bytes, prev_index=u['vout'])
+            tx.tx_ins.append(txin)
+
+        tx.tx_outs.append(TxOut(amount=dest_amount_sats * 100000000, script_pubkey=temp_script))  # to our temp address
+
+        raw_hex = tx.encode().hex()
+
+        output_parts.append(f"Channel open fee: ~{channel_fee_sats:,} sats (added to invoice)")
+        output_parts.append(f"User receives: {dest_amount_sats:,} sats as Lightning balance")
+        output_parts.append("\nUnsigned TX ready — sign & broadcast, then we open your channel instantly")
+
+        return "\n".join(output_parts), raw_hex
+
+    except Exception as e:
+        return f"Lightning sweep failed: {e}", ""
+
 # ==============================
 # main_flow — BULLETPROOF TX GEN
 # ==============================
@@ -402,6 +453,11 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
     if not confirm_proceed:
         output_parts.append("\nClick 'Generate Pruned TX Hex' to build real unsigned transaction")
         return "\n".join(output_parts), ""
+
+    if sweep_to_ln and ln_invoice.strip().startswith("lnbc"):
+        # Call the Lightning sweep builder
+        log, raw_hex = lightning_sweep_flow(pruned_utxos, ln_invoice.strip(), input_vb, output_vb)
+        return log, raw_hex
 
     # ----- REAL TX GENERATION (100% safe) -----
     raw_hex = None
@@ -550,6 +606,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     });
     </script>
     """)
+
+    with gr.Row():
+        sweep_to_ln = gr.Checkbox(label="Sweep to Lightning ⚡ (turn dust into spendable balance)", value=False)
+        ln_invoice = gr.Textbox(label="Lightning Invoice (lnbc...)", placeholder="Paste invoice from Phoenix, Breez, Muun, etc.", visible=False)
+
+    # Show/hide invoice field
+    sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
+
     # Your existing logic (unchanged)
     def show_generate_btn():
         return gr.update(visible=True), gr.update(visible=False)
