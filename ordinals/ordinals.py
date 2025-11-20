@@ -211,7 +211,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
             extra_fee = int(vsize * bump_sats_per_vb)
 
             if tx.tx_outs[0].amount <= extra_fee + 546:
-            r    eturn None, "Not enough in first output to cover bump + dust limit"
+                return None, "Not enough in first output to cover bump + dust limit"
 
             tx.tx_outs[0].amount -= extra_fee
             for txin in tx.tx_ins:
