@@ -67,19 +67,19 @@ Pay a few thousand sats today… or 10–20× more next cycle. This is fee insur
 
 **One-click dusty wallet cleanup**  
 • Paste any address (legacy · SegWit · Taproot)  
-• Get real, RBF-ready raw TX hex in <15 seconds  
+• Get a real, RBF-ready raw TX hex in <15 seconds  
 • **New: Sweep to Lightning ⚡ — turn dead dust into spendable sats instantly**  
 • Sign & broadcast with your own wallet — zero custody
 
-**Stuck transaction?**  
-Scroll down → paste raw hex → +50 sat/vB bump in one click.
+**Stuck in the mempool?**  
+Scroll down → paste raw hex → +50 sat/vB bump in one click. (Repeatable. Free)
 
 100% open-source • non-custodial • voluntary “Fuel the Swarm” donations
 
 **DAO address** bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj  
 Every sat pays for maintenance + future features. Thank you 🜂
 
-[**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0  
+[**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) •[**babyblueviper.com**](https://babyblueviper.com) • Apache 2.0  
 **Surge the swarm. Ledger’s yours.**
 """
 
@@ -149,7 +149,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
     sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
 
     # RBF
-    gr.Markdown("### 🆙 Stuck tx? Paste hex → +50 sat/vB bump")
+    gr.Markdown("### 🆙 Stuck tx? Paste hex → +50 sat/vB bump (repeatable, free)")
     with gr.Row():
         rbf_input = gr.Textbox(label="Stuck raw hex", lines=8, placeholder="01000000...")
         rbf_btn = gr.Button("Bump +50 sat/vB", variant="primary")
