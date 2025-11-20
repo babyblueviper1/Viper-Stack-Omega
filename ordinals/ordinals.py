@@ -523,35 +523,34 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
     # Floating orange QR button — fully working
-    gr.HTML("""
-    <label class="qr-button">
-      <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
-      <div>📷</div>
-    </label>
-    <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
-    <script>
-    document.getElementById('qr-camera').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const img = new Image();
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width; canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        try {
-          const result = await ZXing.readBarcodeFromCanvas(canvas);
-          if (result && result.text) {
-            const input = document.querySelector("#user-address input");
-            if (input) { input.value = result.text; input.dispatchEvent(new Event('input')); }
-            alert("⚡ Address scanned!");
-          }
-        } catch (err) { alert("No QR found"); }
-      };
-      img.src = URL.createObjectURL(file);
-    });
-    </script>
-    """)
-
+gr.HTML("""
+<label class="qr-button">
+  <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
+  <div style="width:100%; height:100%; display:grid; place-items:center; font-size:38px; pointer-events:none;">📷</div>
+</label>
+<script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+<script>
+document.getElementById('qr-camera').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width; canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    try {
+      const result = await ZXing.readBarcodeFromCanvas(canvas);
+      if (result && result.text) {
+        const input = document.querySelector("#user-address input");
+        if (input) { input.value = result.text; input.dispatchEvent(new Event('input')); }
+        alert("⚡ Address scanned!");
+      }
+    } catch (err) { alert("No QR found"); }
+  };
+  img.src = URL.createObjectURL(file);
+});
+</script>
+""")
     # Your existing logic (unchanged)
     def show_generate_btn():
         return gr.update(visible=True), gr.update(visible=False)
