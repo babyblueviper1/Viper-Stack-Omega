@@ -608,15 +608,13 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 """)
-
 if __name__ == "__main__":
     demo.queue()
     demo.launch(
         share=False,
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
-        allowed_paths=["static"],
-        inbrowser=False,          # ← this stops the auto-open that triggers the localhost check
-        prevent_threading=True,   # ← extra safety belt (some 4.x versions still respect this)
+        allowed_paths=["static"],          # serves your icons, manifest, sw.js
+        prevent_thread_lock=True,          # ← this is the correct name in 4.44.1
         show_error=True
     )
