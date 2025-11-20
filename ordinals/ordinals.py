@@ -635,7 +635,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     )
 
     # RBF section
-    gr.Markdown("### 🆙 Stuck tx? Paste hex → +50 sat/vB bump")
+    gr.Markdown("### 🆙 Stuck tx? Paste hex below → +50 sat/vB bump")
     with gr.Row():
         rbf_input = gr.Textbox(label="Stuck raw hex", lines=8, placeholder="01000000...")
         rbf_btn = gr.Button("Bump +50 sat/vB", variant="primary")
