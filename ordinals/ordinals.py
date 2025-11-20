@@ -49,7 +49,8 @@ Pay a few thousand sats today… or 10–20× more next cycle. This is fee insur
 **One-click dusty wallet cleanup**  
 • Paste any address (legacy · SegWit · Taproot)  
 • Grok-4 instantly tunes the optimal prune (real xAI API)  
-• Get real, RBF-ready raw TX hex in <15 seconds  
+• Get real, RBF-ready raw TX hex in <15 seconds
+• **New: Sweep to Lightning ⚡ — turn dead dust into spendable sats instantly**
 • Sign & broadcast with your own wallet — zero custody, zero keys shared
 
 **Stuck transaction?**  
@@ -129,7 +130,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     # Lightning Sweep checkbox + invoice field
     with gr.Row():
         sweep_to_ln = gr.Checkbox(label="Sweep to Lightning ⚡ (turn dust into spendable balance)", value=False)
-        ln_invoice = gr.Textbox(label="Lightning Invoice (lnbc...)", placeholder="Paste invoice from Phoenix, Breez, Muun, etc.", visible=False)
+    with gr.Row():
+        ln_invoice = gr.Textbox(label="Lightning Invoice (lnbc...)", placeholder="Paste invoice from Phoenix, Breez, Muun, etc.", visible=False, interactive=True)
 
     sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
 
@@ -185,6 +187,13 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 
     def lightning_sweep_flow(pruned_utxos, invoice: str, input_vb, output_vb):
         output_parts = ["Lightning Sweep Mode ⚡\n"]
+        output_parts.append(
+            "Lightning Sweep Mode ⚡\n"
+            "1. Generate a Lightning invoice in your wallet (Phoenix, Breez, Muun, Wallet of Satoshi, etc.)\n"
+            "2. Set the amount to your current dust total (~{total_in_sats:,} sats)\n"
+            "3. Paste the invoice below — we’ll add the small channel-open fee (~{channel_fee_sats:,} sats)\n"
+            "4. Sign & broadcast — your dust becomes spendable Lightning balance instantly\n"
+        )
         
         try:
             from bolt11 import decode
@@ -636,12 +645,16 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
             "Public vault: bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj\n"
             "Your coins stay yours. The cut fuels the swarm. Thank you. 🜂\n\n"
         )
-    
 
         output_parts.append(
             "Copy the ENTIRE hex below → Electrum/Sparrow → Load transaction → From text → Sign → Broadcast\n\n"
         )
-
+        output_parts.append(
+            "\nWant to turn this dust into spendable Lightning balance instantly?\n"
+            "Check the 'Sweep to Lightning ⚡' box above and paste a Lightning invoice from your wallet (Phoenix, Breez, Muun, etc.)\n"
+            "We'll add the small channel-open fee and send everything to your wallet — no trust required."
+        )
+        
         output_parts.append("Surge the swarm. Ledger’s yours. 🜂\n")
 
     except Exception as e:
