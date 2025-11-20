@@ -591,19 +591,17 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     rbf_btn.click(do_rbf, rbf_input, [rbf_output, rbf_input])
 
 # ← THIS IS THE MAGIC LINE THAT MAKES PWA WORK ON THE GRADIO.LIVE TUNNEL
+# THIS IS THE FINAL, PERFECT PWA + NO ERRORS VERSION
 gr.HTML("""
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#f7931a">
-<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="/icon-192.png">   <!-- iOS uses THIS, not the manifest -->
+<link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Omega Pruner">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#f7931a">
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
 }
 </script>
 """)
@@ -612,6 +610,7 @@ if __name__ == "__main__":
     demo.queue()
     demo.launch(
         share=True,
-        allowed_paths=["static"],
+        allowed_paths=["static"],     # serves manifest, icons, sw.js
         show_error=True
+        # ← NO favicon_path line at all → no more RuntimeError in logs
     )
