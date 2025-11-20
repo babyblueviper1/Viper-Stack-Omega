@@ -588,7 +588,11 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
             success_msg = (
                 f"Success! Consolidated {len(pruned_utxos_global)} UTXOs\n"
                 f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats\n"
-                "Copy the hex below → Load in Electrum/Sparrow → Sign → Broadcast\n"
+                "Copy the hex below → Load in Electrum / Sparrow → Sign → Broadcast\n\n"
+                "Want to turn this dust into spendable Lightning balance instantly? ⚡\n"
+                "Check the “Sweep to Lightning” box below and paste a Lightning invoice\n"
+                "from Phoenix, Breez, Muun, Wallet of Satoshi, etc.\n"
+                "Your dust becomes real spendable sats in seconds — zero custody.\n\n"
                 "Surge the swarm. Ledger’s yours. 🜂"
             )
 
