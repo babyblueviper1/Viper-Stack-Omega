@@ -609,9 +609,9 @@ if ('serviceWorker' in navigator) {
 if __name__ == "__main__":
     demo.queue()
     demo.launch(
-        share=True,
+        share=False,                                     # ← REAL URL, no tunnel
         server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),   # ← this is REQUIRED on Render
-        allowed_paths=["static"],
+        server_port=int(os.environ.get("PORT", 7860)),
+        allowed_paths=["static"],                        # now works because static is inside ordinals/
         show_error=True
     )
