@@ -395,7 +395,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
             return None, f"Error: {e}"
 
   def lightning_sweep_flow(pruned_utxos, invoice: str, input_vb, output_vb):
-    if not bolt11_decode:
+      if not bolt11_decode:
         return "Error: Lightning libraries not available (bolt11 missing)", ""
 
     try:
@@ -450,7 +450,6 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
         )
 
         return result_text, raw_hex
-
     except Exception as e:
         return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun wallet for invoices with on-chain fallback.", ""
 
