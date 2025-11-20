@@ -133,6 +133,33 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 
     sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
 
+    
+    
+    # RBF section
+    gr.Markdown("### 🆙 Stuck tx? Paste hex below → +50 sat/vB bump")
+    with gr.Row():
+        rbf_input = gr.Textbox(label="Stuck raw hex", lines=8, placeholder="01000000...")
+        rbf_btn = gr.Button("Bump +50 sat/vB", variant="primary")
+    rbf_output = gr.Textbox(label="New RBF hex", lines=10)   
+        
+        
+    rbf_btn.click_count = 0
+
+    
+    def do_rbf(hex_in):
+        if not hex_in or not hex_in.strip(): return "Paste hex first", None
+        rbf_btn.click_count += 1
+        new_hex, msg = rbf_bump(hex_in.strip(), 50)
+        if new_hex:
+            return f"Bump #{rbf_btn.click_count} (+{50 * rbf_btn.click_count} sat/vB)\n\n{new_hex}", new_hex
+        return msg or "Error", None
+    
+    rbf_btn.click(do_rbf, rbf_input, [rbf_output, rbf_input])
+    
+    
+    
+    
+    
     # PWA HEAD — orange Ω icon on iOS + Android
     gr.HTML("""
     <link rel="manifest" href="/manifest.json">
@@ -221,15 +248,6 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
         except Exception as e:
             return None, f"Error: {e}"
 
-        rbf_btn.click_count = 0
-
-    def do_rbf(hex_in):
-        if not hex_in or not hex_in.strip(): return "Paste hex first", None
-        rbf_btn.click_count += 1
-        new_hex, msg = rbf_bump(hex_in.strip(), 50)
-        if new_hex:
-            return f"Bump #{rbf_btn.click_count} (+{50 * rbf_btn.click_count} sat/vB)\n\n{new_hex}", new_hex
-        return msg or "Error", None
 
 
 # ==============================
@@ -646,15 +664,6 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
         outputs=[output_text, raw_tx_text, generate_btn]
     )
-
-    rbf_btn.click(do_rbf, rbf_input, [rbf_output, rbf_input])
-
-    # RBF section
-    gr.Markdown("### 🆙 Stuck tx? Paste hex below → +50 sat/vB bump")
-    with gr.Row():
-        rbf_input = gr.Textbox(label="Stuck raw hex", lines=8, placeholder="01000000...")
-        rbf_btn = gr.Button("Bump +50 sat/vB", variant="primary")
-    rbf_output = gr.Textbox(label="New RBF hex", lines=10)
 
 
 if __name__ == "__main__":
