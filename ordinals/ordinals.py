@@ -222,14 +222,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 
         if addr.startswith('3'):
             try:
-            decoded = base58_decode(addr)
-            if len(decoded) == 25 and decoded[0] == 0x05:
-                payload = decoded[1:21]
-                script = bytes([0xa9, 0x14]) + payload + bytes([0x87])
-                # ← CORRECT vB weights for P2SH
-                return script, {'input_vb': 91, 'output_vb': 32, 'type': 'P2SH'}
-        except:
-            return None
+                decoded = base58_decode(addr)
+                if len(decoded) == 25 and decoded[0] == 0x05:
+                    payload = decoded[1:21]
+                    script = bytes([0xa9, 0x14]) + payload + bytes([0x87])
+                    # ← CORRECT vB weights for P2SH
+                    return script, {'input_vb': 91, 'output_vb': 32, 'type': 'P2SH'}
+            except:
+                return None
             
         if addr.startswith('bc1q'):
             hrp, data = bech32_decode(addr)
