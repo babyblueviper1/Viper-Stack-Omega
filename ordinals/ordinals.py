@@ -525,7 +525,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     gr.HTML("""
     <label class="qr-button">
       <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
-      <div style="width:100%; height:100%; display:grid; place-items:center; font-size:38px; pointer-events:none;">📷</div>
+      <div style="width:100%; height:100%; display:flex; place-items:center; justify-content:center; font-size:38px; pointer-events:none;">📷</div>
     </label>
     <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
     <script>
