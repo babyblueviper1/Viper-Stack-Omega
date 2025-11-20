@@ -1,8 +1,8 @@
-gradio @ git+https://github.com/gradio-app/gradio.git@main
+gradio==4.44.1
 qutip
 numpy
 requests
 audioop-lts
-huggingface-hub>=0.33.5
+huggingface_hub==0.24.5
 pydantic==2.10.6
 bitcoinlib
