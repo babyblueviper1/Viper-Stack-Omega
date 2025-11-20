@@ -596,9 +596,14 @@ gr.HTML("""
 <meta name="theme-color" content="#f7931a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Omega Pruner">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {}); // Brave sometimes logs errors, we silence
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
 }
 </script>
 """)
@@ -607,9 +612,6 @@ if __name__ == "__main__":
     demo.queue()
     demo.launch(
         share=True,
-        server_name="0.0.0.0",                                 # ← fixes the Render port-scan warning
-        server_port=int(os.environ.get("PORT", 7860)),         # ← Render injects the correct port
-        allowed_paths=["static"],                              # icons + manifest + sw.js
-        favicon_path="static/icon-192.png",
+        allowed_paths=["static"],
         show_error=True
     )
