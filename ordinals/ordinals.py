@@ -596,9 +596,8 @@ if __name__ == "__main__":
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
-        share=False,
-        root_path=os.environ.get("GRADIO_ROOT_PATH", ""),
-        allowed_paths=["static"],       # serves manifest + icons + sw.js perfectly
-        show_error=True
-        # ← NO favicon_path line at all → no FileNotFoundError ever again
+        share=True,                              # ← YES, share=True (this is the entire fix)
+        show_error=True,
+        allowed_paths=["static"],                # your icons + manifest + sw.js work perfectly
+        favicon_path="static/icon-192.png"       # optional — remove if still angry
     )
