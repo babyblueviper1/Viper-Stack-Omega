@@ -611,10 +611,9 @@ if ('serviceWorker' in navigator) {
 if __name__ == "__main__":
     demo.queue()
     demo.launch(
-        share=False,
+        share=True,                                      # <-- keep this
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
-        allowed_paths=["static"],          # serves your icons, manifest, sw.js
-        prevent_thread_lock=True,          # ← this is the correct name in 4.44.1
+        allowed_paths=["static"],                        # icons + manifest + sw.js served
         show_error=True
     )
