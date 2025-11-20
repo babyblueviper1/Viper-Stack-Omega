@@ -471,30 +471,29 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 # ==============================
 
 css = """
-    .qr-button { 
-        position: fixed !important;
-        bottom: 24px;
-        right: 24px;
-        z-index: 9999;
-        width: 64px;
-        height: 64px;
-        background: #f7931a !important;
-        border-radius: 50% !important;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 40px;
-    }
-    .big-fuel-button button {
-        height: 100px !important;
-        font-size: 20px !important;
-        border-radius: 16px !important;
-    }
+.qr-button { 
+    position: fixed !important;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    width: 64px;
+    height: 64px;
+    background: #f7931a !important;
+    border-radius: 50% !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+}
+.big-fuel-button button {
+    height: 100px !important;
+    font-size: 20px !important;
+    border-radius: 16px !important;
+}
 """
 
-# ← ONLY ONE BLOCKS DEFINITION — THIS IS THE CORRECT ONE
 with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 🜂") as demo:
 
     gr.Markdown("# Omega Pruner Ω v8.4 — Mobile First 🜂")
@@ -522,35 +521,35 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
     raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
-    # Floating orange QR button — fully working
-gr.HTML("""
-<label class="qr-button">
-  <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
-  <div style="width:100%; height:100%; display:grid; place-items:center; font-size:38px; pointer-events:none;">📷</div>
-</label>
-<script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
-<script>
-document.getElementById('qr-camera').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const img = new Image();
-  img.onload = async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width; canvas.height = img.height;
-    canvas.getContext('2d').drawImage(img, 0, 0);
-    try {
-      const result = await ZXing.readBarcodeFromCanvas(canvas);
-      if (result && result.text) {
-        const input = document.querySelector("#user-address input");
-        if (input) { input.value = result.text; input.dispatchEvent(new Event('input')); }
-        alert("⚡ Address scanned!");
-      }
-    } catch (err) { alert("No QR found"); }
-  };
-  img.src = URL.createObjectURL(file);
-});
-</script>
-""")
+    # Floating orange QR button — perfectly centered
+    gr.HTML("""
+    <label class="qr-button">
+      <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
+      <div style="width:100%; height:100%; display:grid; place-items:center; font-size:38px; pointer-events:none;">📷</div>
+    </label>
+    <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+    <script>
+    document.getElementById('qr-camera').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+          const result = await ZXing.readBarcodeFromCanvas(canvas);
+          if (result && result.text) {
+            const input = document.querySelector("#user-address input");
+            if (input) { input.value = result.text; input.dispatchEvent(new Event('input')); }
+            alert("⚡ Address scanned!");
+          }
+        } catch (err) { alert("No QR found"); }
+      };
+      img.src = URL.createObjectURL(file);
+    });
+    </script>
+    """)
     # Your existing logic (unchanged)
     def show_generate_btn():
         return gr.update(visible=True), gr.update(visible=False)
