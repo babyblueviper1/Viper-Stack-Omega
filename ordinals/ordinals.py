@@ -478,15 +478,17 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
             return "\n".join(output_parts + [f"\nTX failed: {e}"]), ""
 
     # Two-step flow
-   def analysis_pass(addr, strategy, threshold, dest, sweep, invoice):
+    def analysis_pass(addr, strategy, threshold, dest, sweep, invoice):
         global pruned_utxos_global, input_vb_global, output_vb_global
 
         log, _ = main_flow(addr.strip(), strategy, dest, False, threshold)
 
         all_utxos, _ = get_utxos(addr.strip(), threshold)
-        ratio = {"Conservative (70/30, Low Risk)": 0.3,
-                 "Efficient (60/40, Default)": 0.4,
-                 "Aggressive (50/50, Max Savings)": 0.5}[strategy]
+        ratio = {
+            "Conservative (70/30, Low Risk)": 0.3,
+            "Efficient (60/40, Default)": 0.4,
+            "Aggressive (50/50, Max Savings)": 0.5
+        }[strategy]
         keep = max(1, int(len(all_utxos) * (1 - ratio)))
         pruned_utxos_global = all_utxos[:keep]
 
@@ -494,7 +496,6 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
         input_vb_global = vb['input_vb']
         output_vb_global = vb['output_vb']
 
-        # ← Warning must come BEFORE return
         if not pruned_utxos_global:
             log += "\nWarning: No UTXOs selected — nothing to consolidate."
 
@@ -505,8 +506,11 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
         global pruned_utxos_global, input_vb_global, output_vb_global
 
         if not pruned_utxos_global:
-            return ("Error: No UTXOs cached — click 'Run Pruner' first.", 
-                    gr.update(visible=False), gr.update(visible=False))
+            return (
+                "Error: No UTXOs cached — click 'Run Pruner' first.",
+                gr.update(visible=False),
+                gr.update(visible=False)
+            )
 
         try:
             if sweep and invoice.strip().startswith("lnbc"):
@@ -516,9 +520,9 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
                 )
                 return log, gr.update(value=hex_out, visible=True), gr.update(visible=False)
 
-            # Normal consolidation (non-Lightning)
-            dest = dest.strip() if dest and dest.strip() else addr.strip()
-            dest_script, _ = address_to_script_pubkey(dest)
+            # Normal on-chain consolidation
+            dest_addr_to_use = dest.strip() if dest and dest.strip() else addr.strip()
+            dest_script, _ = address_to_script_pubkey(dest_addr_to_use)
             dao_script, _ = address_to_script_pubkey(dao_cut_addr)
 
             tx = Tx(tx_ins=[], tx_outs=[])
@@ -531,25 +535,30 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
             fee = int(est_vb * 10)
             dao_cut = int(fee * 0.05)
             send_amount = total_in - fee - dao_cut
+
             if send_amount < 546:
-                raise ValueError("Not enough after fee + DAO cut")
+                raise ValueError("Not enough sats left after fee + DAO cut")
 
             tx.tx_outs.append(TxOut(send_amount, dest_script))
             if dao_cut >= 546:
                 tx.tx_outs.append(TxOut(dao_cut, dao_script))
+            else:
+                log = log  # keep previous log
 
             raw_hex = tx.encode().hex()
-            log = (f"Success! Used {len(pruned_utxos_global)} cached UTXOs\n"
-                   f"Estimated fee ~{fee:,} sats | DAO cut {dao_cut:,} sats\n"
-                   "Copy hex → Sign & Broadcast in Electrum/Sparrow\n"
-                   "Surge the swarm. Ledger’s yours. 🜂")
+            success_msg = (
+                f"Success! Consolidated {len(pruned_utxos_global)} UTXOs\n"
+                f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats\n"
+                "Copy the hex below → Load in Electrum/Sparrow → Sign → Broadcast\n"
+                "Surge the swarm. Ledger’s yours. 🜂"
+            )
 
-            return log, gr.update(value=raw_hex, visible=True), gr.update(visible=False)
+            return success_msg, gr.update(value=raw_hex, visible=True), gr.update(visible=False)
 
         except Exception as e:
-            error_msg = f"TX generation failed: {e}"
-            return error_msg, gr.update(visible=False), gr.update(visible=False)
-
+            error = f"Transaction failed: {e}"
+            return error, gr.update(visible=False), gr.update(visible=False)
+        
     # Button wiring
     submit_btn.click(fn=analysis_pass,
                      inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice],
