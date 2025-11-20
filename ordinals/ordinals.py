@@ -546,7 +546,10 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 
         if not pruned_utxos_global:
             return (
-                "Error: No UTXOs cached — click 'Run Pruner' first.",
+                "Hold on! ⚡\n\n"
+                "You checked Lightning sweep, but we haven’t scanned your address yet.\n"
+                "Please click **Run Pruner** first so we know which dusty UTXOs to consolidate.\n\n"
+                "After that, paste your Lightning invoice and click Generate again — we’ll turn your dust into spendable sats instantly!",
                 gr.update(visible=False),
                 gr.update(visible=False)
             )
