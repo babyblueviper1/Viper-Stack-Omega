@@ -478,26 +478,77 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
             return "\n".join(output_parts + [f"\nTX failed: {e}"]), ""
 
     # Two-step flow
-    def analysis_pass(addr, strategy, threshold, dest, sweep, invoice):
+   def analysis_pass(addr, strategy, threshold, dest, sweep, invoice):
         global pruned_utxos_global, input_vb_global, output_vb_global
+
         log, _ = main_flow(addr.strip(), strategy, dest, False, threshold)
+
         all_utxos, _ = get_utxos(addr.strip(), threshold)
-        ratio = {"Conservative (70/30, Low Risk)": 0.3, "Efficient (60/40, Default)": 0.4,
+        ratio = {"Conservative (70/30, Low Risk)": 0.3,
+                 "Efficient (60/40, Default)": 0.4,
                  "Aggressive (50/50, Max Savings)": 0.5}[strategy]
         keep = max(1, int(len(all_utxos) * (1 - ratio)))
         pruned_utxos_global = all_utxos[:keep]
+
         _, vb = address_to_script_pubkey(addr.strip())
         input_vb_global = vb['input_vb']
         output_vb_global = vb['output_vb']
+
+        # ← Warning must come BEFORE return
+        if not pruned_utxos_global:
+            log += "\nWarning: No UTXOs selected — nothing to consolidate."
+
         return log, gr.update(visible=True), gr.update(visible=False)
+
 
     def build_real_tx(addr, strategy, threshold, dest, sweep, invoice):
         global pruned_utxos_global, input_vb_global, output_vb_global
-        if sweep and invoice.strip().startswith("lnbc"):
-            log, hex_out = lightning_sweep_flow(pruned_utxos_global, invoice.strip(), input_vb_global, output_vb_global)
-        else:
-            log, hex_out = main_flow(addr.strip(), strategy, dest, True, threshold)
-        return log, gr.update(value=hex_out, visible=True), gr.update(visible=False)
+
+        if not pruned_utxos_global:
+            return ("Error: No UTXOs cached — click 'Run Pruner' first.", 
+                    gr.update(visible=False), gr.update(visible=False))
+
+        try:
+            if sweep and invoice.strip().startswith("lnbc"):
+                log, hex_out = lightning_sweep_flow(
+                    pruned_utxos_global, invoice.strip(),
+                    input_vb_global, output_vb_global
+                )
+                return log, gr.update(value=hex_out, visible=True), gr.update(visible=False)
+
+            # Normal consolidation (non-Lightning)
+            dest = dest.strip() if dest and dest.strip() else addr.strip()
+            dest_script, _ = address_to_script_pubkey(dest)
+            dao_script, _ = address_to_script_pubkey(dao_cut_addr)
+
+            tx = Tx(tx_ins=[], tx_outs=[])
+            total_in = 0
+            for u in pruned_utxos_global:
+                tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
+                total_in += int(u['amount'] * 1e8)
+
+            est_vb = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
+            fee = int(est_vb * 10)
+            dao_cut = int(fee * 0.05)
+            send_amount = total_in - fee - dao_cut
+            if send_amount < 546:
+                raise ValueError("Not enough after fee + DAO cut")
+
+            tx.tx_outs.append(TxOut(send_amount, dest_script))
+            if dao_cut >= 546:
+                tx.tx_outs.append(TxOut(dao_cut, dao_script))
+
+            raw_hex = tx.encode().hex()
+            log = (f"Success! Used {len(pruned_utxos_global)} cached UTXOs\n"
+                   f"Estimated fee ~{fee:,} sats | DAO cut {dao_cut:,} sats\n"
+                   "Copy hex → Sign & Broadcast in Electrum/Sparrow\n"
+                   "Surge the swarm. Ledger’s yours. 🜂")
+
+            return log, gr.update(value=raw_hex, visible=True), gr.update(visible=False)
+
+        except Exception as e:
+            error_msg = f"TX generation failed: {e}"
+            return error_msg, gr.update(visible=False), gr.update(visible=False)
 
     # Button wiring
     submit_btn.click(fn=analysis_pass,
