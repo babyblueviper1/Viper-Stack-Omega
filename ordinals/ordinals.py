@@ -594,11 +594,11 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 gr.HTML("""
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#f7931a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js');
-  });
+  navigator.serviceWorker.register('/sw.js').catch(() => {}); // Brave sometimes logs errors, we silence
 }
 </script>
 """)
@@ -607,7 +607,9 @@ if __name__ == "__main__":
     demo.queue()
     demo.launch(
         share=True,
-        allowed_paths=["static"],                # serves manifest.json, sw.js, icons
-        favicon_path="static/icon-192.png",      # orange Ω in browser tab
+        server_name="0.0.0.0",                                 # ← fixes the Render port-scan warning
+        server_port=int(os.environ.get("PORT", 7860)),         # ← Render injects the correct port
+        allowed_paths=["static"],                              # icons + manifest + sw.js
+        favicon_path="static/icon-192.png",
         show_error=True
     )
