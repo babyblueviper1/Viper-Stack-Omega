@@ -598,7 +598,7 @@ if __name__ == "__main__":
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
         root_path=os.environ.get("GRADIO_ROOT_PATH", ""),
-        allowed_paths=["static"],                # serves everything in /static
-        show_error=True,
-        favicon_path="static/icon-192.png"       # ← correct path now
+        allowed_paths=["static"],       # serves manifest + icons + sw.js perfectly
+        show_error=True
+        # ← NO favicon_path line at all → no FileNotFoundError ever again
     )
