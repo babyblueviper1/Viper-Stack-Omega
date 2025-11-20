@@ -83,9 +83,9 @@ Every sat pays for maintenance + future features. Thank you 🜂
 **Surge the swarm. Ledger’s yours.**
 """
 
-with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 🜂") as demo:
+with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 🜂") as demo:
 
-    gr.Markdown("# Omega Pruner Ω v8.4 — Mobile First 🜂")
+    gr.Markdown("# Omega Pruner Ω v8.5 — Mobile First 🜂")
 
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
@@ -106,7 +106,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
         dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
-    output_text = gr.Textbox(label="Log", lines=25)
+    output_text = gr.Textbox(label="Log", lines=5, max_lines=50)  # starts tiny, expands smoothly
     raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
