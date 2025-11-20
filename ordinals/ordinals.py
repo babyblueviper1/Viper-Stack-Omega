@@ -594,14 +594,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 # THIS IS THE FINAL, PERFECT PWA + NO ERRORS VERSION
 gr.HTML("""
 <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">   <!-- iOS uses THIS, not the manifest -->
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#f7931a">
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 </script>
 """)
@@ -610,7 +610,7 @@ if __name__ == "__main__":
     demo.queue()
     demo.launch(
         share=True,
-        allowed_paths=["static"],     # serves manifest, icons, sw.js
+        allowed_paths=["static"],      # serves manifest.json, icon-192.png, icon-512.png, sw.js
         show_error=True
-        # ← NO favicon_path line at all → no more RuntimeError in logs
+        # ← NO favicon_path = no RuntimeError in logs
     )
