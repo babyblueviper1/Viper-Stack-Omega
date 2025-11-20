@@ -41,6 +41,24 @@ css = """
     font-size: 20px !important;
     border-radius: 16px !important;
 }
+
+/* ← THIS IS THE MAGIC THAT KILLS THE EMPTY SPACE ← */
+#output_text {
+    min-height: 80px !important;
+}
+#output_text .textbox,
+#output_text textarea {
+    min-height: 80px !important;
+    height: auto !important;
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    resize: none !important;   /* stops manual dragging */
+}
+
+/* Optional: remove extra bottom margin in the whole form */
+.container > .form {
+    gap: 8px !important;
+}
 """
 
 disclaimer = """
@@ -593,7 +611,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
                 f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats\n"
                 "Copy the hex below → Load in Electrum / Sparrow → Sign → Broadcast\n\n"
                 "Want to turn this dust into spendable Lightning balance instantly? ⚡\n"
-                "Check the “Sweep to Lightning” box below and paste a Lightning invoice\n"
+                "Scroll down and check the “Sweep to Lightning” box. Then paste a Lightning invoice\n"
                 "from Phoenix, Breez, Muun, Wallet of Satoshi, etc.\n"
                 "Your dust becomes real spendable sats in seconds — zero custody.\n\n"
                 "Surge the swarm. Ledger’s yours. 🜂"
