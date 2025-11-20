@@ -217,10 +217,11 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
                     payload = decoded[1:21]
                     script = bytes([0x76, 0xa9, 0x14]) + payload + bytes([0x88, 0xac])
                     return script, {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
-            except: return None
+            except: 
+                return None
 
         if addr.startswith('3'):
-        try:
+            try:
             decoded = base58_decode(addr)
             if len(decoded) == 25 and decoded[0] == 0x05:
                 payload = decoded[1:21]
