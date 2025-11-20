@@ -590,14 +590,24 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
 
     rbf_btn.click(do_rbf, rbf_input, [rbf_output, rbf_input])
 
-# ==============================
+# ← THIS IS THE MAGIC LINE THAT MAKES PWA WORK ON THE GRADIO.LIVE TUNNEL
+gr.HTML("""
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#f7931a">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js');
+  });
+}
+</script>
+""")
+
 if __name__ == "__main__":
     demo.queue()
     demo.launch(
-        server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),
-        share=True,                              # ← YES, share=True (this is the entire fix)
-        show_error=True,
-        allowed_paths=["static"],                # your icons + manifest + sw.js work perfectly
-        favicon_path="static/icon-192.png"       # optional — remove if still angry
+        share=True,
+        allowed_paths=["static"],                # serves manifest.json, sw.js, icons
+        favicon_path="static/icon-192.png",      # orange Ω in browser tab
+        show_error=True
     )
