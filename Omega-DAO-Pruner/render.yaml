@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: ordinals  # Your service name
-    env: python
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt --no-cache-dir
-    startCommand: python omega_dao_pruner_v8.py  # Your script file
