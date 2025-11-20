@@ -220,14 +220,16 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
             except: return None
 
         if addr.startswith('3'):
-            try:
-                decoded = base58_decode(addr)
-                if len(decoded) == 25 and decoded[0] == 0x05:
-                    payload = decoded[1:21]
-                    script = bytes([0xa9, 0x14]) + payload + bytes([0x87])
-                    return script, {'input_vb': 148, 'output_vb': 34, 'type': 'P2SH'}
-            except: return None
-
+        try:
+            decoded = base58_decode(addr)
+            if len(decoded) == 25 and decoded[0] == 0x05:
+                payload = decoded[1:21]
+                script = bytes([0xa9, 0x14]) + payload + bytes([0x87])
+                # ← CORRECT vB weights for P2SH
+                return script, {'input_vb': 91, 'output_vb': 32, 'type': 'P2SH'}
+        except:
+            return None
+            
         if addr.startswith('bc1q'):
             hrp, data = bech32_decode(addr)
             if hrp == 'bc' and data and data[0] == 0:
@@ -532,7 +534,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
                 total_in += int(u['amount'] * 1e8)
 
             est_vb = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
-            fee = int(est_vb * 10)
+            fee = int(est_vb * 5)
             dao_cut = int(fee * 0.05)
             send_amount = total_in - fee - dao_cut
 
