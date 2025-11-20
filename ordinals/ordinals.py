@@ -3,31 +3,46 @@ import json
 import numpy as np
 import requests
 import time
-time.sleep(1)   # ← gives Render time to settle on cold start
+time.sleep(1)
 import os
 import re
-import time
 from dataclasses import dataclass
 from typing import List, Union
 
-# Toggle for local/testing — set TESTING_MODE=1 in Render secrets to disable real Grok calls
 TESTING = os.getenv("TESTING_MODE") == "1"
-
 GROK_API_KEY = os.getenv('GROK_API_KEY')
 
-if TESTING:
-    print("🧪 TESTING MODE — Grok-4 API disabled (using mock responses)")
-    GROK_API_KEY = "fake-key-for-testing"
-else:
-    print(f"GROK_API_KEY flux: {'Eternal' if GROK_API_KEY else 'Void—fallback active'}")
-    if GROK_API_KEY:
-        print("Grok requests summoned eternal—n=500 hooks ready.")
+# ==============================
+# CSS
+# ==============================
+css = """
+.qr-button { 
+    position: fixed !important;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
+    width: 64px;
+    height: 64px;
+    background: #f7931a !important;
+    border-radius: 50% !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 38px;
+}
+.big-fuel-button button {
+    height: 100px !important;
+    font-size: 20px !important;
+    border-radius: 16px !important;
+}
+"""
 
 # ==============================
 # GLOBAL DISCLAIMER
 # ==============================
 disclaimer = """
-
 **Consolidate when fees are low → win when fees are high.**  
 Pay a few thousand sats today… or 10–20× more next cycle. This is fee insurance.
 
@@ -53,6 +68,169 @@ Contact: omegadaov8@proton.me
 
 **Surge the swarm. Ledger’s yours.**
 """
+
+with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 🜂") as demo:
+
+    gr.Markdown("# Omega Pruner Ω v8.4 — Mobile First 🜂")
+
+    with gr.Row():
+        with gr.Column(scale=4):
+            gr.Markdown(disclaimer)
+        with gr.Column(scale=1, min_width=260):
+            gr.Markdown("<br><br><br><br><br><br>")
+            gr.Button("⚡ Fuel the Swarm", variant="primary", link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj", elem_classes="big-fuel-button")
+
+    with gr.Row():
+        user_addr = gr.Textbox(label="Your BTC Address", placeholder="bc1q...", elem_id="user-address")
+        prune_choice = gr.Dropdown(
+            choices=["Conservative (70/30, Low Risk)", "Efficient (60/40, Default)", "Aggressive (50/50, Max Savings)"],
+            value="Efficient (60/40, Default)",
+            label="Prune Strategy"
+        )
+    with gr.Row():
+        dust_threshold = gr.Slider(0, 2000, 546, step=1, label="Dust Threshold (sats)")
+        dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
+
+    submit_btn = gr.Button("Run Pruner", variant="secondary")
+    output_text = gr.Textbox(label="Log", lines=25)
+    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
+    generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
+
+    # Floating orange QR button — perfectly centered
+    gr.HTML("""
+    <label class="qr-button">
+      <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
+      <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:38px; pointer-events:none;">📷</div>
+    </label>
+    <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
+    <script>
+    document.getElementById('qr-camera').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+          const result = await ZXing.readBarcodeFromCanvas(canvas);
+          if (result && result.text) {
+            const input = document.querySelector("#user-address input");
+            if (input) { input.value = result.text; input.dispatchEvent(new Event('input')); }
+            alert("⚡ Address scanned!");
+          }
+        } catch (err) { alert("No QR found"); }
+      };
+      img.src = URL.createObjectURL(file);
+    });
+    </script>
+    """)
+
+    # Lightning Sweep checkbox + invoice field
+    with gr.Row():
+        sweep_to_ln = gr.Checkbox(label="Sweep to Lightning ⚡ (turn dust into spendable balance)", value=False)
+        ln_invoice = gr.Textbox(label="Lightning Invoice (lnbc...)", placeholder="Paste invoice from Phoenix, Breez, Muun, etc.", visible=False)
+
+    sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
+
+    # PWA HEAD — orange Ω icon on iOS + Android
+    gr.HTML("""
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f7931a">
+    <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    }
+    </script>
+    """)
+
+    # Functions that main_flow uses — must be defined before main_flow
+    def show_generate_btn():
+        return gr.update(visible=True), gr.update(visible=False)
+
+    def generate_raw_tx(user_addr, prune_choice, dust_threshold, dest_addr):
+        log, hex_content = main_flow(user_addr, prune_choice, dest_addr, True, dust_threshold)
+        return log, gr.update(value=hex_content, visible=True), gr.update(visible=False)
+
+    def lightning_sweep_flow(pruned_utxos, invoice: str, input_vb, output_vb):
+        output_parts = ["Lightning Sweep Mode ⚡\n"]
+        
+        try:
+            from bolt11 import decode
+            decoded = decode(invoice)
+            original_msats = decoded.amount_msat or 0
+
+            est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2 + 50
+            channel_fee_sats = int(est_vb * 15)  # user pays ~15 sat/vB
+
+            total_in_sats = sum(int(u['amount'] * 1e8) for u in pruned_utxos)
+            if total_in_sats < channel_fee_sats + 546:
+                raise ValueError("Not enough dust to cover channel open fee")
+
+            user_receive_sats = total_in_sats - channel_fee_sats
+            expected_msats = user_receive_sats * 1000
+
+            if abs(expected_msats - original_msats) > 1_000_000:
+                raise ValueError(f"Invoice should be ~{user_receive_sats:,} sats (±1k msats)")
+
+            # Build normal consolidation TX to user's own on-chain fallback address
+            if not decoded.payment_address:
+                raise ValueError("Invoice must support on-chain fallback (use Phoenix, Breez, Muun, etc.)")
+
+            dest_addr = decoded.payment_address
+            dest_script, _ = address_to_script_pubkey(dest_addr)
+
+            tx = Tx(tx_ins=[], tx_outs=[])
+            for u in pruned_utxos:
+                prev_tx_bytes = bytes.fromhex(u['txid'])[::-1]
+                txin = TxIn(prev_tx=prev_tx_bytes, prev_index=u['vout'])
+                tx.tx_ins.append(txin)
+
+            tx.tx_outs.append(TxOut(amount=user_receive_sats * 100_000_000, script_pubkey=dest_script))
+
+            raw_hex = tx.encode().hex()
+
+            output_parts.append(f"Channel open fee: ~{channel_fee_sats:,} sats (paid by user to miners)")
+            output_parts.append(f"You receive: {user_receive_sats:,} sats on-chain → your wallet opens Lightning channel automatically")
+            output_parts.append("\nSign & broadcast — dust becomes spendable Lightning balance instantly")
+
+            return "\n".join(output_parts), raw_hex
+
+        except Exception as e:
+            return f"Lightning sweep failed: {e}", ""
+    
+
+    def rbf_bump(raw_hex, bump_sats_per_vb=50):
+        try:
+            tx = Tx.decode(bytes.fromhex(raw_hex))
+            vsize = len(tx.encode()) // 4
+            extra_fee = int(vsize * bump_sats_per_vb)
+
+            if tx.tx_outs[0].amount <= extra_fee + 546:
+            r    eturn None, "Not enough in first output to cover bump + dust limit"
+
+            tx.tx_outs[0].amount -= extra_fee
+            for txin in tx.tx_ins:
+                txin.sequence = 0xfffffffd
+
+            return tx.encode().hex(), f"RBF bump +{bump_sats_per_vb} sat/vB (+{extra_fee:,} sats)"
+        except Exception as e:
+            return None, f"Error: {e}"
+
+        rbf_btn.click_count = 0
+
+    def do_rbf(hex_in):
+        if not hex_in or not hex_in.strip(): return "Paste hex first", None
+        rbf_btn.click_count += 1
+        new_hex, msg = rbf_bump(hex_in.strip(), 50)
+        if new_hex:
+            return f"Bump #{rbf_btn.click_count} (+{50 * rbf_btn.click_count} sat/vB)\n\n{new_hex}", new_hex
+        return msg or "Error", None
+
 
 # ==============================
 # Bech32 + Address Logic
@@ -350,128 +528,7 @@ class Tx:
         locktime = int.from_bytes(data[pos:pos+4], 'little')
         return Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
 
-def rbf_bump(raw_hex, bump_sats_per_vb=50):
-    try:
-        tx = Tx.decode(bytes.fromhex(raw_hex))
-        vsize = len(tx.encode()) // 4
-        extra_fee = int(vsize * bump_sats_per_vb)
-
-        if tx.tx_outs[0].amount <= extra_fee + 546:
-            return None, "Not enough in first output to cover bump + dust limit"
-
-        tx.tx_outs[0].amount -= extra_fee
-        for txin in tx.tx_ins:
-            txin.sequence = 0xfffffffd
-
-        return tx.encode().hex(), f"RBF bump +{bump_sats_per_vb} sat/vB (+{extra_fee:,} sats)"
-    except Exception as e:
-        return None, f"Error: {e}"
-
-def lightning_sweep_flow(pruned_utxos, invoice: str, input_vb, output_vb):
-    output_parts = ["Lightning Sweep Mode ⚡\n"]
-    
-    try:
-        from bolt11 import decode
-        decoded = decode(invoice)
-        original_msats = decoded.amount_msat or 0
-
-        est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2 + 50
-        channel_fee_sats = int(est_vb * 15)  # user pays ~15 sat/vB
-
-        total_in_sats = sum(int(u['amount'] * 1e8) for u in pruned_utxos)
-        if total_in_sats < channel_fee_sats + 546:
-            raise ValueError("Not enough dust to cover channel open fee")
-
-        user_receive_sats = total_in_sats - channel_fee_sats
-        expected_msats = user_receive_sats * 1000
-
-        if abs(expected_msats - original_msats) > 1_000_000:
-            raise ValueError(f"Invoice should be ~{user_receive_sats:,} sats (±1k msats)")
-
-        # Build normal consolidation TX to user's own on-chain fallback address
-        if not decoded.payment_address:
-            raise ValueError("Invoice must support on-chain fallback (use Phoenix, Breez, Muun, etc.)")
-
-        dest_addr = decoded.payment_address
-        dest_script, _ = address_to_script_pubkey(dest_addr)
-
-        tx = Tx(tx_ins=[], tx_outs=[])
-        for u in pruned_utxos:
-            prev_tx_bytes = bytes.fromhex(u['txid'])[::-1]
-            txin = TxIn(prev_tx=prev_tx_bytes, prev_index=u['vout'])
-            tx.tx_ins.append(txin)
-
-        tx.tx_outs.append(TxOut(amount=user_receive_sats * 100_000_000, script_pubkey=dest_script))
-
-        raw_hex = tx.encode().hex()
-
-        output_parts.append(f"Channel open fee: ~{channel_fee_sats:,} sats (paid by user to miners)")
-        output_parts.append(f"You receive: {user_receive_sats:,} sats on-chain → your wallet opens Lightning channel automatically")
-        output_parts.append("\nSign & broadcast — dust becomes spendable Lightning balance instantly")
-
-        return "\n".join(output_parts), raw_hex
-
-    except Exception as e:
-        return f"Lightning sweep failed: {e}", ""
-
-    # Floating orange QR button — perfectly centered
-    gr.HTML("""
-    <label class="qr-button">
-      <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
-      <div style="width:100%; height:100%; display:flex; place-items:center; justify-content:center; font-size:38px; pointer-events:none;">📷</div>
-    </label>
-    <script src="https://unpkg.com/@zxing/library@0.20.0/dist/index.min.js"></script>
-    <script>
-    document.getElementById('qr-camera').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const img = new Image();
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width; canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        try {
-          const result = await ZXing.readBarcodeFromCanvas(canvas);
-          if (result && result.text) {
-            const input = document.querySelector("#user-address input");
-            if (input) { input.value = result.text; input.dispatchEvent(new Event('input')); }
-            alert("⚡ Address scanned!");
-          }
-        } catch (err) { alert("No QR found"); }
-      };
-      img.src = URL.createObjectURL(file);
-    });
-    </script>
-    """)
-
-    with gr.Row():
-        sweep_to_ln = gr.Checkbox(label="Sweep to Lightning ⚡ (turn dust into spendable balance)", value=False)
-        ln_invoice = gr.Textbox(label="Lightning Invoice (lnbc...)", placeholder="Paste invoice from Phoenix, Breez, Muun, etc.", visible=False)
-
-    # Show/hide invoice field
-    sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
-
-# Your existing logic (unchanged)
-    def show_generate_btn():
-        return gr.update(visible=True), gr.update(visible=False)
-
-    def generate_raw_tx(user_addr, prune_choice, dust_threshold, dest_addr):
-        log, hex_content = main_flow(user_addr, prune_choice, dest_addr, True, dust_threshold)
-        return log, gr.update(value=hex_content, visible=True), gr.update(visible=False)
-
-    submit_btn.click(
-        fn=lambda u, p, dt, d: main_flow(u, p, d, False, dt),
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
-        outputs=[output_text, raw_tx_text]
-    ).then(show_generate_btn, outputs=[generate_btn, raw_tx_text])
-
-    generate_btn.click(
-        fn=generate_raw_tx,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
-        outputs=[output_text, raw_tx_text, generate_btn]
-    )
-
-
+   
 # ==============================
 # main_flow — BULLETPROOF TX GEN
 # ==============================
@@ -576,61 +633,21 @@ def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshol
 
     return "\n".join(output_parts), raw_hex
 
-# ==============================
-# GRADIO INTERFACE — CLEAN v8.4 MOBILE + QR (FINAL)
-# ==============================
 
-css = """
-.qr-button { 
-    position: fixed !important;
-    bottom: 24px;
-    right: 24px;
-    z-index: 9999;
-    width: 64px;
-    height: 64px;
-    background: #f7931a !important;
-    border-radius: 50% !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 40px;
-}
-.big-fuel-button button {
-    height: 100px !important;
-    font-size: 20px !important;
-    border-radius: 16px !important;
-}
-"""
+   # Event handlers
+    submit_btn.click(
+        fn=lambda u, p, dt, d: main_flow(u, p, d, False, dt),
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
+        outputs=[output_text, raw_tx_text]
+    ).then(show_generate_btn, outputs=[generate_btn, raw_tx_text])
 
-with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 🜂") as demo:
+    generate_btn.click(
+        fn=generate_raw_tx,
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr],
+        outputs=[output_text, raw_tx_text, generate_btn]
+    )
 
-    gr.Markdown("# Omega Pruner Ω v8.4 — Mobile First 🜂")
-
-    with gr.Row():
-        with gr.Column(scale=4):
-            gr.Markdown(disclaimer)
-        with gr.Column(scale=1, min_width=260):
-            gr.Markdown("<br><br><br><br><br><br>")
-            gr.Button("⚡ Fuel the Swarm", variant="primary", link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj", elem_classes="big-fuel-button")
-
-    with gr.Row():
-        user_addr = gr.Textbox(label="Your BTC Address", placeholder="bc1q...", elem_id="user-address")
-        prune_choice = gr.Dropdown(
-            choices=["Conservative (70/30, Low Risk)", "Efficient (60/40, Default)", "Aggressive (50/50, Max Savings)"],
-            value="Efficient (60/40, Default)",
-            label="Prune Strategy"
-        )
-    with gr.Row():
-        dust_threshold = gr.Slider(0, 2000, 546, step=1, label="Dust Threshold (sats)")
-        dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
-
-    submit_btn = gr.Button("Run Pruner", variant="secondary")
-    output_text = gr.Textbox(label="Log", lines=25)
-    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
-    generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
-
+    rbf_btn.click(do_rbf, rbf_input, [rbf_output, rbf_input])
 
     # RBF section
     gr.Markdown("### 🆙 Stuck tx? Paste hex below → +50 sat/vB bump")
@@ -639,35 +656,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.4 — Mobile + QR + Lightning 
         rbf_btn = gr.Button("Bump +50 sat/vB", variant="primary")
     rbf_output = gr.Textbox(label="New RBF hex", lines=10)
 
-    rbf_btn.click_count = 0
-    def do_rbf(hex_in):
-        if not hex_in or not hex_in.strip(): return "Paste hex first", None
-        rbf_btn.click_count += 1
-        new_hex, msg = rbf_bump(hex_in.strip(), 50)
-        if new_hex:
-            return f"Bump #{rbf_btn.click_count} (+{50 * rbf_btn.click_count} sat/vB)\n\n{new_hex}", new_hex
-        return msg or "Error", None
 
-    rbf_btn.click(do_rbf, rbf_input, [rbf_output, rbf_input])
-
-# ← THIS IS THE MAGIC LINE THAT MAKES PWA WORK ON THE GRADIO.LIVE TUNNEL
-# THIS IS THE FINAL, PERFECT PWA + NO ERRORS VERSION
-# PWA HEAD — orange Ω icon on iOS + Android
-gr.HTML("""
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#f7931a">
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
-</script>
-""")
 if __name__ == "__main__":
     demo.queue()
     demo.launch(
