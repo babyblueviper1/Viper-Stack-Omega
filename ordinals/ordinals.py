@@ -85,7 +85,7 @@ Every sat pays for maintenance + future features. Thank you 🜂
 
 with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 🜂") as demo:
 
-    gr.Markdown("# Omega Pruner Ω v8.5 — Mobile First 🜂")
+    gr.Markdown("# Omega Pruner Ω v8.5 — Live 🜂")
 
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
@@ -106,7 +106,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
-    output_text = gr.Textbox(label="Log", lines=5, max_lines=50)  # starts tiny, expands smoothly
+    output_text = gr.Textbox(label="Log", lines=6, max_lines=50)  # starts tiny, expands smoothly
     raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
@@ -607,13 +607,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
             raw_hex = tx.encode().hex()
             success_msg = (
-                f"Success! Consolidated {len(pruned_utxos_global)} UTXOs\n"
+                f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
                 f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats\n"
-                "Copy the hex below → Load in Electrum / Sparrow → Sign → Broadcast\n\n"
-                "Want to turn this dust into spendable Lightning balance instantly? ⚡\n"
-                "Scroll down and check the “Sweep to Lightning” box. Then paste a Lightning invoice\n"
-                "from Phoenix, Breez, Muun, Wallet of Satoshi, etc.\n"
-                "Your dust becomes real spendable sats in seconds — zero custody.\n\n"
+                "Copy hex → Load in Electrum / Sparrow → Sign → Broadcast\n\n"
+                "⚡ Want instant Lightning balance instead?\n\n"
+                f"→ Create a Lightning invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
+                "   (this is your dust minus the small miner fee + DAO cut)\n\n"
+                "Then check “Sweep to Lightning ⚡” below, paste the invoice, and hit Generate.\n"
+                "Your dust becomes real spendable Lightning in seconds — zero custody.\n\n"
                 "Surge the swarm. Ledger’s yours. 🜂"
             )
 
