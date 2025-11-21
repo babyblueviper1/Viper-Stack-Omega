@@ -670,62 +670,68 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 )
                 return log, gr.update(value=hex_out, visible=True), gr.update(visible=False)
 
-            # Normal on-chain consolidation
-            dest_addr_to_use = dest.strip() if dest and dest.strip() else addr.strip()
-            dest_script, _ = address_to_script_pubkey(dest_addr_to_use)
-            dao_script, _ = address_to_script_pubkey(dao_cut_addr)
-
-            tx = Tx(tx_ins=[], tx_outs=[])
-            total_in = 0
-            for u in pruned_utxos_global:
-                tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
-                total_in += int(u['amount'] * 1e8)
-
-            # ←←← FIX: define total_in_sats here ←←←
-            total_in_sats = total_in // 100_000_000   # convert from satoshis (int) to sats
-
-            est_vb = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
-            fee = int(est_vb * 5)
-            dao_cut = int(fee * 0.05)
-            send_amount = total_in - fee - dao_cut
-
-            if send_amount < 546:
-                raise ValueError("Not enough sats left after fee + DAO cut")
-
-            tx.tx_outs.append(TxOut(send_amount, dest_script))
-            if dao_cut >= 546:
-                tx.tx_outs.append(TxOut(dao_cut, dao_script))
             else:
-                log = log  # keep previous log
+                # Normal on-chain consolidation
+                dest_addr_to_use = dest.strip() if dest and dest.strip() else addr.strip()
+                dest_script, _ = address_to_script_pubkey(dest_addr_to_use)
+                dao_script, _ = address_to_script_pubkey(dao_cut_addr)
 
-            raw_hex = tx.encode().hex()
-            psbt_b64 = tx_to_psbt(tx)
-             # ←←← THIS LINE WAS MISSING ←←←
-            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=420x420&data={psbt_b64}"
-             # Big beautiful PSBT QR Shorten the QR URL for cleaner display
-            short_qr_url = qr_url.split('&data=')[0] + "&data=PSBT"  # shows as ...&data=PSBT instead of the whole base64
-            psbt_qr_html = f'<div style="text-align:center; margin:25px 0;"><a href="{qr_url}" target="_blank"><img src="{qr_url}" style="max-width:100%; height:auto; border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,0.4);"></a><br><small>Click QR to open full-size • <a href="{qr_url}" target="_blank">direct link</a></small></div>'
-            
-            success_msg = (
-                f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
-                f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats\n"
-                "Choose your wallet:\n\n"
-                "• Electrum / Sparrow → Copy Raw Hex\n"
-                "• BlueWallet / Aqua / Zeus / Mutiny → Scan PSBT QR below\n"
-                "• Coldcard / Jade / Trezor / Ledger → Copy PSBT (base64)\n\n"
-                "Hardware wallet → Copy **PSBT base64**\n\n"
-                f"{psbt_qr_html}\n"
-                "⚡ Want instant Lightning balance instead?\n\n"
-                f"→ Create a Lightning invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
-                "   (this is your dust minus the small miner fee + DAO cut)\n\n"
-                "Then check “Sweep to Lightning ⚡” below, paste the invoice, and hit Generate.\n"
-                "Your dust becomes real spendable Lightning in seconds — zero custody.\n\n"
-                "Surge the swarm. Ledger’s yours. 🜂"
-            )
+                tx = Tx(tx_ins=[], tx_outs=[])
+                total_in = 0
+                for u in pruned_utxos_global:
+                    tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
+                    total_in += int(u['amount'] * 1e8)
 
-            success_msg_with_br = success_msg.replace("\n", "<br>")
-            
-            return  success_msg_with_br, gr.update(value=raw_hex + "\n\nPSBT (base64):\n" + psbt_b64, visible=True), gr.update(visible=False)
+                total_in_sats = total_in // 100_000_000
+
+                est_vb = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
+                fee = int(est_vb * 5)  # 5 sat/vB — safe & low
+                dao_cut = int(fee * 0.05)
+                send_amount = total_in - fee - dao_cut
+
+                if send_amount < 546:
+                    raise ValueError("Not enough sats left after fee + DAO cut")
+
+                tx.tx_outs.append(TxOut(send_amount, dest_script))
+                if dao_cut >= 546:
+                    tx.tx_outs.append(TxOut(dao_cut, dao_script))
+
+                raw_hex = tx.encode().hex()
+                psbt_b64 = tx_to_psbt(tx)
+                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=420x420&data={psbt_b64}"
+
+                # Beautiful clickable QR (works perfectly in Textbox)
+                psbt_qr_html = (
+                    '<div style="text-align:center; margin:30px 0;">'
+                    f'<a href="{qr_url}" target="_blank">'
+                    f'<img src="{qr_url}" style="max-width:100%; height:auto; border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,0.5);">'
+                    '</a>'
+                    '<br><small style="color:#f7931a;">Click/tap QR for full-size • scannable with any wallet</small>'
+                    '</div>'
+                )
+
+                success_msg = (
+                    f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
+                    f"Estimated fee: ~{fee:,} sats • DAO cut: {dao_cut:,} sats\n\n"
+                    "Choose your wallet:\n\n"
+                    "• Electrum / Sparrow → Copy Raw Hex\n"
+                    "• BlueWallet / Aqua / Zeus / Mutiny → Scan PSBT QR below\n"
+                    "• Hardware wallet → Copy PSBT (base64)\n\n"
+                    f"{psbt_qr_html}\n"
+                    "⚡ Want instant Lightning balance instead?\n\n"
+                    f"Create invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
+                    "Check “Sweep to Lightning ⚡” → paste/scan → Generate\n\n"
+                    "Surge the swarm. Ledger’s yours. 🜂"
+                )
+
+                # Convert \n → <br> so line breaks show in Textbox
+                success_msg_html = success_msg.replace("\n", "<br>")
+
+                return (
+                    success_msg_html,
+                    gr.update(value=raw_hex + "\n\nPSBT (base64):\n" + psbt_b64, visible=True),
+                    gr.update(visible=False)
+                )
 
         except Exception as e:
             error = f"Transaction failed: {e}"
