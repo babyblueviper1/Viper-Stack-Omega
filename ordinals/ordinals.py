@@ -642,8 +642,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
             f"Live Scan:\n"
             f"• Total UTXOs found: {len(all_utxos):,}\n"
             f"• Strategy: {prune_choice}\n"
-            f"→ Keeping the {prune_choice.split('%')[0].split()[-1]}% largest UTXOs\n"
-            f"→ Pruning the smallest {100 - int(prune_choice.split('%')[0].split()[-1])}% (above dust threshold)"
+            f"→ Keeping the {keep_pct}% largest UTXOs\n"
+            f"→ Pruning the smallest {100 - keep_pct}% (above dust threshold)"
         )
 
         if not confirm_proceed:
