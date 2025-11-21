@@ -59,6 +59,9 @@ css = """
 .container > .form {
     gap: 8px !important;
 }
+@media (max-width: 768px) {
+    .big-fuel-button { margin-top: -10px !important; }
+}
 """
 
 disclaimer = """
@@ -92,7 +95,6 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
         with gr.Column(scale=1, min_width=260):
-            gr.Markdown("<br>"*6)
             gr.Button("⚡ Fuel the Swarm", variant="primary",
                       link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj",
                       elem_classes="big-fuel-button")
