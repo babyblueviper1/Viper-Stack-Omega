@@ -96,6 +96,17 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
             gr.Button("⚡ Fuel the Swarm", variant="primary",
                       link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj",
                       elem_classes="big-fuel-button")
+            # ←←← YOUR LOGO UNDER THE BUTTON ←←←
+            gr.HTML("""
+            <div style="text-align: center; margin-top: 20px; padding-bottom: 20px;">
+              <img src="/file=static/BBV_logo.png" 
+                   alt="BabyBlueViper" 
+                   style="max-height: 90px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,123,255,0.3);">
+              <p style="margin: 8px 0 0; font-size: 12px; color: #888; font-weight: bold;">
+                BabyBlueViper Ω
+              </p>
+            </div>
+            """)
 
     with gr.Row():
         user_addr = gr.Textbox(label="Your BTC Address", placeholder="bc1q...", elem_id="user-address")
