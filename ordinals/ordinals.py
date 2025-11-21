@@ -82,7 +82,7 @@ Every sat pays for maintenance + future features. Thank you 🜂
 [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) •[**babyblueviper.com**](https://babyblueviper.com) • Apache 2.0  
 **Surge the swarm. Ledger’s yours.**
 
-(Tap 📷 / ⚡ buttons to scan QR or upload a QR screenshot)
+(Tap 📷 / ⚡ buttons to scan or upload QR)
 """
 
 with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 🜂") as demo:
