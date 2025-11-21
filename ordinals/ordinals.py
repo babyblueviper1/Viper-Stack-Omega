@@ -59,9 +59,7 @@ css = """
 .container > .form {
     gap: 8px !important;
 }
-@media (max-width: 768px) {
-    .big-fuel-button { margin-top: -10px !important; }
-}
+
 """
 
 disclaimer = """
@@ -542,46 +540,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
             output_parts.append("\nClick 'Generate Real TX Hex' to build transaction")
             return "\n".join(output_parts), ""
 
-        try:
-            dest = dest_addr.strip() if dest_addr and dest_addr.strip() else user_addr.strip()
-            dest_script, _ = address_to_script_pubkey(dest)
-            dao_script, _ = address_to_script_pubkey(dao_cut_addr)
-
-            tx = Tx(tx_ins=[], tx_outs=[])
-            total_in = 0
-            for u in pruned_utxos:
-                tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
-                total_in += int(u['amount'] * 1e8)
-
-            est_vb = 10.5 + input_vb * len(pruned_utxos) + output_vb * 2
-            fee = int(est_vb * 10)
-            dao_cut = int(fee * 0.05)
-            send_amount = total_in - fee - dao_cut
-            if send_amount < 546:
-                raise ValueError("Not enough after fee + DAO cut")
-
-            tx.tx_outs.append(TxOut(send_amount, dest_script))
-            if dao_cut >= 546:
-                tx.tx_outs.append(TxOut(dao_cut, dao_script))
-            else:
-                output_parts.append("DAO cut below dust — skipped")
-
-            raw_hex = tx.encode().hex()
-            output_parts.append(f"\nUnsigned TX ready ({len(tx.tx_ins)}→{len(tx.tx_outs)})")
-            output_parts.append(f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats")
-            output_parts.append("\nCopy the hex below → Load in Electrum / Sparrow → Sign → Broadcast")
-
-            output_parts.append(
-                "\nWant to turn this dust into spendable Lightning balance instantly? ⚡\n"
-                "Just check “Sweep to Lightning” above and paste a Lightning invoice\n"
-                "from Phoenix, Breez, Muun, Wallet of Satoshi, etc.\n"
-                "We’ll route your dust straight to your Lightning wallet — zero custody, zero trust.\n"
-                "The small on-chain channel-open fee is paid by you to the miners (shown clearly).\n"
-            )
-            output_parts.append("Surge the swarm. Ledger’s yours. 🜂")
-            return "\n".join(output_parts), raw_hex
-        except Exception as e:
-            return "\n".join(output_parts + [f"\nTX failed: {e}"]), ""
+       # Real TX is now built entirely in build_real_tx — nothing to do here
+        return "\n".join(output_parts), ""
 
     # Two-step flow
     def analysis_pass(addr, strategy, threshold, dest, sweep, invoice):
