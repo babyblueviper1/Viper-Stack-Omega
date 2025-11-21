@@ -101,7 +101,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
             <div style="text-align: center; margin-top: 20px; padding-bottom: 20px;">
               <img src="/file=static/BBV_logo.png" 
                    alt="BabyBlueViper" 
-                   style="width: 90%; max-width: 280px; height: auto; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,123,255,0.4);">
+                   style="width: 100%; max-width: 280px; height: auto; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,123,255,0.4);">
               <p style="margin: 15px 0 0; font-size: 14px; color: #f7931a; font-weight: bold; letter-spacing: 1px;">
                 BabyBlueViper Ω
               </p>
