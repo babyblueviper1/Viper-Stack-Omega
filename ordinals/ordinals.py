@@ -273,6 +273,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
     sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
 
+     # ←←← THANK YOU MESSAGE — appears at the very bottom of the app ←←←
+    gr.Markdown(
+        "<div style='text-align: center; margin: 60px 0 20px 0; padding: 20px; color: #f7931a; font-size: 16px; font-weight: bold;'>"
+        "Thank you for using Omega Pruner Ω v8.6 — brought to you by the DAO.<br>"
+        "Come back soon. Surge the swarm. 🜂"
+        "</div>"
+    )
+
     # RBF
     gr.Markdown("### 🆙 Stuck tx? Paste hex → +50 sat/vB bump (repeatable, free)")
     with gr.Row():
@@ -745,11 +753,12 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 success_msg = (
                     f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
                     f"Estimated fee: ~{fee:,} sats • DAO cut: {dao_cut:,} sats\n\n"
-                    "Choose your wallet:\n\n"
+                    "Next step:\n\n"
                     "• Electrum / Sparrow → Copy Raw Hex\n"
-                    "• BlueWallet / Aqua / Zeus / Mutiny → Scan PSBT QR below\n"
+                    "• BlueWallet / Aqua / Zeus / Mutiny → Scan PSBT QR\n"
                     "• Hardware wallet → Copy PSBT (base64)\n\n"
                     f"{psbt_qr_html}\n"
+                    "\nDon't forget to sign and broadcast the transaction!\n\n"
                 )
                 success_msg_html = success_msg.replace("\n", "<br>")
 
@@ -763,10 +772,9 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
                 # 3. Lightning upsell — appears AFTER the code box
                 lightning_msg = (
-                    "\n⚡ Want instant Lightning balance instead?\n\n"
+                    "\n⚡Want instant Lightning balance instead?\n\n"
                     f"Create invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
-                    "Check “Sweep to Lightning ⚡” → paste/scan → Generate\n\n"
-                    "🜂"
+                    "Check “Sweep to Lightning ⚡” → paste/scan → Generate 🜂\n\n"
                 )
                 lightning_msg_html = lightning_msg.replace("\n", "<br>")
 
