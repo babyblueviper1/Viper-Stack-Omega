@@ -72,12 +72,16 @@ css = """
     }
    /* Perfect HTML log box — starts small, grows, then scrolls */
 #output_log {
-    min-height: 120px !important;
-    max-height: 70vh !important;   /* never more than 70% of screen */
+   white-space: pre-line !important;     /* ← makes \n show as real line breaks */
+    min-height: 140px !important;
+    max-height: 75vh !important;
     overflow-y: auto !important;
-    padding: 16px !important;
-    border-radius: 16px !important;
+    padding: 18px !important;
+    border-radius: 18px !important;
     background: #0f0f17 !important;
+    font-size: 15px !important;
+    line-height: 1.6 !important;
+    color: #e0e0e0 !important;
 }
 """
 
@@ -160,7 +164,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
-    output_text = gr.HTML(label="Log", elem_id="output_log")
+    output_text = gr.HTML(label="Log", elem_id="output_log", elem_classes="log-output")
     raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
