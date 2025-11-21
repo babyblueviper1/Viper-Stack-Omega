@@ -92,7 +92,19 @@ css = """
     font-family: monospace !important;
     white-space: pre-wrap !important;
     word-wrap: break-word !important;
+
+    }
+
+    /* Caption centered on mobile, left-aligned on desktop */
+.qr-caption-desktop {
+    text-align: center !important;
 }
+@media (min-width: 769px) {
+    .qr-caption-desktop {
+        text-align: left !important;
+        margin-left: 20px !important;
+    }
+
 """
 
 disclaimer = """
@@ -699,13 +711,15 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 raw_hex = tx.encode().hex()
                 psbt_b64 = tx_to_psbt(tx)
                 qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=420x420&data={psbt_b64}"
-
+                
                 psbt_qr_html = (
                     '<div style="text-align:center; margin:30px 0;">'
                     f'<a href="{qr_url}" target="_blank">'
                     f'<img src="{qr_url}" style="max-width:100%; height:auto; border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,0.5);">'
                     '</a>'
-                    '<br><small style="color:#f7931a;">Click/tap QR for full-size • scannable with any wallet</small>'
+                    '</div>'
+                    '<div class="qr-caption-desktop">'
+                    '<small style="color:#f7931a;">Click/tap QR for full-size • scannable with any wallet</small>'
                     '</div>'
                 )
 
@@ -728,11 +742,18 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
             # Convert \n → <br> because gr.HTML doesn't do it automatically
                 success_msg_html = success_msg.replace("\n", "<br>")
 
+               raw_tx_output = (
+                    f"<pre style='background:#000; color:#0f0; padding:16px; border-radius:12px; overflow-x:auto; font-family:monospace; font-size:13px;'>"
+                    f"<strong>Raw Transaction Hex:</strong><br>{raw_hex}<br><br>"
+                    f"<strong>PSBT (base64):</strong><br>{psbt_b64}"
+                    f"</pre>"
+                )
+
                 return (
                     success_msg_html,
-                    gr.update(value=f"<pre style='background:#000; color:#0f0; padding:16px; border-radius:12px; overflow-x:auto;'>{raw_hex}<br><br>PSBT (base64):<br>{psbt_b64}</pre>", visible=True),
+                    gr.update(value=raw_tx_output, visible=True),
                     gr.update(visible=False)
-            )
+                )
 
         except Exception as e:
             error = f"Transaction failed: {e}"
