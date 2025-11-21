@@ -622,15 +622,27 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
         if not all_utxos:
             return "\n".join(output_parts + ["No UTXOs above dust threshold"]), ""
+        ratio = {
+            "Conservative (70/30, Low Risk)": 0.3,
+            "Efficient (60/40, Default)": 0.4,
+            "Aggressive (50/50, Max Savings)": 0.5
+        }[prune_choice]
 
-        ratio = {"Conservative (70/30, Low Risk)": 0.3, "Efficient (60/40, Default)": 0.4,
-                          "Aggressive (50/50, Max Savings)": 0.5}[prune_choice]
         keep = max(1, int(len(all_utxos) * (1 - ratio)))
         pruned_utxos = all_utxos[:keep]
-        output_parts.append(f"Scan: {len(all_utxos)} → Will use: {len(pruned_utxos)} UTXOs ({prune_choice})")
+
+        output_parts.append(
+            f"Live Scan:\n"
+            f"• Total UTXOs found: {len(all_utxos):,}\n"
+            f"• Strategy: {prune_choice}\n"
+            f"• Will consolidate: {len(pruned_utxos):,} UTXOs\n"
+        )
 
         if not confirm_proceed:
-            output_parts.append("\nClick 'Generate Real TX Hex' to build transaction")
+            output_parts.append(
+                "\nClick **'Generate Real TX Hex'** below to create the unsigned transaction\n"
+                "(includes DAO cut + RBF-ready)"
+            )
             return "\n".join(output_parts), ""
 
        # Real TX is now built entirely in build_real_tx — nothing to do here
@@ -658,7 +670,11 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         if not pruned_utxos_global:
             log += "\nWarning: No UTXOs selected — nothing to consolidate."
 
-        return log, gr.update(visible=True), gr.update(visible=False)
+        # ←←← THIS LINE IS PERFECT — converts all \n to <br> for Textbox
+        log_with_br = log.replace("\n", "<br>")
+
+        return log_with_br, gr.update(visible=True), gr.update(visible=False)
+        
 
 
     def build_real_tx(addr, strategy, threshold, dest, sweep, invoice):
@@ -725,6 +741,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
                 total_in_sats = total_in // 100_000_000
 
+                # 1. Main log — everything BEFORE the code box
                 success_msg = (
                     f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
                     f"Estimated fee: ~{fee:,} sats • DAO cut: {dao_cut:,} sats\n\n"
@@ -733,25 +750,32 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                     "• BlueWallet / Aqua / Zeus / Mutiny → Scan PSBT QR below\n"
                     "• Hardware wallet → Copy PSBT (base64)\n\n"
                     f"{psbt_qr_html}\n"
-                    "⚡ Want instant Lightning balance instead?\n\n"
-                    f"Create invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
-                    "Check “Sweep to Lightning ⚡” → paste/scan → Generate\n\n"
-                    "Surge the swarm. Ledger’s yours. 🜂"
                 )
+                success_msg_html = success_msg.replace("\PS", "<br>")
 
-            # Convert \n → <br> because gr.HTML doesn't do it automatically
-                success_msg_html = success_msg.replace("\n", "<br>")
-                
+                # 2. Raw TX / PSBT box (green code box)
                 raw_tx_output = (
-                    f"<pre style='background:#000; color:#0f0; padding:16px; border-radius:12px; overflow-x:auto; font-family:monospace; font-size:13px;'>"
+                    f"<pre style='background:#000; color:#0f0; padding:16px; border-radius:12px; overflow-x:auto; font-family:monospace; font-size:13px; line-height:1.5;'>"
                     f"<strong>Raw Transaction Hex:</strong><br>{raw_hex}<br><br>"
                     f"<strong>PSBT (base64):</strong><br>{psbt_b64}"
                     f"</pre>"
                 )
 
+                # 3. Lightning upsell — appears AFTER the code box
+                lightning_msg = (
+                    "\n⚡ Want instant Lightning balance instead?\n\n"
+                    f"Create invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
+                    "Check “Sweep to Lightning ⚡” → paste/scan → Generate\n\n"
+                    "Surge the swarm. Ledger’s yours. 🜂"
+                )
+                lightning_msg_html = lightning_msg.replace("\n", "<br>")
+
+                # Combine: main log + code box + Lightning text
+                final_log = success_msg_html + "<br>" + raw_tx_output + "<br><br>" + lightning_msg_html
+
                 return (
-                    success_msg_html,
-                    gr.update(value=raw_tx_output, visible=True),
+                    final_log,
+                    gr.update(visible=False),   # hide the raw_tx_text component (we're showing it in the log now)
                     gr.update(visible=False)
                 )
 
