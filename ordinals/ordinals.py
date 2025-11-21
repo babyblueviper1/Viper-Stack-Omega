@@ -700,6 +700,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
             raw_hex = tx.encode().hex()
             psbt_b64 = tx_to_psbt(tx)
+             # ←←← THIS LINE WAS MISSING ←←←
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=420x420&data={psbt_b64}"
              # Big beautiful PSBT QR Shorten the QR URL for cleaner display
             short_qr_url = qr_url.split('&data=')[0] + "&data=PSBT"  # shows as ...&data=PSBT instead of the whole base64
             psbt_qr_html = f'<div style="text-align:center; margin:25px 0;"><a href="{qr_url}" target="_blank"><img src="{qr_url}" style="max-width:100%; height:auto; border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,0.4);"></a><br><small>Click QR to open full-size • <a href="{qr_url}" target="_blank">direct link</a></small></div>'
