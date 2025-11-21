@@ -184,8 +184,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
                 "Aggressive – prune 50% (more savings, less privacy)"
             ],
             value="Efficient – prune 40% of smallest (recommended – default)",
-            label="Prune Strategy – how much dust to clean?",
-            interactive=True
+            label="Prune Strategy – how much dust to clean?"
         )
     with gr.Row():
         dust_threshold = gr.Slider(0, 2000, 546, step=1, label="Dust Threshold (sats)")
