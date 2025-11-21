@@ -60,6 +60,18 @@ css = """
     gap: 8px !important;
 }
 
+/* Force perfect centering of the logo on mobile — kills the left bias */
+@media (max-width: 768px) {
+    .gr-form > .gr-row > .gr-column:last-child {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    .gr-form > .gr-row > .gr-column:last-child > div {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}
+
 """
 
 disclaimer = """
@@ -103,6 +115,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                    alt="BabyBlueViper" 
                    style="width: 100%; max-width: 300px; height: auto; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,123,255,0.4);">
               <p style="margin: 15px 0 0; font-size: 14px; color: #f7931a; font-weight: bold; letter-spacing: 1px;">
+              <a href="https://babyblueviper.com" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none;">
                 BabyBlueViper Ω
               </p>
               <p style="margin: 5px 0 0; font-size: 11px; color: #888;">
