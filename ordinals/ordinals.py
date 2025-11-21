@@ -174,9 +174,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
-    output_text = gr.HTML(label="Log", allow_unsafe_html=True)
-    raw_tx_text = gr.HTML(label="Unsigned Transaction", visible=False, allow_unsafe_html=True)
-    generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
+    output_text = gr.Textbox(label="Log", lines=7, max_lines=50)
+    raw_tx_text = gr.Textbox(label="Unsigned Transaction", lines=12, visible=False)    generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
     # QR Scanner for on-chain address (orange 📷) — TOP button
     gr.HTML("""
@@ -721,12 +720,9 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 "Surge the swarm. Ledger’s yours. 🜂"
             )
 
-            success_msg_html = success_msg.replace("\n", "<br>")
-            raw_tx_html = (raw_hex + "<br><br>PSBT (base64):<br>" + psbt_b64).replace("\n", "<br>")
-
-            raw_tx_html = f"<pre class='raw-tx-output'>{raw_hex}<br><br>PSBT (base64):<br>{psbt_b64}</pre>"
+            success_msg_with_br = success_msg.replace("\n", "<br>")
             
-            return success_msg, gr.update(value=raw_hex + "\n\nPSBT (base64):\n" + psbt_b64, visible=True), gr.update(visible=False)
+            return  success_msg_with_br, gr.update(value=raw_hex + "\n\nPSBT (base64):\n" + psbt_b64, visible=True), gr.update(visible=False)
 
         except Exception as e:
             error = f"Transaction failed: {e}"
