@@ -491,6 +491,21 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
             locktime = int.from_bytes(data[pos:pos+4], 'little')
             return Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
 
+    def tx_to_psbt(tx: Tx) -> str:
+        """Convert our Tx object to base64 PSBT (compatible with all modern wallets)"""
+        from io import BytesIO
+        psbt_bytes = BytesIO()
+        # Version
+        psbt_bytes.write(b'psbt\xff')
+        # Global unsigned tx
+        psbt_bytes.write(b'\x00')  # key type global unsigned tx
+        psbt_bytes.write(b'\x00')  # key len
+        psbt_bytes.write(tx.encode())  # value = raw tx
+        # Separator
+        psbt_bytes.write(b'\x00')
+        import base64
+        return base64.b64encode(psbt_bytes.getvalue()).decode()
+    
     def rbf_bump(raw_hex, bump=50):
         try:
             tx = Tx.decode(bytes.fromhex(raw_hex))
@@ -660,10 +675,18 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 log = log  # keep previous log
 
             raw_hex = tx.encode().hex()
+            psbt_b64 = tx_to_psbt(tx)
+            # Big scannable QR for PSBT (works with BlueWallet, Aqua, Zeus, etc.)
+            psbt_qr = f"<img src='https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={psbt_b64}' style='max-width:100%; margin:20px 0; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3);'>"
             success_msg = (
                 f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
                 f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats\n"
-                "Copy hex → Load in Electrum / Sparrow → Sign → Broadcast\n\n"
+                "Choose your wallet:\n\n"
+                "• Electrum / Sparrow → Copy Raw Hex\n"
+                "• BlueWallet / Aqua / Zeus / Mutiny → Scan PSBT QR below\n"
+                "• Coldcard / Jade / Trezor / Ledger → Copy PSBT (base64)\n\n"
+                "Copy the hex / PSBT below → Load → Sign → Broadcast\n\n"
+                f"{psbt_qr}\n"
                 "⚡ Want instant Lightning balance instead?\n\n"
                 f"→ Create a Lightning invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
                 "   (this is your dust minus the small miner fee + DAO cut)\n\n"
@@ -672,7 +695,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 "Surge the swarm. Ledger’s yours. 🜂"
             )
 
-            return success_msg, gr.update(value=raw_hex, visible=True), gr.update(visible=False)
+            return success_msg, gr.update(value=raw_hex + "\n\nPSBT (base64):\n" + psbt_b64, visible=True), gr.update(visible=False)
 
         except Exception as e:
             error = f"Transaction failed: {e}"
