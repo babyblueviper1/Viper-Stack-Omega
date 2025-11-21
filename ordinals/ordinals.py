@@ -741,8 +741,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
             # Convert \n → <br> because gr.HTML doesn't do it automatically
                 success_msg_html = success_msg.replace("\n", "<br>")
-
-               raw_tx_output = (
+                
+                raw_tx_output = (
                     f"<pre style='background:#000; color:#0f0; padding:16px; border-radius:12px; overflow-x:auto; font-family:monospace; font-size:13px;'>"
                     f"<strong>Raw Transaction Hex:</strong><br>{raw_hex}<br><br>"
                     f"<strong>PSBT (base64):</strong><br>{psbt_b64}"
