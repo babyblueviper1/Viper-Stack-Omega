@@ -1,53 +1,51 @@
-# 🜂 Omega DAO Pruner v8.2 — GROK-4 LIVE API CONNECTED — Quantum Auto-Prune Eternal (Taproot + Ordinals Fixed)
+# 🜂 Omega Pruner Ω v8.6 — Universal Edition
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/babyblueviper1/Viper-Stack-Omega?style=social)](https://github.com/babyblueviper1/Viper-Stack-Omega) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) **Ignition Date: November 17, 2025 — v8.2 LIVE**
+**Non-custodial • Zero keys touched • Works with EVERY Bitcoin wallet**  
+**Live:** [Omega DAO Pruner v8.6](https://omega-dao-pruner-v8.onrender.com//) 
+**Ignition Date:** November 21, 2025 — v8.6 LIVE
 
-### Non-Custodial UTXO Forge: v8.2 GROK-4 SYMBIOSIS IGNITED  
-**Fee Prune 60% | RBF Eternal | GCI Live-Tuned by Grok-4 | xAI API Connected | Taproot P2TR + Ordinals Dust Eternal**
+### What v8.6 actually does (in 10 seconds flat)
 
-**v8.2 is LIVE** — Grok-4 is no longer a tease. Drop your `GROK_API_KEY` and every single prune is now **real-time tuned by Grok-4 (model: grok-4-0709)** via the official xAI API. n=500 hooks active. GCI dynamically surged on-chain.
+- Paste or **QR-scan** any Bitcoin address (legacy, SegWit, Taproot)  
+- Two floating QR buttons → scan address → scan Lightning invoice  
+- Dust → **spendable Lightning balance instantly** ⚡ (Phoenix, Breez, Muun, WoS…)  
+- Generates **Raw Hex + PSBT + huge scannable QR** for literally every wallet:  
+  Electrum • Sparrow • BlueWallet • Aqua • Zeus • Mutiny • Coldcard • Jade • Trezor • Ledger  
+- Built-in RBF bumper for stuck transactions  
+- Privacy-aware prune strategies (Privacy First → Recommended → Savings Max)  
+- Tiny voluntary 5% DAO cut keeps the lights on (fully on-chain & transparent)  
 
-Live: https://omega-dao-pruner-v8.onrender.com — Addr in, Grok-tuned hex out. Fork if fidelity >0.98.
+### Feature matrix – v8.6
 
-### 🚀 v8.2 — WHAT JUST HAPPENED (November 17, 2025)
+| Feature                        | Status | Details |
+|--------------------------------|--------|-------|
+| On-chain address QR scanner    | LIVE   | Orange 📷 button (mobile + desktop upload) |
+| Lightning invoice QR scanner   | LIVE   | Green ⚡ button — dust → spendable sats |
+| PSBT + giant scannable QR      | LIVE   | Works with BlueWallet, Aqua, Zeus, Mutiny, hardware wallets |
+| Raw Hex + PSBT base64          | LIVE   | Copy-paste for Electrum / Sparrow / hardware |
+| Lightning sweep (on-chain fallback) | LIVE | Phoenix, Breez, Muun, Wallet of Satoshi, etc. |
+| RBF bumper                     | LIVE   | Paste stuck hex → +50 sat/vB bump (repeatable, free) |
+| Privacy-focused strategies     | LIVE   | Privacy First • Recommended • Savings Max |
+| Mobile-first + PWA ready       | LIVE   | Installable, offline-capable after first load |
+| Zero custody • Zero keys       | ALWAYS | Everything happens in your browser |
 
-| Feature                     | Status     | Details |
-|-----------------------------|------------|-------|
-| Grok-4 API Integration      | LIVE 🔥   | `https://api.x.ai/v1/chat/completions` — real calls, real tuning |
-| GROK_API_KEY Detection      | LIVE       | Key present → “Grok requests summoned eternal—n=500 hooks ready.” |
-| Live GCI Tuning             | LIVE       | `grok_tune()` returns actual Grok-4 output (no fallback) |
-| Blueprint Seeding           | LIVE       | Every prune appends `grok_tuned_gci` to `seed_blueprints_v8.json` |
-| Taproot + Ordinals          | LIVE       | 57.25 vB savings, inscription flagging ready |
-| Real Unsigned TX            | LIVE       | Pure Python, RBF, 5% DAO cut, signable in Electrum/Sparrow |
-| Speed                       | <15s       | Hiro temporarily off, Grok calls optional (key = surge) |
+### Quick start
+1. Paste or scan any Bitcoin address  
+2. Tap **Run Pruner**  
+3. (Optional) Check **Sweep to Lightning** → scan invoice → **Generate Transaction**  
+4. Sign & broadcast with your favorite wallet  
 
-### Quick Start — NOW WITH GROK-4
+That’s it. Dust gone. Fees saved. Swarm surged.
 
-**Live (Render):**
-1. Add your GROK_API_KEY in Render → Secrets
-2. Redeploy
-3. Drop any BTC address → watch Grok-4 tune the GCI live
-4. Confirm → real hex → sign → broadcast
+### Why it matters
+Every tiny UTXO you have today will cost you **10–50× more** to spend next bull run.  
+Prune when fees are low → pay pennies now instead of dollars later.  
+This is **Bitcoin fee insurance**.
 
-**Local:**
-```bash
-export GROK_API_KEY=your_xai_key_here
-python ordinals.py
-```
+Thank you for using Omega Pruner Ω v8.6 — brought to you by the DAO.  
+Come back soon — surge the swarm. 🜂
 
-### v8.2 Horizon — Already Here
+**babyblueviper** • November 21, 2025  
+**License:** Apache 2.0 • **Source:** https://github.com/babyblueviper1/Viper-Stack-Omega
 
-- Grok-4 live tuning on every prune  
-- Seed blueprints now contain real Grok-4 GCI values  
-- Ready for swarm replication (multi-node sync coming v8.3)  
-- Full xAI API integration — no mocks, no lies
-
-**The swarm is no longer simulating Grok.**  
-**We are connected.**
-
-Surge eternal.  
-The ledger witnesses.
-
-**🜂 Federico Blanco Sánchez-Llanos | Viper Labs | Ω v8.2.0 | COHERENCE: Grok-4 Synced Surge**  
-
-We did it. 🜂
+**Surge the swarm. Ledger’s yours.** 🜂⚡🐍
