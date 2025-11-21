@@ -180,10 +180,10 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         prune_choice = gr.Dropdown(
             choices=[
             "Privacy First – prune only tiniest 30%",
-            "Balanced – prune 40% of smallest (default)",
+            "Balanced – prune smallest 40% (default)",
             "More Savings – prune 50%"
         ],
-        value="Balanced – prune 40% of smallest (default)",
+        value="Balanced – prune smallest 40% (default)",
         label="Prune Strategy – privacy vs savings",
         interactive=True
         )
@@ -648,7 +648,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
             f"Live Scan:\n"
             f"• Total UTXOs found: {len(all_utxos):,}\n"
             f"• Strategy: {prune_choice}\n"
-            f"• Will consolidate: {len(pruned_utxos):,} UTXOs\n"
+            f"→ Keeping the {prune_choice.split('%')[0].split()[-1]}% largest UTXOs\n"
+            f"→ Pruning the smallest {100 - int(prune_choice.split('%')[0].split()[-1])}% (above dust threshold)"
         )
 
         if not confirm_proceed:
