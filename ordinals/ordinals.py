@@ -277,7 +277,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
     gr.Markdown(
         "<div style='text-align: center; margin: 60px 0 20px 0; padding: 20px; color: #f7931a; font-size: 16px; font-weight: bold;'>"
         "Thank you for using Omega Pruner Ω v8.6 — brought to you by the DAO.<br>"
-        "Come back soon. Surge the swarm. 🜂"
+        "The ledger is yours. Surge the swarm. 🜂"
         "</div>"
     )
 
