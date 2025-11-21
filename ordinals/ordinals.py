@@ -81,6 +81,8 @@ Every sat pays for maintenance + future features. Thank you 🜂
 
 [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) •[**babyblueviper.com**](https://babyblueviper.com) • Apache 2.0  
 **Surge the swarm. Ledger’s yours.**
+
+(Tap 📷 / ⚡ buttons to scan QR or upload a QR screenshot)
 """
 
 with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 🜂") as demo:
@@ -110,9 +112,9 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
     raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
-    # QR Scanner
+    # QR Scanner for on-chain address (orange 📷) — TOP button
     gr.HTML("""
-    <label class="qr-button">
+    <label class="qr-button" style="bottom: 96px !important; background: #f7931a !important;">
       <input type="file" accept="image/*" capture="environment" id="qr-camera" style="display:none">
       <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:38px;pointer-events:none;">📷</div>
     </label>
@@ -122,7 +124,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
       const file = e.target.files[0];
       if (!file) return;
       const img = new Image();
-      img.onload = async () => {
+      img.onload = async function() {
         const canvas = document.createElement('canvas');
         canvas.width = img.width; canvas.height = img.height;
         canvas.getContext('2d').drawImage(img, 0, 0);
@@ -130,10 +132,55 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
           const result = await ZXing.readBarcodeFromCanvas(canvas);
           if (result && result.text) {
             const input = document.querySelector("#user-address input");
-            if (input) { input.value = result.text; input.dispatchEvent(new Event('input')); }
+            if (input) {
+              input.value = result.text;
+              input.dispatchEvent(new Event('input'));
+              input.dispatchEvent(new Event('change'));
+            }
             alert("⚡ Address scanned!");
           }
-        } catch (err) { alert("No QR found"); }
+        } catch (err) {
+          alert("No QR found — try again");
+        }
+      };
+      img.src = URL.createObjectURL(file);
+    });
+    </script>
+    """)
+
+    # Lightning invoice QR scanner (green ⚡) — BOTTOM button
+    gr.HTML("""
+    <label class="qr-button" style="bottom: 24px !important; background: #00ff9d !important; box-shadow: 0 4px 20px rgba(0,255,157,0.6);">
+      <input type="file" accept="image/*" capture="environment" id="qr-lightning" style="display:none">
+      <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:38px;pointer-events:none;">⚡</div>
+    </label>
+    <script>
+    document.getElementById('qr-lightning').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = async function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+          const result = await ZXing.readBarcodeFromCanvas(canvas);
+          const text = result.text.trim();
+          if (text.toLowerCase().startsWith('lnbc') || text.toLowerCase().startsWith('lnurl')) {
+            const input = document.querySelector("#ln_invoice input") || 
+                         document.querySelector('textarea[placeholder*="lnbc"]');
+            if (input) {
+              input.value = text;
+              input.dispatchEvent(new Event('input'));
+              input.dispatchEvent(new Event('change'));
+            }
+            alert("⚡ Lightning invoice scanned & pasted!");
+          } else {
+            alert("Not a Lightning invoice — try again");
+          }
+        } catch (err) {
+          alert("No QR code found — try again");
+        }
       };
       img.src = URL.createObjectURL(file);
     });
