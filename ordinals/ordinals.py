@@ -751,7 +751,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                     "• Hardware wallet → Copy PSBT (base64)\n\n"
                     f"{psbt_qr_html}\n"
                 )
-                success_msg_html = success_msg.replace("\PS", "<br>")
+                success_msg_html = success_msg.replace("\n", "<br>")
 
                 # 2. Raw TX / PSBT box (green code box)
                 raw_tx_output = (
@@ -766,7 +766,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                     "\n⚡ Want instant Lightning balance instead?\n\n"
                     f"Create invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
                     "Check “Sweep to Lightning ⚡” → paste/scan → Generate\n\n"
-                    "Surge the swarm. Ledger’s yours. 🜂"
+                    "🜂"
                 )
                 lightning_msg_html = lightning_msg.replace("\n", "<br>")
 
