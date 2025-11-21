@@ -72,7 +72,8 @@ css = """
     }
    /* Perfect HTML log box — starts small, grows, then scrolls */
 #output_log {
-   white-space: pre-line !important;     /* ← makes \n show as real line breaks */
+   white-space: pre-wrap !important;   /* ← THIS IS THE MAGIC LINE */
+    word-wrap: break-word !important;
     min-height: 140px !important;
     max-height: 75vh !important;
     overflow-y: auto !important;
