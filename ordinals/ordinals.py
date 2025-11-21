@@ -679,8 +679,10 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
             raw_hex = tx.encode().hex()
             psbt_b64 = tx_to_psbt(tx)
-            # Big scannable QR for PSBT (works with BlueWallet, Aqua, Zeus, etc.)
-            psbt_qr = f"<img src='https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={psbt_b64}' style='max-width:100%; margin:20px 0; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3);'>"
+             # Big beautiful PSBT QR
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=420x420&data={psbt_b64}"
+            psbt_qr_html = f'<div style="text-align:center; margin:25px 0;"><img src="{qr_url}" style="max-width:100%; height:auto; border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,0.4);"></div>'
+            
             success_msg = (
                 f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
                 f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats\n"
@@ -688,8 +690,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 "• Electrum / Sparrow → Copy Raw Hex\n"
                 "• BlueWallet / Aqua / Zeus / Mutiny → Scan PSBT QR below\n"
                 "• Coldcard / Jade / Trezor / Ledger → Copy PSBT (base64)\n\n"
-                "Copy the hex / PSBT below → Load → Sign → Broadcast\n\n"
-                f"{psbt_qr}\n"
+                "Hardware wallet → Copy **PSBT base64**\n\n"
+                f"{psbt_qr_html}\n"
                 "⚡ Want instant Lightning balance instead?\n\n"
                 f"→ Create a Lightning invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
                 "   (this is your dust minus the small miner fee + DAO cut)\n\n"
