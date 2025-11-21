@@ -636,9 +636,9 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         if not all_utxos:
             return "\n".join(output_parts + ["No UTXOs above dust threshold"]), ""
         ratio = {
-            "Conservative (70/30, Low Risk)": 0.3,
-            "Efficient (60/40, Default)": 0.4,
-            "Aggressive (50/50, Max Savings)": 0.5
+            "Privacy First - prune only tiniest 30%": 0.3,
+            "Balanced - prune 40% of smallest (default)": 0.4,
+            "More Savings - prune 50%": 0.5
         }[prune_choice]
 
         keep = max(1, int(len(all_utxos) * (1 - ratio)))
@@ -669,9 +669,9 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
 
         all_utxos, _ = get_utxos(addr.strip(), threshold)
         ratio = {
-            "Conservative (70/30, Low Risk)": 0.3,
-            "Efficient (60/40, Default)": 0.4,
-            "Aggressive (50/50, Max Savings)": 0.5
+            "Privacy First - prune only tiniest 30%": 0.3,
+            "Balanced - prune 40% of smallest (default)": 0.4,
+            "More Savings - prune 50%": 0.5
         }[strategy]
         keep = max(1, int(len(all_utxos) * (1 - ratio)))
         pruned_utxos_global = all_utxos[:keep]
