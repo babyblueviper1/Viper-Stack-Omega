@@ -763,8 +763,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
                 # 2. Raw TX / PSBT box (green code box)
                 raw_tx_output = (
                     f"<pre style='background:#000; color:#0f0; padding:16px; border-radius:12px; overflow-x:auto; font-family:monospace; font-size:13px; line-height:1.5;'>"
-                    f"<strong>Raw Transaction Hex:</strong><br>{raw_hex}<br><br>"
-                    f"<strong>PSBT (base64):</strong><br>{psbt_b64}"
+                    f"<strong style='color:#ff0;'Raw Transaction Hex:</strong><br>{raw_hex}<br><br>"
+                    f"<strong style='color:#ff0;'PSBT (base64):</strong><br>{psbt_b64}"
                     f"</pre>"
                 )
 
