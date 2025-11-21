@@ -131,9 +131,9 @@ Every sat pays for maintenance + future features. Thank you 🜂
 (Tap 📷 / ⚡ buttons to scan or upload QR)
 """
 
-with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 🜂") as demo:
+with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
 
-    gr.Markdown("# Omega Pruner Ω v8.5 — Live 🜂")
+    gr.Markdown("# Omega Pruner Ω v8.6 ")
 
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
