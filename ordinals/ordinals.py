@@ -635,15 +635,27 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
             "More Savings (50% pruned)": 0.5
         }[prune_choice]
 
-        keep = max(1, int(len(all_utxos) * (1 - ratio)))
-        pruned_utxos = all_utxos[:keep]
+        keep_percent = {
+            "Privacy First (30% pruned)": 70,
+            "Recommended (40% pruned)": 60,
+            "More Savings (50% pruned)": 50
+        }.get(prune_choice, 60)  # fallback to 60 if something weird happens
 
+        ratio = 1 - (keep_percent / 100)   # 0.3, 0.4, or 0.5
+        keep = max(1, int(len(all_utxos) * (keep_percent / 100)))
+        pruned_utxos = all_utxos[:keep]
+        name_map = {
+            "Privacy First (30% pruned)": "Privacy First",
+            "Recommended (40% pruned)": "Recommended",
+            "More Savings (50% pruned)": "More Savings"
+        }
+        strategy_name = name_map.get(prune_choice, prune_choice.split(" (")[0])  # fallback
         output_parts.append(
             f"Live Scan:\n"
             f"• Total UTXOs found: {len(all_utxos):,}\n"
-            f"• Strategy: {prune_choice}\n"
-            f"→ Keeping the {keep_pct}% largest UTXOs\n"
-            f"→ Pruning the smallest {100 - keep_pct}% (above dust threshold)"
+            f"• Strategy: {strategy_name}\n"
+            f"→ Keeping the {keep_percent}% largest UTXOs\n"
+            f"→ Pruning the smallest {100 - keep_percent}% (above dust threshold)"
         )
 
         if not confirm_proceed:
