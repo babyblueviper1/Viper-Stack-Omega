@@ -103,6 +103,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                    alt="BabyBlueViper" 
                    style="width: 100%; max-width: 280px; height: auto; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,123,255,0.4);">
               <p style="margin: 15px 0 0; font-size: 14px; color: #f7931a; font-weight: bold; letter-spacing: 1px;">
+              <a href="https://babyblueviper.com" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none;">
                 BabyBlueViper Ω
               </p>
               <p style="margin: 5px 0 0; font-size: 11px; color: #888;">
