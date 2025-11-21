@@ -712,6 +712,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 "Surge the swarm. Ledger’s yours. 🜂"
             )
 
+            success_msg_html = success_msg.replace("\n", "<br>")
+            
             return success_msg, gr.update(value=raw_hex + "\n\nPSBT (base64):\n" + psbt_b64, visible=True), gr.update(visible=False)
 
         except Exception as e:
