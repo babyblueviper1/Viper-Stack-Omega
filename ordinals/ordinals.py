@@ -175,7 +175,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
     output_text = gr.Textbox(label="Log", lines=7, max_lines=50)
-    raw_tx_text = gr.Textbox(label="Unsigned Transaction", lines=12, visible=False)    generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
+    raw_tx_text = gr.Textbox(label="Unsigned Transaction", lines=12, visible=False)    
+    generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
     # QR Scanner for on-chain address (orange 📷) — TOP button
     gr.HTML("""
