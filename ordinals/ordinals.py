@@ -123,7 +123,7 @@ Scroll down → paste raw hex → +50 sat/vB bump in one click. (Repeatable. Fre
 100% open-source • non-custodial • voluntary “Fuel the Swarm” donations
 
 **DAO address** bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj  
-Every sat pays for maintenance + future features. Thank you 🜂
+Every sat pays for maintenance + future features.
 
 [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) •[**babyblueviper.com**](https://babyblueviper.com) • Apache 2.0  
 **Surge the swarm. Ledger’s yours.**
@@ -133,7 +133,7 @@ Every sat pays for maintenance + future features. Thank you 🜂
 
 with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
 
-    gr.Markdown("# Omega Pruner Ω v8.6 ")
+    gr.Markdown("# Omega Pruner Ω v8.6 🜂")
 
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
