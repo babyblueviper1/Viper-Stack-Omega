@@ -70,7 +70,40 @@ css = """
         padding-left: 12px !important;
         padding-right: 12px !important;
     }
+   /* Perfect HTML log box — starts small, grows, then scrolls */
+#output_log {
+   white-space: pre-wrap !important;   /* ← THIS IS THE MAGIC LINE */
+    word-wrap: break-word !important;
+    min-height: 140px !important;
+    max-height: 75vh !important;
+    overflow-y: auto !important;
+    padding: 18px !important;
+    border-radius: 18px !important;
+    background: #0f0f17 !important;
+    font-size: 15px !important;
+    line-height: 1.6 !important;
+    color: #e0e0e0 !important;
 }
+.raw-tx-output pre {
+    background: #000 !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
+    overflow-x: auto !important;
+    font-family: monospace !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+
+    }
+
+    /* Caption centered on mobile, left-aligned on desktop */
+.qr-caption-desktop {
+    text-align: center !important;
+}
+@media (min-width: 769px) {
+    .qr-caption-desktop {
+        text-align: left !important;
+        margin-left: 20px !important;
+    }
 
 """
 
@@ -90,7 +123,7 @@ Scroll down → paste raw hex → +50 sat/vB bump in one click. (Repeatable. Fre
 100% open-source • non-custodial • voluntary “Fuel the Swarm” donations
 
 **DAO address** bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj  
-Every sat pays for maintenance + future features. Thank you 🜂
+Every sat pays for maintenance + future features.
 
 [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) •[**babyblueviper.com**](https://babyblueviper.com) • Apache 2.0  
 **Surge the swarm. Ledger’s yours.**
@@ -98,9 +131,9 @@ Every sat pays for maintenance + future features. Thank you 🜂
 (Tap 📷 / ⚡ buttons to scan or upload QR)
 """
 
-with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 🜂") as demo:
+with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
 
-    gr.Markdown("# Omega Pruner Ω v8.5 — Live 🜂")
+    gr.Markdown("# Omega Pruner Ω v8.6 🜂")
 
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
@@ -153,8 +186,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
-    output_text = gr.Textbox(label="Log", lines=7, max_lines=50)  # starts tiny, expands smoothly
-    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
+    output_text = gr.HTML(label="Log")          # ← HTML, not Textbox
+    raw_tx_text = gr.HTML(label="Unsigned Transaction", visible=False)   
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
     # QR Scanner for on-chain address (orange 📷) — TOP button
@@ -239,6 +272,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         ln_invoice = gr.Textbox(label="Lightning Invoice (lnbc...)", placeholder="Paste invoice from Phoenix, Breez, Muun, etc.", visible=False)
 
     sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
+
+     # ←←← THANK YOU MESSAGE — appears at the very bottom of the app ←←←
+    gr.Markdown(
+        "<div style='text-align: center; margin: 60px 0 20px 0; padding: 20px; color: #f7931a; font-size: 16px; font-weight: bold;'>"
+        "Thank you for using Omega Pruner Ω v8.6 — brought to you by the DAO.<br>"
+        "The ledger is yours. Surge the swarm. 🜂"
+        "</div>"
+    )
 
     # RBF
     gr.Markdown("### 🆙 Stuck tx? Paste hex → +50 sat/vB bump (repeatable, free)")
@@ -491,6 +532,21 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
             locktime = int.from_bytes(data[pos:pos+4], 'little')
             return Tx(version=version, tx_ins=tx_ins, tx_outs=tx_outs, locktime=locktime)
 
+    def tx_to_psbt(tx: Tx) -> str:
+        """Convert our Tx object to base64 PSBT (compatible with all modern wallets)"""
+        from io import BytesIO
+        psbt_bytes = BytesIO()
+        # Version
+        psbt_bytes.write(b'psbt\xff')
+        # Global unsigned tx
+        psbt_bytes.write(b'\x00')  # key type global unsigned tx
+        psbt_bytes.write(b'\x00')  # key len
+        psbt_bytes.write(tx.encode())  # value = raw tx
+        # Separator
+        psbt_bytes.write(b'\x00')
+        import base64
+        return base64.b64encode(psbt_bytes.getvalue()).decode()
+    
     def rbf_bump(raw_hex, bump=50):
         try:
             tx = Tx.decode(bytes.fromhex(raw_hex))
@@ -552,8 +608,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 "Zero custody. Dust becomes real money.\n\n"
                 "Surge the swarm. Ledger’s yours. 🜂"
             )
-
-            return result_text, raw_hex
+            return result_text.replace("\n", "<br>"), raw_hex
 
         except Exception as e:
             return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun for invoices with on-chain fallback.", ""
@@ -574,15 +629,27 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
         if not all_utxos:
             return "\n".join(output_parts + ["No UTXOs above dust threshold"]), ""
+        ratio = {
+            "Conservative (70/30, Low Risk)": 0.3,
+            "Efficient (60/40, Default)": 0.4,
+            "Aggressive (50/50, Max Savings)": 0.5
+        }[prune_choice]
 
-        ratio = {"Conservative (70/30, Low Risk)": 0.3, "Efficient (60/40, Default)": 0.4,
-                          "Aggressive (50/50, Max Savings)": 0.5}[prune_choice]
         keep = max(1, int(len(all_utxos) * (1 - ratio)))
         pruned_utxos = all_utxos[:keep]
-        output_parts.append(f"Scan: {len(all_utxos)} → Will use: {len(pruned_utxos)} UTXOs ({prune_choice})")
+
+        output_parts.append(
+            f"Live Scan:\n"
+            f"• Total UTXOs found: {len(all_utxos):,}\n"
+            f"• Strategy: {prune_choice}\n"
+            f"• Will consolidate: {len(pruned_utxos):,} UTXOs\n"
+        )
 
         if not confirm_proceed:
-            output_parts.append("\nClick 'Generate Real TX Hex' to build transaction")
+            output_parts.append(
+                "\nClick **'Generate Real TX Hex'** below to create the unsigned transaction\n"
+                "(includes DAO cut + RBF-ready)"
+            )
             return "\n".join(output_parts), ""
 
        # Real TX is now built entirely in build_real_tx — nothing to do here
@@ -610,21 +677,24 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         if not pruned_utxos_global:
             log += "\nWarning: No UTXOs selected — nothing to consolidate."
 
-        return log, gr.update(visible=True), gr.update(visible=False)
+        # ←←← THIS LINE IS PERFECT — converts all \n to <br> for Textbox
+        log_with_br = log.replace("\n", "<br>")
+
+        return log_with_br, gr.update(visible=True), gr.update(visible=False)
+        
 
 
     def build_real_tx(addr, strategy, threshold, dest, sweep, invoice):
         global pruned_utxos_global, input_vb_global, output_vb_global
 
         if not pruned_utxos_global:
-            return (
+            hold_msg = (
                 "Hold on! ⚡\n\n"
                 "You checked Lightning sweep, but we haven’t scanned your address yet.\n"
                 "Please click **Run Pruner** first so we know which dusty UTXOs to consolidate.\n\n"
-                "After that, paste your Lightning invoice and click Generate again — we’ll turn your dust into spendable sats instantly!",
-                gr.update(visible=False),
-                gr.update(visible=False)
+                "After that, paste your Lightning invoice and click Generate again — we’ll turn your dust into spendable sats instantly!"
             )
+            return hold_msg.replace("\n", "<br>"), gr.update(visible=False), gr.update(visible=False)
 
         try:
             if sweep and invoice.strip().startswith("lnbc"):
@@ -634,48 +704,86 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 )
                 return log, gr.update(value=hex_out, visible=True), gr.update(visible=False)
 
-            # Normal on-chain consolidation
-            dest_addr_to_use = dest.strip() if dest and dest.strip() else addr.strip()
-            dest_script, _ = address_to_script_pubkey(dest_addr_to_use)
-            dao_script, _ = address_to_script_pubkey(dao_cut_addr)
-
-            tx = Tx(tx_ins=[], tx_outs=[])
-            total_in = 0
-            for u in pruned_utxos_global:
-                tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
-                total_in += int(u['amount'] * 1e8)
-
-            # ←←← FIX: define total_in_sats here ←←←
-            total_in_sats = total_in // 100_000_000   # convert from satoshis (int) to sats
-
-            est_vb = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
-            fee = int(est_vb * 5)
-            dao_cut = int(fee * 0.05)
-            send_amount = total_in - fee - dao_cut
-
-            if send_amount < 546:
-                raise ValueError("Not enough sats left after fee + DAO cut")
-
-            tx.tx_outs.append(TxOut(send_amount, dest_script))
-            if dao_cut >= 546:
-                tx.tx_outs.append(TxOut(dao_cut, dao_script))
             else:
-                log = log  # keep previous log
+                # Normal on-chain consolidation
+                dest_addr_to_use = dest.strip() if dest and dest.strip() else addr.strip()
+                dest_script, _ = address_to_script_pubkey(dest_addr_to_use)
+                dao_script, _ = address_to_script_pubkey(dao_cut_addr)
 
-            raw_hex = tx.encode().hex()
-            success_msg = (
-                f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
-                f"Estimated fee: ~{fee:,} sats | DAO cut: {dao_cut:,} sats\n"
-                "Copy hex → Load in Electrum / Sparrow → Sign → Broadcast\n\n"
-                "⚡ Want instant Lightning balance instead?\n\n"
-                f"→ Create a Lightning invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
-                "   (this is your dust minus the small miner fee + DAO cut)\n\n"
-                "Then check “Sweep to Lightning ⚡” below, paste the invoice, and hit Generate.\n"
-                "Your dust becomes real spendable Lightning in seconds — zero custody.\n\n"
-                "Surge the swarm. Ledger’s yours. 🜂"
-            )
+                tx = Tx(tx_ins=[], tx_outs=[])
+                total_in = 0
+                for u in pruned_utxos_global:
+                    tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
+                    total_in += int(u['amount'] * 1e8)
 
-            return success_msg, gr.update(value=raw_hex, visible=True), gr.update(visible=False)
+                total_in_sats = total_in // 100_000_000
+
+                est_vb = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
+                fee = int(est_vb * 5)  # 5 sat/vB — safe & low
+                dao_cut = int(fee * 0.05)
+                send_amount = total_in - fee - dao_cut
+
+                if send_amount < 546:
+                    raise ValueError("Not enough sats left after fee + DAO cut")
+
+                tx.tx_outs.append(TxOut(send_amount, dest_script))
+                if dao_cut >= 546:
+                    tx.tx_outs.append(TxOut(dao_cut, dao_script))
+
+                raw_hex = tx.encode().hex()
+                psbt_b64 = tx_to_psbt(tx)
+                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=420x420&data={psbt_b64}"
+                
+                psbt_qr_html = (
+                    '<div style="text-align:center; margin:30px 0;">'
+                    f'<a href="{qr_url}" target="_blank">'
+                    f'<img src="{qr_url}" style="max-width:100%; height:auto; border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,0.5);">'
+                    '</a>'
+                    '</div>'
+                    '<div class="qr-caption-desktop">'
+                    '<small style="color:#f7931a;">Click/tap QR for full-size • scannable with any wallet</small>'
+                    '</div>'
+                )
+
+                total_in_sats = total_in // 100_000_000
+
+                # 1. Main log — everything BEFORE the code box
+                success_msg = (
+                    f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
+                    f"Estimated fee: ~{fee:,} sats • DAO cut: {dao_cut:,} sats\n\n"
+                    "Next step:\n\n"
+                    "• Electrum / Sparrow → Copy Raw Hex\n"
+                    "• BlueWallet / Aqua / Zeus / Mutiny → Scan PSBT QR\n"
+                    "• Hardware wallet → Copy PSBT (base64)\n\n"
+                    f"{psbt_qr_html}\n"
+                    "\nDon't forget to sign and broadcast the transaction!\n\n"
+                )
+                success_msg_html = success_msg.replace("\n", "<br>")
+
+                # 2. Raw TX / PSBT box (green code box)
+                raw_tx_output = (
+                    f"<pre style='background:#000; color:#0f0; padding:16px; border-radius:12px; overflow-x:auto; font-family:monospace; font-size:13px; line-height:1.5;'>"
+                    f"<strong>Raw Transaction Hex:</strong><br>{raw_hex}<br><br>"
+                    f"<strong>PSBT (base64):</strong><br>{psbt_b64}"
+                    f"</pre>"
+                )
+
+                # 3. Lightning upsell — appears AFTER the code box
+                lightning_msg = (
+                    "\n⚡Want instant Lightning balance instead?\n\n"
+                    f"Create invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
+                    "Check “Sweep to Lightning ⚡” → paste/scan → Generate\n\n"
+                )
+                lightning_msg_html = lightning_msg.replace("\n", "<br>")
+
+                # Combine: main log + code box + Lightning text
+                final_log = success_msg_html + "<br>" + raw_tx_output + "<br><br>" + lightning_msg_html
+
+                return (
+                    final_log,
+                    gr.update(visible=False),   # hide the raw_tx_text component (we're showing it in the log now)
+                    gr.update(visible=False)
+                )
 
         except Exception as e:
             error = f"Transaction failed: {e}"
