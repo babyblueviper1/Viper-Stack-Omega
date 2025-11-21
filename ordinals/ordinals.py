@@ -178,14 +178,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
     with gr.Row():
         user_addr = gr.Textbox(label="Your BTC Address", placeholder="bc1q...", elem_id="user-address")
         prune_choice = gr.Dropdown(
-            choices=[
-            "Privacy First - prune only tiniest 30%",
-            "Balanced - prune smallest 40% (default)",
-            "More Savings - prune 50%"
-        ],
-        value="Balanced - prune smallest 40% (default)",
-        label="Prune Strategy - privacy vs savings",
-        interactive=True
+            choices=["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
+            value="Recommended (40% pruned)", label="Prune Strategy", interactive=True
         )
     with gr.Row():
         dust_threshold = gr.Slider(0, 2000, 546, step=1, label="Dust Threshold (sats)")
