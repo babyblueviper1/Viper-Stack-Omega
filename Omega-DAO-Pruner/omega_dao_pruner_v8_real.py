@@ -178,7 +178,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
     with gr.Row():
         user_addr = gr.Textbox(label="Your BTC Address", placeholder="bc1q...", elem_id="user-address")
         prune_choice = gr.Dropdown(
-            choices=["Conservative (70/30, Low Risk)", "Efficient (60/40, Default)", "Aggressive (50/50, Max Savings)"],
+            choices=["Privacy First (70/30, Low Risk)", "Balanced (60/40, Default)", "More Savings (50/50, Max Savings)"],
             value="Efficient (60/40, Default)", label="Prune Strategy"
         )
     with gr.Row():
