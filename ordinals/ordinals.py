@@ -84,6 +84,15 @@ css = """
     line-height: 1.6 !important;
     color: #e0e0e0 !important;
 }
+.raw-tx-output pre {
+    background: #000 !important;
+    padding: 16px !important;
+    border-radius: 12px !important;
+    overflow-x: auto !important;
+    font-family: monospace !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+}
 """
 
 disclaimer = """
@@ -166,7 +175,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
     output_text = gr.HTML(label="Log", elem_id="output_log", elem_classes="log-output")
-    raw_tx_text = gr.Textbox(label="Unsigned Raw TX Hex", lines=12, visible=False)
+    raw_tx_text = gr.HTML(label="Unsigned Transaction", visible=False)
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
     # QR Scanner for on-chain address (orange 📷) — TOP button
@@ -713,6 +722,9 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
             )
 
             success_msg_html = success_msg.replace("\n", "<br>")
+            raw_tx_html = (raw_hex + "<br><br>PSBT (base64):<br>" + psbt_b64).replace("\n", "<br>")
+
+            raw_tx_html = f"<pre class='raw-tx-output'>{raw_hex}<br><br>PSBT (base64):<br>{psbt_b64}</pre>"
             
             return success_msg, gr.update(value=raw_hex + "\n\nPSBT (base64):\n" + psbt_b64, visible=True), gr.update(visible=False)
 
