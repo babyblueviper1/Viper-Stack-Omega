@@ -645,6 +645,9 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
                 total_in += int(u['amount'] * 1e8)
 
+            # ←←← FIX: define total_in_sats here ←←←
+            total_in_sats = total_in // 100_000_000   # convert from satoshis (int) to sats
+
             est_vb = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
             fee = int(est_vb * 5)
             dao_cut = int(fee * 0.05)
