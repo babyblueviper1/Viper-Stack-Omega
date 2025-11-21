@@ -181,7 +181,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
             choices=[
                 "Conservative – prune only tiniest 30% (more privacy)",
                 "Efficient – prune 40% of smallest (recommended – default)",
-                "Aggressive – prune 50% (max savings, slightly less privacy)"
+                "Aggressive – prune 50% (max savings, less privacy)"
             ],
             value="Efficient – prune 40% of smallest (recommended – default)",
             label="Prune Strategy – how much dust to clean?",
