@@ -174,8 +174,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
-    output_text = gr.Textbox(label="Log", lines=7, max_lines=50)
-    raw_tx_text = gr.Textbox(label="Unsigned Transaction", lines=12, visible=False)    
+    output_text = gr.HTML(label="Log")          # ← HTML, not Textbox
+    raw_tx_text = gr.HTML(label="Unsigned Transaction", visible=False)   
     generate_btn = gr.Button("Generate Real TX Hex (with DAO cut)", visible=False)
 
     # QR Scanner for on-chain address (orange 📷) — TOP button
@@ -700,7 +700,6 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 psbt_b64 = tx_to_psbt(tx)
                 qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=420x420&data={psbt_b64}"
 
-                # Beautiful clickable QR (works perfectly in Textbox)
                 psbt_qr_html = (
                     '<div style="text-align:center; margin:30px 0;">'
                     f'<a href="{qr_url}" target="_blank">'
@@ -709,6 +708,8 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                     '<br><small style="color:#f7931a;">Click/tap QR for full-size • scannable with any wallet</small>'
                     '</div>'
                 )
+
+                total_in_sats = total_in // 100_000_000
 
                 success_msg = (
                     f"Success! Consolidated {len(pruned_utxos_global)} UTXOs ({total_in_sats:,} sats total)\n"
@@ -724,14 +725,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                     "Surge the swarm. Ledger’s yours. 🜂"
                 )
 
-                # Convert \n → <br> so line breaks show in Textbox
+            # Convert \n → <br> because gr.HTML doesn't do it automatically
                 success_msg_html = success_msg.replace("\n", "<br>")
 
                 return (
                     success_msg_html,
-                    gr.update(value=raw_hex + "\n\nPSBT (base64):\n" + psbt_b64, visible=True),
+                    gr.update(value=f"<pre style='background:#000; color:#0f0; padding:16px; border-radius:12px; overflow-x:auto;'>{raw_hex}<br><br>PSBT (base64):<br>{psbt_b64}</pre>", visible=True),
                     gr.update(visible=False)
-                )
+            )
 
         except Exception as e:
             error = f"Transaction failed: {e}"
