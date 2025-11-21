@@ -108,22 +108,40 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
             gr.Button("⚡ Fuel the Swarm", variant="primary",
                       link="https://blockstream.info/address/bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj",
                       elem_classes="big-fuel-button")
-            # ←←← YOUR LOGO UNDER THE BUTTON ←←←
+            # ←←← FINAL: DEAD-CENTER + CLICKABLE LOGO ←←←
             gr.HTML("""
-            <div style="text-align: center; margin-top: 30px; padding: 0 20px 40px 20px; width: 100%; box-sizing: border-box;">
-              <img src="/file=static/BBV_logo.png" 
-                   alt="BabyBlueViper" 
-                   style="width: 100%; max-width: 300px; height: auto; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,123,255,0.4);">
-              <p style="margin: 15px 0 0; font-size: 14px; color: #f7931a; font-weight: bold; letter-spacing: 1px;">
-              <a href="https://babyblueviper.com" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none;">
-                BabyBlueViper Ω
+            <div style="text-align: center; margin-top: 30px; padding: 0 8px 40px 8px; width: 100%; box-sizing: border-box;">
+              <a href="https://babyblueviper.com" target="_blank" rel="noopener">
+                <img src="/file=static/BBV_logo.png" 
+                     alt="BabyBlueViper" 
+                     style="width: 100%; max-width: 340px; height: auto; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,123,255,0.4); transition: transform 0.2s;">
+              </a>
+              <p style="margin: 15px 0 0; font-size: 15px; font-weight: bold; letter-spacing: 1px;">
+                <a href="https://babyblueviper.com" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none;">
+                  BabyBlueViper Ω
+                </a>
               </p>
               <p style="margin: 5px 0 0; font-size: 11px; color: #888;">
                 Surge the swarm.
               </p>
             </div>
-            """)
 
+            <style>
+            /* FINAL MOBILE CENTERING FIX — kills every last pixel of left bias */
+            @media (max-width: 768px) {
+                [data-testid="column"]:last-child {
+                    padding-left: 0px !important;
+                    padding-right: 0px !important;
+                }
+                [data-testid="column"]:last-child > div {
+                    padding-left: 8px !important;
+                    padding-right: 8px !important;
+                }
+            }
+            /* Hover effect on logo */
+            a img:hover { transform: scale(1.04); }
+            </style>
+            """)
     with gr.Row():
         user_addr = gr.Textbox(label="Your BTC Address", placeholder="bc1q...", elem_id="user-address")
         prune_choice = gr.Dropdown(
