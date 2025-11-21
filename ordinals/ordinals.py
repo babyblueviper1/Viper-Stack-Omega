@@ -608,8 +608,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 "Zero custody. Dust becomes real money.\n\n"
                 "Surge the swarm. Ledger’s yours. 🜂"
             )
-
-            return result_text, raw_hex
+            return result_text.replace("\n", "<br>"), raw_hex
 
         except Exception as e:
             return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun for invoices with on-chain fallback.", ""
@@ -689,14 +688,13 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
         global pruned_utxos_global, input_vb_global, output_vb_global
 
         if not pruned_utxos_global:
-            return (
+            hold_msg = (
                 "Hold on! ⚡\n\n"
                 "You checked Lightning sweep, but we haven’t scanned your address yet.\n"
                 "Please click **Run Pruner** first so we know which dusty UTXOs to consolidate.\n\n"
-                "After that, paste your Lightning invoice and click Generate again — we’ll turn your dust into spendable sats instantly!",
-                gr.update(visible=False),
-                gr.update(visible=False)
+                "After that, paste your Lightning invoice and click Generate again — we’ll turn your dust into spendable sats instantly!"
             )
+            return hold_msg.replace("\n", "<br>"), gr.update(visible=False), gr.update(visible=False)
 
         try:
             if sweep and invoice.strip().startswith("lnbc"):
@@ -774,7 +772,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.5 — Mobile + QR + Lightning 
                 lightning_msg = (
                     "\n⚡Want instant Lightning balance instead?\n\n"
                     f"Create invoice for exactly **{total_in_sats - fee - dao_cut:,} sats**\n"
-                    "Check “Sweep to Lightning ⚡” → paste/scan → Generate 🜂\n\n"
+                    "Check “Sweep to Lightning ⚡” → paste/scan → Generate\n\n"
                 )
                 lightning_msg_html = lightning_msg.replace("\n", "<br>")
 
