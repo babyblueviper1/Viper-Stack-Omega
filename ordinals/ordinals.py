@@ -614,7 +614,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
             return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun for invoices with on-chain fallback.", ""
 
     def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
-        output_parts = ["Omega Pruner Ω v8.4 — Live 🜂\n"]
+        output_parts = ["Omega Pruner Ω v8.6 🜂\n"]
         if not user_addr or not user_addr.strip():
             return "\n".join(output_parts + ["No address"]), ""
 
