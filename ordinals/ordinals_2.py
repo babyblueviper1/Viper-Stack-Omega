@@ -521,12 +521,20 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     gr.Markdown("# Omega Pruner v9.0")
     gr.Markdown(disclaimer)
 
-    with gr.Row():
-        user_addr = gr.Textbox(label="Bitcoin address or xpub/zpub", placeholder="bc1q… or xpub…", lines=2, scale=4)
+    with gr.Column(scale=4, min_width=300):
+        user_addr = gr.Textbox(
+            label="Bitcoin address or xpub/zpub",
+            placeholder="bc1q… or xpub…",
+            lines=2
+        )
+    with gr.Column(scale=3, min_width=240):
         prune_choice = gr.Dropdown(
-            ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
-            value="Recommended (40% pruned)", label="Strategy")
-
+            ["Privacy First (30% pruned)", 
+             "Recommended (40% pruned)", 
+             "More Savings (50% pruned)"],
+            value="Recommended (40% pruned)",
+            label="Pruning Strategy"
+        )
     dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
     dest_addr = gr.Textbox(label="Destination (optional – leave blank = same address)", placeholder="bc1q…")
 
