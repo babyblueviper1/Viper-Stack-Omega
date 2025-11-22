@@ -621,17 +621,39 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         except Exception as e:
             return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun for invoices with on-chain fallback.", ""
 
-   ef analysis_pass(addr, strategy, threshold, dest, sweep, invoice, xpub_input=""):
-        global pruned_utxos_global, input_vb_global, output_vb_global
+    def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546, xpub_input=""):
+        output_parts = ["Omega Pruner Ω v8.7 — Live 🜂\n"]
 
-        log, _ = main_flow(addr, strategy, dest, False, threshold, xpub_input)
-
-        # Re-use the same all_utxos that main_flow already fetched
-        # (no duplicate API calls!)
+        # ── v8.7: FULL-WALLET OR SINGLE-ADDRESS MODE ──
         if xpub_input and xpub_input.strip():
-            all_utxos, _ = fetch_all_utxos_from_xpub(xpub_input.strip(), threshold)
+            # Full-wallet mode via xpub
+            all_utxos, derived_count = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
+            if not all_utxos:
+                output_parts.append("No UTXOs found across derived addresses.")
+                return "\n".join(output_parts), ""
+            output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
         else:
-            all_utxos, _ = get_utxos(addr.strip(), threshold)
+            # Single-address mode (exactly like before)
+            if not user_addr or not user_addr.strip():
+                output_parts.append("No address provided.")
+                return "\n".join(output_parts), ""
+            all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
+            if not all_utxos:
+                output_parts.append("No confirmed UTXOs above dust threshold.")
+                return "\n".join(output_parts), ""
+            output_parts.append(f"Single address scan: found {len(all_utxos):,} UTXOs")
+
+        # Address validation & vB weights (works for both modes)
+        sample_addr = user_addr.strip() if not xpub_input else all_utxos[0].get("address", user_addr.strip())
+        try:
+            _, vb = address_to_script_pubkey(sample_addr)
+            input_vb = vb['input_vb']
+            output_vb = vb['output_vb']
+            output_parts.append(f"Address format: {vb['type']} • Ready to prune\n")
+        except:
+            output_parts.append("Warning: Could not determine address type — using default weights")
+            input_vb = 68   # safe fallback (SegWit average)
+            output_vb = 31
 
 
         ratio = {
@@ -674,35 +696,17 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         return "\n".join(output_parts), ""
 
     # Two-step flow
-   def analysis_pass(addr, strategy, threshold, dest, sweep, invoice, xpub_input=""):
+    def analysis_pass(addr, strategy, threshold, dest, sweep, invoice, xpub_input=""):
         global pruned_utxos_global, input_vb_global, output_vb_global
 
-        output_parts = ["Omega Pruner Ω v8.7 — Live 🜂\n"]
+        log, _ = main_flow(addr, strategy, dest, False, threshold, xpub_input)
 
-        # ── v8.7 FULL-WALLET OR SINGLE-ADDRESS MODE ──
+        # Re-use the same all_utxos that main_flow already fetched
+        # (no duplicate API calls!)
         if xpub_input and xpub_input.strip():
-            all_utxos, derived_count = fetch_all_utxos_from_xpub(xpub_input.strip(), threshold)
-            if not all_utxos:
-                output_parts.append("No UTXOs found across derived addresses.")
-                log = "\n".join(output_parts)
-                log_with_br = log.replace("\n", "<br>")
-                return log_with_br, gr.update(visible=False), gr.update(visible=False)
-            output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
+            all_utxos, _ = fetch_all_utxos_from_xpub(xpub_input.strip(), threshold)
         else:
-            if not addr or not addr.strip():
-                output_parts.append("No address provided.")
-                log = "\n".join(output_parts)
-                log_with_br = log.replace("\n", "<br>")
-                return log_with_br, gr.update(visible=False), gr.update(visible=False)
             all_utxos, _ = get_utxos(addr.strip(), threshold)
-            if not all_utxos:
-                output_parts.append("No confirmed UTXOs above dust threshold.")
-                log = "\n".join(output_parts)
-                log_with_br = log.replace("\n", "<br>")
-                return log_with_br, gr.update(visible=False), gr.update(visible=False)
-            output_parts.append(f"Single address scan: found {len(all_utxos):,} UTXOs")
-
-        all_utxos, _ = get_utxos(addr.strip(), threshold)
         ratio = {
             "Privacy First (30% pruned)": 0.3,
             "Recommended (40% pruned)": 0.4,
