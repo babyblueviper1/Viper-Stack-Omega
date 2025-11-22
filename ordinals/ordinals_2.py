@@ -520,7 +520,6 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     gr.Markdown("# Omega Pruner v9.0")
     gr.Markdown(disclaimer)
 
-    # Input row: address + strategy
     with gr.Row():
         with gr.Column(scale=4, min_width=300):
             user_addr = gr.Textbox(label="Bitcoin address or xpub/zpub", placeholder="bc1q… or xpub…", lines=2)
@@ -553,10 +552,10 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", scale=1)
         generate_btn = gr.Button("2. Generate Transaction", visible=False, interactive=False, variant="primary", scale=1)
 
-    # MAIN OUTPUT
+    # ——————— MAIN OUTPUT AREA ———————
     output_log = gr.HTML()
 
-    # LIGHTNING BOX — appears right after output, before RBF
+    # LIGHTNING BOX — appears right after output_log, before RBF
     ln_invoice = gr.Textbox(
         label="Want this on Lightning instead?",
         placeholder="Paste your lnbc... invoice (must match exact amount above)",
@@ -573,16 +572,14 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
 
     status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin", visible=True)
 
-    # ——————————————  EVENTS  ——————————————
+    # ———————————————— EVENTS ————————————————
     submit_btn.click(
         fn=analysis_pass,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr],
         outputs=[output_log, generate_btn]
     ).then(
-        fn=lambda: (
-            gr.update(visible=True, interactive=True),
-            gr.update(value="Ready → Click **2. Generate Transaction**")
-        ),
+        fn=lambda: (gr.update(visible=True, interactive=True), 
+                    gr.update(value="Ready → Click **2. Generate Transaction**")),
         outputs=[generate_btn, status_msg]
     )
 
@@ -590,25 +587,22 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     generate_btn.click(
         fn=build_real_tx,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr,
-                 dao_percent, selfish_mode, dao_addr],
+                dao_percent, selfish_mode, dao_addr],
         outputs=[output_log, generate_btn]
     ).then(
-        # Show Lightning invoice box
-        fn=lambda: gr.update(visible=True, placeholder="Paste Lightning invoice for the exact amount above → auto-convert"),
+        fn=lambda: gr.update(visible=True, placeholder="Paste Lightning invoice → auto-convert"),
         outputs=ln_invoice
     ).then(
-        fn=lambda: (
-            gr.update(interactive=False),
-            gr.update(value="On-chain ready. Paste Lightning invoice below to convert →")
-        ),
+        fn=lambda: (gr.update(interactive=False),
+                    gr.update(value="On-chain ready. Paste invoice below for Lightning sweep")),
         outputs=[generate_btn, status_msg]
     )
 
-    # User pastes invoice → auto-build Lightning tx
+    # Paste invoice → generate Lightning tx
     ln_invoice.submit(
         fn=build_real_tx,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr,
-                 dao_percent, selfish_mode, dao_addr],
+                dao_percent, selfish_mode, dao_addr],
         outputs=[output_log, generate_btn]
     ).then(
         fn=lambda: gr.update(visible=False),
