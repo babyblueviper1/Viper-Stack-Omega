@@ -424,8 +424,9 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
     if invoice and invoice.strip().lower().startswith("lnbc"):
         return lightning_sweep_flow(pruned_utxos_global, invoice.strip(), miner_fee, savings, dao_cut, selfish_mode)
 
-    return f"""
-      <div style="text-align:center; max-width:780px; margin:0 auto; padding:20px;">
+    return (
+    f"""
+    <div style="text-align:center; max-width:780px; margin:0 auto; padding:20px;">
         <h3 style="color:#f7931a; margin-bottom:32px;">Transaction Ready</h3>
         <p>Consolidated <b>{inputs}</b> inputs → <b>{format_btc(total)}</b> total<br>
         Live fee rate: <b>{fee_rate}</b> sat/vB → Miner fee <b>{format_btc(miner_fee)}</b><br>
@@ -442,7 +443,10 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
 Raw hex:  {raw}
 PSBT:     {psbt}</pre></details>
     </div>
-    """, gr.update(visible=True, interactive=False), ""
+    """,
+    gr.update(visible=True, interactive=False),
+    ""   # ← dummy third value so .then() chain works
+)
 
 def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_cut: int, selfish_mode: bool):
     if not bolt11_decode:
@@ -561,7 +565,7 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     rbf_out = gr.Textbox(label="New transaction", lines=8)
 
     status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin", visible=True)
-
+    dummy_state = gr.State()   # ← THIS IS THE MISSING LINE
     # ———————————————— EVENTS ————————————————
     submit_btn.click(
         fn=analysis_pass,
@@ -578,14 +582,13 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         fn=build_real_tx,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr,
                 dao_percent, selfish_mode, dao_addr],
-        outputs=[output_log, generate_btn, gr.State()]  # ← use gr.State() as dummy third output
+        outputs=[output_log, generate_btn, dummy_state]   # ← fixed!
     ).then(
         fn=lambda: gr.update(visible=True, placeholder="Paste Lightning invoice → auto-convert"),
         outputs=ln_invoice
     ).then(
-        fn=lambda: (gr.update(interactive=False),
-                    gr.update(value="On-chain ready. Paste invoice below for Lightning sweep")),
-        outputs=[generate_btn, status_msg]
+        fn=lambda: gr.update(value="On-chain ready. Paste invoice below for Lightning sweep"),
+        outputs=status_msg
     )
 
     # Paste invoice → generate Lightning tx
