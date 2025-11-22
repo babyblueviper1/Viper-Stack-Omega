@@ -547,6 +547,7 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         generate_btn = gr.Button("2. Generate Transaction", visible=False, interactive=False, variant="primary", scale=1)
 
     # ——————— MAIN OUTPUT AREA ———————
+    xpub = user_addr   # allows xpub detection while keeping single input box
     output_log = gr.HTML()
 
     # LIGHTNING BOX — appears right after output_log, before RBF
