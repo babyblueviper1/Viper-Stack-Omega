@@ -515,26 +515,28 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_
 # Gradio UI – clean & honest
 # ==============================
 with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
-    # Inject CSS (Gradio 5.x fix — works in 4.x too)
     gr.HTML(f"<style>{css}</style>")
 
     gr.Markdown("# Omega Pruner v9.0")
     gr.Markdown(disclaimer)
 
-    with gr.Column(scale=4, min_width=300):
-        user_addr = gr.Textbox(
-            label="Bitcoin address or xpub/zpub",
-            placeholder="bc1q… or xpub…",
-            lines=2
-        )
-    with gr.Column(scale=3, min_width=240):
-        prune_choice = gr.Dropdown(
-            ["Privacy First (30% pruned)", 
-             "Recommended (40% pruned)", 
-             "More Savings (50% pruned)"],
-            value="Recommended (40% pruned)",
-            label="Pruning Strategy"
-        )
+    # Address + Strategy (perfect balanced row)
+    with gr.Row():
+        with gr.Column(scale=4, min_width=300):
+            user_addr = gr.Textbox(
+                label="Bitcoin address or xpub/zpub",
+                placeholder="bc1q… or xpub…",
+                lines=2
+            )
+        with gr.Column(scale=3, min_width=240):
+            prune_choice = gr.Dropdown(
+                ["Privacy First (30% pruned)", 
+                 "Recommended (40% pruned)", 
+                 "More Savings (50% pruned)"],
+                value="Recommended (40% pruned)",
+                label="Pruning Strategy"
+            )
+
     dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
     dest_addr = gr.Textbox(label="Destination (optional – leave blank = same address)", placeholder="bc1q…")
 
@@ -543,44 +545,62 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100% (no thank-you)", value=False)
 
     with gr.Row():
-    dao_percent = gr.Slider(0, 500, value=50, step=10, 
-                            label="Optional thank-you (basis points of future savings)")
-    gr.Markdown(" ← 50 bps = 0.5% · 0 = keep 100%")
+        with gr.Column(scale=1, min_width=120):
+            dao_percent = gr.Slider(0, 500, value=50, step=10,
+                                    label="Optional thank-you (bps of savings)")
+        with gr.Column(scale=1, min_width=280):
+            gr.Markdown("50 bps = 0.5% · 0 = keep 100%")
 
     dao_addr = gr.Textbox(
         label="Thank-you address (optional)",
         placeholder="Leave default to support the original Ω author",
-        value=DEFAULT_DAO_ADDR,           # pre-filled!
+        value=DEFAULT_DAO_ADDR,
         interactive=True
     )
-    submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
-    generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary")
-    output_log = gr.HTML()
 
+    with gr.Row():
+        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", scale=1)
+        generate_btn = gr.Button("2. Generate Transaction", visible=False, interactive=False, variant="primary", scale=1)
+
+    output_log = gr.HTML()
     ln_invoice = gr.Textbox(label="Lightning invoice (exact amount shown above)", lines=3, visible=False)
 
-    # RBF section unchanged
     gr.Markdown("### Stuck tx? RBF bump")
     with gr.Row():
-        rbf_in = gr.Textbox(label="Raw hex", lines=5)
-        rbf_btn = gr.Button("Bump +50 sat/vB")
+        rbf_in = gr.Textbox(label="Raw hex", lines=5, scale=4)
+        rbf_btn = gr.Button("Bump +50 sat/vB", scale=1)
     rbf_out = gr.Textbox(label="New transaction", lines=8)
 
-    # Events
+    status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin", visible=True)
+
+    # ←←←←←←←←  ALL EVENTS  →→→→→→→→
     submit_btn.click(
-        analysis_pass,
+        fn=analysis_pass,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice, user_addr],
-        outputs=[output_log, generate_btn, gr.State()]  # dummy state to keep type detection if you want
+        outputs=[output_log, generate_btn]
+    ).then(
+        fn=lambda: (
+            gr.update(visible=True, interactive=True),
+            gr.update(value="Ready → Click **2. Generate Transaction**", visible=True)
+        ),
+        outputs=[generate_btn, status_msg]
     )
+
     generate_btn.click(
-        build_real_tx,
+        fn=build_real_tx,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice, user_addr,
                  dao_percent, selfish_mode, dao_addr],
-        outputs=[output_log, generate_btn, gr.State()]
+        outputs=[output_log, generate_btn]
+    ).then(
+        fn=lambda: (
+            gr.update(interactive=False),
+            gr.update(value="Transaction ready! Scan QR or copy PSBT below", visible=True)
+        ),
+        outputs=[generate_btn, status_msg]
     )
+
     rbf_btn.click(lambda h: rbf_bump(h)[0], rbf_in, rbf_out)
 
-    # Auto-show/hide Lightning invoice box when checkbox changes
     sweep_to_ln.change(
         fn=lambda sweep, html: gr.update(visible=sweep and "You receive" in str(html)),
         inputs=[sweep_to_ln, output_log],
@@ -588,7 +608,7 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     )
 
     gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
-
+    
     # QR scanners + auto-show invoice box (same excellent code from v8.7)
     gr.HTML("""
     <!-- ORANGE CAMERA BUTTON - SCAN ON-CHAIN ADDRESS -->
