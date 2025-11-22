@@ -301,13 +301,19 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     dest_script, _ = address_to_script_pubkey(dest_addr)
     dao_script, _ = address_to_script_pubkey(DAO_ADDR)
 
-    total = sum(u['value'] for u in pruned_utxos_global)  # ← fixed variable name
+    total = sum(u['value'] for u in pruned_utxos_global)
     vsize = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
-    fee = int(vsize * 5)
-    dao_cut = max(0, int(fee * 0.05))
-    send = total - fee - dao_cut
+    actual_fee = max(800, int(vsize * 5))  # low, fair fee
+
+    # If user had sent each UTXO separately at 100 sat/vB (worst case next bull run)
+    fee_if_not_consolidated = int((input_vb_global * len(pruned_utxos_global) + output_vb_global) * 100)
+    savings = fee_if_not_consolidated - actual_fee
+    dao_cut = max(546, int(savings * 0.05))  # 5% of SAVINGS
+
+    send = total - actual_fee - dao_cut
+
     if send < 546:
-        return "Not enough sats after fee + DAO cut", gr.update(visible=False)
+        return "Not enough for fee + DAO cut (this shouldn't happen)", gr.update(visible=False)
 
     tx = Tx()
     for u in pruned_utxos_global:
@@ -339,27 +345,35 @@ PSBT (base64): {psbt}
     """
     return result, gr.update(visible=False)
     
-
 def lightning_sweep_flow(utxos, invoice: str):
     if not bolt11_decode:
         return "bolt11 library missing — Lightning sweep disabled", ""
 
     try:
-        decoded = bolt11_decode(invoice)
+        decoded = bolt11_decode(invoice.strip())
         total = sum(u['value'] for u in utxos)
+
+        # Estimate vsize for the sweep transaction (channel open)
         vsize = 10.5 + input_vb_global * len(utxos) + output_vb_global * 2
-        fee = int(vsize * 15)
-        dao_cut = max(546, int(total * 0.05))
-        user_gets = total - fee - dao_cut
+        miner_fee = max(1500, int(vsize * 15))  # realistic channel open fee
+
+        # What it would cost to spend these UTXOs separately at 100 sat/vB (next bull run hell)
+        fee_if_not_consolidated = int((input_vb_global * len(utxos) + output_vb_global) * 100)
+        savings = fee_if_not_consolidated - miner_fee
+        
+        # DAO gets 5% of the SAVINGS (this is the soul of Omega Pruner)
+        dao_cut = max(546, int(savings * 0.05))
+        user_gets = total - miner_fee - dao_cut
 
         if user_gets < 546:
-            raise ValueError("Not enough sats after fees + DAO cut")
+            raise ValueError("Not enough left after miner fee + DAO cut")
 
-        if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 2_000_000:
-            raise ValueError(f"Invoice should be ~{user_gets:,} sats (±2k msats)")
+        expected_msats = user_gets * 1000
+        if abs(expected_msats - (decoded.amount_msat or 0)) > 2_000_000:
+            raise ValueError(f"Invoice must be ~{user_gets:,} sats (±2k msats)")
 
         if not getattr(decoded, 'payment_address', None):
-            raise ValueError("Invoice needs on-chain fallback address (use Phoenix, Muun, Breez)")
+            raise ValueError("Invoice needs on-chain fallback (use Phoenix, Muun, Breez, Blink)")
 
         dest_script, _ = address_to_script_pubkey(decoded.payment_address)
         dao_script, _ = address_to_script_pubkey(DAO_ADDR)
@@ -368,30 +382,36 @@ def lightning_sweep_flow(utxos, invoice: str):
         for u in utxos:
             tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
 
-        tx.tx_outs.append(TxOut(user_gets, dest_script))      # ← already satoshis
-        tx.tx_outs.append(TxOut(dao_cut, dao_script))         # ← already satoshis
+        tx.tx_outs.append(TxOut(user_gets, dest_script))
+        tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
         raw = tx.encode().hex()
         qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={raw}"
 
         msg = f"""
-        <div style="text-align:center;font-size:18px">Lightning Sweep Ready!</div><br>
+        <div style="text-align:center;font-size:22px;color:#00ff9d;margin:20px 0">
+        Lightning Sweep Ready!
+        </div>
         Dust consolidated: <b>{total:,}</b> sats<br>
-        Miner fee: ~<b>{fee:,}</b> sats<br>
-        DAO fuel (5%): <b>{dao_cut:,}</b> sats<br><br>
+        Miner fee: ~<b>{miner_fee:,}</b> sats<br>
+        <b>You saved ~{savings:,} sats in future fees</b><br>
+        DAO fuel (5% of savings): <b>{dao_cut:,}</b> sats<br><br>
         <b>You receive: {user_gets:,} sats instantly on Lightning</b><br><br>
         <div style="text-align:center;margin:30px 0">
             <a href="{qr}" target="_blank">
-                <img src="{qr}" style="max-width:100%;border-radius:16px;box-shadow:0 8px 30px rgba(0,255,157,0.6)">
+                <img src="{qr}" style="max-width:100%;border-radius:16px;box-shadow:0 8px 40px rgba(0,255,157,0.7)">
             </a>
         </div>
-        <small>Sign & broadcast → channel opens automatically<br>Zero custody. Dust → real money.</small>
+        <small>
+        Sign & broadcast → your wallet opens the channel automatically<br>
+        Zero custody • Dust → real spendable money • This is the way 🜂
+        </small>
         """
 
         return msg, raw
 
     except Exception as e:
-        return f"<b style='color:#f66'>Lightning sweep failed:</b> {e}", ""
+        return f"<b style='color:#ff5555'>Lightning sweep failed:</b> {str(e)}", ""
 # ==============================
 # Gradio UI
 # ==============================
