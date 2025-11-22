@@ -1,4 +1,4 @@
-# app.py — Omega Pruner Ω v9.1 — UNBREAKABLE 2025 FINAL
+# app.py — Omega Pruner Ω v8.7
 import gradio as gr
 import requests
 import time
@@ -44,9 +44,9 @@ css = """
 disclaimer = """
 **Consolidate when fees are low — win when fees are high.**  
 One-click dusty UTXO cleanup • Legacy / SegWit / Taproot • Lightning Sweep  
-Zero custody • 100% open-source • **DAO fuel mandatory (5% of future savings)**  
+Zero custody • 100% open-source • **DAO fuel included (5% of future savings)**  
 **DAO:** `bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj`  
-**The swarm demands tribute. You pay to win later.** Ω
+**The swarm is smart. You pay to win later.** Ω
 """
 
 # ==============================
@@ -343,7 +343,7 @@ def analysis_pass(addr, strategy, threshold, dest, sweep, invoice, xpub):
     Found <b>{len(utxos):,}</b> UTXOs • Keeping the <b>{keep_count:,}</b> largest<br>
     Strategy: <b>{strategy.split(' (')[0]}</b><br>
     Format: <b>{detected_type}</b><br><br>
-    Click below to consolidate + pay mandatory DAO fuel (5% of future savings)
+    Click below to consolidate
     """
     # ─────────────────────────────────────────────────────────────────────────────────────
     # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
@@ -371,7 +371,7 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
 
     user_gets = total - miner_fee - dao_cut
     if user_gets < 546:
-        return "Not enough after miner fee + DAO tribute", gr.update(visible=False)
+        return "Not enough after miner fee + DAO fuel", gr.update(visible=False)
 
      # Lightning path — only if checkbox + valid invoice present
     # ===================================================================
@@ -476,7 +476,7 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int):
         user_gets = total - miner_fee - dao_cut
 
         if user_gets < 546:
-            raise ValueError("Not enough after DAO tribute")
+            raise ValueError("Not enough after DAO Fuel")
 
         expected_msats = user_gets * 1000
         if abs(expected_msats - (decoded.amount_msat or 0)) > 3_000_000:
@@ -499,10 +499,10 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int):
 
         return f"""
         <div style="text-align:center;font-size:24px;color:#00ff9d;margin:20px 0">
-        Lightning Sweep + DAO Tribute Paid
+        Lightning Sweep + DAO Fuel Paid
         </div>
         You saved <b>{savings:,}</b> sats in future fees<br>
-        DAO receives mandatory <b>{dao_cut:,}</b> sats (5%)<br>
+        DAO receives <b>{dao_cut:,}</b> sats (5%)<br>
         You receive <b>{user_gets:,}</b> sats on Lightning instantly<br><br>
         <div style="text-align:center;margin:30px 0">
             <a href="{qr}" target="_blank">
@@ -524,20 +524,6 @@ with gr.Blocks(title="Omega Pruner Ω v8.7") as demo:
     gr.Markdown("# Omega Pruner Ω v8.7")
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
-        with gr.Column(scale=2, min_width=200):
-            gr.HTML("""
-            <div style="text-align:center; padding:24px 0; cursor:pointer;" 
-                 onclick="window.open('https://babyblueviper.com', '_blank')">
-                <img src="/file=static/BBV_logo.png" 
-                     alt="BabyBlueViper" 
-                     style="height:92px; filter:drop-shadow(0 0 20px #00ff9d); border-radius:12px; transition:transform 0.3s;"
-                     onmouseover="this.style.transform='scale(1.08)'"
-                     onmouseout="this.style.transform='scale(1)'">
-                <div style="color:#00ff9d; font-size:15px; margin-top:10px; font-weight:bold; letter-spacing:1.2px; text-shadow:0 0 10px #00ff9d;">
-                    Ω v10 UNBREAKABLE
-                </div>
-            </div>
-            """)
         with gr.Column(scale=1, min_width=260):
             gr.Button("Fuel the Swarm", link=f"https://blockstream.info/address/{DAO_ADDR}",
                       variant="primary", elem_classes="big-fuel-button")
