@@ -477,53 +477,72 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int):
         return f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}", ""
 
 # ==============================
-# Gradio UI
+# Gradio UI – FINAL UNBREAKABLE ORDER
 # ==============================
 with gr.Blocks(title="Omega Pruner Ω v9.1 — UNBREAKABLE") as demo:
-    demo.css = css                     # ← NEW OFFICIAL WAY
-    # gr.HTML(f"<style>{css}</style>") # ← fallback if you prefer
+    demo.css = css
+
     gr.Markdown("# Omega Pruner Ω v9.1 — UNBREAKABLE")
-    # ... rest of your UI unchanged
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
         with gr.Column(scale=1, min_width=260):
-            gr.Button("Fuel the Swarm", link=f"https://blockstream.info/address/{DAO_ADDR}", variant="primary", elem_classes="big-fuel-button")
+            gr.Button("Fuel the Swarm", link=f"https://blockstream.info/address/{DAO_ADDR}",
+                      variant="primary", elem_classes="big-fuel-button")
 
     user_addr = gr.Textbox(label="BTC Address or xpub", placeholder="bc1q... or xpub...", lines=2)
-    prune_choice = gr.Dropdown(["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"], value="Recommended (40% pruned)", label="Pruning Strategy")
+    prune_choice = gr.Dropdown(
+        ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
+        value="Recommended (40% pruned)", label="Pruning Strategy")
     dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust Threshold (sats)")
     dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
+
     with gr.Row():
         sweep_to_ln = gr.Checkbox(label="Sweep to Lightning Network", value=False)
 
-    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
-    # NEW: Invoice box appears ONLY AFTER results, with exact amount hint
-    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    # ── BUTTONS MUST BE CREATED BEFORE ANY .click() ─────────────────────
+    submit_btn    = gr.Button("Run Pruner", variant="secondary")
+    generate_btn  = gr.Button("Generate Transaction + Pay DAO", visible=False, variant="primary")
+    output_log    = gr.HTML()
+
+    # Lightning invoice box – hidden until results + checkbox checked
     ln_invoice = gr.Textbox(
-        label="Lightning Invoice — create for exact amount shown above",
-        placeholder="After seeing results → generate invoice for the exact amount you receive",
+        label="Lightning Invoice – create for the exact amount shown above",
+        placeholder="After results → generate invoice for the exact sats you receive",
         lines=3,
         visible=False
     )
 
-    # Show invoice box only after Pruner ran AND Lightning is checked
-    def show_ln_box(sweep_checked, has_results):
-        # has_results = True when output_log contains "You receive" or similar
-        if has_results and has_results.strip():
-            return gr.update(visible=sweep_checked)
+    # RBF section (unchanged)
+    gr.Markdown("### Stuck transaction? RBF Bump +50 sat/vB")
+    with gr.Row():
+        rbf_in  = gr.Textbox(label="Raw transaction hex", lines=6)
+        rbf_btn = gr.Button("Bump Fee +50 sat/vB")
+    rbf_out = gr.Textbox(label="New bumped transaction", lines=8)
+
+    # ── ALL EVENTS GO AFTER THE COMPONENTS ARE CREATED ──────────────────
+    # Show/hide Lightning invoice box when results appear
+    def update_ln_visibility(log_html, sweep):
+        if sweep and log_html and ("You receive" in log_html or "Transaction Ready" in log_html or "Lightning Sweep" in log_html):
+            return gr.update(visible=True, placeholder="Paste invoice for the exact amount shown above")
         return gr.update(visible=False)
 
-    # Update visibility dynamically
+    submit_btn.click(update_ln_visibility,   inputs=[output_log, sweep_to_ln], outputs=ln_invoice)
+    generate_btn.click(update_ln_visibility, inputs=[output_log, sweep_to_ln], outputs=ln_invoice)
+
+    # Main flows
     submit_btn.click(
-        fn=lambda *args: args,  # dummy, we just need to trigger updates
-        inputs=[sweep_to_ln, output_log],
-        outputs=ln_invoice,
-        js="() => {''}"  # we'll use a tiny JS trick below instead
+        analysis_pass,
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice, user_addr],
+        outputs=[output_log, generate_btn]
     )
 
-    submit_btn = gr.Button("Run Pruner", variant="secondary")
-    generate_btn = gr.Button("Generate Transaction + Pay DAO", visible=False, variant="primary")
-    output_log = gr.HTML()
+    generate_btn.click(
+        build_real_tx,
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice, user_addr],
+        outputs=[output_log, generate_btn]
+    )
+
+    rbf_btn.click(lambda h: rbf_bump(h), rbf_in, rbf_out)
 
     # QR Scanners (unchanged — perfect)
         # ────── INSERT THIS BLOCK EXACTLY HERE IN THE GRADIO UI SECTION ──────
@@ -609,17 +628,6 @@ document.addEventListener('gradio', (e) => {
     """)
     
 
-    gr.Markdown("### Stuck transaction? RBF Bump +50 sat/vB")
-    with gr.Row():
-        rbf_in = gr.Textbox(label="Raw transaction hex", lines=6)
-        rbf_btn = gr.Button("Bump Fee +50 sat/vB")
-    rbf_out = gr.Textbox(label="New bumped transaction", lines=8)
-
-    # Events
-    sweep_to_ln.change(lambda x: gr.update(elem_classes="" if x else "hidden-ln-invoice"), sweep_to_ln, ln_invoice)
-    submit_btn.click(analysis_pass, [user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice, user_addr], [output_log, generate_btn])
-    generate_btn.click(build_real_tx, [user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice, user_addr], [output_log, generate_btn])
-    rbf_btn.click(lambda h: rbf_bump(h), rbf_in, rbf_out)
 
 if __name__ == "__main__":
     import os
