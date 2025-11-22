@@ -355,29 +355,36 @@ def lightning_sweep_flow(utxos, invoice: str):
         if abs(user * 1000 - (decoded.amount_msat or 0)) > 2_000_000:
             raise ValueError("Invoice amount mismatch")
         if not getattr(decoded, 'payment_address', None):
-            raise ValueError("No on-chain fallback")
+                raise ValueError("Invoice needs on-chain fallback address")
 
-        dest_script, _ = address_to_script_pubkey(decoded.payment_address)
-        dao_script, _ = address_to_script_pubkey(DAO_ADDR)
-        tx = Tx()
-        for u in utxos:
-            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
-       TxOut(send, dest_script)          # send is already in satoshis
-       TxOut(dao_cut, dao_script)        # dao_cut is already in satoshis
-        raw = tx.encode().hex()
-        qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={raw}"
-        msg = f"""
-        ⚡ Lightning Sweep Ready!<br><br>
-        You receive <b>{user:,}</b> sats instantly<br>
-        DAO fuel <b>{dao:,}</b> sats<br><br>
-        <div style="text-align:center">
-            <a href="{qr}" target="_blank"><img src="{qr}" style="max-width:100%"></a>
-        </div>
-        """
-        return msg, raw
-    except Exception as e:
-        return f"Lightning failed: {e}", ""
+            dest_script, _ = address_to_script_pubkey(decoded.payment_address)
+            dao_script, _ = address_to_script_pubkey(DAO_ADDR)
 
+            tx = Tx()
+            for u in utxos:
+                tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
+
+            # ←←← CORRECT INDENTATION + NO * 100_000_000 ANYMORE
+            tx.tx_outs.append(TxOut(user_gets, dest_script))      # already satoshis
+            tx.tx_outs.append(TxOut(dao_cut, dao_script))         # already satoshis
+
+            raw = tx.encode().hex()
+            qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={raw}"
+            msg = f"""
+            ⚡ Lightning Sweep Ready!<br><br>
+            You receive <b>{user_gets:,}</b> sats instantly on Lightning<br>
+            Miner fee ~<b>{fee:,}</b> sats • DAO fuel <b>{dao_cut:,}</b> sats<br><br>
+            <div style="text-align:center;margin:30px 0">
+                <a href="{qr}" target="_blank">
+                    <img src="{qr}" style="max-width:100%;border-radius:16px">
+                </a>
+            </div>
+            Sign & broadcast → your wallet opens the channel automatically.<br>
+            Zero custody. Dust → real money. 🜂
+            """
+            return msg, raw
+        except Exception as e:
+            return f"Lightning sweep failed: {e}", ""
 # ==============================
 # Gradio UI
 # ==============================
