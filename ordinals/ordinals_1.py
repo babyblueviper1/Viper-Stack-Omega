@@ -377,7 +377,7 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     # ===================================================================
     # LIGHTNING SWEEP — FIXED FOREVER (2025 edition)
     # ===================================================================
-   f sweep:
+   if sweep:
         inv = invoice.strip()
         if not inv:
             return f"""
