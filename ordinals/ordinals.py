@@ -104,6 +104,13 @@ css = """
         text-align: left !important;
         margin-left: 20px !important;
     }
+.hidden-ln-invoice {
+    display: none !important;
+}
+.hidden-ln-invoice:gr-show {
+    display: block !important;
+}
+
 
 """
 
@@ -276,10 +283,19 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
     # Lightning
     with gr.Row():
         sweep_to_ln = gr.Checkbox(label="Sweep to Lightning ⚡ (turn dust into spendable balance)", value=False)
-    with gr.Row():
-        ln_invoice = gr.Textbox(label="Lightning Invoice (lnbc...)", placeholder="Paste invoice from Phoenix, Breez, Muun, etc.", visible=False)
+   with gr.Row():
+        ln_invoice = gr.Textbox(
+        label="Lightning Invoice (lnbc...)",
+        placeholder="Paste invoice from Phoenix, Breez, Muun, etc.",
+        visible=True,                    # ← always in DOM
+        elem_classes="hidden-ln-invoice" # ← hide with CSS
+    )
 
-    sweep_to_ln.change(fn=lambda x: gr.update(visible=x), inputs=sweep_to_ln, outputs=ln_invoice)
+    sweep_to_ln.change(
+        fn=lambda x: gr.update(visible=x, elem_classes="hidden-ln-invoice" if not x else ""),
+        inputs=sweep_to_ln,
+        outputs=ln_invoice
+    )
 
      # ←←← THANK YOU MESSAGE — appears at the very bottom of the app ←←←
     gr.Markdown(
