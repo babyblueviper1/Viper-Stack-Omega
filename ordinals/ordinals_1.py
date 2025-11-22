@@ -342,49 +342,56 @@ PSBT (base64): {psbt}
 
 def lightning_sweep_flow(utxos, invoice: str):
     if not bolt11_decode:
-        return "bolt11 missing", ""
+        return "bolt11 library missing — Lightning sweep disabled", ""
+
     try:
         decoded = bolt11_decode(invoice)
         total = sum(u['value'] for u in utxos)
         vsize = 10.5 + input_vb_global * len(utxos) + output_vb_global * 2
         fee = int(vsize * 15)
-        dao = max(546, int(total * 0.05))
-        user = total - fee - dao
-        if user < 546:
-            raise ValueError("Not enough after fees")
-        if abs(user * 1000 - (decoded.amount_msat or 0)) > 2_000_000:
-            raise ValueError("Invoice amount mismatch")
+        dao_cut = max(546, int(total * 0.05))
+        user_gets = total - fee - dao_cut
+
+        if user_gets < 546:
+            raise ValueError("Not enough sats after fees + DAO cut")
+
+        if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 2_000_000:
+            raise ValueError(f"Invoice should be ~{user_gets:,} sats (±2k msats)")
+
         if not getattr(decoded, 'payment_address', None):
-                raise ValueError("Invoice needs on-chain fallback address")
+            raise ValueError("Invoice needs on-chain fallback address (use Phoenix, Muun, Breez)")
 
         dest_script, _ = address_to_script_pubkey(decoded.payment_address)
         dao_script, _ = address_to_script_pubkey(DAO_ADDR)
 
         tx = Tx()
         for u in utxos:
-                tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
+            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
 
-            # ←←← CORRECT INDENTATION + NO * 100_000_000 ANYMORE
-        tx.tx_outs.append(TxOut(user_gets, dest_script))      # already satoshis
-        tx.tx_outs.append(TxOut(dao_cut, dao_script))         # already satoshis
+        tx.tx_outs.append(TxOut(user_gets, dest_script))      # ← already satoshis
+        tx.tx_outs.append(TxOut(dao_cut, dao_script))         # ← already satoshis
 
         raw = tx.encode().hex()
         qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={raw}"
+
         msg = f"""
-            ⚡ Lightning Sweep Ready!<br><br>
-            You receive <b>{user_gets:,}</b> sats instantly on Lightning<br>
-            Miner fee ~<b>{fee:,}</b> sats • DAO fuel <b>{dao_cut:,}</b> sats<br><br>
-            <div style="text-align:center;margin:30px 0">
-                <a href="{qr}" target="_blank">
-                    <img src="{qr}" style="max-width:100%;border-radius:16px">
-                </a>
-            </div>
-            Sign & broadcast → your wallet opens the channel automatically.<br>
-            Zero custody. Dust → real money. 🜂
-            """
-            return msg, raw
-        except Exception as e:
-            return f"Lightning sweep failed: {e}", ""
+        <div style="text-align:center;font-size:18px">Lightning Sweep Ready!</div><br>
+        Dust consolidated: <b>{total:,}</b> sats<br>
+        Miner fee: ~<b>{fee:,}</b> sats<br>
+        DAO fuel (5%): <b>{dao_cut:,}</b> sats<br><br>
+        <b>You receive: {user_gets:,} sats instantly on Lightning</b><br><br>
+        <div style="text-align:center;margin:30px 0">
+            <a href="{qr}" target="_blank">
+                <img src="{qr}" style="max-width:100%;border-radius:16px;box-shadow:0 8px 30px rgba(0,255,157,0.6)">
+            </a>
+        </div>
+        <small>Sign & broadcast → channel opens automatically<br>Zero custody. Dust → real money.</small>
+        """
+
+        return msg, raw
+
+    except Exception as e:
+        return f"<b style='color:#f66'>Lightning sweep failed:</b> {e}", ""
 # ==============================
 # Gradio UI
 # ==============================
