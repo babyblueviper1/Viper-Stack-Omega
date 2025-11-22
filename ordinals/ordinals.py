@@ -568,7 +568,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         except Exception as e:
             return None, f"Error: {e}"
 
-    def fetch_all_utxos_from_xpub(xpub_str: str, dust_threshold: int = 546):
+def fetch_all_utxos_from_xpub(xpub_str: str, dust_threshold: int = 546):
     try:
         # Import inside function — if libraries are missing we catch it gracefully
         from bip32 import BIP32
