@@ -453,5 +453,10 @@ with gr.Blocks(title="Omega Pruner Ω v9.0") as demo:
     rbf_btn.click(lambda h: (rbf_bump(h)[0] or "Error", rbf_bump(h)[0] or h), rbf_in, [rbf_out, rbf_in])
 
 if __name__ == "__main__":
-    demo.queue(max_size=20)  # optional: prevents queue overload
-    demo.launch(allowed_paths=["static"])  # ← THIS IS THE MAGIC LINE FOR RENDER 2025
+    import os
+    demo.queue(max_size=20)
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        allowed_paths=["static"]
+    )
