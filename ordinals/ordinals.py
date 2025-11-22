@@ -568,6 +568,45 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         except Exception as e:
             return None, f"Error: {e}"
 
+    def fetch_all_utxos_from_xpub(xpub_str: str, dust_threshold: int = 546):
+    try:
+        # Import inside function — if libraries are missing we catch it gracefully
+        from bip32 import BIP32
+        from bitcoin_utils import pub_to_addr
+
+        node = BIP32.from_xpub(xpub_str.strip())
+        all_utxos = []
+
+        # Scan receive (0/i) and change (1/i) — gap limit 20
+        for is_change in [0, 1]:
+            empty_count = 0
+            for i in range(200):
+                try:
+                    child = node.get_pubkey_from_path(f"{is_change}/{i}")
+                    # Detect if it's mainnet or testnet from the version bytes
+                    is_testnet = node.version == 0x043587cf  # tpub
+                    addr = pub_to_addr(child, testnet=is_testnet)
+                    utxos, _ = get_utxos(addr, dust_threshold)
+                    if utxos:
+                        all_utxos.extend(utxos)
+                        empty_count = 0
+                    else:
+                        empty_count += 1
+                        if empty_count >= 20:  # standard gap limit
+                            break
+                except Exception:
+                    empty_count += 1
+                    if empty_count >= 20:
+                        break
+
+        all_utxos.sort(key=lambda x: x['amount'], reverse=True)
+        return all_utxos, len(all_utxos)
+
+    except ImportError:
+        return [], "Missing libraries (bip32 / bitcoin-utils) — install with: pip install bip32 bitcoin-utils"
+    except Exception as e:
+        return [], f"Invalid xpub or scan failed: {str(e)[:120]}"
+
     def lightning_sweep_flow(pruned_utxos, invoice: str, input_vb, output_vb):
         if not bolt11_decode:
             return "Error: bolt11 library missing — Lightning sweep disabled", ""
@@ -709,8 +748,12 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         log, _ = main_flow(addr, strategy, dest, False, threshold, xpub_input)
 
         # Re-use the same all_utxos from main_flow (no duplicate calls)
-        if xpub_input and xpub_input.strip():
-            all_utxos, _ = fetch_all_utxos_from_xpub(xpub_input.strip(), threshold)
+           if xpub_input and xpub_input.strip():
+            all_utxos, result = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
+            if isinstance(result, str):  # ← error string
+                output_parts.append(result)
+                return "\n".join(output_parts), ""
+            output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
         else:
             all_utxos, _ = get_utxos(addr.strip(), threshold)
 
