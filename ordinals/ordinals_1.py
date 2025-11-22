@@ -376,7 +376,7 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
         return lightning_sweep_flow(pruned_utxos_global, invoice.strip(), miner_fee, savings)
 
     # On-chain path
-   dest_addr = (dest or addr).strip()
+    dest_addr = (dest or addr).strip()
     dest_script, dest_vb = address_to_script_pubkey(dest_addr)
     if not dest_script:
         return f"Invalid destination address: {dest_addr}<br>Enter a valid BTC addr (bc1q..., 1..., 3...)", gr.update(visible=False)
