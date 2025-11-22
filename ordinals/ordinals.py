@@ -177,7 +177,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
             """)
     with gr.Row():
         user_addr = gr.Textbox(label="Your BTC Address", placeholder="bc1q...", elem_id="user-address")
-    )
+    
     with gr.Row():
         xpub_input = gr.Textbox(
             label="xpub / ypub / zpub (optional – full wallet prune)",
