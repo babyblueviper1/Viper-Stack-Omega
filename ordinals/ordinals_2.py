@@ -535,11 +535,16 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100% (no thank-you)", value=False)
 
     with gr.Row():
-        dao_percent = gr.Slider(0, 500, value=50, step=10, label="Optional thank-you to original author (basis points of future savings)")
-        gr.Markdown(" ← 50 bps = 0.5% (recommended if you like the tool)")
+    dao_percent = gr.Slider(0, 500, value=50, step=10, 
+                            label="Optional thank-you (basis points of future savings)")
+    gr.Markdown(" ← 50 bps = 0.5% · 0 = keep 100%")
 
-    dao_addr = gr.Textbox(label="Custom thank-you address (optional)", placeholder=f"Default: {DEFAULT_DAO_ADDR}")
-
+    dao_addr = gr.Textbox(
+        label="Thank-you address (optional)",
+        placeholder="Leave default to support the original Ω author",
+        value=DEFAULT_DAO_ADDR,           # pre-filled!
+        interactive=True
+    )
     submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
     generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary")
     output_log = gr.HTML()
