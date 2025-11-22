@@ -363,8 +363,12 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
     try:
         fee_rate = requests.get("https://mempool.space/api/v3/fees/recommended", timeout=8).json()["fastestFee"]
     except:
-        fee_rate = 12  # sane fallback
-
+        try:
+            # backup API (rarely needed, but bulletproof)
+            fee_rate = requests.get("https://bitcoinfees.net/api/v1/fees/recommended", timeout=5).json()["fastestFee"]
+        except:
+            # final fallback — still better than the old static 12
+            fee_rate = 20
     vsize = 10 + inputs + (input_vb_global * inputs) + (output_vb_global * (2 if not selfish_mode and dao_percent > 0 else 1))
     miner_fee = max(1000, int(vsize * fee_rate * 1.15))  # +15% buffer
 
@@ -407,7 +411,11 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
     dest_script, dest_info = address_to_script_pubkey(dest_addr)
     if len(dest_script) < 20:
         return "Invalid destination address", gr.update(visible=False), ""
-
+# After: dest_script, dest_info = address_to_script_pubkey(dest_addr)
+if dest_info and 'output_vb' in dest_info:
+    output_vb_global = dest_info['output_vb']  # respect Taproot/P2PKH destination
+     After: dest_script, dest_info = address_to_script_pubkey(dest_addr)
+                      
     tx = Tx()
     for u in pruned_utxos_global:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
@@ -439,6 +447,54 @@ Raw hex:  {raw}
 PSBT:     {psbt}</pre></details>
     </div>
     """, gr.update(visible=False), ""
+
+def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_cut: int, selfish_mode: bool):
+    if not bolt11_decode:
+        return "<b style='color:#ff3333'>bolt11 library missing — Lightning disabled</b>", ""
+
+    try:
+        decoded = bolt11_decode(invoice.strip())
+        total = sum(u['value'] for u in utxos)
+        user_gets = total - miner_fee - (0 if selfish_mode else dao_cut)
+
+        if user_gets < 546:
+            raise ValueError("Not enough after fees")
+
+        expected_msats = user_gets * 1000
+        if abs(expected_msats - (decoded.amount_msat or 0)) > 5_000_000:
+            raise ValueError(f"Invoice must be for ~{user_gets:,} sats (±5k tolerance)")
+
+        if not getattr(decoded, 'payment_address', None):
+            raise ValueError("Invoice must support key-send or on-chain fallback (Phoenix, Breez, Blink, Muun)")
+
+        dest_script, _ = address_to_script_pubkey(decoded.payment_address)
+        tx = Tx()
+        for u in utxos:
+            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
+        tx.tx_outs.append(TxOut(user_gets, dest_script))
+        if dao_cut > 0 and not selfish_mode:
+            dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
+            tx.tx_outs.append(TxOut(dao_cut, dao_script))
+
+        raw = tx.encode().hex()
+        qr = make_qr(raw)
+
+        return f"""
+        <div style="text-align:center;font-size:24px;color:#00ff9d;margin:40px 0">
+        Lightning Sweep Ready
+        </div>
+        You receive <b>{user_gets:,}</b> sats instantly on Lightning<br>
+        Miner fee: <b>{miner_fee:,}</b> sats • Thank-you: <b>{dao_cut if dao_cut>0 else 0:,}</b> sats<br><br>
+        <div style="display:flex; justify-content:center;">
+            <img src="{qr}" style="max-width:100%;border-radius:16px;box-shadow:0 8px 40px rgba(0,255,157,0.6)">
+        </div>
+        <small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small>
+        """, raw
+
+    except Exception as e:
+        return f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}", ""
+
+
 
 # ==============================
 # Gradio UI – clean & honest
@@ -492,6 +548,13 @@ with gr.Blocks(css=css, title="Omega Pruner v9.0 – Community Edition") as demo
         outputs=[output_log, generate_btn, gr.State()]
     )
     rbf_btn.click(lambda h: rbf_bump(h)[0], rbf_in, rbf_out)
+
+    # Auto-show/hide Lightning invoice box when checkbox changes
+sweep_to_ln.change(
+    fn=lambda sweep, html: gr.update(visible=sweep and "You receive" in str(html)),
+    inputs=[sweep_to_ln, output_log],
+    outputs=ln_invoice
+)
 
     # QR scanners + auto-show invoice box (same excellent code from v8.7)
     gr.HTML("""
@@ -573,6 +636,7 @@ document.addEventListener('gradio', (e) => {
 });
     </script>
     """)
+gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
 
 if __name__ == "__main__":
     demo.queue(max_size=30)
