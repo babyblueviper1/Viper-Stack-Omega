@@ -357,20 +357,20 @@ def lightning_sweep_flow(utxos, invoice: str):
         if not getattr(decoded, 'payment_address', None):
                 raise ValueError("Invoice needs on-chain fallback address")
 
-            dest_script, _ = address_to_script_pubkey(decoded.payment_address)
-            dao_script, _ = address_to_script_pubkey(DAO_ADDR)
+        dest_script, _ = address_to_script_pubkey(decoded.payment_address)
+        dao_script, _ = address_to_script_pubkey(DAO_ADDR)
 
-            tx = Tx()
-            for u in utxos:
+        tx = Tx()
+        for u in utxos:
                 tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
 
             # ←←← CORRECT INDENTATION + NO * 100_000_000 ANYMORE
-            tx.tx_outs.append(TxOut(user_gets, dest_script))      # already satoshis
-            tx.tx_outs.append(TxOut(dao_cut, dao_script))         # already satoshis
+        tx.tx_outs.append(TxOut(user_gets, dest_script))      # already satoshis
+        tx.tx_outs.append(TxOut(dao_cut, dao_script))         # already satoshis
 
-            raw = tx.encode().hex()
-            qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={raw}"
-            msg = f"""
+        raw = tx.encode().hex()
+        qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={raw}"
+        msg = f"""
             ⚡ Lightning Sweep Ready!<br><br>
             You receive <b>{user_gets:,}</b> sats instantly on Lightning<br>
             Miner fee ~<b>{fee:,}</b> sats • DAO fuel <b>{dao_cut:,}</b> sats<br><br>
