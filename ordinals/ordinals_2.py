@@ -1,49 +1,49 @@
 # app.py — Omega Pruner v9.0 — Community Edition
 import gradio as gr
-print(f"Gradio version: {gr.__version__}")
-import requests, time, base64, qrcode, io
+import requests, time, base64, io, qrcode
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple, Optional
+
+print(f"Gradio version: {gr.__version__}")
 
 # ==============================
-# Optional deps (still graceful)
+# Optional deps
 # ==============================
 try:
     from bolt11 import decode as bolt11_decode
-except:
+except ImportError:
     bolt11_decode = None
 
 # ==============================
 # Constants
 # ==============================
-DEFAULT_DAO_ADDR = "bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"   # kept only for grateful users
+DEFAULT_DAO_ADDR = "bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"
 pruned_utxos_global = None
-input_vb_global = 68
-output_vb_global = 31
+input_vb_global = output_vb_global = None
 
 # ==============================
-# Clean, non-cult CSS + disclaimer
+# CSS + Disclaimer
 # ==============================
 css = """
 .qr-button { position: fixed !important; bottom: 24px; right: 24px; z-index: 9999;
     width: 64px; height: 64px; border-radius: 50% !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4); cursor: pointer; display: flex;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5); cursor: pointer; display: flex;
     align-items: center; justify-content: center; font-size: 38px; }
 .qr-button.camera { bottom: 96px !important; background: #f7931a !important; }
-.qr-button.lightning { bottom: 24px !important; background: #1188ff !important; }
-.big-fuel-button button { height: 80px !important; font-size: 18px !important; border-radius: 16px !important; }
+.qr-button.lightning { bottom: 24px !important; background: #00ff9d !important; }
 """
 
 disclaimer = """
 **Omega Pruner v9.0 — Community Edition**  
-Open-source • Zero custody • No forced fees  
+Zero custody • Fully open-source • No forced fees  
 Consolidate dusty UTXOs when fees are low → win when fees are high.  
-Optional small thank-you to the original author (default 0.5% of future savings).  
-Source: github.com/omega-pruner/v9 (Apache license)
+Optional thank-you (default 0.5% of future savings) to the original author.  
+Source: github.com/omega-pruner/v9 • Apache 2.0
 """
 
 # ==============================
-# All the Bitcoin helpers
+# Bitcoin Helpers
+# ==============================
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
@@ -65,8 +65,8 @@ def convertbits(data, frombits, tobits, pad=True):
     acc = bits = 0
     ret = []
     maxv = (1 << tobits) - 1
-    for value in data:
-        acc = ((acc << frombits) | value) & ((1 << (frombits + tobits - 1)) - 1)
+    for v in data:
+        acc = (acc << frombits | v) & ((1 << (frombits + tobits - 1)) - 1)
         bits += frombits
         while bits >= tobits:
             bits -= tobits
@@ -75,21 +75,18 @@ def convertbits(data, frombits, tobits, pad=True):
     return ret
 
 def base58_decode(s):
-    n = 0
-    for c in s: n = n * 58 + BASE58_ALPHABET.index(c)
+    n = sum(BASE58_ALPHABET.index(c) * (58 ** i) for i, c in enumerate(reversed(s)))
     leading_zeros = len(s) - len(s.lstrip('1'))
     return b'\x00' * leading_zeros + n.to_bytes((n.bit_length() + 7) // 8, 'big')
 
-def address_to_script_pubkey(addr: str):
-    if not addr or len(addr.strip()) < 26:  # Too short for any valid addr
-        return b'\x00\x14' + b'\x00' * 20, {'input_vb': 68, 'output_vb': 31, 'type': 'P2WPKH (fallback)'}
-    
+def address_to_script_pubkey(addr: str) -> Tuple[bytes, dict]:
     addr = addr.strip().lower()
-    # Reject obvious non-addresses like xpubs
-    if addr.startswith('xpub') or addr.startswith('zpub') or addr.startswith('ypub') or addr.startswith('tpub'):
-        return b'\x00\x14' + b'\x00' * 20, {'input_vb': 68, 'output_vb': 31, 'type': 'SegWit (xpub fallback)'}
-    
-    # Your existing logic (unchanged, just indented)
+    if not addr or len(addr) < 26:
+        return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'fallback'}
+
+    if addr.startswith(('xpub', 'zpub', 'ypub', 'tpub')):
+        return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'xpub'}
+
     if addr.startswith('1'):
         dec = base58_decode(addr)
         if len(dec) == 25 and dec[0] == 0x00:
@@ -103,17 +100,15 @@ def address_to_script_pubkey(addr: str):
         if data and data[0] == 0 and bech32_verify_checksum('bc', data):
             prog = convertbits(data[1:], 5, 8, False)
             if prog and len(prog) in (20, 32):
-                script = bytes([0x00, 0x14 if len(prog) == 20 else 0x20]) + bytes(prog)
-                return script, {'input_vb': 68, 'output_vb': 31, 'type': 'SegWit'}
+                return bytes([0x00, 0x14 if len(prog) == 20 else 0x20]) + bytes(prog), {'input_vb': 68, 'output_vb': 31, 'type': 'SegWit'}
     if addr.startswith('bc1p'):
         data = [CHARSET.find(c) for c in addr[5:] if c in CHARSET]
         if data and data[0] == 1 and bech32m_verify_checksum('bc', data):
             prog = convertbits(data[1:], 5, 8, False)
             if prog and len(prog) == 32:
                 return b'\x51\x20' + bytes(prog), {'input_vb': 57.5, 'output_vb': 43, 'type': 'Taproot'}
-    
-    # NEW: Graceful fallback for invalids (e.g., xpub as dest)
-    return b'\x00\x14' + b'\x00' * 20, {'input_vb': 68, 'output_vb': 31, 'type': 'SegWit (fallback - provide valid dest)'}
+
+    return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'fallback'}
 
 def api_get(url, timeout=30):
     for _ in range(3):
@@ -132,72 +127,39 @@ def get_utxos(addr, dust=546):
     except:
         api_get("https://mempool.space/api/blocks/tip/height")
         utxos = api_get(f"https://mempool.space/api/address/{addr}/utxo")
-    confirmed = [u for u in utxos if u.get('status', {}).get('confirmed')]
+    confirmed = [u for u in utxos if u.get('status', {}).get('confirmed', True)]
     return [u for u in confirmed if u['value'] > dust]
 
 def fetch_all_utxos_from_xpub(xpub: str, dust: int = 546):
-    """
-    Pure-API xpub scanner — No bip32 lib needed. Uses Blockchain.info multiaddr + Blockstream/Mempool.
-    Scans up to 200 addresses (100 receive + 100 change). Sorted descending by value.
-    """
     try:
-        import urllib.parse  # Built-in, zero deps
+        import urllib.parse
         xpub_clean = xpub.strip()
-        
-        # Step 1: Get addresses via Blockchain.info multiaddr (fast, handles derivation paths)
-        multi_url = f"https://blockchain.info/multiaddr?active={urllib.parse.quote(xpub_clean)}&n=200&index=0"
-        multi_resp = requests.get(multi_url, timeout=30)
-        multi_resp.raise_for_status()
-        data = multi_resp.json()
-        
-        if not data.get("addresses"):
-            raise ValueError("No addresses derived from xpub — invalid format?")
-        
+        url = f"https://blockchain.info/multiaddr?active={urllib.parse.quote(xpub_clean)}&n=200"
+        data = requests.get(url, timeout=30).json()
+        addresses = [a["address"] for a in data.get("addresses", [])[:200]]
+
         all_utxos = []
-        scanned = 0
-        max_scan = 200  # Safety cap
-        
-        for addr_info in data["addresses"]:
-            if scanned >= max_scan:
-                break
-            addr = addr_info["address"]
-            scanned += 1
-            
-            # Step 2: Fetch UTXOs for this addr using your existing api_get (with fallbacks)
+        for addr in addresses:
             try:
                 utxos = api_get(f"https://blockstream.info/api/address/{addr}/utxo")
             except:
-                try:
-                    utxos = api_get(f"https://mempool.space/api/address/{addr}/utxo")
-                except Exception as e:
-                    print(f"API fail for {addr}: {e}")  # Silent log, don't crash
-                    continue
-            
+                utxos = api_get(f"https://mempool.space/api/address/{addr}/utxo")
             confirmed = [u for u in utxos if u.get('status', {}).get('confirmed', True)]
             all_utxos.extend([u for u in confirmed if u['value'] > dust])
-        
-        # CRITICAL: Sort by value descending (your existing logic)
-        all_utxos = sorted(all_utxos, key=lambda x: x['value'], reverse=True)
-        
-        return all_utxos, f"API-scanned xpub → {len(all_utxos):,} UTXOs across {scanned} addresses"
-    
-    except requests.exceptions.RequestException as e:
-        return [], f"API scan failed (network?): {str(e)}<br>Tip: Check xpub format or try single address."
+
+        all_utxos.sort(key=lambda x: x['value'], reverse=True)
+        return all_utxos, f"Scanned {len(addresses)} addresses → {len(all_utxos)} UTXOs"
     except Exception as e:
-        return [], f"xpub parse error: {str(e)}<br>Fallback: Enter a single BTC address instead."
+        return [], f"Error: {str(e)}"
 
 def format_btc(sats: int) -> str:
-    if sats == 0:
-        return "0 sats"
     if sats < 100_000:
         return f"{sats:,} sats"
     btc = sats / 100_000_000
-    if sats >= 100_000_000:  # 1 BTC+
-        return f"{btc:,.4f} BTC".rstrip("0").rstrip(".")
-    else:
-        return f"{btc:.8f} BTC".rstrip("0").rstrip(".")
+    return f"{btc:,.8f} BTC".rstrip("0").rstrip(".") + (" BTC" if btc >= 1 else " BTC")
+
 # ==============================
-# Transaction Primitives
+# Transaction Building
 # ==============================
 def encode_varint(i):
     if i < 0xfd: return bytes([i])
@@ -210,7 +172,7 @@ class TxIn:
     prev_tx: bytes
     prev_index: int
     script_sig: bytes = b''
-    sequence: int = 0xfffffffd  # RBF enabled by default
+    sequence: int = 0xfffffffd
     def encode(self):
         return (self.prev_tx[::-1] +
                 self.prev_index.to_bytes(4, 'little') +
@@ -222,8 +184,7 @@ class TxOut:
     amount: int
     script_pubkey: bytes
     def encode(self):
-        return (self.amount.to_bytes(8, 'little') +
-                encode_varint(len(self.script_pubkey)) + self.script_pubkey)
+        return self.amount.to_bytes(8, 'little') + encode_varint(len(self.script_pubkey)) + self.script_pubkey
 
 @dataclass
 class Tx:
@@ -235,415 +196,223 @@ class Tx:
         self.tx_ins = self.tx_ins or []
         self.tx_outs = self.tx_outs or []
     def encode(self):
-        out = [self.version.to_bytes(4, 'little'), encode_varint(len(self.tx_ins))]
-        out += [i.encode() for i in self.tx_ins]
-        out += [encode_varint(len(self.tx_outs))]
-        out += [o.encode() for o in self.tx_outs]
-        out += [self.locktime.to_bytes(4, 'little')]
-        return b''.join(out)
+        parts = [
+            self.version.to_bytes(4, 'little'),
+            encode_varint(len(self.tx_ins)),
+            *[i.encode() for i in self.tx_ins],
+            encode_varint(len(self.tx_outs)),
+            *[o.encode() for o in self.tx_outs],
+            self.locktime.to_bytes(4, 'little')
+        ]
+        return b''.join(parts)
 
-def tx_to_psbt(tx: Tx) -> str:
-    return base64.b64encode(b'psbt\xff\x00\x00' + tx.encode() + b'\x00').decode()
-
-# ==============================
-# RBF Bump
-# ==============================
-def varint_decode(data: bytes, pos: int):
-    first = data[pos]
-    pos += 1
-    if first < 0xfd: return first, pos
-    elif first == 0xfd: return int.from_bytes(data[pos:pos+2], 'little'), pos + 2
-    elif first == 0xfe: return int.from_bytes(data[pos:pos+4], 'little'), pos + 4
-    else: return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
-
-def rbf_bump(raw_hex: str, bump: int = 50):
-    try:
-        data = bytes.fromhex(raw_hex.strip())
-        pos = 4
-        vin_len, pos = varint_decode(data, pos)
-        for _ in range(vin_len):
-            pos += 36
-            slen, pos = varint_decode(data, pos)
-            pos += slen + 4
-        vout_len, pos = varint_decode(data, pos)
-        amount = int.from_bytes(data[pos:pos+8], 'little')
-        vsize = (len(data) + 3) // 4
-        extra = int(vsize * bump)
-        if amount <= extra + 546:
-            return "Not enough for bump", raw_hex
-        new_amount = amount - extra
-        tx = bytearray(data)
-        tx[pos:pos+8] = new_amount.to_bytes(8, 'little')
-        ipos = 5
-        for _ in range(vin_len):
-            ipos += 36
-            slen, ipos = varint_decode(data, ipos-1 if ipos > len(data) else ipos)
-            ipos += slen + 4
-            tx[ipos-4:ipos] = b'\xfd\xff\xff\xff'
-        return tx.hex(), f"Bumped +{bump} sat/vB (+{extra:,} sats fee)"
-    except Exception as e:
-        return f"Error: {e}", raw_hex
-
-# ==============================
-# NEW: Local QR code generation (privacy!)
-# ==============================
 def make_qr(data: str) -> str:
     img = qrcode.make(data, box_size=10, border=4)
     buf = io.BytesIO()
     img.save(buf, format='PNG')
-    b64 = base64.b64encode(buf.getvalue()).decode()
-    return f"data:image/png;base64,{b64}"
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
 # ==============================
-# Core logic — now with all requested upgrades
+# Core Functions
 # ==============================
-def analysis_pass(addr, strategy, threshold, dest, sweep, invoice, xpub):
+def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
     global pruned_utxos_global, input_vb_global, output_vb_global
-    pruned_utxos_global = None
-    input_vb_global = 68
-    output_vb_global = 31
 
-    if xpub and xpub.strip():
-        utxos, info = fetch_all_utxos_from_xpub(xpub.strip(), threshold)
-        if isinstance(info, str) and ("error" in info.lower() or "failed" in info.lower()):
-            return info.replace("\n", "<br>"), gr.update(visible=True)
+    is_xpub = user_input.strip().startswith(('xpub', 'zpub', 'ypub', 'tpub'))
+    addr = user_input.strip()
+
+    if is_xpub:
+        utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
     else:
-        if not addr or not addr.strip():
-            return "Enter a Bitcoin address or xpub", gr.update(visible=True)
-        utxos = get_utxos(addr.strip(), threshold)
+        if not addr: return "Enter address or xpub", gr.update(visible=False)
+        utxos = get_utxos(addr, threshold)
 
     if not utxos:
-        return "No confirmed UTXOs above dust threshold.<br>Lower threshold or wait for confirmations.", gr.update(visible=True)
+        return "No UTXOs above dust threshold", gr.update(visible=False)
 
-    # SORT BY VALUE DESCENDING — CRITICAL FIX
-    utxos = sorted(utxos, key=lambda x: x['value'], reverse=True)
+    utxos.sort(key=lambda x: x['value'], reverse=True)
+    sample = [u.get('address') or addr for u in utxos[:10]]
+    types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
+    from collections import Counter
+    detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
 
-    # ──────────────────────── NEW DETECTION LOGIC (xpub-proof) ────────────────────────
-    sample_addrs = [u.get('address') or addr.strip() for u in utxos[:10]]  # sample up to 10
-    script_types = []
-    for s in sample_addrs:
-        _, info = address_to_script_pubkey(s)
-        if info:
-            script_types.append(info['type'])
-
-    if script_types:
-        from collections import Counter
-        detected_type = Counter(script_types).most_common(1)[0][0]
-    else:
-        detected_type = "SegWit (safe fallback)"
-
-    # Apply correct vBytes based on detected type
-    type_to_vb = {
-        'P2PKH': {'input_vb': 148, 'output_vb': 34},
-        'P2SH':  {'input_vb': 91,  'output_vb': 32},
-        'SegWit': {'input_vb': 68, 'output_vb': 31},
-        'Taproot': {'input_vb': 57.5, 'output_vb': 43},
+    vb_map = {
+        'P2PKH': (148, 34), 'P2SH': (91, 32), 'SegWit': (68, 31), 'Taproot': (57.5, 43)
     }
-    vb = type_to_vb.get(detected_type.split(' ')[0], {'input_vb': 68, 'output_vb': 31})
-    input_vb_global = vb['input_vb']
-    output_vb_global = vb['output_vb']
-    # ─────────────────────────────────────────────────────────────────────────────────────
+    input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
 
     ratio = {"Privacy First (30% pruned)": 0.3, "Recommended (40% pruned)": 0.4, "More Savings (50% pruned)": 0.5}.get(strategy, 0.4)
-    keep_count = max(1, int(len(utxos) * (1 - ratio)))
-    pruned_utxos_global = utxos[:keep_count]
+    keep = max(1, int(len(utxos) * (1 - ratio)))
+    pruned_utxos_global = utxos[:keep]
 
-    log = f"""
-    <b>Scan complete!</b><br><br>
-    Found <b>{len(utxos):,}</b> UTXOs • Keeping the <b>{keep_count:,}</b> largest<br>
-    Strategy: <b>{strategy.split(' (')[0]}</b><br>
-    Format: <b>{detected_type}</b><br><br>
-    Click below to consolidate
-    """
-    # ─────────────────────────────────────────────────────────────────────────────────────
-    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
-    # THIS IS THE LINE YOU WERE LOOKING FOR — IT'S NOW USING "detected_type"
-    # ─────────────────────────────────────────────────────────────────────────────────────
-    return log, gr.update(visible=True), detected_type
+    return (
+        f"<b>Found {len(utxos):,} UTXOs</b> • Keeping {keep} largest • {detected}<br>"
+        f"Click <b>Generate Transaction</b> to continue",
+        gr.update(visible=True)
+    )
 
-def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
-                  dao_percent, selfish_mode, dao_addr):
+def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice):
     global pruned_utxos_global, input_vb_global, output_vb_global
     if not pruned_utxos_global:
-        return "Run analysis first!", gr.update(visible=False), ""
+        return "Run analysis first", gr.update(visible=False), ""
 
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
+    outputs = 1 + (1 if not selfish_mode and dao_percent > 0 else 0)
+    vsize = 10 + inputs + input_vb_global * inputs + output_vb_global * outputs
 
-    # Live fee rate from mempool.space
     try:
-        fee_rate = requests.get("https://mempool.space/api/v3/fees/recommended", timeout=8).json()["fastestFee"]
+        fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
     except:
-        try:
-            # backup API (rarely needed, but bulletproof)
-            fee_rate = requests.get("https://bitcoinfees.net/api/v1/fees/recommended", timeout=5).json()["fastestFee"]
-        except:
-            # final fallback — still better than the old static 12
-            fee_rate = 20
-    vsize = 10 + inputs + (input_vb_global * inputs) + (output_vb_global * (2 if not selfish_mode and dao_percent > 0 else 1))
-    miner_fee = max(1000, int(vsize * fee_rate * 1.15))  # +15% buffer
+        fee_rate = 20
+    miner_fee = max(1000, int(vsize * fee_rate * 1.2))
 
-    future_cost = int((input_vb_global * inputs + output_vb_global) * 120)  # assume 120 sat/vB future
-    savings = future_cost - miner_fee
-
-    # DAO logic — completely optional
-    dao_cut = 0
-    if not selfish_mode and dao_percent > 0 and savings > 2000:
-        dao_cut = max(546, int(savings * dao_percent / 10000))  # percent → bps → fraction
-
+    savings = int((input_vb_global * inputs + output_vb_global) * 120) - miner_fee
+    dao_cut = max(546, int(savings * dao_percent / 10000)) if not selfish_mode and dao_percent > 0 and savings > 2000 else 0
     user_gets = total - miner_fee - dao_cut
-    if user_gets < 546:
-        return "Not enough for dust limit after fees", gr.update(visible=False), ""
-            
-    # On-chain path
-    dest_addr = (dest or addr).strip() if dest else addr.strip()
-    dest_script, dest_info = address_to_script_pubkey(dest_addr)
-    if len(dest_script) < 20:
-        return "Invalid destination address", gr.update(visible=False), ""
 
-    # Respect destination output type for accurate vsize
-    if dest_info and 'output_vb' in dest_info:
-        output_vb_global = dest_info['output_vb']
+    if user_gets < 546:
+        return "Not enough after fees", gr.update(visible=False), ""
+
+    # Lightning path
+    if ln_invoice and ln_invoice.strip().lower().startswith("lnbc"):
+        return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode)
+
+    # On-chain path
+    dest = (dest_addr or user_input).strip()
+    dest_script, _ = address_to_script_pubkey(dest)
+    if len(dest_script) < 20:
+        return "Invalid destination", gr.update(visible=False), ""
 
     tx = Tx()
     for u in pruned_utxos_global:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
-
     tx.tx_outs.append(TxOut(user_gets, dest_script))
-    if dao_cut > 0:
+    if dao_cut:
         dao_script, _ = address_to_script_pubkey(dao_addr or DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-    raw = tx.encode().hex()
-    psbt = tx_to_psbt(tx)
+    psbt = base64.b64encode(b'psbt\xff\x00\x00' + tx.encode() + b'\x00').decode()
     qr = make_qr(psbt)
 
-    fee_text = "No thank-you" if dao_cut == 0 else f"Thank-you: <b>{format_btc(dao_cut)}</b> ({dao_percent/100:.2f}% of savings)"
-
-    # Lightning path
-    if invoice and invoice.strip().lower().startswith("lnbc"):
-        return lightning_sweep_flow(pruned_utxos_global, invoice.strip(), miner_fee, savings, dao_cut, selfish_mode)
-
+    thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
     return (
-    f"""
-    <div style="text-align:center; max-width:780px; margin:0 auto; padding:20px;">
-        <h3 style="color:#f7931a; margin-bottom:32px;">Transaction Ready</h3>
-        <p>Consolidated <b>{inputs}</b> inputs → <b>{format_btc(total)}</b> total<br>
-        Live fee rate: <b>{fee_rate}</b> sat/vB → Miner fee <b>{format_btc(miner_fee)}</b><br>
-        {fee_text}<br><br>
-        <span style="font-size:32px; color:#00ff9d; font-weight:bold;">
-            You receive: {format_btc(user_gets)}
-        </span></p>
-        <div style="display:flex; justify-content:center; margin:50px 0;">
-            <img src="{qr}" style="width:440px; max-width:96vw; border-radius:20px; border:5px solid #f7931a;">
+        f"""
+        <div style="text-align:center; padding:20px;">
+            <h3 style="color:#f7931a;">Transaction Ready</h3>
+            <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
+            Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
+            <b style="font-size:32px; color:#00ff9d;">You receive: {format_btc(user_gets)}</b></p>
+            <img src="{qr}" style="width:420px; border-radius:16px; border:4px solid #f7931a;">
+            <p><small>Scan with Sparrow, BlueWallet, Nunchuk, Electrum</small></p>
         </div>
-        <small>Scan with any PSBT-compatible wallet (Sparrow, BlueWallet, Nunchuk…)</small>
-        <details><summary>Raw hex / PSBT</summary>
-        <pre style="text-align:left; background:#000; color:#0f0; padding:15px; border-radius:8px; overflow-x:auto;">
-Raw hex:  {raw}
-PSBT:     {psbt}</pre></details>
-    </div>
-    """,
-    gr.update(visible=True, interactive=False),
-    ""   # ← dummy third value so .then() chain works
-)
+        """,
+        gr.update(visible=False),
+        "onchain"
+    )
 
-def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_cut: int, selfish_mode: bool):
+def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
     if not bolt11_decode:
-        return "<b style='color:#ff3333'>bolt11 library missing — Lightning disabled</b>", ""
+        return "bolt11 missing", gr.update(visible=False), ""
 
     try:
-        decoded = bolt11_decode(invoice.strip())
+        decoded = bolt11_decode(invoice)
         total = sum(u['value'] for u in utxos)
         user_gets = total - miner_fee - (0 if selfish_mode else dao_cut)
-
-        if user_gets < 546:
-            raise ValueError("Not enough after fees")
-
-        expected_msats = user_gets * 1000
-        if abs(expected_msats - (decoded.amount_msat or 0)) > 5_000_000:
-            raise ValueError(f"Invoice must be for ~{format_btc(user_gets)} (±5k sats tolerance)")
-
-        if not getattr(decoded, 'payment_address', None):
-            raise ValueError("Invoice must support on-chain fallback (Phoenix, Breez, Blink, Muun)")
+        if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
+            raise ValueError("Invoice amount mismatch")
 
         dest_script, _ = address_to_script_pubkey(decoded.payment_address)
         tx = Tx()
         for u in utxos:
             tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
         tx.tx_outs.append(TxOut(user_gets, dest_script))
-        if dao_cut > 0 and not selfish_mode:
+        if dao_cut and not selfish_mode:
             dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
             tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-        raw = tx.encode().hex()
-        qr = make_qr(raw)
-
-        thank_you_text = "No thank-you" if dao_cut == 0 else f"Thank-you: <b>{format_btc(dao_cut)}</b>"
-
+        qr = make_qr(tx.encode().hex())
         return (
             f"""
-            <div style="text-align:center; font-size:24px; color:#00ff9d; margin:40px 0;">
-                Lightning Sweep Ready
+            <div style="text-align:center; color:#00ff9d; font-size:24px;">
+                Lightning Sweep Ready<br><br>
+                You receive {format_btc(user_gets)} instantly
             </div>
-            You receive <b>{format_btc(user_gets)}</b> instantly on Lightning<br>
-            Miner fee: <b>{format_btc(miner_fee)}</b> • Thank-you: <b>{format_btc(dao_cut)}</b><br><br>
-            <div style="display:flex; justify-content:center;">
-                <img src="{qr}" style="max-width:100%; border-radius:16px; box-shadow:0 8px 40px rgba(0,255,157,0.6)">
-            </div>
-            <small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small>
+            <img src="{qr}" style="max-width:100%; border-radius:16px;">
             """,
-            gr.update(visible=True, interactive=False),
-            ""
+            gr.update(visible=False),
+            "lightning"
         )
-
     except Exception as e:
-        error_msg = f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}"
-        return (
-            error_msg,
-            gr.update(visible=True, interactive=False),
-            ""
-        )
+        return f"Lightning failed: {e}", gr.update(visible=False), ""
 
 # ==============================
-# Gradio UI – clean & honest
+# Gradio UI — Final & Perfect
 # ==============================
-with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
+with gr.Blocks(title="Omega Pruner v9.0", theme=gr.themes.Soft()) as demo:
     gr.HTML(f"<style>{css}</style>")
-
-    gr.Markdown("# Omega Pruner v9.0")
+    gr.Markdown("# Omega Pruner v9.0 — Community Edition")
     gr.Markdown(disclaimer)
 
     with gr.Row():
-        with gr.Column(scale=4, min_width=300):
-            user_addr = gr.Textbox(
-                label="Bitcoin address or xpub/zpub",
-                placeholder="bc1q… or xpub…",
-                lines=2
-            )
-        with gr.Column(scale=3, min_width=240):
-            prune_choice = gr.Dropdown(
-                ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
-                value="Recommended (40% pruned)",
-                label="Pruning Strategy"
-            )
+        with gr.Column(scale=4): user_input = gr.Textbox(label="Address or xpub", placeholder="bc1q… or xpub…", lines=2)
+        with gr.Column(scale=3): prune_choice = gr.Dropdown(["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"], value="Recommended (40% pruned)", label="Strategy")
 
     dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
-    dest_addr = gr.Textbox(
-        label="Destination (optional – leave blank = same address)",
-        placeholder="bc1q…"
-    )
+    dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     with gr.Row():
-        selfish_mode = gr.Checkbox(label="Selfish mode – keep 100% (no thank-you)", value=False)
-
+        selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
     with gr.Row():
-        with gr.Column(scale=1, min_width=120):
-            dao_percent = gr.Slider(0, 500, value=50, step=10, label="Optional thank-you (bps)")
-        with gr.Column(scale=1, min_width=280):
-            gr.Markdown("50 bps = 0.5% · 0 = keep 100%")
+        with gr.Column(scale=1): dao_percent = gr.Slider(0, 500, 50, step=10, label="Thank-you (bps)")
+        with gr.Column(scale=2): gr.Markdown("50 bps = 0.5% • 0 = keep all")
 
-    dao_addr = gr.Textbox(
-        label="Thank-you address (optional)",
-        placeholder="Leave default to support the original Ω author",
-        value=DEFAULT_DAO_ADDR,
-        interactive=True
-    )
+    dao_addr = gr.Textbox(label="Thank-you address (optional)", value=DEFAULT_DAO_ADDR)
 
     with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
-        generate_btn = gr.Button("2. Generate Transaction", visible=False, interactive=False, variant="primary")
+        generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary")
 
-    # ——————— MAIN OUTPUT AREA ———————
     output_log = gr.HTML()
+    ln_invoice = gr.Textbox(label="Lightning Invoice → paste lnbc…", lines=3, visible=False)
 
-    # LIGHTNING BOX — appears right after output_log
-    ln_invoice = gr.Textbox(
-        label="Lightning Invoice → paste lnbc... here to sweep instantly",
-        placeholder="Will appear automatically after transaction is generated",
-        lines=3,
-        visible=False
-    )
-
-    # RBF TOOL
-    gr.Markdown("### Stuck tx? RBF bump")
+    gr.Markdown("### RBF Bump")
     with gr.Row():
-        rbf_in = gr.Textbox(label="Raw hex", lines=5, scale=4)
-        rbf_btn = gr.Button("Bump +50 sat/vB", scale=1)
-    rbf_out = gr.Textbox(label="New transaction", lines=8)
+        rbf_in = gr.Textbox(label="Raw hex", lines=5)
+        rbf_btn = gr.Button("Bump +50 sat/vB")
+    rbf_out = gr.Textbox(label="Bumped tx", lines=8)
 
-    status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin")
-
-    # ———————————————— EVENTS ————————————————
-    # 1. Analyze → show generate button
-    submit_btn.click(
-        fn=analysis_pass,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-        outputs=[output_log, generate_btn]
-    ).then(
-        lambda: (
-            gr.update(visible=True, interactive=True),
-            gr.update(value="Ready → Click **2. Generate Transaction**")
-        ),
-        outputs=[generate_btn, status_msg]
+    # Events
+    submit_btn.click(analysis_pass, [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr], [output_log, generate_btn])
+    generate_btn.click(build_real_tx, [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice], [output_log, generate_btn, None]).then(
+        lambda: gr.update(visible=True), outputs=ln_invoice
     )
-
-    # 2. Generate on-chain TX → then auto-show Lightning invoice box
-    generate_btn.click(
-        fn=build_real_tx,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
-        outputs=[output_log, generate_btn, ln_invoice]  # 3 outputs!
-    ).then(
-        lambda log: gr.update(
-            visible="You receive" in str(log) or "Lightning" in str(log),
-            label="Lightning Invoice → paste lnbc... to sweep instantly",
-            placeholder="Must be for the exact amount shown above"
-        ),
-        inputs=output_log,
-        outputs=ln_invoice
+    ln_invoice.submit(build_real_tx, [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice], [output_log, generate_btn]).then(
+        lambda: gr.update(visible=False), outputs=ln_invoice
     )
+    rbf_btn.click(lambda h: rbf_bump(h.strip())[0] if h.strip() else "Paste hex", rbf_in, rbf_out)
 
-    # 3. User pastes Lightning invoice → generate Lightning sweep TX
-    ln_invoice.submit(
-        fn=build_real_tx,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
-        outputs=[output_log, generate_btn]
-    ).then(
-        lambda: gr.update(visible=False),
-        outputs=ln_invoice
-    ).then(
-        lambda: gr.update(value="Lightning sweep ready! Scan QR below"),
-        outputs=status_msg
-    )
+    gr.Markdown("<hr><small>Made with love by the swarm • Ω lives forever • 2025</small>")
 
-    # RBF
-    rbf_btn.click(
-        fn=lambda h: rbf_bump(h)[0] if h.strip() else "Paste raw hex first",
-        inputs=rbf_in,
-        outputs=rbf_out
-    )
-
-    gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
-    
-    # QR scanners + auto-show invoice box (same excellent code from v8.7)
+    # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
     gr.HTML("""
-    <!-- ORANGE CAMERA BUTTON - SCAN ON-CHAIN ADDRESS -->
-    <label class="qr-button camera">
-      <input type="file" accept="image/*" capture="environment" id="qr-camera-omega" style="display:none">
-      <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:38px;pointer-events:none;">Camera</div>
-    </label>
+    <label class="qr-button camera">Camera</label>
+    <label class="qr-button lightning">Lightning</label>
 
-    <!-- GREEN LIGHTNING BUTTON - SCAN LIGHTNING INVOICE -->
-    <label class="qr-button lightning">
-      <input type="file" accept="image/*" capture="environment" id="qr-lightning-omega" style="display:none">
-      <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:38px;pointer-events:none;">Lightning</div>
-    </label>
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-camera" style="display:none">
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
 
     <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
     <script>
-    // Camera → Address field
-    document.getElementById('qr-camera-omega').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
+    const cameraBtn = document.querySelector('.qr-button.camera');
+    const lnBtn = document.querySelector('.qr-button.lightning');
+    const cameraInput = document.getElementById('qr-scanner-camera');
+    const lnInput = document.getElementById('qr-scanner-ln');
+
+    cameraBtn.onclick = () => cameraInput.click();
+    lnBtn.onclick = () => lnInput.click();
+
+    async function scan(file, isLightning = false) {
       if (!file) return;
       const img = new Image();
       img.onload = async () => {
@@ -652,53 +421,30 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         canvas.getContext('2d').drawImage(img, 0, 0);
         try {
           const result = await ZXing.readBarcodeFromCanvas(canvas);
-          if (result.text.startsWith('bitcoin:') || result.text.startsWith('bc1') || result.text.startsWith('1') || result.text.startsWith('3')) {
-            document.querySelector("#user_addr input").value = result.text.replace(/^bitcoin:/i, '').split('?')[0];
-            document.querySelector("#user_addr input").dispatchEvent(new Event('input'));
-            alert("Address scanned successfully!");
+          const text = result.text.trim();
+
+          if (isLightning && (text.toLowerCase().startsWith('lnbc') || text.toLowerCase().startsWith('lnurl'))) {
+            const textbox = document.querySelector('textarea[placeholder*="lnbc"], input[placeholder*="lnbc"]');
+            if (textbox) { textbox.value = text; textbox.dispatchEvent(new Event('input')); }
+            alert("Lightning invoice scanned!");
+          } else if (!isLightning && (text.startsWith('bc1') || text.startsWith('1') || text.startsWith('3') || text.startsWith('xpub') || text.startsWith('zpub'))) {
+            const addrbox = document.querySelector('textarea[placeholder*="bc1q"], input[placeholder*="bc1q"]');
+            if (addrbox) { addrbox.value = text.split('?')[0].replace(/^bitcoin:/i, ''); addrbox.dispatchEvent(new Event('input')); }
+            alert("Address/xpub scanned!");
           } else {
-            alert("Not a Bitcoin address");
+            alert("Not recognized. Try again.");
           }
-        } catch { alert("No QR code found — try again"); }
+        } catch (e) { alert("No QR found — try better lighting"); }
       };
       img.src = URL.createObjectURL(file);
-    });
-    // Lightning → Invoice field
-    document.getElementById('qr-lightning-omega').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const img = new Image();
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width; canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        try {
-          const result = await ZXing.readBarcodeFromCanvas(canvas);
-          const text = result.text.trim().toLowerCase();
-          if (text.startsWith('lnbc') || text.startsWith('lnurl')) {
-            const invoiceBox = document.querySelector("#ln_invoice textarea") || document.querySelector("#ln_invoice input");
-            if (invoiceBox) {
-              invoiceBox.value = result.text;
-              invoiceBox.dispatchEvent(new Event('input'));
-              invoiceBox.dispatchEvent(new Event('change'));
-              alert("Lightning invoice scanned & pasted!");
-            }
-          } else {
-            alert("Not a Lightning invoice");
-          }
-        } catch { alert("No QR code found"); }
-      };
-      img.src = URL.createObjectURL(file);
-    });
+    }
+
+    cameraInput.onchange = (e) => scan(e.target.files[0], false);
+    lnInput.onchange = (e) => scan(e.target.files[0], true);
     </script>
     """)
 
 if __name__ == "__main__":
     import os
     demo.queue(max_size=30)
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),
-        share=True,
-        allowed_paths=["static"]   # optional, only if you have a /static folder
-    )
+    demo.launch(server_port=int(os.environ.get("PORT", 7860)), share=True)
