@@ -660,16 +660,17 @@ def fetch_all_utxos_from_xpub(xpub_str: str, dust_threshold: int = 546):
         except Exception as e:
             return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun for invoices with on-chain fallback.", ""
 
-    def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546, xpub_input=""):
+     def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546, xpub_input=""):
         output_parts = ["Omega Pruner Ω v8.7 — Live 🜂\n"]
 
         # ── v8.7: FULL-WALLET OR SINGLE-ADDRESS MODE ──
         if xpub_input and xpub_input.strip():
-            all_utxos, result = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
-            if isinstance(result, str):  # ← error string
-                output_parts.append(result)
-                return "\n".join(output_parts), ""
-            output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
+            try:
+                all_utxos, result = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
+                if isinstance(result, str):  # error string from function
+                    output_parts.append(result)
+                    return "\n".join(output_parts), ""
+                output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
             except Exception as e:
                 output_parts.append(f"Invalid xpub or scan failed: {str(e)[:100]}")
                 return "\n".join(output_parts), ""
