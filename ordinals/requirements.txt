@@ -1,4 +1,4 @@
-gradio>=5.4.0
+gradio>=5.9.0
 requests
 pydantic>=2.8
 qrcode[pil] 
