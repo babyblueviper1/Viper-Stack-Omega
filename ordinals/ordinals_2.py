@@ -550,11 +550,11 @@ with gr.Blocks(css=css, title="Omega Pruner v9.0 – Community Edition") as demo
     rbf_btn.click(lambda h: rbf_bump(h)[0], rbf_in, rbf_out)
 
     # Auto-show/hide Lightning invoice box when checkbox changes
-sweep_to_ln.change(
-    fn=lambda sweep, html: gr.update(visible=sweep and "You receive" in str(html)),
-    inputs=[sweep_to_ln, output_log],
-    outputs=ln_invoice
-)
+    sweep_to_ln.change(
+        fn=lambda sweep, html: gr.update(visible=sweep and "You receive" in str(html)),
+        inputs=[sweep_to_ln, output_log],
+        outputs=ln_invoice
+    )
 
     gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
 
