@@ -394,29 +394,7 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
     user_gets = total - miner_fee - dao_cut
     if user_gets < 546:
         return "Not enough for dust limit after fees", gr.update(visible=False), ""
-
-    # Lightning path
-    if sweep:
-        inv = invoice.strip()
-        if not inv:
-            return f"""
-            <div style="text-align:center; color:#ff5555; font-size:22px; padding:60px; background:#33000020; border-radius:20px; margin:40px;">
-                Lightning invoice required<br><br>
-                Paste a valid <code>lnbc...</code> invoice for exactly <b>{user_gets:,}</b> sats
-            </div>
-            """, gr.update(visible=False)
-
-        if not inv.lower().startswith("lnbc"):
-            return f"""
-            <div style="text-align:center; color:#ff5555; font-size:22px; padding:60px; background:#33000020; border-radius:20px; margin:40px;">
-                Invalid invoice<br><br>
-                Must start with <code>lnbc</code><br>
-                You entered: <code>{inv[:30]}...</code>
-            </div>
-            """, gr.update(visible=False)
             
-        return lightning_sweep_flow(pruned_utxos_global, invoice, miner_fee, savings, dao_cut, selfish_mode), ""
-
     # On-chain path
     dest_addr = (dest or addr).strip() if dest else addr.strip()
     dest_script, dest_info = address_to_script_pubkey(dest_addr)
@@ -441,6 +419,10 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
     qr = make_qr(psbt)
 
     fee_text = "No thank-you" if dao_cut == 0 else f"Thank-you: <b>{format_btc(dao_cut)}</b> ({dao_percent/100:.2f}% of savings)"
+
+    # Lightning path
+    if invoice and invoice.strip().lower().startswith("lnbc"):
+        return lightning_sweep_flow(pruned_utxos_global, invoice.strip(), miner_fee, savings, dao_cut, selfish_mode)
 
     return f"""
       <div style="text-align:center; max-width:780px; margin:0 auto; padding:20px;">
