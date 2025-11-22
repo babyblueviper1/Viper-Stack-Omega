@@ -6,6 +6,6 @@ audioop-lts
 huggingface_hub==0.24.5
 pydantic==2.10.6
 bitcoinlib
-bolt11
-bip32utils
-python-bolt11
+bolt11>=2.1.0
+bip32>=0.0.2
+bitcoin-utils>=0.6.3
