@@ -460,7 +460,7 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
 Raw hex:  {raw}
 PSBT:     {psbt}</pre></details>
     </div>
-    """, gr.update(visible=False), ""
+    """, gr.update(visible=True, interactive=False), ""
 
 def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_cut: int, selfish_mode: bool):
     if not bolt11_decode:
@@ -495,21 +495,29 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_
 
         thank_you_text = "No thank-you" if dao_cut == 0 else f"Thank-you: <b>{format_btc(dao_cut)}</b>"
 
-        return f"""
-        <div style="text-align:center;font-size:24px;color:#00ff9d;margin:40px 0">
-        Lightning Sweep Ready
-        </div>
-        You receive <b>{format_btc(user_gets)}</b> instantly on Lightning<br>
-        Miner fee: <b>{format_btc(miner_fee)}</b> • {thank_you_text}<br><br>
-        <div style="display:flex; justify-content:center;">
-            <img src="{qr}" style="max-width:100%;border-radius:16px;box-shadow:0 8px 40px rgba(0,255,157,0.6)">
-        </div>
-        <small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small>
-        """, raw
+                return (
+            f"""
+            <div style="text-align:center; font-size:24px; color:#00ff9d; margin:40px 0;">
+                Lightning Sweep Ready
+            </div>
+            You receive <b>{format_btc(user_gets)}</b> instantly on Lightning<br>
+            Miner fee: <b>{format_btc(miner_fee)}</b> • Thank-you: <b>{format_btc(dao_cut)}</b><br><br>
+            <div style="display:flex; justify-content:center;">
+                <img src="{qr}" style="max-width:100%; border-radius:16px; box-shadow:0 8px 40px rgba(0,255,157,0.6)">
+            </div>
+            <small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small>
+            """,
+            gr.update(visible=True, interactive=False),
+            ""
+        )
 
     except Exception as e:
-        return f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}", ""
-
+        error_msg = f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}"
+        return (
+            error_msg,
+            gr.update(visible=True, interactive=False),
+            ""
+        )
 
 # ==============================
 # Gradio UI – clean & honest
@@ -588,7 +596,7 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         fn=build_real_tx,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr,
                 dao_percent, selfish_mode, dao_addr],
-        outputs=[output_log, generate_btn]
+        outputs=[output_log, generate_btn, gr.State()]  # ← use gr.State() as dummy third output
     ).then(
         fn=lambda: gr.update(visible=True, placeholder="Paste Lightning invoice → auto-convert"),
         outputs=ln_invoice
