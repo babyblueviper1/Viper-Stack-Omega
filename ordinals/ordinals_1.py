@@ -484,7 +484,31 @@ with gr.Blocks(title="Omega Pruner Ω v9.1 — UNBREAKABLE") as demo:
     dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
     with gr.Row():
         sweep_to_ln = gr.Checkbox(label="Sweep to Lightning Network", value=False)
-    ln_invoice = gr.Textbox(label="Lightning Invoice (lnbc...)", placeholder="Paste invoice here", lines=2, elem_classes="hidden-ln-invoice")
+
+    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    # NEW: Invoice box appears ONLY AFTER results, with exact amount hint
+    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    ln_invoice = gr.Textbox(
+        label="Lightning Invoice — create for exact amount shown above",
+        placeholder="After seeing results → generate invoice for the exact amount you receive",
+        lines=3,
+        visible=False
+    )
+
+    # Show invoice box only after Pruner ran AND Lightning is checked
+    def show_ln_box(sweep_checked, has_results):
+        # has_results = True when output_log contains "You receive" or similar
+        if has_results and has_results.strip():
+            return gr.update(visible=sweep_checked)
+        return gr.update(visible=False)
+
+    # Update visibility dynamically
+    submit_btn.click(
+        fn=lambda *args: args,  # dummy, we just need to trigger updates
+        inputs=[sweep_to_ln, output_log],
+        outputs=ln_invoice,
+        js="() => {''}"  # we'll use a tiny JS trick below instead
+    )
 
     submit_btn = gr.Button("Run Pruner", variant="secondary")
     generate_btn = gr.Button("Generate Transaction + Pay DAO", visible=False, variant="primary")
@@ -557,6 +581,19 @@ with gr.Blocks(title="Omega Pruner Ω v9.1 — UNBREAKABLE") as demo:
       };
       img.src = URL.createObjectURL(file);
     });
+
+    // Auto-show Lightning invoice box when results appear + checkbox is on
+document.addEventListener('gradio', (e) => {
+  if (e.detail && e.detail.output && e.detail.output.html) {
+    const hasResults = e.detail.output.html.includes('You receive') || 
+                       e.detail.output.html.includes('Transaction Ready');
+    const sweepChecked = document.querySelector('[data-testid="checkbox"] input')?.checked;
+    const lnBox = document.querySelector('#ln_invoice')?.closest('.gradio-container');
+    if (lnBox) {
+      lnBox.style.display = (hasResults && sweepChecked) ? 'block' : 'none';
+    }
+  }
+});
     </script>
     """)
     
