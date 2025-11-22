@@ -397,22 +397,33 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     psbt = tx_to_psbt(tx)
     qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={psbt}"
 
-    return f"""
-    <h3>Transaction Ready — DAO Fuel Paid</h3>
-    Consolidated <b>{inputs}</b> UTXOs → <b>{total:,}</b> sats<br>
-    Miner fee: <b>{miner_fee:,}</b> sats • DAO tribute: <b>{dao_cut:,}</b> sats (5% of future savings)<br><br>
-    You receive: <b>{user_gets:,}</b> sats<br><br>
-    <div style="text-align:center;margin:30px 0">
-        <a href="{qr}" target="_blank">
-            <img src="{qr}" style="max-width:100%;border-radius:16px;box-shadow:0 8px 30px rgba(255,165,0,0.6)">
-        </a>
-        <br><small>Sign with BlueWallet • Zeus • Mutiny • Aqua • Sparrow • Electrum</small>
-    </div>
-    <pre style="background:#000;color:#0f0;padding:16px;border-radius:12px;overflow-x:auto">
-Raw Hex: {raw}
+  return f"""
+    <div style="text-align:center; max-width:780px; margin:0 auto; padding:20px;">
+        <h3 style="color:#f7931a; margin-bottom:24px;">Transaction Ready — DAO Fuel Paid</h3>
+        
+        <div style="font-size:18px; margin:24px 0; line-height:1.8;">
+            Consolidated <b>{inputs}</b> UTXOs → <b>{total:,}</b> sats<br>
+            Miner fee: <b>{miner_fee:,}</b> sats • DAO tribute: <b>{dao_cut:,}</b> sats (5% of future savings)<br><br>
+            <span style="font-size:24px; color:#00ff9d;">You receive: <b>{user_gets:,}</b> sats</span>
+        </div>
 
-PSBT: {psbt}
-    </pre>
+        <div style="margin:40px 0;">
+            <a href="{qr}" target="_blank">
+                <img src="{qr}" style="width:420px; max-width:96%; height:auto; border-radius:20px; 
+                                     box-shadow:0 12px 40px rgba(247,147,26,0.5); border:4px solid #f7931a;">
+            </a>
+            <br><br>
+            <small style="color:#aaa;">
+                Sign with BlueWallet • Zeus • Mutiny • Aqua • Sparrow • Electrum • Nunchuk
+            </small>
+        </div>
+
+        <div style="text-align:left; background:#000; color:#0f0; padding:20px; border-radius:16px; 
+                     margin:30px auto; max-width:720px; overflow-x:auto; font-family:monospace; font-size:14px;">
+            <b>Raw Hex:</b><br>{raw}<br><br>
+            <b>PSBT (base64):</b><br>{psbt}
+        </div>
+    </div>
     """, gr.update(visible=False)
 
 def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int):
