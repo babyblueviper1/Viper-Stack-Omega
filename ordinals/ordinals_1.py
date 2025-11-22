@@ -372,17 +372,30 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
         return "Not enough after miner fee + DAO tribute", gr.update(visible=False)
 
      # Lightning path — only if checkbox + valid invoice present
+    # ===================================================================
+    # LIGHTNING SWEEP — FIXED FOREVER (2025 edition)
+    # ===================================================================
     if sweep:
         inv = invoice.strip()
-        if inv.startswith("lnbc"):
-            return lightning_sweep_flow(pruned_utxos_global, inv, miner_fee, savings)
-        else:
-            return """
-            <div style="text-align:center; color:#ff3333; font-size:20px; padding:40px;">
-                Lightning invoice missing or invalid<br><br>
-                Paste a valid lnbc... invoice for exactly <b>{user_gets:,}</b> sats
+        if not inv:
+            return f"""
+            <div style="text-align:center; color:#ff5555; font-size:22px; padding:50px; background:#33000020; border-radius:16px;">
+                Missing Lightning invoice<br><br>
+                <b>Paste a valid lnbc... invoice for exactly {user_gets:,} sats</b>
             </div>
             """, gr.update(visible=False)
+
+        if not inv.lower().startswith("lnbc"):
+            return f"""
+            <div style="text-align:center; color:#ff5555; font-size:22px; padding:50px; background:#33000020; border-radius:16px;">
+                Invalid Lightning invoice<br><br>
+                Invoice must start with <code>lnbc</code><br>
+                You pasted: <code>{inv[:20]}...</code>
+            </div>
+            """, gr.update(visible=False)
+
+        # Valid invoice → go to Lightning flow
+        return lightning_sweep_flow(pruned_utxos_global, inv, miner_fee, savings)
 
     # On-chain path
     dest_addr = (dest or addr).strip()
