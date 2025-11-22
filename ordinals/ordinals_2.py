@@ -411,11 +411,13 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
     dest_script, dest_info = address_to_script_pubkey(dest_addr)
     if len(dest_script) < 20:
         return "Invalid destination address", gr.update(visible=False), ""
-# After: dest_script, dest_info = address_to_script_pubkey(dest_addr)
-if dest_info and 'output_vb' in dest_info:
-    output_vb_global = dest_info['output_vb']  # respect Taproot/P2PKH destination
-     After: dest_script, dest_info = address_to_script_pubkey(dest_addr)
-                      
+    if len(dest_script) < 20:
+        return "Invalid destination address", gr.update(visible=False), ""
+
+    # Respect destination output type for accurate vsize
+    if dest_info and 'output_vb' in dest_info:
+        output_vb_global = dest_info['output_vb']
+
     tx = Tx()
     for u in pruned_utxos_global:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
@@ -556,6 +558,8 @@ sweep_to_ln.change(
     outputs=ln_invoice
 )
 
+    gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
+
     # QR scanners + auto-show invoice box (same excellent code from v8.7)
     gr.HTML("""
     <!-- ORANGE CAMERA BUTTON - SCAN ON-CHAIN ADDRESS -->
@@ -636,7 +640,6 @@ document.addEventListener('gradio', (e) => {
 });
     </script>
     """)
-gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
 
 if __name__ == "__main__":
     demo.queue(max_size=30)
