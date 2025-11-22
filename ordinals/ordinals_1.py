@@ -282,6 +282,8 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     except Exception as e:
         return f"Error: {e}", raw_hex
 
+
+
 # ==============================
 # Core Logic — DAO CUT ENFORCED EVERYWHERE
 # ==============================
@@ -375,26 +377,26 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     # ===================================================================
     # LIGHTNING SWEEP — FIXED FOREVER (2025 edition)
     # ===================================================================
-    if sweep:
+   f sweep:
         inv = invoice.strip()
         if not inv:
             return f"""
-            <div style="text-align:center; color:#ff5555; font-size:22px; padding:50px; background:#33000020; border-radius:16px;">
-                Missing Lightning invoice<br><br>
-                <b>Paste a valid lnbc... invoice for exactly {user_gets:,} sats</b>
+            <div style="text-align:center; color:#ff5555; font-size:22px; padding:60px; background:#33000020; border-radius:20px; margin:40px;">
+                Lightning invoice required<br><br>
+                Paste a valid <code>lnbc...</code> invoice for exactly <b>{user_gets:,}</b> sats
             </div>
             """, gr.update(visible=False)
 
         if not inv.lower().startswith("lnbc"):
             return f"""
-            <div style="text-align:center; color:#ff5555; font-size:22px; padding:50px; background:#33000020; border-radius:16px;">
-                Invalid Lightning invoice<br><br>
-                Invoice must start with <code>lnbc</code><br>
-                You pasted: <code>{inv[:20]}...</code>
+            <div style="text-align:center; color:#ff5555; font-size:22px; padding:60px; background:#33000020; border-radius:20px; margin:40px;">
+                Invalid invoice<br><br>
+                Must start with <code>lnbc</code><br>
+                You entered: <code>{inv[:30]}...</code>
             </div>
             """, gr.update(visible=False)
 
-        # Valid invoice → go to Lightning flow
+        # Valid invoice → proceed
         return lightning_sweep_flow(pruned_utxos_global, inv, miner_fee, savings)
 
     # On-chain path
@@ -559,12 +561,22 @@ with gr.Blocks(title="Omega Pruner Ω v9.1 — UNBREAKABLE") as demo:
     # ── ALL EVENTS GO AFTER THE COMPONENTS ARE CREATED ──────────────────
     # Show/hide Lightning invoice box when results appear
     def update_ln_visibility(log_html, sweep):
-        if sweep and log_html and ("You receive" in log_html or "Transaction Ready" in log_html or "Lightning Sweep" in log_html):
-            return gr.update(visible=True, placeholder="Paste invoice for the exact amount shown above")
-        return gr.update(visible=False)
+    # log_html contains the result text, sweep is the checkbox state
+    if sweep and log_html and "You receive" in log_html:
+        # Extract the exact amount from the HTML (robust)
+        import re
+        match = re.search(r"You receive.*?([0-9,]+) sats", log_html)
+        amount = match.group(1) if match else "the exact amount shown"
+        return gr.update(
+            visible=True,
+            label=f"Lightning Invoice – REQUIRED (exactly {amount} sats)",
+            placeholder="Paste your lnbc... invoice here"
+        )
+    return gr.update(visible=False)
 
-    submit_btn.click(update_ln_visibility,   inputs=[output_log, sweep_to_ln], outputs=ln_invoice)
-    generate_btn.click(update_ln_visibility, inputs=[output_log, sweep_to_ln], outputs=ln_invoice)
+# Attach it to both buttons (must be AFTER the components exist)
+submit_btn.click(update_ln_visibility, inputs=[output_log, sweep_to_ln], outputs=ln_invoice)
+generate_btn.click(update_ln_visibility, inputs=[output_log, sweep_to_ln], outputs=ln_invoice)
 
     # Main flows
     submit_btn.click(
