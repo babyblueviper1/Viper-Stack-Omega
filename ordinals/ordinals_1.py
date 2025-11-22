@@ -574,7 +574,7 @@ with gr.Blocks(title="Omega Pruner Ω v8.7") as demo:
 
     # ── ALL EVENTS GO AFTER THE COMPONENTS ARE CREATED ──────────────────
     # Show/hide Lightning invoice box when results appear
-    def update_ln_visibility(log_html, sweep):
+def update_ln_visibility(log_html, sweep):
     # log_html contains the result text, sweep is the checkbox state
     if sweep and log_html and "You receive" in log_html:
         # Extract the exact amount from the HTML (robust)
