@@ -621,78 +621,85 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         except Exception as e:
             return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun for invoices with on-chain fallback.", ""
 
-    def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546, xpub_input=""):
+        def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546, xpub_input=""):
         output_parts = ["Omega Pruner Ω v8.7 — Live 🜂\n"]
 
         # ── v8.7: FULL-WALLET OR SINGLE-ADDRESS MODE ──
         if xpub_input and xpub_input.strip():
-            # Full-wallet mode via xpub
-            all_utxos, derived_count = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
-            if not all_utxos:
-                output_parts.append("No UTXOs found across derived addresses.")
+            try:
+                all_utxos, derived_count = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
+                if not all_utxos:
+                    output_parts.append("No UTXOs found across derived addresses.")
+                    return "\n".join(output_parts), ""
+                output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
+            except Exception as e:
+                output_parts.append(f"Invalid xpub or scan failed: {str(e)[:100]}")
                 return "\n".join(output_parts), ""
-            output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
         else:
-            # Single-address mode (exactly like before)
             if not user_addr or not user_addr.strip():
                 output_parts.append("No address provided.")
                 return "\n".join(output_parts), ""
-            all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
-            if not all_utxos:
-                output_parts.append("No confirmed UTXOs above dust threshold.")
+            try:
+                all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
+                if not all_utxos:
+                    output_parts.append("No confirmed UTXOs above dust threshold.")
+                    return "\n".join(output_parts), ""
+                output_parts.append(f"Single address scan: found {len(all_utxos):,} UTXOs")
+            except Exception as e:
+                output_parts.append(f"Invalid address: {str(e)[:100]}")
                 return "\n".join(output_parts), ""
-            output_parts.append(f"Single address scan: found {len(all_utxos):,} UTXOs")
 
-        # Address validation & vB weights (works for both modes)
-        sample_addr = user_addr.strip() if not xpub_input else all_utxos[0].get("address", user_addr.strip())
+        # Address validation & vB weights (safe for both modes)
+        if all_utxos:
+            sample_addr = all_utxos[0].get("address", user_addr.strip())
+        else:
+            sample_addr = user_addr.strip()
+
         try:
             _, vb = address_to_script_pubkey(sample_addr)
             input_vb = vb['input_vb']
             output_vb = vb['output_vb']
             output_parts.append(f"Address format: {vb['type']} • Ready to prune\n")
         except:
-            output_parts.append("Warning: Could not determine address type — using default weights")
-            input_vb = 68   # safe fallback (SegWit average)
+            output_parts.append("Address format unknown • Using safe default weights\n")
+            input_vb = 68
             output_vb = 31
 
-
-        ratio = {
+        # Strategy & pruning
+        ratio_map = {
             "Privacy First (30% pruned)": 0.3,
             "Recommended (40% pruned)": 0.4,
             "More Savings (50% pruned)": 0.5
-        }[prune_choice]
+        }
+        ratio = ratio_map.get(prune_choice, 0.4)
 
-        keep_percent = {
+        keep_percent_map = {
             "Privacy First (30% pruned)": 70,
             "Recommended (40% pruned)": 60,
             "More Savings (50% pruned)": 50
-        }.get(prune_choice, 60)  # fallback to 60 if something weird happens
+        }
+        keep_percent = keep_percent_map.get(prune_choice, 60)
 
-        ratio = 1 - (keep_percent / 100)   # 0.3, 0.4, or 0.5
         keep = max(1, int(len(all_utxos) * (keep_percent / 100)))
         pruned_utxos = all_utxos[:keep]
-        name_map = {
+
+        strategy_name_map = {
             "Privacy First (30% pruned)": "Privacy First",
             "Recommended (40% pruned)": "Recommended",
             "More Savings (50% pruned)": "More Savings"
         }
-        strategy_name = name_map.get(prune_choice, prune_choice.split(" (")[0])  # fallback
+        strategy_name = strategy_name_map.get(prune_choice, prune_choice.split(" (")[0])
+
         output_parts.append(
-            f"Live Scan:\n"
-            f"• Total UTXOs found: {len(all_utxos):,}\n"
-            f"• Strategy: {strategy_name}\n"
+            f"Strategy: {strategy_name}\n"
             f"→ Keeping the {keep_percent}% largest UTXOs\n"
             f"→ Pruning the smallest {100 - keep_percent}% (above dust threshold)"
         )
 
         if not confirm_proceed:
-            output_parts.append(
-                "\nClick **'Generate Real TX Hex'** below to create the unsigned transaction\n"
-                "(includes DAO cut + RBF-ready)"
-            )
+            output_parts.append("\nClick 'Generate Transaction (with DAO cut)' to build the real transaction")
             return "\n".join(output_parts), ""
 
-       # Real TX is now built entirely in build_real_tx — nothing to do here
         return "\n".join(output_parts), ""
 
     # Two-step flow
@@ -701,30 +708,32 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
 
         log, _ = main_flow(addr, strategy, dest, False, threshold, xpub_input)
 
-        # Re-use the same all_utxos that main_flow already fetched
-        # (no duplicate API calls!)
+        # Re-use the same all_utxos from main_flow (no duplicate calls)
         if xpub_input and xpub_input.strip():
             all_utxos, _ = fetch_all_utxos_from_xpub(xpub_input.strip(), threshold)
         else:
             all_utxos, _ = get_utxos(addr.strip(), threshold)
+
         ratio = {
             "Privacy First (30% pruned)": 0.3,
             "Recommended (40% pruned)": 0.4,
             "More Savings (50% pruned)": 0.5
-        }[strategy]
+        }.get(strategy, 0.4)
+
         keep = max(1, int(len(all_utxos) * (1 - ratio)))
         pruned_utxos_global = all_utxos[:keep]
 
-        _, vb = address_to_script_pubkey(addr.strip())
-        input_vb_global = vb['input_vb']
-        output_vb_global = vb['output_vb']
+        # Safe vB weights
+        sample_addr = addr.strip() if not xpub_input else all_utxos[0].get("address", addr.strip()) if all_utxos else addr.strip()
+        try:
+            _, vb = address_to_script_pubkey(sample_addr)
+            input_vb_global = vb['input_vb']
+            output_vb_global = vb['output_vb']
+        except:
+            input_vb_global = 68
+            output_vb_global = 31
 
-        if not pruned_utxos_global:
-            log += "\nWarning: No UTXOs selected — nothing to consolidate."
-
-        # ←←← THIS LINE IS PERFECT — converts all \n to <br> for Textbox
         log_with_br = log.replace("\n", "<br>")
-
         return log_with_br, gr.update(visible=True), gr.update(visible=False)
         
 
@@ -840,10 +849,11 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         outputs=[output_text, generate_btn, raw_tx_text]
     )
 
-    generate_btn.click(fn=build_real_tx,
-                       inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice],
-                       outputs=[output_text, raw_tx_text, generate_btn])
-
+    generate_btn.click(
+        fn=build_real_tx,
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice, xpub_input],
+        outputs=[output_text, raw_tx_text, generate_btn]
+    )
     # RBF
     rbf_btn.click_count = 0
     def do_rbf(hex_in):
