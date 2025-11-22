@@ -5,5 +5,5 @@ audioop-lts
 huggingface_hub==0.24.5
 pydantic==2.10.6
 bolt11>=2.1.0
-python-bip32
+bip32>=5.0.0
 bitcoin-utils>=0.6.3
