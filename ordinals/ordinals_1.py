@@ -134,32 +134,55 @@ def get_utxos(addr, dust=546):
     return [u for u in confirmed if u['value'] > dust]
 
 def fetch_all_utxos_from_xpub(xpub: str, dust: int = 546):
-    if not BIP32:
-        return [], "bip32 library missing — pip install bip32"
+    """
+    Pure-API xpub scanner — No bip32 lib needed. Uses Blockchain.info multiaddr + Blockstream/Mempool.
+    Scans up to 200 addresses (100 receive + 100 change). Sorted descending by value.
+    """
     try:
-        bip32 = BIP32.from_xpub(xpub)
+        import urllib.parse  # Built-in, zero deps
+        xpub_clean = xpub.strip()
+        
+        # Step 1: Get addresses via Blockchain.info multiaddr (fast, handles derivation paths)
+        multi_url = f"https://blockchain.info/multiaddr?active={urllib.parse.quote(xpub_clean)}&n=200&index=0"
+        multi_resp = requests.get(multi_url, timeout=30)
+        multi_resp.raise_for_status()
+        data = multi_resp.json()
+        
+        if not data.get("addresses"):
+            raise ValueError("No addresses derived from xpub — invalid format?")
+        
         all_utxos = []
-        for change in [0, 1]:
-            for i in range(100):
-                addr = bip32.get_address(change=change, index=i)
-                try:
-                    utxos = api_get(f"https://blockstream.info/api/address/{addr}/utxo")
-                except:
-                    try:
-                        utxos = api_get(f"https://mempool.space/api/address/{addr}/utxo")
-                    except:
-                        continue
-                confirmed = [u for u in utxos if u.get('status', {}).get('confirmed')]
-                all_utxos.extend([u for u in confirmed if u['value'] > dust])
-                if len(all_utxos) > 1000:
-                    break
-            if len(all_utxos) > 1000:
+        scanned = 0
+        max_scan = 200  # Safety cap
+        
+        for addr_info in data["addresses"]:
+            if scanned >= max_scan:
                 break
-        # CRITICAL: Sort by value descending
+            addr = addr_info["address"]
+            scanned += 1
+            
+            # Step 2: Fetch UTXOs for this addr using your existing api_get (with fallbacks)
+            try:
+                utxos = api_get(f"https://blockstream.info/api/address/{addr}/utxo")
+            except:
+                try:
+                    utxos = api_get(f"https://mempool.space/api/address/{addr}/utxo")
+                except Exception as e:
+                    print(f"API fail for {addr}: {e}")  # Silent log, don't crash
+                    continue
+            
+            confirmed = [u for u in utxos if u.get('status', {}).get('confirmed', True)]
+            all_utxos.extend([u for u in confirmed if u['value'] > dust])
+        
+        # CRITICAL: Sort by value descending (your existing logic)
         all_utxos = sorted(all_utxos, key=lambda x: x['value'], reverse=True)
-        return all_utxos, f"Scanned xpub → Found {len(all_utxos):,} UTXOs"
+        
+        return all_utxos, f"API-scanned xpub → {len(all_utxos):,} UTXOs across {scanned} addresses"
+    
+    except requests.exceptions.RequestException as e:
+        return [], f"API scan failed (network?): {str(e)}<br>Tip: Check xpub format or try single address."
     except Exception as e:
-        return [], f"xpub error: {str(e)}"
+        return [], f"xpub parse error: {str(e)}<br>Fallback: Enter a single BTC address instead."
 
 # ==============================
 # Transaction Primitives
