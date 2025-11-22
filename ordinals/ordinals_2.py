@@ -349,7 +349,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-with gr.Blocks(title="Omega Pruner v9.0", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Omega Pruner v9.0") as demo:
     gr.HTML(f"<style>{css}</style>")
     gr.Markdown("# Omega Pruner v9.0 — Community Edition")
     gr.Markdown(disclaimer)
@@ -447,4 +447,8 @@ with gr.Blocks(title="Omega Pruner v9.0", theme=gr.themes.Soft()) as demo:
 if __name__ == "__main__":
     import os
     demo.queue(max_size=30)
-    demo.launch(server_port=int(os.environ.get("PORT", 7860)), share=True)
+    demo.launch(
+        theme=gr.themes.Soft(),  # Soft theme, now in launch()
+        server_port=int(os.environ.get("PORT", 7860)),
+        share=True
+    )
