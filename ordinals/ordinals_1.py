@@ -312,9 +312,9 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     tx = Tx()
     for u in pruned_utxos_global:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
-    tx.tx_outs.append(TxOut(send * 100_000_000, dest_script))
+    tx.tx_outs.append(TxOut(send, dest_script))        # send is already in SATOSHIS
     if dao_cut >= 546:
-        tx.tx_outs.append(TxOut(dao_cut * 100_000_000, dao_script))
+        tx.tx_outs.append(TxOut(dao_cut, dao_script)) 
 
     raw = tx.encode().hex()
     psbt = tx_to_psbt(tx)
@@ -362,8 +362,8 @@ def lightning_sweep_flow(utxos, invoice: str):
         tx = Tx()
         for u in utxos:
             tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
-        tx.tx_outs.append(TxOut(user * 100_000_000, dest_script))
-        tx.tx_outs.append(TxOut(dao * 100_000_000, dao_script))
+       TxOut(send, dest_script)          # send is already in satoshis
+       TxOut(dao_cut, dao_script)        # dao_cut is already in satoshis
         raw = tx.encode().hex()
         qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={raw}"
         msg = f"""
