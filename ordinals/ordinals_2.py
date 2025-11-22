@@ -495,7 +495,7 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_
 
         thank_you_text = "No thank-you" if dao_cut == 0 else f"Thank-you: <b>{format_btc(dao_cut)}</b>"
 
-                return (
+        return (
             f"""
             <div style="text-align:center; font-size:24px; color:#00ff9d; margin:40px 0;">
                 Lightning Sweep Ready
