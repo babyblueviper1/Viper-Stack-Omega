@@ -1,5 +1,6 @@
 # app.py — Omega Pruner v9.0 — Community Edition
 import gradio as gr
+print(f"Gradio version: {gr.__version__}")
 import requests, time, base64, qrcode, io
 from dataclasses import dataclass
 from typing import List
@@ -499,7 +500,10 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_
 # ==============================
 # Gradio UI – clean & honest
 # ==============================
-with gr.Blocks(css=css, title="Omega Pruner v9.0 – Community Edition") as demo:
+with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
+    # Inject CSS (Gradio 5.x fix — works in 4.x too)
+    gr.HTML(f"<style>{css}</style>")
+
     gr.Markdown("# Omega Pruner v9.0")
     gr.Markdown(disclaimer)
 
