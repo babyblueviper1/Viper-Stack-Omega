@@ -371,9 +371,18 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     if user_gets < 546:
         return "Not enough after miner fee + DAO tribute", gr.update(visible=False)
 
-    # Lightning path — DAO CUT STILL ENFORCED
-    if sweep and invoice.strip().startswith("lnbc"):
-        return lightning_sweep_flow(pruned_utxos_global, invoice.strip(), miner_fee, savings)
+     # Lightning path — only if checkbox + valid invoice present
+    if sweep:
+        inv = invoice.strip()
+        if inv.startswith("lnbc"):
+            return lightning_sweep_flow(pruned_utxos_global, inv, miner_fee, savings)
+        else:
+            return """
+            <div style="text-align:center; color:#ff3333; font-size:20px; padding:40px;">
+                Lightning invoice missing or invalid<br><br>
+                Paste a valid lnbc... invoice for exactly <b>{user_gets:,}</b> sats
+            </div>
+            """, gr.update(visible=False)
 
     # On-chain path
     dest_addr = (dest or addr).strip()
