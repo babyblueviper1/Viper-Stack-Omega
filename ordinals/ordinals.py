@@ -621,7 +621,7 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         except Exception as e:
             return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun for invoices with on-chain fallback.", ""
 
-        def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546, xpub_input=""):
+    def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546, xpub_input=""):
         output_parts = ["Omega Pruner Ω v8.7 — Live 🜂\n"]
 
         # ── v8.7: FULL-WALLET OR SINGLE-ADDRESS MODE ──
