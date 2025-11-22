@@ -551,10 +551,10 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
 
     # LIGHTNING BOX — appears right after output_log, before RBF
     ln_invoice = gr.Textbox(
-        label="Want this on Lightning instead?",
-        placeholder="Paste your lnbc... invoice (must match exact amount above)",
-        lines=2,
-        visible=False
+        label="Lightning Invoice → paste lnbc... here to sweep instantly",
+        placeholder="Will appear automatically after transaction is generated",
+        lines=3,
+        visible=False   # starts hidden — will be shown by .then()
     )
 
     # RBF TOOL
@@ -578,18 +578,19 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     )
 
     # Generate on-chain → then show Lightning box
-    generate_btn.click(
-        fn=build_real_tx,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr,
-                dao_percent, selfish_mode, dao_addr],
-        outputs=[output_log, generate_btn, dummy_state]   # ← fixed!
-    ).then(
-        fn=lambda: gr.update(visible=True, placeholder="Paste Lightning invoice → auto-convert"),
-        outputs=ln_invoice
-    ).then(
-        fn=lambda: gr.update(value="On-chain ready. Paste invoice below for Lightning sweep"),
-        outputs=status_msg
-    )
+generate_btn.click(
+    build_real_tx,
+    inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, xpub],
+    outputs=[output_log, generate_btn, ln_invoice]
+).then(
+    lambda log: gr.update(
+        visible=True,
+        label="Lightning Invoice → paste lnbc... to sweep instantly",
+        placeholder="Invoice must be for exactly the amount shown above"
+    ),
+    inputs=output_log,
+    outputs=ln_invoice
+)
 
     # Paste invoice → generate Lightning tx
     ln_invoice.submit(
