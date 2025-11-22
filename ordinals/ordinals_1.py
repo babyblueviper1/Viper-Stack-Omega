@@ -397,7 +397,7 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     psbt = tx_to_psbt(tx)
     qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={psbt}"
 
-  return f"""
+    return f"""
     <div style="text-align:center; max-width:780px; margin:0 auto; padding:20px;">
         <h3 style="color:#f7931a; margin-bottom:24px;">Transaction Ready — DAO Fuel Paid</h3>
         
