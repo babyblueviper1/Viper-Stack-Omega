@@ -674,19 +674,6 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
       };
       img.src = URL.createObjectURL(file);
     });
-
-    // Auto-show Lightning invoice box when results appear + checkbox is on
-document.addEventListener('gradio', (e) => {
-  if (e.detail && e.detail.output && e.detail.output.html) {
-    const hasResults = e.detail.output.html.includes('You receive') || 
-                       e.detail.output.html.includes('Transaction Ready');
-    const sweepChecked = document.querySelector('[data-testid="checkbox"] input')?.checked;
-    const lnBox = document.querySelector('#ln_invoice')?.closest('.gradio-container');
-    if (lnBox) {
-      lnBox.style.display = (hasResults && sweepChecked) ? 'block' : 'none';
-    }
-  }
-});
     </script>
     """)
 
