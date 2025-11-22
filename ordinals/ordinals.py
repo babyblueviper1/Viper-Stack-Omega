@@ -776,7 +776,7 @@ def fetch_all_utxos_from_xpub(xpub_str: str, dust_threshold: int = 546):
         return log_with_br, gr.update(visible=True), gr.update(visible=False)
         
 
-    def build_real_tx(addr, strategy, threshold, dest, sweep, invoice):
+    def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub_input=""):
         global pruned_utxos_global, input_vb_global, output_vb_global
 
         if not pruned_utxos_global:
