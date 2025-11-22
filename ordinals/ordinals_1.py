@@ -407,9 +407,11 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int):
 # ==============================
 # Gradio UI
 # ==============================
-with gr.Blocks(title="Omega Pruner Ω v9.1 — UNBREAKABLE", css=css) as demo:
-    gr.HTML("<style>{}</style>".format(css))
+with gr.Blocks(title="Omega Pruner Ω v9.1 — UNBREAKABLE") as demo:
+    demo.css = css                     # ← NEW OFFICIAL WAY
+    # gr.HTML(f"<style>{css}</style>") # ← fallback if you prefer
     gr.Markdown("# Omega Pruner Ω v9.1 — UNBREAKABLE")
+    # ... rest of your UI unchanged
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
         with gr.Column(scale=1, min_width=260):
