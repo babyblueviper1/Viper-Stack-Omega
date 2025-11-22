@@ -406,7 +406,8 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
         <div style="font-size:19px; margin:30px 0; line-height:1.9; color:#eee;">
             Consolidated <b>{inputs}</b> dusty UTXOs → <b>{total:,}</b> sats total<br>
             Miner fee: <b>{miner_fee:,}</b> sats<br>
-            DAO tribute: <b>{dao_cut:,}</b> sats <span style="color:#ff9900;">(5% of future savings – mandatory)</span><br><br>
+            DAO tribute: <b>{dao_cut:,}</b> sats 
+            <span style="color:#ff9900;">(5% of the fees you’re saving)</span><br><br>
             <span style="font-size:28px; color:#00ff9d; font-weight:bold;">
                 You receive: {user_gets:,} sats
             </span>
@@ -434,8 +435,8 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
         </div>
 
         <div style="margin-top:40px; color:#ff9900; font-size:14px;">
-            The swarm demands tribute.<br>
-            Pay the DAO cut or your future fees will be higher. Ω
+            The swarm keeps the chain spinning.<br>
+            Thank you for fueling the future. Ω
         </div>
     </div>
     """, gr.update(visible=False)
