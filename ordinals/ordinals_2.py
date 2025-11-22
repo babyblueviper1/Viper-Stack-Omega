@@ -516,15 +516,23 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
 
     with gr.Row():
         with gr.Column(scale=4, min_width=300):
-            user_addr = gr.Textbox(label="Bitcoin address or xpub/zpub", placeholder="bc1q… or xpub…", lines=2)
+            user_addr = gr.Textbox(
+                label="Bitcoin address or xpub/zpub",
+                placeholder="bc1q… or xpub…",
+                lines=2
+            )
         with gr.Column(scale=3, min_width=240):
             prune_choice = gr.Dropdown(
                 ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
-                value="Recommended (40% pruned)", label="Pruning Strategy"
+                value="Recommended (40% pruned)",
+                label="Pruning Strategy"
             )
 
     dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
-    dest_addr = gr.Textbox(label="Destination (optional – leave blank = same address)", placeholder="bc1q…")
+    dest_addr = gr.Textbox(
+        label="Destination (optional – leave blank = same address)",
+        placeholder="bc1q…"
+    )
 
     with gr.Row():
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100% (no thank-you)", value=False)
@@ -543,14 +551,13 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     )
 
     with gr.Row():
-        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", scale=1)
-        generate_btn = gr.Button("2. Generate Transaction", visible=False, interactive=False, variant="primary", scale=1)
+        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
+        generate_btn = gr.Button("2. Generate Transaction", visible=False, interactive=False, variant="primary")
 
     # ——————— MAIN OUTPUT AREA ———————
-    xpub = user_addr   # allows xpub detection while keeping single input box
     output_log = gr.HTML()
 
-    # LIGHTNING BOX — appears right after output_log, before RBF
+    # LIGHTNING BOX — appears right after output_log
     ln_invoice = gr.Textbox(
         label="Lightning Invoice → paste lnbc... here to sweep instantly",
         placeholder="Will appear automatically after transaction is generated",
@@ -565,30 +572,30 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         rbf_btn = gr.Button("Bump +50 sat/vB", scale=1)
     rbf_out = gr.Textbox(label="New transaction", lines=8)
 
-    status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin", visible=True)
-    dummy_state = gr.State()   # optional, harmless if unused
+    status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin")
 
     # ———————————————— EVENTS ————————————————
+    # 1. Analyze → show generate button
     submit_btn.click(
         fn=analysis_pass,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, xpub],
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
         outputs=[output_log, generate_btn]
     ).then(
         lambda: (
             gr.update(visible=True, interactive=True),
-            gr.update(value="Ready → Click **2. Generate Transaction + Pay DAO**")
+            gr.update(value="Ready → Click **2. Generate Transaction**")
         ),
         outputs=[generate_btn, status_msg]
     )
 
-    # MAIN FLOW: Generate on-chain → auto-show Lightning box
+    # 2. Generate on-chain TX → then auto-show Lightning invoice box
     generate_btn.click(
-        build_real_tx,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, xpub],
-        outputs=[output_log, generate_btn, ln_invoice]   # ← 3 outputs!
+        fn=build_real_tx,
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
+        outputs=[output_log, generate_btn, ln_invoice]  # 3 outputs!
     ).then(
         lambda log: gr.update(
-            visible=True,
+            visible="You receive" in str(log) or "Lightning" in str(log),
             label="Lightning Invoice → paste lnbc... to sweep instantly",
             placeholder="Must be for the exact amount shown above"
         ),
@@ -596,13 +603,13 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         outputs=ln_invoice
     )
 
-    # When user PASTES invoice → instantly generate Lightning sweep transaction
+    # 3. User pastes Lightning invoice → generate Lightning sweep TX
     ln_invoice.submit(
-        build_real_tx,   # reuse same function — it detects invoice and does Lightning path
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, xpub],
+        fn=build_real_tx,
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
         outputs=[output_log, generate_btn]
     ).then(
-        lambda: gr.update(visible=False),  # hide the box again after use
+        lambda: gr.update(visible=False),
         outputs=ln_invoice
     ).then(
         lambda: gr.update(value="Lightning sweep ready! Scan QR below"),
@@ -610,7 +617,11 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     )
 
     # RBF
-    rbf_btn.click(lambda h: rbf_bump(h)[0], rbf_in, rbf_out)
+    rbf_btn.click(
+        fn=lambda h: rbf_bump(h)[0] if h.strip() else "Paste raw hex first",
+        inputs=rbf_in,
+        outputs=rbf_out
+    )
 
     gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
     
