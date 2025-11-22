@@ -518,12 +518,26 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int):
 # ==============================
 # Gradio UI – FINAL UNBREAKABLE ORDER
 # ==============================
-with gr.Blocks(title="Omega Pruner Ω v9.1 — UNBREAKABLE") as demo:
+with gr.Blocks(title="Omega Pruner Ω v8.7") as demo:
     demo.css = css
 
-    gr.Markdown("# Omega Pruner Ω v9.1 — UNBREAKABLE")
+    gr.Markdown("# Omega Pruner Ω v8.7")
     with gr.Row():
         with gr.Column(scale=4): gr.Markdown(disclaimer)
+        with gr.Column(scale=2, min_width=200):
+            gr.HTML("""
+            <div style="text-align:center; padding:24px 0; cursor:pointer;" 
+                 onclick="window.open('https://babyblueviper.com', '_blank')">
+                <img src="/file=static/BBV_logo.png" 
+                     alt="BabyBlueViper" 
+                     style="height:92px; filter:drop-shadow(0 0 20px #00ff9d); border-radius:12px; transition:transform 0.3s;"
+                     onmouseover="this.style.transform='scale(1.08)'"
+                     onmouseout="this.style.transform='scale(1)'">
+                <div style="color:#00ff9d; font-size:15px; margin-top:10px; font-weight:bold; letter-spacing:1.2px; text-shadow:0 0 10px #00ff9d;">
+                    Ω v10 UNBREAKABLE
+                </div>
+            </div>
+            """)
         with gr.Column(scale=1, min_width=260):
             gr.Button("Fuel the Swarm", link=f"https://blockstream.info/address/{DAO_ADDR}",
                       variant="primary", elem_classes="big-fuel-button")
