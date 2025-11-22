@@ -186,6 +186,16 @@ def fetch_all_utxos_from_xpub(xpub: str, dust: int = 546):
     except Exception as e:
         return [], f"xpub parse error: {str(e)}<br>Fallback: Enter a single BTC address instead."
 
+def format_btc(sats: int) -> str:
+    if sats == 0:
+        return "0 sats"
+    if sats < 100_000:
+        return f"{sats:,} sats"
+    btc = sats / 100_000_000
+    if sats >= 100_000_000:  # 1 BTC+
+        return f"{btc:,.4f} BTC".rstrip("0").rstrip(".")
+    else:
+        return f"{btc:.8f} BTC".rstrip("0").rstrip(".")
 # ==============================
 # Transaction Primitives
 # ==============================
@@ -430,14 +440,17 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
     psbt = tx_to_psbt(tx)
     qr = make_qr(psbt)
 
-    fee_text = "No thank-you" if dao_cut == 0 else f"Thank-you: {dao_cut:,} sats ({dao_percent/100:.2f}% of savings)"
+    fee_text = "No thank-you" if dao_cut == 0 else f"Thank-you: <b>{format_btc(dao_cut)}</b> ({dao_percent/100:.2f}% of savings)"
+
     return f"""
-    <div style="text-align:center; max-width:780px; margin:0 auto; padding:20px;">
+      <div style="text-align:center; max-width:780px; margin:0 auto; padding:20px;">
         <h3 style="color:#f7931a; margin-bottom:32px;">Transaction Ready</h3>
-        <p>Consolidated <b>{inputs}</b> inputs → <b>{total:,}</b> sats total<br>
-        Live fee rate: <b>{fee_rate}</b> sat/vB → Miner fee <b>{miner_fee:,}</b> sats<br>
+        <p>Consolidated <b>{inputs}</b> inputs → <b>{format_btc(total)}</b> total<br>
+        Live fee rate: <b>{fee_rate}</b> sat/vB → Miner fee <b>{format_btc(miner_fee)}</b><br>
         {fee_text}<br><br>
-        <span style="font-size:28px; color:#00ff9d; font-weight:bold;">You receive: {user_gets:,} sats</span></p>
+        <span style="font-size:32px; color:#00ff9d; font-weight:bold;">
+            You receive: {format_btc(user_gets)}
+        </span></p>
         <div style="display:flex; justify-content:center; margin:50px 0;">
             <img src="{qr}" style="width:440px; max-width:96vw; border-radius:20px; border:5px solid #f7931a;">
         </div>
@@ -463,10 +476,10 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_
 
         expected_msats = user_gets * 1000
         if abs(expected_msats - (decoded.amount_msat or 0)) > 5_000_000:
-            raise ValueError(f"Invoice must be for ~{user_gets:,} sats (±5k tolerance)")
+            raise ValueError(f"Invoice must be for ~{format_btc(user_gets)} (±5k sats tolerance)")
 
         if not getattr(decoded, 'payment_address', None):
-            raise ValueError("Invoice must support key-send or on-chain fallback (Phoenix, Breez, Blink, Muun)")
+            raise ValueError("Invoice must support on-chain fallback (Phoenix, Breez, Blink, Muun)")
 
         dest_script, _ = address_to_script_pubkey(decoded.payment_address)
         tx = Tx()
@@ -480,12 +493,14 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_
         raw = tx.encode().hex()
         qr = make_qr(raw)
 
+        thank_you_text = "No thank-you" if dao_cut == 0 else f"Thank-you: <b>{format_btc(dao_cut)}</b>"
+
         return f"""
         <div style="text-align:center;font-size:24px;color:#00ff9d;margin:40px 0">
         Lightning Sweep Ready
         </div>
-        You receive <b>{user_gets:,}</b> sats instantly on Lightning<br>
-        Miner fee: <b>{miner_fee:,}</b> sats • Thank-you: <b>{dao_cut if dao_cut>0 else 0:,}</b> sats<br><br>
+        You receive <b>{format_btc(user_gets)}</b> instantly on Lightning<br>
+        Miner fee: <b>{format_btc(miner_fee)}</b> • {thank_you_text}<br><br>
         <div style="display:flex; justify-content:center;">
             <img src="{qr}" style="max-width:100%;border-radius:16px;box-shadow:0 8px 40px rgba(0,255,157,0.6)">
         </div>
@@ -494,7 +509,6 @@ def lightning_sweep_flow(utxos, invoice: str, miner_fee: int, savings: int, dao_
 
     except Exception as e:
         return f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}", ""
-
 
 
 # ==============================
