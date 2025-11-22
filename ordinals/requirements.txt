@@ -7,3 +7,5 @@ huggingface_hub==0.24.5
 pydantic==2.10.6
 bitcoinlib
 bolt11
+bip32utils
+python-bolt11
