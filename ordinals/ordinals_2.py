@@ -520,13 +520,13 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     gr.Markdown("# Omega Pruner v9.0")
     gr.Markdown(disclaimer)
 
-    # Address + Strategy
+    # Input row: address + strategy
     with gr.Row():
         with gr.Column(scale=4, min_width=300):
             user_addr = gr.Textbox(label="Bitcoin address or xpub/zpub", placeholder="bc1q… or xpub…", lines=2)
         with gr.Column(scale=3, min_width=240):
             prune_choice = gr.Dropdown(
-                ["Privacy First (30% pruned)", "Recommended (40% pruned)", "MoreSavings (50% pruned)"],
+                ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
                 value="Recommended (40% pruned)", label="Pruning Strategy"
             )
 
@@ -556,10 +556,10 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     # MAIN OUTPUT
     output_log = gr.HTML()
 
-    # LIGHTNING INVOICE BOX — appears only after on-chain tx
+    # LIGHTNING BOX — appears right after output, before RBF
     ln_invoice = gr.Textbox(
         label="Want this on Lightning instead?",
-        placeholder="Paste lnbc... invoice for the exact amount shown above",
+        placeholder="Paste your lnbc... invoice (must match exact amount above)",
         lines=2,
         visible=False
     )
@@ -571,10 +571,9 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         rbf_btn = gr.Button("Bump +50 sat/vB", scale=1)
     rbf_out = gr.Textbox(label="New transaction", lines=8)
 
-    # STATUS
     status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin", visible=True)
 
-    # ————————————  EVENTS  ————————————
+    # ——————————————  EVENTS  ——————————————
     submit_btn.click(
         fn=analysis_pass,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr],
@@ -582,45 +581,43 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     ).then(
         fn=lambda: (
             gr.update(visible=True, interactive=True),
-            gr.update(value="Ready → Click **2. Generate Transaction**", visible=True)
+            gr.update(value="Ready → Click **2. Generate Transaction**")
         ),
         outputs=[generate_btn, status_msg]
     )
 
-    # Generate on-chain transaction
+    # Generate on-chain → then show Lightning box
     generate_btn.click(
         fn=build_real_tx,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr,
                  dao_percent, selfish_mode, dao_addr],
         outputs=[output_log, generate_btn]
     ).then(
-        # Show Lightning option
-        fn=lambda html: gr.update(visible=True) if "You receive" in str(html) else gr.update(visible=False),
-        inputs=output_log,
+        # Show Lightning invoice box
+        fn=lambda: gr.update(visible=True, placeholder="Paste Lightning invoice for the exact amount above → auto-convert"),
         outputs=ln_invoice
     ).then(
         fn=lambda: (
             gr.update(interactive=False),
-            gr.update(value="On-chain ready. Paste Lightning invoice below to convert", visible=True)
+            gr.update(value="On-chain ready. Paste Lightning invoice below to convert →")
         ),
         outputs=[generate_btn, status_msg]
     )
 
-    # When user pastes Lightning invoice → auto-build Lightning tx
+    # User pastes invoice → auto-build Lightning tx
     ln_invoice.submit(
         fn=build_real_tx,
         inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr,
                  dao_percent, selfish_mode, dao_addr],
         outputs=[output_log, generate_btn]
     ).then(
-        fn=lambda: gr.update(visible=False),  # hide box after success
+        fn=lambda: gr.update(visible=False),
         outputs=ln_invoice
     ).then(
-        fn=lambda: gr.update(value="Lightning sweep ready! Scan QR below", visible=True),
+        fn=lambda: gr.update(value="Lightning sweep ready! Scan QR below"),
         outputs=status_msg
     )
 
-    # RBF
     rbf_btn.click(lambda h: rbf_bump(h)[0], rbf_in, rbf_out)
 
     gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
