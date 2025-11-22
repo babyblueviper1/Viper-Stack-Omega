@@ -665,12 +665,11 @@ def fetch_all_utxos_from_xpub(xpub_str: str, dust_threshold: int = 546):
 
         # ── v8.7: FULL-WALLET OR SINGLE-ADDRESS MODE ──
         if xpub_input and xpub_input.strip():
-            try:
-                all_utxos, derived_count = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
-                if not all_utxos:
-                    output_parts.append("No UTXOs found across derived addresses.")
-                    return "\n".join(output_parts), ""
-                output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
+            all_utxos, result = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
+            if isinstance(result, str):  # ← error string
+                output_parts.append(result)
+                return "\n".join(output_parts), ""
+            output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
             except Exception as e:
                 output_parts.append(f"Invalid xpub or scan failed: {str(e)[:100]}")
                 return "\n".join(output_parts), ""
@@ -748,12 +747,8 @@ def fetch_all_utxos_from_xpub(xpub_str: str, dust_threshold: int = 546):
         log, _ = main_flow(addr, strategy, dest, False, threshold, xpub_input)
 
         # Re-use the same all_utxos from main_flow (no duplicate calls)
-           if xpub_input and xpub_input.strip():
-            all_utxos, result = fetch_all_utxos_from_xpub(xpub_input.strip(), dust_threshold)
-            if isinstance(result, str):  # ← error string
-                output_parts.append(result)
-                return "\n".join(output_parts), ""
-            output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
+        if xpub_input and xpub_input.strip():
+            all_utxos, _ = fetch_all_utxos_from_xpub(xpub_input.strip(), threshold)
         else:
             all_utxos, _ = get_utxos(addr.strip(), threshold)
 
