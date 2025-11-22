@@ -554,7 +554,7 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
         label="Lightning Invoice → paste lnbc... here to sweep instantly",
         placeholder="Will appear automatically after transaction is generated",
         lines=3,
-        visible=False   # starts hidden — will be shown by .then()
+        visible=False
     )
 
     # RBF TOOL
@@ -565,47 +565,50 @@ with gr.Blocks(title="Omega Pruner v9.0 – Community Edition") as demo:
     rbf_out = gr.Textbox(label="New transaction", lines=8)
 
     status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin", visible=True)
-    dummy_state = gr.State()   # ← THIS IS THE MISSING LINE
+    dummy_state = gr.State()   # optional, harmless if unused
+
     # ———————————————— EVENTS ————————————————
     submit_btn.click(
         fn=analysis_pass,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr],
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, xpub],
         outputs=[output_log, generate_btn]
     ).then(
-        fn=lambda: (gr.update(visible=True, interactive=True), 
-                    gr.update(value="Ready → Click **2. Generate Transaction**")),
+        lambda: (
+            gr.update(visible=True, interactive=True),
+            gr.update(value="Ready → Click **2. Generate Transaction + Pay DAO**")
+        ),
         outputs=[generate_btn, status_msg]
     )
 
-    # Generate on-chain → then show Lightning box
-generate_btn.click(
-    build_real_tx,
-    inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, xpub],
-    outputs=[output_log, generate_btn, ln_invoice]
-).then(
-    lambda log: gr.update(
-        visible=True,
-        label="Lightning Invoice → paste lnbc... to sweep instantly",
-        placeholder="Invoice must be for exactly the amount shown above"
-    ),
-    inputs=output_log,
-    outputs=ln_invoice
-)
+    # MAIN FLOW: Generate on-chain → auto-show Lightning box
+    generate_btn.click(
+        build_real_tx,
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, xpub],
+        outputs=[output_log, generate_btn, ln_invoice]   # ← 3 outputs!
+    ).then(
+        lambda log: gr.update(
+            visible=True,
+            label="Lightning Invoice → paste lnbc... to sweep instantly",
+            placeholder="Must be for the exact amount shown above"
+        ),
+        inputs=output_log,
+        outputs=ln_invoice
+    )
 
-    # Paste invoice → generate Lightning tx
+    # When user PASTES invoice → instantly generate Lightning sweep transaction
     ln_invoice.submit(
-        fn=build_real_tx,
-        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, user_addr,
-                dao_percent, selfish_mode, dao_addr],
+        build_real_tx,   # reuse same function — it detects invoice and does Lightning path
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, ln_invoice, xpub],
         outputs=[output_log, generate_btn]
     ).then(
-        fn=lambda: gr.update(visible=False),
+        lambda: gr.update(visible=False),  # hide the box again after use
         outputs=ln_invoice
     ).then(
-        fn=lambda: gr.update(value="Lightning sweep ready! Scan QR below"),
+        lambda: gr.update(value="Lightning sweep ready! Scan QR below"),
         outputs=status_msg
     )
 
+    # RBF
     rbf_btn.click(lambda h: rbf_bump(h)[0], rbf_in, rbf_out)
 
     gr.Markdown("<br><hr><small>Made better by the community • Original Ω concept by anon • 2025</small>")
