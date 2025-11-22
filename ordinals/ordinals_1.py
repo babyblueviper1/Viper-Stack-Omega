@@ -229,48 +229,85 @@ def rbf_bump(raw_hex: str, bump: int = 50):
 # ==============================
 def analysis_pass(addr, strategy, threshold, dest, sweep, invoice, xpub):
     global pruned_utxos_global, input_vb_global, output_vb_global
-    if xpub and xpub.strip() and BIP32:
-        utxos, _ = fetch_all_utxos_from_xpub(xpub.strip(), threshold)
+
+    # Reset globals every time (prevents stale data from previous runs)
+    pruned_utxos_global = None
+    input_vb_global = output_vb_global = None
+
+    # Default safe vB weights (in case address parsing fails)
+    input_vb_global = 68
+    output_vb_global = 31
+
+    # === Fetch UTXOs (xpub or single address) ===
+    if xpub and xpub.strip():
+        if not BIP32:
+            return "bip32 library missing — install with: pip install bip32", gr.update(visible=True)
+        utxos, info = fetch_all_utxos_from_xpub(xpub.strip(), threshold)
+        if isinstance(info, str):  # error message
+            return info.replace("\n", "<br>"), gr.update(visible=True)
     else:
+        if not addr or not addr.strip():
+            return "Please enter a Bitcoin address", gr.update(visible=True)
         utxos = get_utxos(addr.strip(), threshold)
+
     if not utxos:
-        return "No UTXOs found above dust threshold", gr.update(visible=True)
+        return "No confirmed UTXOs above dust threshold found.<br>Try lowering the dust threshold or waiting for confirmations.", gr.update(visible=True)
 
+    # === Detect address type & refine vB weights ===
     sample_addr = utxos[0].get("address") or addr.strip()
-    _, vb = address_to_script_pubkey(sample_addr)
-    input_vb_global = vb['input_vb'] if vb else 68
-    output_vb_global = vb['output_vb'] if vb else 31
+    script_info = address_to_script_pubkey(sample_addr)
+    if script_info and script_info[1]:
+        vb = script_info[1]
+        input_vb_global = vb.get('input_vb', input_vb_global)
+        output_vb_global = vb.get('output_vb', output_vb_global)
 
-    ratio = {"Privacy First (30% pruned)": 0.3, "Recommended (40% pruned)": 0.4, "More Savings (50% pruned)": 0.5}.get(strategy, 0.4)
-    keep = max(1, int(len(utxos) * (1 - ratio)))
-    pruned_utxos_global = utxos[:keep]
+    # === Apply pruning strategy ===
+    ratio = {
+        "Privacy First (30% pruned)": 0.3,
+        "Recommended (40% pruned)": 0.4,
+        "More Savings (50% pruned)": 0.5
+    }.get(strategy, 0.4)
 
+    keep_count = max(1, int(len(utxos) * (1 - ratio)))
+    pruned_utxos_global = utxos[:keep_count]
+
+    # === Success message ===
     log = f"""
-    Found <b>{len(utxos)}</b> UTXOs → Keeping <b>{len(pruned_utxos_global)}</b> largest<br>
-    Strategy: <b>{strategy.split(' (')[0]}</b><br><br>
-    Ready — click <b>Generate Transaction</b> 👇
+    <b>Scan complete!</b><br><br>
+    Found <b>{len(utxos):,}</b> UTXOs above dust threshold<br>
+    Strategy: <b>{strategy.split(' (')[0]}</b> → Keeping the <b>{keep_count:,}</b> largest<br><br>
+    Detected format: <b>{script_info[1]['type'] if script_info and script_info[1] else 'Unknown → using safe defaults'}</b><br><br>
+    Click <b>Generate Transaction (with DAO cut)</b> below to build the real TX 👇
     """
     return log, gr.update(visible=True)
 
 def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     global pruned_utxos_global, input_vb_global, output_vb_global
     if not pruned_utxos_global:
-        return "Run Pruner first!", gr.update(visible=False)
+        return "Click Run Pruner first!", gr.update(visible=False)
+
+    # Ensure vB weights are set (safety)
+    if input_vb_global is None or output_vb_global is None:
+        input_vb_global = 68
+        output_vb_global = 31
 
     if sweep and invoice.strip().startswith("lnbc"):
-        return lightning_sweep_flow(pruned_utxos_global, invoice.strip()) + (gr.update(visible=False),)
+        msg, raw = lightning_sweep_flow(pruned_utxos_global, invoice.strip())
+        qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={raw or 'LIGHTNING'}"
+        return f"{msg}<br><br><div style='text-align:center'><a href='{qr}' target='_blank'><img src='{qr}' style='max-width:100%;border-radius:16px'></a></div>", gr.update(visible=False)
 
-    dest_addr = (dest or addr).strip()
+    # Normal on-chain consolidation
+    dest_addr = (dest or addr).strip() or addr.strip()
     dest_script, _ = address_to_script_pubkey(dest_addr)
     dao_script, _ = address_to_script_pubkey(DAO_ADDR)
 
-    total = sum(u['value'] for u in pruned_utxos_global)
+    total = sum(u['value'] for u in pruned_utxos_global)  # ← fixed variable name
     vsize = 10.5 + input_vb_global * len(pruned_utxos_global) + output_vb_global * 2
     fee = int(vsize * 5)
     dao_cut = max(0, int(fee * 0.05))
     send = total - fee - dao_cut
     if send < 546:
-        return "Not enough after fees", gr.update(visible=False)
+        return "Not enough sats after fee + DAO cut", gr.update(visible=False)
 
     tx = Tx()
     for u in pruned_utxos_global:
@@ -284,22 +321,24 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub):
     qr = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={psbt}"
 
     result = f"""
-    <h3>Transaction Ready!</h3>
+    <h3>✅ Transaction Ready!</h3>
     Consolidated <b>{len(pruned_utxos_global)}</b> UTXOs → <b>{total:,}</b> sats<br>
-    Fee ~<b>{fee:,}</b> • DAO <b>{dao_cut:,}</b><br><br>
-    <div style="text-align:center">
+    Fee ~<b>{fee:,}</b> sats • DAO fuel <b>{dao_cut:,}</b> sats<br><br>
+    <div style="text-align:center;margin:30px 0">
         <a href="{qr}" target="_blank">
-            <img src="{qr}" style="max-width:100%;border-radius:16px">
+            <img src="{qr}" style="max-width:100%;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,0.5)">
         </a>
-        <br><small>Tap QR → BlueWallet / Zeus / Mutiny</small>
+        <br><small>Tap QR → BlueWallet / Zeus / Mutiny / Aqua / Electrum / Sparrow</small>
     </div>
-    <pre style="background:#000;color:#0f0;padding:16px;border-radius:12px;overflow-x:auto">
+    <pre style="background:#000;color:#0f0;padding:16px;border-radius:12px;overflow-x:auto;font-family:monospace">
 Raw Hex: {raw}
 
-PSBT: {psbt}
+PSBT (base64): {psbt}
     </pre>
-"""
+    <br>⚡ Want Lightning instead? Check the box, paste invoice, generate again.
+    """
     return result, gr.update(visible=False)
+    
 
 def lightning_sweep_flow(utxos, invoice: str):
     if not bolt11_decode:
