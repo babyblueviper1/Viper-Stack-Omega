@@ -177,6 +177,14 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
             """)
     with gr.Row():
         user_addr = gr.Textbox(label="Your BTC Address", placeholder="bc1q...", elem_id="user-address")
+    )
+    with gr.Row():
+        xpub_input = gr.Textbox(
+            label="xpub / ypub / zpub (optional – full wallet prune)",
+            placeholder="Paste master public key to scan all your addresses at once",
+            lines=1
+        )
+    with gr.Row():
         prune_choice = gr.Dropdown(
             choices=["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
             value="Recommended (40% pruned)", label="Prune Strategy", interactive=True
@@ -613,22 +621,19 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         except Exception as e:
             return f"Lightning sweep failed: {e}\nTip: Use Phoenix, Breez, or Muun for invoices with on-chain fallback.", ""
 
-    def main_flow(user_addr, prune_choice, dest_addr, confirm_proceed, dust_threshold=546):
-        output_parts = ["Omega Pruner Ω v8.6 🜂\n"]
-        if not user_addr or not user_addr.strip():
-            return "\n".join(output_parts + ["No address"]), ""
+   ef analysis_pass(addr, strategy, threshold, dest, sweep, invoice, xpub_input=""):
+        global pruned_utxos_global, input_vb_global, output_vb_global
 
-        try:
-            _, vb = address_to_script_pubkey(user_addr.strip())
-            input_vb = vb['input_vb']
-            output_vb = vb['output_vb']
-            output_parts.append(f"Address valid: {user_addr.strip()}\n")
-        except:
-            return "\n".join(output_parts + ["Invalid address"]), ""
+        log, _ = main_flow(addr, strategy, dest, False, threshold, xpub_input)
 
-        all_utxos, _ = get_utxos(user_addr.strip(), dust_threshold)
-        if not all_utxos:
-            return "\n".join(output_parts + ["No UTXOs above dust threshold"]), ""
+        # Re-use the same all_utxos that main_flow already fetched
+        # (no duplicate API calls!)
+        if xpub_input and xpub_input.strip():
+            all_utxos, _ = fetch_all_utxos_from_xpub(xpub_input.strip(), threshold)
+        else:
+            all_utxos, _ = get_utxos(addr.strip(), threshold)
+
+
         ratio = {
             "Privacy First (30% pruned)": 0.3,
             "Recommended (40% pruned)": 0.4,
@@ -669,10 +674,33 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
         return "\n".join(output_parts), ""
 
     # Two-step flow
-    def analysis_pass(addr, strategy, threshold, dest, sweep, invoice):
+   def analysis_pass(addr, strategy, threshold, dest, sweep, invoice, xpub_input=""):
         global pruned_utxos_global, input_vb_global, output_vb_global
 
-        log, _ = main_flow(addr.strip(), strategy, dest, False, threshold)
+        output_parts = ["Omega Pruner Ω v8.7 — Live 🜂\n"]
+
+        # ── v8.7 FULL-WALLET OR SINGLE-ADDRESS MODE ──
+        if xpub_input and xpub_input.strip():
+            all_utxos, derived_count = fetch_all_utxos_from_xpub(xpub_input.strip(), threshold)
+            if not all_utxos:
+                output_parts.append("No UTXOs found across derived addresses.")
+                log = "\n".join(output_parts)
+                log_with_br = log.replace("\n", "<br>")
+                return log_with_br, gr.update(visible=False), gr.update(visible=False)
+            output_parts.append(f"Full-wallet scan: derived up to 400 addresses → found {len(all_utxos):,} UTXOs")
+        else:
+            if not addr or not addr.strip():
+                output_parts.append("No address provided.")
+                log = "\n".join(output_parts)
+                log_with_br = log.replace("\n", "<br>")
+                return log_with_br, gr.update(visible=False), gr.update(visible=False)
+            all_utxos, _ = get_utxos(addr.strip(), threshold)
+            if not all_utxos:
+                output_parts.append("No confirmed UTXOs above dust threshold.")
+                log = "\n".join(output_parts)
+                log_with_br = log.replace("\n", "<br>")
+                return log_with_br, gr.update(visible=False), gr.update(visible=False)
+            output_parts.append(f"Single address scan: found {len(all_utxos):,} UTXOs")
 
         all_utxos, _ = get_utxos(addr.strip(), threshold)
         ratio = {
@@ -802,9 +830,11 @@ with gr.Blocks(css=css, title="Omega Pruner Ω v8.6 🜂") as demo:
             return error, gr.update(visible=False), gr.update(visible=False)
         
     # Button wiring
-    submit_btn.click(fn=analysis_pass,
-                     inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice],
-                     outputs=[output_text, generate_btn, raw_tx_text])
+    submit_btn.click(
+        fn=analysis_pass,
+        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice, xpub_input],
+        outputs=[output_text, generate_btn, raw_tx_text]
+    )
 
     generate_btn.click(fn=build_real_tx,
                        inputs=[user_addr, prune_choice, dust_threshold, dest_addr, sweep_to_ln, ln_invoice],
