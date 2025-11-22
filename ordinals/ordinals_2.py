@@ -411,8 +411,6 @@ def build_real_tx(addr, strategy, threshold, dest, sweep, invoice, xpub,
     dest_script, dest_info = address_to_script_pubkey(dest_addr)
     if len(dest_script) < 20:
         return "Invalid destination address", gr.update(visible=False), ""
-    if len(dest_script) < 20:
-        return "Invalid destination address", gr.update(visible=False), ""
 
     # Respect destination output type for accurate vsize
     if dest_info and 'output_vb' in dest_info:
