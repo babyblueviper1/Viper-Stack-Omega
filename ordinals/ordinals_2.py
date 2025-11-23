@@ -372,11 +372,11 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
         <small>Strategy: <b>{strategy_name}</b> • Detected: <b>{detected}</b></small><br>
         Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
-        <b style='font-size:32px; color:white; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;'>You receive: {format_btc(user_gets)}</b>"
+        <<b style='font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d, 0 0 60px #00ff9d; font-weight:900;'>You receive: {format_btc(user_gets)}</b>
         <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
             <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
                 Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
-                <b style='font-size:24px; color:white; text-shadow: 0 0 20px #00ff9d;'>You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
+                <b style='font-size:24px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d; font-weight:900;'>You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
                 <span style="font-size:14px; color:#aaa;">
                     Fees have exceeded 6× the current rate in every Bitcoin bull cycle since 2017.
                 </span>
@@ -444,14 +444,14 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
         return (
             f"""
             <div style="text-align:center; color:#00ff9d; font-size:26px; padding:20px;">
-                Lightning Sweep Ready<br><br>
-                <b style="font-size:32px; color:white; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
-                    You receive: {format_btc(user_gets)}
-                </b> instantly
+            Lightning Sweep Ready<br><br>
+            <b style='font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d, 0 0 60px #00ff9d; font-weight:900;'>
+            You receive: {format_btc(user_gets)}
+            </b> instantly
             </div>
             <div style="display: flex; justify-content: center; margin: 40px 0;">
-                <img src="{qr}" style="max-width:100%; width:460px; border-radius:20px; 
-                     box-shadow:0 12px 50px rgba(0,255,157,0.7); border: 6px solid #00ff9d;">
+            <img src="{qr}" style="max-width:100%; width:460px; border-radius:20px; 
+            box-shadow:0 12px 50px rgba(0,255,157,0.7); border: 6px solid #00ff9d;">
             </div>
             <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
             {details_section}
