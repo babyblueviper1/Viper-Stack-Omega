@@ -396,16 +396,27 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary")
 
     output_log = gr.HTML()
-    ln_invoice_state = gr.State("")  # hidden state
+        # LIGHTNING INVOICE BOX — THE ONE TRUE FINAL VERSION
+    ln_invoice_state = gr.State("")
+
     with gr.Row(visible=False) as ln_invoice_row:
         ln_invoice = gr.Textbox(
             label="Lightning Invoice → paste lnbc… to sweep instantly",
-            placeholder="Paste your lnbc invoice here",
+            placeholder="Paste your invoice here",
             lines=3,
-            scale=9
+            scale=7
         )
-    clear_btn = gr.Button("✕", scale=1)
-
+        with gr.Column(scale=2, min_width=180):
+            submit_ln_btn = gr.Button(
+                "Generate Lightning Sweep",
+                variant="primary",
+                size="lg"
+            )
+            clear_ln_btn = gr.Button(
+                "Clear",
+                variant="secondary",
+                size="sm"
+            )
     gr.Markdown("### RBF Bump")
     with gr.Row():
         rbf_in = gr.Textbox(label="Raw hex", lines=5)
@@ -426,18 +437,37 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     )
 
     # ONLY THIS — NO .then() AFTER IT
+ # Show Lightning box after on-chain tx
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]  # control row visibility
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
-    ln_invoice.submit(
-        lambda x: x, ln_invoice, ln_invoice_state  # copy textbox → state
-    ).then(
+    # Keep state in sync when user types/pastes
+    ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
+
+    # MAIN ACTION: Generate Lightning sweep
+    submit_ln_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row]
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
+    )
+
+    # BONUS: Press Enter in textbox → also trigger
+    ln_invoice.submit(
+        build_real_tx,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
+    )
+
+    # CLEAR BUTTON — resets everything cleanly
+    clear_ln_btn.click(
+        lambda: ("", gr.update(visible=False)),
+        outputs=[ln_invoice, ln_invoice_row]
+    ).then(
+        lambda: gr.update(value="Ready → Click **2. Generate Transaction**"),
+        outputs=status_msg
     )
     rbf_btn.click(
         lambda hex: rbf_bump(hex.strip())[0] if hex.strip() else "Paste a raw transaction first",
