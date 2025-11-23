@@ -186,7 +186,10 @@ def format_btc(sats: int) -> str:
     if sats < 100_000:
         return f"{sats:,} sats"
     btc = sats / 100_000_000
-    return f"{btc:,.8f} BTC".rstrip("0").rstrip(".") + (" BTC" if btc >= 1 else " BTC")
+    if btc >= 1:
+        return f"{btc:,.8f}".rstrip("0").rstrip(".") + " BTC"
+    else:
+        return f"{btc:.8f}".rstrip("0").rstrip(".") + " BTC"
 
 # ==============================
 # Transaction Building
@@ -640,7 +643,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     gr.HTML("""
 <!-- Floating QR Scanner Buttons — REAL ICONS ONLY -->
 <label class="qr-button btc" title="Scan Address / xpub">B</label>
-<label class="qr-button ln" title="Scan Lightning Invoice">Lightning</label>
+<label class="qr-button ln" title="Scan Lightning Invoice">⚡</label>
 
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
