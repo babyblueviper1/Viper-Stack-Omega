@@ -421,7 +421,6 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
         outputs=[output_log, generate_btn, ln_invoice]
-    )
     ).then(
         lambda html: gr.update(
             visible="You receive" in str(html) or "Transaction Ready" in str(html),
