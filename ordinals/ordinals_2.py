@@ -296,7 +296,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     miner_fee = max(1000, int(vsize * fee_rate * 1.2))
 
     savings = future_cost - miner_fee
-    dao_cut = max(546, int(savings * dao_percent / 10000)) if not selfish_mode and dao_percent > 0 and savings > 2000 else 0
+    dao_cut = max(546, int(savings * dao_percent / 100)) if not selfish_mode and dao_percent > 0 and savings > 2000 else 0
     user_gets = total - miner_fee - dao_cut
 
     if user_gets < 546:
@@ -480,7 +480,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             # Slider with static label
             dao_percent = gr.Slider(
                 0, 500, 50, step=10,
-                label="Thank-you to Ω author",
+                label="Thank-you to Ω author (basis points)",
                 info="0 bps = keep 100% • 500 bps = 5%"
             )
             # Separate live label — updates safely
@@ -492,7 +492,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
 
     # LIVE UPDATE — updates the separate label, no crash
     def update_thankyou_label(bps):
-        pct = bps / 10000
+        pct = bps / 100
         return f"<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>→ {pct:.3f}% of future savings</div>"
 
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
