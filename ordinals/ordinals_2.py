@@ -455,46 +455,48 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     gr.Markdown(disclaimer)
 
     with gr.Row():
-        with gr.Column(scale=4): 
+        with gr.Column(scale=4):
             user_input = gr.Textbox(label="Address or xpub", placeholder="bc1q… or xpub…", lines=2)
-        with gr.Column(scale=3): 
+        with gr.Column(scale=3):
             prune_choice = gr.Dropdown(
-                ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"], 
-                value="Recommended (40% pruned)", 
+                ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
+                value="Recommended (40% pruned)",
                 label="Strategy"
             )
 
-    dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
-    dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
-
-    # Selfish mode + Thank-you slider + live percentage
     with gr.Row():
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
 
+    # DUST + THANK-YOU SLIDERS + LIVE % — SAME ROW
     with gr.Row():
-        with gr.Column(scale=1, min_width=120):
-            dao_percent = gr.Slider(
-                0, 500, 50, step=10,
-                label="Thank-you to Ω author (optional)"
-            )
-        with gr.Column(scale=3):
+        with gr.Column(scale=1, min_width=180):
+            dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
+        with gr.Column(scale=1, min_width=180):
+            dao_percent = gr.Slider(0, 500, 50, step=10, label="Thank-you to Ω author (optional)")
+        with gr.Column(scale=2):
             live_pct = gr.Markdown(
                 "<div style='text-align: right; padding-right: 20px; margin-top: 30px;'>"
                 "<b style='color:#f7931a; font-size: 28px;'>0.50%</b>"
                 "</div>"
             )
-    dao_addr = gr.Textbox(
-        label="Thank-you address (optional)",
-        value=DEFAULT_DAO_ADDR,
-        placeholder="Leave blank to support the Ω author"
-    )
 
-    # Live percentage updater
+    # Live percentage updater — ONLY ONCE
     def update_pct(bps):
         pct = bps / 10000
         return f"<div style='text-align: right; padding-right: 20px; margin-top: 30px;'><b style='color:#f7931a; font-size: 28px;'>{pct:.3f}%</b></div>"
 
     dao_percent.change(update_pct, dao_percent, live_pct)
+
+    # DESTINATION + THANK-YOU ADDRESS — CLEAN ROW BELOW
+    with gr.Row():
+        with gr.Column(scale=4):
+            dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
+        with gr.Column(scale=3):
+            dao_addr = gr.Textbox(
+                label="Thank-you address (optional)",
+                value=DEFAULT_DAO_ADDR,
+                placeholder="Leave blank to support the Ω author"
+            )
 
     # Buttons
     with gr.Row():
