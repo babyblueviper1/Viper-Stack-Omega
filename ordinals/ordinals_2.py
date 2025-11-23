@@ -259,8 +259,20 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
 def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice):
     global pruned_utxos_global, input_vb_global, output_vb_global
+
+    # Fix #1 — Recalculate detected type (or pass it from analysis)
+    sample_addr = pruned_utxos_global[0].get('address') or user_input.strip()
+    _, info = address_to_script_pubkey(sample_addr)
+    detected = info['type'].split(' (')[0] if '(' in info['type'] else info['type']
+
+    strategy_name = {
+        "Privacy First (30% pruned)": "Privacy First",
+        "Recommended (40% pruned)": "Recommended", 
+        "More Savings (50% pruned)": "More Savings"
+    }.get(strategy, strategy.split(" (")[0])
+
     if not pruned_utxos_global:
-        return "Run analysis first", gr.update(visible=False)
+        return "Run analysis first", gr.update(visible=False), gr.update(visible=False), ""
 
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
@@ -278,17 +290,15 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     user_gets = total - miner_fee - dao_cut
 
     if user_gets < 546:
-        return "Not enough after fees", gr.update(visible=False)
+        return "Not enough after fees", gr.update(visible=False), gr.update(visible=False), ""
 
-    # Lightning path
     if ln_invoice and ln_invoice.strip().lower().startswith("lnbc"):
         return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode)
 
-    # On-chain path
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return "Invalid destination address", gr.update(visible=False)
+        return "Invalid destination address", gr.update(visible=False), gr.update(visible=False), ""
 
     tx = Tx()
     for u in pruned_utxos_global:
@@ -298,28 +308,57 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         dao_script, _ = address_to_script_pubkey(dao_addr or DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
+    raw = tx.encode().hex()                                   # ← FIXED
     psbt = base64.b64encode(b'psbt\xff\x00\x00' + tx.encode() + b'\x00').decode()
     qr = make_qr(psbt)
 
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
+
+    details_section = f"""
+        <details style="margin-top: 40px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto;">
+            <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px;">
+                View Raw Hex & PSBT (click to expand)
+            </summary>
+            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; border: 1px solid #333;">
+<b>Raw Hex:</b>
+{raw}
+
+<b>PSBT (base64):</b>
+{psbt}
+            </pre>
+            <small style="color:#aaa;">Use in Sparrow, Nunchuk, BlueWallet, Electrum, etc.</small>
+        </details>
+    """
+
     return (
         f"""
         <div style="text-align:center; padding:20px;">
             <h3 style="color:#f7931a;">Transaction Ready</h3>
             <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
+            <small>Strategy: <b>{strategy_name}</b> • Detected: <b>{detected}</b></small><br>
             Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
             <b style="font-size:32px; color:#00ff9d;">You receive: {format_btc(user_gets)}</b></p>
-            <img src="{qr}" style="width:420px; border-radius:16px; border:4px solid #f7931a;">
+            <div style="display: flex; justify-content: center; margin: 40px 0;">
+                <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
+            </div>
             <p><small>Scan with Sparrow, BlueWallet, Nunchuk, Electrum</small></p>
+            {details_section}
         </div>
         """,
-        gr.update(visible=False), gr.update(visible=True), ""
+        gr.update(visible=False),
+        gr.update(visible=True),
+        ""
     )
 
 
 def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
     if not bolt11_decode:
-        return "bolt11 library missing — Lightning disabled", gr.update(visible=False), gr.update(visible=False)
+        return (
+            "bolt11 library missing — Lightning disabled",
+            gr.update(visible=False),
+            gr.update(visible=False),
+            ""  # ← 4th value
+        )
 
     try:
         decoded = bolt11_decode(invoice)
@@ -342,23 +381,48 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
             tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
         qr = make_qr(tx.encode().hex())
+        raw = tx.encode().hex()
+
+        details_section = f"""
+        <details style="margin-top: 40px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto;">
+            <summary style="cursor: pointer; color: #00ff9d; font-weight: bold; font-size: 18px;">
+                View Raw Transaction Hex (click to expand)
+            </summary>
+            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; border: 1px solid #333;">
+{raw}
+            </pre>
+            <small style="color:#aaa;">Copy and broadcast with any wallet that supports raw hex</small>
+        </details>
+        """
+
         return (
             f"""
-            <div style="text-align:center; color:#00ff9d; font-size:24px;">
+            <div style="text-align:center; color:#00ff9d; font-size:26px; padding:20px;">
                 Lightning Sweep Ready<br><br>
                 You receive <b>{format_btc(user_gets)}</b> instantly
             </div>
-            <img src="{qr}" style="max-width:100%; border-radius:16px; box-shadow:0 8px 40px rgba(0,255,157,0.6);">
+            <div style="display: flex; justify-content: center; margin: 40px 0;">
+                <img src="{qr}" style="max-width:100%; width:460px; border-radius:20px; 
+                     box-shadow:0 12px 50px rgba(0,255,157,0.7); border: 6px solid #00ff9d;">
+            </div>
             <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
+            {details_section}
             """,
             gr.update(visible=False),  # hide generate button
-            gr.update(visible=False)   # HIDE LIGHTNING BOX — sweep is done
+            gr.update(visible=False),  # hide Lightning box
+            ""                         # ← 4th value (state unchanged)
         )
+
     except Exception as e:
         msg = f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}"
         if "amount" in str(e).lower():
             msg += "<br>Invoice must be for the exact amount shown above"
-        return msg, gr.update(visible=False), gr.update(visible=True)  # keep box open on error
+        return (
+            msg,
+            gr.update(visible=False),
+            gr.update(visible=True),   # keep box open
+            ""                         # ← 4th value
+        )
 
 # ==============================
 # Gradio UI — Final & Perfect
@@ -396,7 +460,8 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary")
 
     output_log = gr.HTML()
-        # LIGHTNING INVOICE BOX — THE ONE TRUE FINAL VERSION
+
+    # LIGHTNING INVOICE BOX — THE ONE TRUE FINAL VERSION
     ln_invoice_state = gr.State("")
 
     with gr.Row(visible=False) as ln_invoice_row:
@@ -407,26 +472,18 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             scale=7
         )
         with gr.Column(scale=2, min_width=180):
-            submit_ln_btn = gr.Button(
-                "Generate Lightning Sweep",
-                variant="primary",
-                size="lg"
-            )
-            clear_ln_btn = gr.Button(
-                "Clear",
-                variant="secondary",
-                size="sm"
-            )
+            submit_ln_btn = gr.Button("Generate Lightning Sweep", variant="primary", size="lg")
+            clear_ln_btn = gr.Button("Clear", variant="secondary", size="sm")
+
     gr.Markdown("### RBF Bump")
     with gr.Row():
         rbf_in = gr.Textbox(label="Raw hex", lines=5)
         rbf_btn = gr.Button("Bump +50 sat/vB")
     rbf_out = gr.Textbox(label="Bumped tx", lines=8)
 
-    # ←←← THIS WAS MISSING — ADD IT HERE
     status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin")
 
-      # Events — FINAL & BULLETPROOF (Gradio 6.0.0)
+    # Events — FINAL & BULLETPROOF (Gradio 6.0.0) — MUST BE AT ROOT LEVEL
     submit_btn.click(
         analysis_pass,
         [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
@@ -436,32 +493,26 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         outputs=[generate_btn, status_msg]
     )
 
-    # ONLY THIS — NO .then() AFTER IT
- # Show Lightning box after on-chain tx
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
-    # Keep state in sync when user types/pastes
     ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
 
-    # MAIN ACTION: Generate Lightning sweep
     submit_ln_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
-    # BONUS: Press Enter in textbox → also trigger
     ln_invoice.submit(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
-    # CLEAR BUTTON — resets everything cleanly
     clear_ln_btn.click(
         lambda: ("", gr.update(visible=False)),
         outputs=[ln_invoice, ln_invoice_row]
@@ -469,62 +520,83 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         lambda: gr.update(value="Ready → Click **2. Generate Transaction**"),
         outputs=status_msg
     )
+
     rbf_btn.click(
         lambda hex: rbf_bump(hex.strip())[0] if hex.strip() else "Paste a raw transaction first",
-        rbf_in,
-        rbf_out
+        rbf_in, rbf_out
     )
+
     gr.Markdown("<hr><small>Made with love by the swarm • Ω lives forever • 2025</small>")
 
     # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
     gr.HTML("""
-    <label class="qr-button camera">Camera</label>
-    <label class="qr-button lightning">Lightning</label>
+<!-- Floating QR Scanner Buttons — REAL ICONS ONLY -->
+<label class="qr-button camera" title="Scan Address / xpub"></label>
+<label class="qr-button lightning" title="Scan Lightning Invoice"></label>
 
-    <input type="file" accept="image/*" capture="environment" id="qr-scanner-camera" style="display:none">
-    <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
+<input type="file" accept="image/*" capture="environment" id="qr-scanner-camera" style="display:none">
+<input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
 
-    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-    <script>
-    const cameraBtn = document.querySelector('.qr-button.camera');
-    const lnBtn = document.querySelector('.qr-button.lightning');
-    const cameraInput = document.getElementById('qr-scanner-camera');
-    const lnInput = document.getElementById('qr-scanner-ln');
+<script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+<script>
+const cameraBtn = document.querySelector('.qr-button.camera');
+const lnBtn = document.querySelector('.qr-button.lightning');
+const cameraInput = document.getElementById('qr-scanner-camera');
+const lnInput = document.getElementById('qr-scanner-ln');
 
-    cameraBtn.onclick = () => cameraInput.click();
-    lnBtn.onclick = () => lnInput.click();
+cameraBtn.onclick = () => cameraInput.click();
+lnBtn.onclick = () => lnInput.click();
 
-    async function scan(file, isLightning = false) {
-      if (!file) return;
-      const img = new Image();
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width; canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        try {
-          const result = await ZXing.readBarcodeFromCanvas(canvas);
-          const text = result.text.trim();
+async function scan(file, isLightning = false) {
+  if (!file) return;
+  const img = new Image();
+  img.onload = async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width; canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    try {
+      const result = await ZXing.readBarcodeFromCanvas(canvas);
+      const text = result.text.trim();
 
-          if (isLightning && (text.toLowerCase().startsWith('lnbc') || text.toLowerCase().startsWith('lnurl'))) {
-            const textbox = document.querySelector('textarea[placeholder*="lnbc"], input[placeholder*="lnbc"]');
-            if (textbox) { textbox.value = text; textbox.dispatchEvent(new Event('input')); }
-            alert("Lightning invoice scanned!");
-          } else if (!isLightning && (text.startsWith('bc1') || text.startsWith('1') || text.startsWith('3') || text.startsWith('xpub') || text.startsWith('zpub'))) {
-            const addrbox = document.querySelector('textarea[placeholder*="bc1q"], input[placeholder*="bc1q"]');
-            if (addrbox) { addrbox.value = text.split('?')[0].replace(/^bitcoin:/i, ''); addrbox.dispatchEvent(new Event('input')); }
-            alert("Address/xpub scanned!");
-          } else {
-            alert("Not recognized. Try again.");
-          }
-        } catch (e) { alert("No QR found — try better lighting"); }
-      };
-      img.src = URL.createObjectURL(file);
-    }
+      if (isLightning && text.toLowerCase().startsWith('lnbc')) {
+        const box = document.querySelector('textarea[placeholder*="lnbc"], input[placeholder*="lnbc"]');
+        if (box) { box.value = text; box.dispatchEvent(new Event('input')); }
+        alert("Lightning invoice scanned!");
+      } else if (!isLightning && /(bc1|[13]|xpub|zpub|ypub)/i.test(text)) {
+        const box = document.querySelector('textarea[placeholder*="bc1q"], input[placeholder*="bc1q"]');
+        if (box) { box.value = text.split('?')[0].replace(/^bitcoin:/i, ''); box.dispatchEvent(new Event('input')); }
+        alert("Address/xpub scanned!");
+      } else {
+        alert("Not a valid QR");
+      }
+    } catch (e) { alert("No QR detected"); }
+  };
+  img.src = URL.createObjectURL(file);
+}
 
-    cameraInput.onchange = (e) => scan(e.target.files[0], false);
-    lnInput.onchange = (e) => scan(e.target.files[0], true);
-    </script>
-    """)
+cameraInput.onchange = e => scan(e.target.files[0], false);
+lnInput.onchange = e => scan(e.target.files[0], true);
+</script>
+
+<style>
+.qr-button { 
+  position: fixed !important; right: 24px; z-index: 9999;
+  width: 64px; height: 64px; border-radius: 50% !important; 
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  background: #000 !important; color: white !important; 
+  border: 4px solid #f7931a;
+  font-size: 36px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s;
+}
+.qr-button:hover { transform: scale(1.15); box-shadow: 0 12px 40px rgba(0,0,0,0.7); }
+.qr-button.camera { bottom: 96px; background: #f7931a !important; }
+.qr-button.lightning { bottom: 24px; background: #00ff9d !important; color: black !important; }
+
+/* REAL ICONS — NO TEXT */
+.qr-button.camera::before { content: "Camera"; }
+.qr-button.lightning::before { content: "Lightning"; }
+</style>
+""")
 
 if __name__ == "__main__":
     import os
