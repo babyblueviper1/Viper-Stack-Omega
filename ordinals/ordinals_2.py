@@ -468,24 +468,26 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
 
     # DUST + THANK-YOU SLIDERS + LIVE % — SAME ROW
-    with gr.Row():
-        with gr.Column(scale=1, min_width=180):
-            dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
-        with gr.Column(scale=1, min_width=180):
-            dao_percent = gr.Slider(0, 500, 50, step=10, label="Thank-you to Ω author (optional)")
-        with gr.Column(scale=2):
-            live_pct = gr.Markdown(
-                "<div style='text-align: right; padding-right: 20px; margin-top: 30px;'>"
-                "<b style='color:#f7931a; font-size: 28px;'>0.50%</b>"
-                "</div>"
+    with gr.Row(equal_height=False):
+        with gr.Column(scale=1, min_width=300):  # ensures it never gets too narrow
+            dust_threshold = gr.Slider(
+                0, 3000, 546, step=1,
+                label="Dust threshold (sats)",
+                info="UTXOs below this value are ignored"
+            )
+        with gr.Column(scale=1, min_width=300):
+            dao_percent = gr.Slider(
+                0, 500, 50, step=10,
+                label="Thank-you to Ω author → 0.50% of future savings",
+                info="0 bps = keep 100% • 500 bps = 5%"
             )
 
-    # Live percentage updater — ONLY ONCE
-    def update_pct(bps):
+    # LIVE UPDATE: Percentage in the slider label itself
+    def update_thankyou_label(bps):
         pct = bps / 10000
-        return f"<div style='text-align: right; padding-right: 20px; margin-top: 30px;'><b style='color:#f7931a; font-size: 28px;'>{pct:.3f}%</b></div>"
+        return f"Thank-you to Ω author → {pct:.3f}% of future savings"
 
-    dao_percent.change(update_pct, dao_percent, live_pct)
+    dao_percent.change(update_thankyou_label, dao_percent, dao_percent)
 
     # DESTINATION + THANK-YOU ADDRESS — CLEAN ROW BELOW
     with gr.Row():
