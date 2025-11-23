@@ -278,17 +278,33 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     }
     input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
 
-    # Apply pruning strategy
-    ratio = {"Privacy First (30% pruned)": 0.3, "Recommended (40% pruned)": 0.4, "More Savings (50% pruned)": 0.5}.get(strategy, 0.4)
+      # Apply pruning strategy
+    ratio = {
+        "Privacy First (30% pruned)": 0.3,
+        "Recommended (40% pruned)": 0.4,
+        "More Savings (50% pruned)": 0.5
+    }.get(strategy, 0.4)
+
+    strategy_name = {
+        "Privacy First (30% pruned)": "Privacy First",
+        "Recommended (40% pruned)": "Recommended",
+        "More Savings (50% pruned)": "More Savings"
+    }.get(strategy, strategy.split(" (")[0])
+
     keep = max(1, int(len(utxos) * (1 - ratio)))
     pruned_utxos_global = utxos[:keep]
 
     return (
-        f"<b>Found {len(utxos):,} UTXOs</b> • Keeping <b>{keep}</b> largest • {detected}<br>"
-        f"Click <b>Generate Transaction</b> to continue",
+        f"""
+        <div style="text-align:center; padding:20px;">
+            <b style="font-size:22px; color:#f7931a;">Analysis Complete</b><br><br>
+            Found <b>{len(utxos):,}</b> UTXOs • Keeping <b>{keep}</b> largest<br>
+            <b style="color:#f7931a;">Strategy:</b> <b>{strategy_name}</b> • Format: <b>{detected}</b><br><br>
+            Click <b>Generate Transaction</b> to continue
+        </div>
+        """,
         gr.update(visible=True)
     )
-
 
 def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice):
     global pruned_utxos_global, input_vb_global, output_vb_global
@@ -380,7 +396,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
                 Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
                 <b style='font-size:24px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d; font-weight:900;'>You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
-                <span style="font-size:14px; color:#aaa;">
+                <span style="font-size:14px; color:#ccc;">
                     Fees have exceeded 6× the current rate in every Bitcoin bull cycle since 2017.
                 </span>
             </p>
