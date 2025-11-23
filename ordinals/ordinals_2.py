@@ -218,19 +218,23 @@ def make_qr(data: str) -> str:
 def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
-    is_xpub = user_input.strip().startswith(('xpub', 'zpub', 'ypub', 'tpub'))
     addr = user_input.strip()
+    is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub'))
 
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
+        if not utxos:
+            return msg or "Failed to scan xpub", gr.update(visible=False)
     else:
-        if not addr: return "Enter address or xpub", gr.update(visible=False)
+        if not addr:
+            return "Enter address or xpub", gr.update(visible=False)
         utxos = get_utxos(addr, threshold)
-
-    if not utxos:
-        return "No UTXOs above dust threshold", gr.update(visible=False)
+        if not utxos:
+            return "No UTXOs above dust threshold", gr.update(visible=False)
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
+
+    # Detect script type
     sample = [u.get('address') or addr for u in utxos[:10]]
     types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
     from collections import Counter
@@ -241,20 +245,22 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     }
     input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
 
+    # Apply pruning strategy
     ratio = {"Privacy First (30% pruned)": 0.3, "Recommended (40% pruned)": 0.4, "More Savings (50% pruned)": 0.5}.get(strategy, 0.4)
     keep = max(1, int(len(utxos) * (1 - ratio)))
     pruned_utxos_global = utxos[:keep]
 
     return (
-        f"<b>Found {len(utxos):,} UTXOs</b> • Keeping {keep} largest • {detected}<br>"
+        f"<b>Found {len(utxos):,} UTXOs</b> • Keeping <b>{keep}</b> largest • {detected}<br>"
         f"Click <b>Generate Transaction</b> to continue",
         gr.update(visible=True)
     )
 
+
 def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice):
     global pruned_utxos_global, input_vb_global, output_vb_global
     if not pruned_utxos_global:
-        return "Run analysis first", gr.update(visible=False), ""
+        return "Run analysis first", gr.update(visible=False)
 
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
@@ -272,7 +278,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     user_gets = total - miner_fee - dao_cut
 
     if user_gets < 546:
-        return "Not enough after fees", gr.update(visible=False), ""
+        return "Not enough after fees", gr.update(visible=False)
 
     # Lightning path
     if ln_invoice and ln_invoice.strip().lower().startswith("lnbc"):
@@ -282,7 +288,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return "Invalid destination", gr.update(visible=False), ""
+        return "Invalid destination address", gr.update(visible=False)
 
     tx = Tx()
     for u in pruned_utxos_global:
@@ -310,16 +316,21 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         gr.update(visible=False)
     )
 
+
 def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
     if not bolt11_decode:
-        return "bolt11 missing", gr.update(visible=False), ""
+        return "bolt11 library missing — Lightning disabled", gr.update(visible=False)
 
     try:
         decoded = bolt11_decode(invoice)
         total = sum(u['value'] for u in utxos)
         user_gets = total - miner_fee - (0 if selfish_mode else dao_cut)
+
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
-            raise ValueError("Invoice amount mismatch")
+            raise ValueError("Invoice amount mismatch (±5M msat)")
+
+        if not getattr(decoded, 'payment_address', None):
+            raise ValueError("Invoice must support on-chain fallback")
 
         dest_script, _ = address_to_script_pubkey(decoded.payment_address)
         tx = Tx()
@@ -335,14 +346,18 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
             f"""
             <div style="text-align:center; color:#00ff9d; font-size:24px;">
                 Lightning Sweep Ready<br><br>
-                You receive {format_btc(user_gets)} instantly
+                You receive <b>{format_btc(user_gets)}</b> instantly
             </div>
-            <img src="{qr}" style="max-width:100%; border-radius:16px;">
+            <img src="{qr}" style="max-width:100%; border-radius:16px; box-shadow:0 8px 40px rgba(0,255,157,0.6);">
+            <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
             """,
             gr.update(visible=False)
         )
     except Exception as e:
-        return f"Lightning failed: {e}", gr.update(visible=False), ""
+        msg = f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}"
+        if "amount" in str(e).lower():
+            msg += "<br>Invoice must be for the exact amount shown above"
+        return msg, gr.update(visible=False)
 
 # ==============================
 # Gradio UI — Final & Perfect
@@ -353,8 +368,14 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     gr.Markdown(disclaimer)
 
     with gr.Row():
-        with gr.Column(scale=4): user_input = gr.Textbox(label="Address or xpub", placeholder="bc1q… or xpub…", lines=2)
-        with gr.Column(scale=3): prune_choice = gr.Dropdown(["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"], value="Recommended (40% pruned)", label="Strategy")
+        with gr.Column(scale=4): 
+            user_input = gr.Textbox(label="Address or xpub", placeholder="bc1q… or xpub…", lines=2)
+        with gr.Column(scale=3): 
+            prune_choice = gr.Dropdown(
+                ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"], 
+                value="Recommended (40% pruned)", 
+                label="Strategy"
+            )
 
     dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
     dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
@@ -362,8 +383,10 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     with gr.Row():
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
     with gr.Row():
-        with gr.Column(scale=1): dao_percent = gr.Slider(0, 500, 50, step=10, label="Thank-you (bps)")
-        with gr.Column(scale=2): gr.Markdown("50 bps = 0.5% • 0 = keep all")
+        with gr.Column(scale=1): 
+            dao_percent = gr.Slider(0, 500, 50, step=10, label="Thank-you (bps)")
+        with gr.Column(scale=2): 
+            gr.Markdown("50 bps = 0.5% • 0 = keep all")
 
     dao_addr = gr.Textbox(label="Thank-you address (optional)", value=DEFAULT_DAO_ADDR)
 
@@ -380,10 +403,13 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         rbf_btn = gr.Button("Bump +50 sat/vB")
     rbf_out = gr.Textbox(label="Bumped tx", lines=8)
 
-    # Events
+    # ←←← THIS WAS MISSING — ADD IT HERE
+    status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin")
+
+    # Events — Gradio 6.0.0 Bulletproof
     submit_btn.click(
-        analysis_pass,
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        analysis_pass, 
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr], 
         [output_log, generate_btn]
     ).then(
         lambda: (gr.update(visible=True), gr.update(value="Ready → Click **2. Generate Transaction**")),
@@ -391,30 +417,33 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     )
 
     generate_btn.click(
-        build_real_tx,
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
-        [output_log, generate_btn]  # ← NO None HERE
+        build_real_tx, 
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice], 
+        [output_log, generate_btn]  # ← No None — fixed for 6.0.0
     ).then(
-        lambda html: gr.update(visible=True, label="Lightning Invoice → paste here for instant sweep"),
-        inputs=output_log,
-        outputs=ln_invoice
+        lambda html: gr.update(
+            visible="You receive" in str(html) or "Transaction Ready" in str(html),
+            label="Lightning Invoice → paste here for instant sweep"
+        ),
+        inputs=[output_log],
+        outputs=[ln_invoice]
     )
 
     ln_invoice.submit(
-        build_real_tx,
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
+        build_real_tx, 
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice], 
         [output_log, generate_btn]
     ).then(
-        lambda: gr.update(visible=False),
-        outputs=ln_invoice
+        lambda: gr.update(visible=False), 
+        outputs=[ln_invoice]
     ).then(
-        lambda: gr.update(value="Lightning sweep ready! Scan the QR below"),
-        outputs=status_msg
+        lambda: gr.update(value="Lightning sweep ready! Scan the QR below"), 
+        outputs=[status_msg]
     )
 
     rbf_btn.click(
         lambda hex: rbf_bump(hex.strip())[0] if hex.strip() else "Paste a raw transaction first",
-        rbf_in,
+        rbf_in, 
         rbf_out
     )
     gr.Markdown("<hr><small>Made with love by the swarm • Ω lives forever • 2025</small>")
