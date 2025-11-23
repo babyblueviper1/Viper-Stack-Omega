@@ -407,44 +407,36 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     # ←←← THIS WAS MISSING — ADD IT HERE
     status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin")
 
-    # Events — Gradio 6.0.0 Bulletproof
+      # Events — FINAL & BULLETPROOF (Gradio 6.0.0)
     submit_btn.click(
-        analysis_pass, 
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr], 
+        analysis_pass,
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
         [output_log, generate_btn]
     ).then(
         lambda: (gr.update(visible=True), gr.update(value="Ready → Click **2. Generate Transaction**")),
         outputs=[generate_btn, status_msg]
     )
 
+    # ONLY THIS — NO .then() AFTER IT
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
-        outputs=[output_log, generate_btn, ln_invoice]
-    ).then(
-        lambda html: gr.update(
-            visible="You receive" in str(html) or "Transaction Ready" in str(html),
-            label="Lightning Invoice → paste here for instant sweep"
-        ),
-        inputs=[output_log],
-        outputs=[ln_invoice]
+        outputs=[output_log, generate_btn, ln_invoice]  # ← 3 outputs, controls Lightning box
     )
 
+    # Submit invoice → generate sweep
     ln_invoice.submit(
-        build_real_tx, 
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice], 
-        [output_log, generate_btn]
+        build_real_tx,
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
+        [output_log, generate_btn, ln_invoice]  # ← also 3 outputs
     ).then(
-        lambda: gr.update(visible=False), 
-        outputs=[ln_invoice]
-    ).then(
-        lambda: gr.update(value="Lightning sweep ready! Scan the QR below"), 
-        outputs=[status_msg]
+        lambda: gr.update(value="Lightning sweep ready! Scan the QR below"),
+        outputs=status_msg
     )
 
     rbf_btn.click(
         lambda hex: rbf_bump(hex.strip())[0] if hex.strip() else "Paste a raw transaction first",
-        rbf_in, 
+        rbf_in,
         rbf_out
     )
     gr.Markdown("<hr><small>Made with love by the swarm • Ω lives forever • 2025</small>")
