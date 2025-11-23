@@ -464,9 +464,11 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     dust_threshold = gr.Slider(0, 3000, 546, step=1, label="Dust threshold (sats)")
     dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
-    with gr.Row():
+    # Selfish mode + Thank-you slider + live percentage
     with gr.Row():
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
+
+    with gr.Row():
         with gr.Column(scale=1, min_width=120):
             dao_percent = gr.Slider(
                 0, 500, 50, step=10,
@@ -479,19 +481,21 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
                 "</div>"
             )
 
+    # Live percentage updater
     def update_pct(bps):
         pct = bps / 10000
-        return f"<div style='text-align: right; padding-right: 20px; margin-top: 30px;'><b style='color:#f7931a; font-size: 28px;'>{pct:.3f}%</b> of future savings</b></div>"
+        return f"<div style='text-align: right; padding-right: 20px; margin-top: 30px;'><b style='color:#f7931a; font-size: 28px;'>{pct:.3f}%</b></div>"
 
     dao_percent.change(update_pct, dao_percent, live_pct)
 
+    # Buttons
     with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
         generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary")
 
     output_log = gr.HTML()
 
-    # LIGHTNING INVOICE BOX — THE ONE TRUE FINAL VERSION
+    # LIGHTNING INVOICE BOX
     ln_invoice_state = gr.State("")
 
     with gr.Row(visible=False) as ln_invoice_row:
@@ -503,16 +507,15 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         )
         with gr.Column(scale=2, min_width=180):
             submit_ln_btn = gr.Button("Generate Lightning Sweep", variant="primary", size="lg")
-    
-    # === START OVER BUTTON — ALWAYS VISIBLE, NUCLEAR RESET ===
+
+    # START OVER BUTTON — FULL WIDTH, ALWAYS VISIBLE
     with gr.Row():
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
             variant="secondary",
             size="lg",
-            elem_classes="full-width"
+            elem_class="full-width"   # ← Gradio 6.0.0 uses elem_class (singular)
         )
-
     # === RBF SECTION ===
     gr.Markdown("### RBF Bump")
     with gr.Row():
