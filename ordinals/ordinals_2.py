@@ -483,6 +483,11 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
                 "<b style='color:#f7931a; font-size: 28px;'>0.50%</b>"
                 "</div>"
             )
+    dao_addr = gr.Textbox(
+        label="Thank-you address (optional)",
+        value=DEFAULT_DAO_ADDR,
+        placeholder="Leave blank to support the Ω author"
+    )
 
     # Live percentage updater
     def update_pct(bps):
