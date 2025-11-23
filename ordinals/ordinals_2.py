@@ -25,15 +25,41 @@ input_vb_global = output_vb_global = None
 # CSS + Disclaimer
 # ==============================
 css = """
-.qr-button { position: fixed !important; bottom: 24px; right: 24px; z-index: 9999;
-    width: 64px; height: 64px; border-radius: 50% !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5); cursor: pointer; display: flex;
-    align-items: center; justify-content: center; font-size: 38px; }
-.qr-button.camera { bottom: 96px !important; background: #f7931a !important; }
-.qr-button.lightning { bottom: 24px !important; background: #00ff9d !important; }
-..full-width button { 
+/* Full-width buttons */
+.full-width, .full-width > button { 
     width: 100% !important; 
     margin: 20px 0 !important; 
+}
+
+/* Floating QR Scanner Buttons — ICONS ONLY, PERFECT CONTRAST */
+.qr-button { 
+  position: fixed !important; 
+  right: 20px; 
+  z-index: 9999;
+  width: 64px; height: 64px; 
+  border-radius: 50% !important; 
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; 
+  cursor: pointer; 
+  transition: all 0.2s; 
+  border: 4px solid white;
+  font-weight: bold;
+}
+.qr-button:hover { transform: scale(1.15); }
+
+/* Bitcoin button — Orange */
+.qr-button.btc { 
+  bottom: 96px; 
+  background: #f7931a !important; 
+  color: white !important; 
+}
+
+/* Lightning button — Neon Green with BLACK text */
+.qr-button.ln { 
+  bottom: 20px; 
+  background: #00ff9d !important; 
+  color: black !important; 
 }
 """
 
@@ -509,16 +535,23 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             )
 
     # Buttons
-    with gr.Row():
-        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary") 
+    ith gr.Row():
+        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
 
     output_log = gr.HTML()
-    with gr.Row():
-        generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary", size="lg", elem_classes="full-width", interactive=True)
-        
-    # LIGHTNING INVOICE BOX
-    ln_invoice_state = gr.State("")
 
+    # GENERATE BUTTON — FULL WIDTH, IN ITS OWN ROW
+    with gr.Row():
+        generate_btn = gr.Button(
+            "2. Generate Transaction → Consolidate & Pay Thank-You",
+            visible=False,
+            variant="primary",
+            size="lg",
+            elem_classes="full-width"
+        )
+
+    # LIGHTNING BOX
+    ln_invoice_state = gr.State("")
     with gr.Row(visible=False) as ln_invoice_row:
         ln_invoice = gr.Textbox(
             label="Lightning Invoice → paste lnbc… to sweep instantly",
@@ -529,7 +562,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         with gr.Column(scale=2, min_width=180):
             submit_ln_btn = gr.Button("Generate Lightning Sweep", variant="primary", size="lg")
 
-    # START OVER BUTTON — FULL WIDTH, ALWAYS VISIBLE
+    # START OVER — FULL WIDTH, DIRECTLY BELOW GENERATE
     with gr.Row():
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
@@ -606,8 +639,8 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
     gr.HTML("""
 <!-- Floating QR Scanner Buttons — REAL ICONS ONLY -->
-<label class="qr-button btc" title="Scan Address / xpub">₿</label>
-<label class="qr-button ln" title="Scan Lightning Invoice">⚡</label>
+<label class="qr-button btc" title="Scan Address / xpub">B</label>
+<label class="qr-button ln" title="Scan Lightning Invoice">Lightning</label>
 
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
