@@ -536,9 +536,6 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         analysis_pass,
         [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
         [output_log, generate_btn]
-    ).then(
-        lambda: (gr.update(visible=True), gr.update(value="Ready → Click **2. Generate Transaction**")),
-        outputs=[generate_btn, status_msg]
     )
 
     generate_btn.click(
