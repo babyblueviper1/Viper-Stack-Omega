@@ -535,7 +535,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             )
 
     # Buttons
-    ith gr.Row():
+    with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
 
     output_log = gr.HTML()
