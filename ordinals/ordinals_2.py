@@ -307,8 +307,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             <p><small>Scan with Sparrow, BlueWallet, Nunchuk, Electrum</small></p>
         </div>
         """,
-        gr.update(visible=False),
-        "onchain"
+        gr.update(visible=False)
     )
 
 def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
@@ -340,8 +339,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
             </div>
             <img src="{qr}" style="max-width:100%; border-radius:16px;">
             """,
-            gr.update(visible=False),
-            "lightning"
+            gr.update(visible=False)
         )
     except Exception as e:
         return f"Lightning failed: {e}", gr.update(visible=False), ""
