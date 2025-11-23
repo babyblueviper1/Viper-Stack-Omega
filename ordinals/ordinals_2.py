@@ -282,10 +282,16 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     try:
         fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
     except:
-        fee_rate = 20
+        fee_rate = 2
+
+    # NEW: Dynamic future rate = 6× current
+    future_rate = max(fee_rate * 6, 100)  # never below 100 sat/vB (safety)
+
+    # Future cost if you DON'T consolidate now
+    future_cost = int((input_vb_global * inputs + output_vb_global) * future_rate)
     miner_fee = max(1000, int(vsize * fee_rate * 1.2))
 
-    savings = int((input_vb_global * inputs + output_vb_global) * 120) - miner_fee
+    savings = future_cost - miner_fee
     dao_cut = max(546, int(savings * dao_percent / 10000)) if not selfish_mode and dao_percent > 0 and savings > 2000 else 0
     user_gets = total - miner_fee - dao_cut
 
@@ -315,39 +321,50 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
 
     details_section = f"""
-        <details style="margin-top: 40px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto;">
-            <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px;">
-                View Raw Hex & PSBT (click to expand)
-            </summary>
-            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; border: 1px solid #333;">
-<b>Raw Hex:</b>
+<details style="margin-top: 40px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto;">
+    <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px;">
+        View Raw Hex & PSBT (click to expand)
+    </summary>
+    <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; border: 1px solid #333;">
+<span style="color:#f7931a; font-weight:bold;">Raw Hex:</span>
 {raw}
 
-<b>PSBT (base64):</b>
+<span style="color:#f7931a; font-weight:bold;">PSBT (base64):</span>
 {psbt}
-            </pre>
-            <small style="color:#aaa;">Use in Sparrow, Nunchuk, BlueWallet, Electrum, etc.</small>
-        </details>
-    """
-
+    </pre>
+    <small style="color:#aaa;">Use in Sparrow, Nunchuk, BlueWallet, Electrum, etc.</small>
+</details>
+"""
     return (
-        f"""
-        <div style="text-align:center; padding:20px;">
-            <h3 style="color:#f7931a;">Transaction Ready</h3>
-            <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
-            <small>Strategy: <b>{strategy_name}</b> • Detected: <b>{detected}</b></small><br>
-            Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
-            <b style="font-size:32px; color:#00ff9d;">You receive: {format_btc(user_gets)}</b></p>
-            <div style="display: flex; justify-content: center; margin: 40px 0;">
-                <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
-            </div>
-            <p><small>Scan with Sparrow, BlueWallet, Nunchuk, Electrum</small></p>
-            {details_section}
+    f"""
+    <div style="text-align:center; padding:20px;">
+        <h3 style="color:#f7931a;">Transaction Ready</h3>
+        <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
+        <small>Strategy: <b>{strategy_name}</b> • Detected: <b>{detected}</b></small><br>
+        Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
+        <b style="font-size:32px; color:#00ff9d;">You receive: {format_btc(user_gets)}</b></p>
+
+        !-- DYNAMIC SAVINGS + HISTORICAL TRUTH -->
+        <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
+            <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
+                Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
+                <b style="font-size:24px; color:#00ff9d;">You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
+                <span style="font-size:14px; color:#aaa;">
+                    Fees have exceeded 6× the current rate in every Bitcoin bull cycle since 2017.
+                </span>
+            </p>
         </div>
-        """,
-        gr.update(visible=False),
-        gr.update(visible=True),
-        ""
+        <div style="display: flex; justify-content: center; margin: 40px 0;">
+            <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; 
+                 border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
+        </div>
+        <p><small>Scan with Sparrow, BlueWallet, Nunchuk, Electrum</small></p>
+        {details_section}
+    </div>
+    """,
+    gr.update(visible=False),
+    gr.update(visible=True),
+    ""
     )
 
 
@@ -389,7 +406,8 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
                 View Raw Transaction Hex (click to expand)
             </summary>
             <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; border: 1px solid #333;">
-{raw}
+            <span style="color:#00ff9d; font-weight:bold;">Raw Transaction Hex:</span>
+            {raw}
             </pre>
             <small style="color:#aaa;">Copy and broadcast with any wallet that supports raw hex</small>
         </details>
@@ -446,14 +464,23 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     with gr.Row():
-        selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
-    with gr.Row():
-        with gr.Column(scale=1): 
-            dao_percent = gr.Slider(0, 500, 50, step=10, label="Thank-you (bps)")
-        with gr.Column(scale=2): 
-            gr.Markdown("50 bps = 0.5% • 0 = keep all")
+        with gr.Column(scale=1, min_width=120):
+            dao_percent = gr.Slider(
+                0, 500, 50, step=10,
+                label="Thank-you to Ω author (optional)"
+            )
+        with gr.Column(scale=3):
+            live_pct = gr.Markdown(
+                "<div style='text-align: right; padding-right: 20px; margin-top: 30px;'>"
+                "<b style='color:#f7931a; font-size: 28px;'>0.50%</b>"
+                "</div>"
+            )
 
-    dao_addr = gr.Textbox(label="Thank-you address (optional)", value=DEFAULT_DAO_ADDR)
+    def update_pct(bps):
+        pct = bps / 10000
+        return f"<div style='text-align: right; padding-right: 20px; margin-top: 30px;'><b style='color:#f7931a; font-size: 28px;'>{pct:.3f}%</b> of future savings</b></div>"
+
+    dao_percent.change(update_pct, dao_percent, live_pct)
 
     with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
