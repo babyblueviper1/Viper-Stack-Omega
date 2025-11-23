@@ -383,15 +383,42 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     rbf_out = gr.Textbox(label="Bumped tx", lines=8)
 
     # Events
-    submit_btn.click(analysis_pass, [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr], [output_log, generate_btn])
-    generate_btn.click(build_real_tx, [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice], [output_log, generate_btn, None]).then(
-        lambda: gr.update(visible=True), outputs=ln_invoice
+    submit_btn.click(
+        analysis_pass,
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        [output_log, generate_btn]
+    ).then(
+        lambda: (gr.update(visible=True), gr.update(value="Ready → Click **2. Generate Transaction**")),
+        outputs=[generate_btn, status_msg]
     )
-    ln_invoice.submit(build_real_tx, [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice], [output_log, generate_btn]).then(
-        lambda: gr.update(visible=False), outputs=ln_invoice
-    )
-    rbf_btn.click(lambda h: rbf_bump(h.strip())[0] if h.strip() else "Paste hex", rbf_in, rbf_out)
 
+    generate_btn.click(
+        build_real_tx,
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
+        [output_log, generate_btn]  # ← NO None HERE
+    ).then(
+        lambda html: gr.update(visible=True, label="Lightning Invoice → paste here for instant sweep"),
+        inputs=output_log,
+        outputs=ln_invoice
+    )
+
+    ln_invoice.submit(
+        build_real_tx,
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
+        [output_log, generate_btn]
+    ).then(
+        lambda: gr.update(visible=False),
+        outputs=ln_invoice
+    ).then(
+        lambda: gr.update(value="Lightning sweep ready! Scan the QR below"),
+        outputs=status_msg
+    )
+
+    rbf_btn.click(
+        lambda hex: rbf_bump(hex.strip())[0] if hex.strip() else "Paste a raw transaction first",
+        rbf_in,
+        rbf_out
+    )
     gr.Markdown("<hr><small>Made with love by the swarm • Ω lives forever • 2025</small>")
 
     # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
