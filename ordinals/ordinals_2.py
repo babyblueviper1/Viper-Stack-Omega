@@ -502,7 +502,8 @@ if __name__ == "__main__":
     import os
     demo.queue(max_size=30)
     demo.launch(
-        theme=gr.themes.Soft(),  # Soft theme, now in launch()
-        server_port=int(os.environ.get("PORT", 7860)),
+        theme=gr.themes.Soft(),
+        server_name="0.0.0.0",  # ← CRITICAL: Binds to all interfaces
+        server_port=int(os.environ.get("PORT", 7860)),  # ← Uses Render's $PORT (defaults to 7860 locally)
         share=True
     )
