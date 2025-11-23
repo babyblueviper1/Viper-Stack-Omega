@@ -572,7 +572,6 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             gr.update(visible=False),      # ln_invoice_row
             "",                            # ln_invoice
             "",                            # ln_invoice_state
-            "Click **1. Analyze UTXOs** to begin",  # status_msg
             "",                            # rbf_in
             ""                             # rbf_out
         ),
@@ -580,7 +579,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             user_input, prune_choice, dust_threshold, dest_addr,
             selfish_mode, dao_percent, dao_addr,
             output_log, generate_btn, ln_invoice_row,
-            ln_invoice, ln_invoice_state, status_msg,
+            ln_invoice, ln_invoice_state,
             rbf_in, rbf_out
         ]
     )
