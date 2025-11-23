@@ -469,25 +469,33 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
 
     # DUST + THANK-YOU SLIDERS + LIVE % — SAME ROW
     with gr.Row(equal_height=False):
-        with gr.Column(scale=1, min_width=300):  # ensures it never gets too narrow
+        with gr.Column(scale=1, min_width=300):
             dust_threshold = gr.Slider(
                 0, 3000, 546, step=1,
                 label="Dust threshold (sats)",
                 info="UTXOs below this value are ignored"
             )
+
         with gr.Column(scale=1, min_width=300):
+            # Slider with static label
             dao_percent = gr.Slider(
                 0, 500, 50, step=10,
-                label="Thank-you to Ω author → 0.50% of future savings",
+                label="Thank-you to Ω author",
                 info="0 bps = keep 100% • 500 bps = 5%"
             )
+            # Separate live label — updates safely
+            live_thankyou = gr.Markdown(
+                "<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>"
+                "→ 0.50% of future savings"
+                "</div>"
+            )
 
-    # LIVE UPDATE: Percentage in the slider label itself
+    # LIVE UPDATE — updates the separate label, no crash
     def update_thankyou_label(bps):
         pct = bps / 10000
-        return f"Thank-you to Ω author → {pct:.3f}% of future savings"
+        return f"<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>→ {pct:.3f}% of future savings</div>"
 
-    dao_percent.change(update_thankyou_label, dao_percent, dao_percent)
+    dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
     # DESTINATION + THANK-YOU ADDRESS — CLEAN ROW BELOW
     with gr.Row():
