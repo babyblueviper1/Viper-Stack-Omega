@@ -31,6 +31,7 @@ css = """
     align-items: center; justify-content: center; font-size: 38px; }
 .qr-button.camera { bottom: 96px !important; background: #f7931a !important; }
 .qr-button.lightning { bottom: 24px !important; background: #00ff9d !important; }
+.full-width button { width: 100% !important; }
 """
 
 disclaimer = """
@@ -464,6 +465,8 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
 
     with gr.Row():
+    with gr.Row():
+        selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
         with gr.Column(scale=1, min_width=120):
             dao_percent = gr.Slider(
                 0, 500, 50, step=10,
@@ -500,15 +503,22 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         )
         with gr.Column(scale=2, min_width=180):
             submit_ln_btn = gr.Button("Generate Lightning Sweep", variant="primary", size="lg")
-            clear_ln_btn = gr.Button("Clear", variant="secondary", size="sm")
+    
+    # === START OVER BUTTON — ALWAYS VISIBLE, NUCLEAR RESET ===
+    with gr.Row():
+        start_over_btn = gr.Button(
+            "Start Over — Clear Everything",
+            variant="secondary",
+            size="lg",
+            elem_classes="full-width"
+        )
 
+    # === RBF SECTION ===
     gr.Markdown("### RBF Bump")
     with gr.Row():
-        rbf_in = gr.Textbox(label="Raw hex", lines=5)
-        rbf_btn = gr.Button("Bump +50 sat/vB")
-    rbf_out = gr.Textbox(label="Bumped tx", lines=8)
-
-    status_msg = gr.Markdown("Click **1. Analyze UTXOs** to begin")
+        rbf_in = gr.Textbox(label="Raw hex", lines=5, scale=8)
+        rbf_btn = gr.Button("Bump +50 sat/vB", scale=2)
+    rbf_out = gr.Textbox(label="Bumped transaction", lines=8)
 
     # Events — FINAL & BULLETPROOF (Gradio 6.0.0) — MUST BE AT ROOT LEVEL
     submit_btn.click(
@@ -540,14 +550,32 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
-    clear_ln_btn.click(
-        lambda: ("", gr.update(visible=False)),
-        outputs=[ln_invoice, ln_invoice_row]
-    ).then(
-        lambda: gr.update(value="Ready → Click **2. Generate Transaction**"),
-        outputs=status_msg
+    start_over_btn.click(
+        lambda: (
+            "",                            # user_input
+            "Recommended (40% pruned)",    # prune_choice
+            546,                           # dust_threshold
+            "",                            # dest_addr
+            False,                         # selfish_mode
+            50,                            # dao_percent
+            DEFAULT_DAO_ADDR,              # dao_addr
+            "",                            # output_log
+            gr.update(visible=False),      # generate_btn
+            gr.update(visible=False),      # ln_invoice_row
+            "",                            # ln_invoice
+            "",                            # ln_invoice_state
+            "Click **1. Analyze UTXOs** to begin",  # status_msg
+            "",                            # rbf_in
+            ""                             # rbf_out
+        ),
+        outputs=[
+            user_input, prune_choice, dust_threshold, dest_addr,
+            selfish_mode, dao_percent, dao_addr,
+            output_log, generate_btn, ln_invoice_row,
+            ln_invoice, ln_invoice_state, status_msg,
+            rbf_in, rbf_out
+        ]
     )
-
     rbf_btn.click(
         lambda hex: rbf_bump(hex.strip())[0] if hex.strip() else "Paste a raw transaction first",
         rbf_in, rbf_out
