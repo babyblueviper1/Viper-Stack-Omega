@@ -313,7 +313,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             <p><small>Scan with Sparrow, BlueWallet, Nunchuk, Electrum</small></p>
         </div>
         """,
-        gr.update(visible=False), gr.update(visible=True)
+        gr.update(visible=False), gr.update(visible=True), ""
     )
 
 
@@ -396,7 +396,15 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary")
 
     output_log = gr.HTML()
-    ln_invoice = gr.Textbox(label="Lightning Invoice → paste lnbc…", lines=3, visible=False)
+    ln_invoice_state = gr.State("")  # hidden state
+    with gr.Row(visible=False) as ln_invoice_row:
+        ln_invoice = gr.Textbox(
+            label="Lightning Invoice → paste lnbc… to sweep instantly",
+            placeholder="Paste your lnbc invoice here",
+            lines=3,
+            scale=9
+        )
+    clear_btn = gr.Button("✕", scale=1)
 
     gr.Markdown("### RBF Bump")
     with gr.Row():
@@ -420,20 +428,17 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     # ONLY THIS — NO .then() AFTER IT
     generate_btn.click(
         build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
-        outputs=[output_log, generate_btn, ln_invoice]  # ← 3 outputs, controls Lightning box
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]  # control row visibility
     )
 
-    # Submit invoice → generate sweep
     ln_invoice.submit(
-        build_real_tx,
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
-        [output_log, generate_btn, ln_invoice]  # ← also 3 outputs
+        lambda x: x, ln_invoice, ln_invoice_state  # copy textbox → state
     ).then(
-        lambda: gr.update(value="Lightning sweep ready! Scan the QR below"),
-        outputs=status_msg
+        build_real_tx,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+        outputs=[output_log, generate_btn, ln_invoice_row]
     )
-
     rbf_btn.click(
         lambda hex: rbf_bump(hex.strip())[0] if hex.strip() else "Paste a raw transaction first",
         rbf_in,
