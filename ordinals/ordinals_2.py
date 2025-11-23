@@ -313,13 +313,13 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             <p><small>Scan with Sparrow, BlueWallet, Nunchuk, Electrum</small></p>
         </div>
         """,
-        gr.update(visible=False)
+        gr.update(visible=False), gr.update(visible=True)
     )
 
 
 def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
     if not bolt11_decode:
-        return "bolt11 library missing — Lightning disabled", gr.update(visible=False)
+        return "bolt11 library missing — Lightning disabled", gr.update(visible=False), gr.update(visible=False)
 
     try:
         decoded = bolt11_decode(invoice)
@@ -351,13 +351,14 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
             <img src="{qr}" style="max-width:100%; border-radius:16px; box-shadow:0 8px 40px rgba(0,255,157,0.6);">
             <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
             """,
-            gr.update(visible=False)
+            gr.update(visible=False),  # hide generate button
+            gr.update(visible=False)   # HIDE LIGHTNING BOX — sweep is done
         )
     except Exception as e:
         msg = f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}"
         if "amount" in str(e).lower():
             msg += "<br>Invoice must be for the exact amount shown above"
-        return msg, gr.update(visible=False)
+        return msg, gr.update(visible=False), gr.update(visible=True)  # keep box open on error
 
 # ==============================
 # Gradio UI — Final & Perfect
@@ -417,9 +418,10 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     )
 
     generate_btn.click(
-        build_real_tx, 
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice], 
-        [output_log, generate_btn]  # ← No None — fixed for 6.0.0
+        build_real_tx,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice],
+        outputs=[output_log, generate_btn, ln_invoice]
+    )
     ).then(
         lambda html: gr.update(
             visible="You receive" in str(html) or "Transaction Ready" in str(html),
