@@ -31,7 +31,10 @@ css = """
     align-items: center; justify-content: center; font-size: 38px; }
 .qr-button.camera { bottom: 96px !important; background: #f7931a !important; }
 .qr-button.lightning { bottom: 24px !important; background: #00ff9d !important; }
-.full-width button { width: 100% !important; }
+..full-width button { 
+    width: 100% !important; 
+    margin: 20px 0 !important; 
+}
 """
 
 disclaimer = """
@@ -514,7 +517,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             "Start Over — Clear Everything",
             variant="secondary",
             size="lg",
-            elem_class="full-width"   # ← Gradio 6.0.0 uses elem_class (singular)
+            elem_classes="full-width"
         )
     # === RBF SECTION ===
     gr.Markdown("### RBF Bump")
