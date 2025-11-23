@@ -415,25 +415,25 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
         </details>
         """
 
-return (
-    f"""
-    <div style="text-align:center; color:#00ff9d; font-size:26px; padding:20px;">
-        Lightning Sweep Ready<br><br>
-        <b style="font-size:32px; color:white; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
-            You receive: {format_btc(user_gets)}
-        </b> instantly
-    </div>
-    <div style="display: flex; justify-content: center; margin: 40px 0;">
-        <img src="{qr}" style="max-width:100%; width:460px; border-radius:20px; 
-             box-shadow:0 12px 50px rgba(0,255,157,0.7); border: 6px solid #00ff9d;">
-    </div>
-    <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
-    {details_section}
-    """,
-    gr.update(visible=False),  # hide generate button
-    gr.update(visible=False),  # hide Lightning box
-    ln_invoice  # ← PRESERVE THE INVOICE IN STATE (don't clear!)
-)
+        return (
+            f"""
+            <div style="text-align:center; color:#00ff9d; font-size:26px; padding:20px;">
+                Lightning Sweep Ready<br><br>
+                <b style="font-size:32px; color:white; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
+                    You receive: {format_btc(user_gets)}
+                </b> instantly
+            </div>
+            <div style="display: flex; justify-content: center; margin: 40px 0;">
+                <img src="{qr}" style="max-width:100%; width:460px; border-radius:20px; 
+                     box-shadow:0 12px 50px rgba(0,255,157,0.7); border: 6px solid #00ff9d;">
+            </div>
+            <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
+            {details_section}
+            """,
+            gr.update(visible=False),  # hide generate button
+            gr.update(visible=False),  # hide Lightning box
+            ln_invoice                 # preserve invoice in state
+        )
 
     except Exception as e:
         msg = f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}"
