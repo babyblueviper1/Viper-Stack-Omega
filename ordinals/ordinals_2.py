@@ -346,13 +346,11 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
         <small>Strategy: <b>{strategy_name}</b> • Detected: <b>{detected}</b></small><br>
         Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
-        <b style="font-size:32px; color:#00ff9d;">You receive: {format_btc(user_gets)}</b></p>
-
-        !-- DYNAMIC SAVINGS + HISTORICAL TRUTH -->
+        <b style='font-size:32px; color:white; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;'>You receive: {format_btc(user_gets)}</b>"
         <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
             <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
                 Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
-                <b style="font-size:24px; color:#00ff9d;">You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
+                <b style='font-size:24px; color:white; text-shadow: 0 0 20px #00ff9d;'>You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
                 <span style="font-size:14px; color:#aaa;">
                     Fees have exceeded 6× the current rate in every Bitcoin bull cycle since 2017.
                 </span>
@@ -417,23 +415,25 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
         </details>
         """
 
-        return (
-            f"""
-            <div style="text-align:center; color:#00ff9d; font-size:26px; padding:20px;">
-                Lightning Sweep Ready<br><br>
-                You receive <b>{format_btc(user_gets)}</b> instantly
-            </div>
-            <div style="display: flex; justify-content: center; margin: 40px 0;">
-                <img src="{qr}" style="max-width:100%; width:460px; border-radius:20px; 
-                     box-shadow:0 12px 50px rgba(0,255,157,0.7); border: 6px solid #00ff9d;">
-            </div>
-            <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
-            {details_section}
-            """,
-            gr.update(visible=False),  # hide generate button
-            gr.update(visible=False),  # hide Lightning box
-            ""                         # ← 4th value (state unchanged)
-        )
+return (
+    f"""
+    <div style="text-align:center; color:#00ff9d; font-size:26px; padding:20px;">
+        Lightning Sweep Ready<br><br>
+        <b style="font-size:32px; color:white; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
+            You receive: {format_btc(user_gets)}
+        </b> instantly
+    </div>
+    <div style="display: flex; justify-content: center; margin: 40px 0;">
+        <img src="{qr}" style="max-width:100%; width:460px; border-radius:20px; 
+             box-shadow:0 12px 50px rgba(0,255,157,0.7); border: 6px solid #00ff9d;">
+    </div>
+    <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
+    {details_section}
+    """,
+    gr.update(visible=False),  # hide generate button
+    gr.update(visible=False),  # hide Lightning box
+    ln_invoice  # ← PRESERVE THE INVOICE IN STATE (don't clear!)
+)
 
     except Exception as e:
         msg = f"<b style='color:#ff3333'>Lightning failed:</b> {str(e)}"
@@ -493,7 +493,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     # LIVE UPDATE — updates the separate label, no crash
     def update_thankyou_label(bps):
         pct = bps / 100
-        return f"<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>→ {pct:.3f}% of future savings</div>"
+        return f"<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>→ {pct:.2f}% of future savings</div>"
 
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
@@ -510,11 +510,12 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
 
     # Buttons
     with gr.Row():
-        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
-        generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary")
+        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary") 
 
     output_log = gr.HTML()
-
+    with gr.Row():
+        generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary", size="lg", elem_classes="full-width", interactive=True)
+        
     # LIGHTNING INVOICE BOX
     ln_invoice_state = gr.State("")
 
@@ -605,20 +606,20 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
     gr.HTML("""
 <!-- Floating QR Scanner Buttons — REAL ICONS ONLY -->
-<label class="qr-button camera" title="Scan Address / xpub"></label>
-<label class="qr-button lightning" title="Scan Lightning Invoice"></label>
+<label class="qr-button btc" title="Scan Address / xpub">₿</label>
+<label class="qr-button ln" title="Scan Lightning Invoice">⚡</label>
 
-<input type="file" accept="image/*" capture="environment" id="qr-scanner-camera" style="display:none">
+<input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
 
 <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
 <script>
-const cameraBtn = document.querySelector('.qr-button.camera');
-const lnBtn = document.querySelector('.qr-button.lightning');
-const cameraInput = document.getElementById('qr-scanner-camera');
+const btcBtn = document.querySelector('.qr-button.btc');
+const lnBtn = document.querySelector('.qr-button.ln');
+const btcInput = document.getElementById('qr-scanner-btc');
 const lnInput = document.getElementById('qr-scanner-ln');
 
-cameraBtn.onclick = () => cameraInput.click();
+btcBtn.onclick = () => btcInput.click();
 lnBtn.onclick = () => lnInput.click();
 
 async function scan(file, isLightning = false) {
@@ -631,7 +632,6 @@ async function scan(file, isLightning = false) {
     try {
       const result = await ZXing.readBarcodeFromCanvas(canvas);
       const text = result.text.trim();
-
       if (isLightning && text.toLowerCase().startsWith('lnbc')) {
         const box = document.querySelector('textarea[placeholder*="lnbc"], input[placeholder*="lnbc"]');
         if (box) { box.value = text; box.dispatchEvent(new Event('input')); }
@@ -640,35 +640,27 @@ async function scan(file, isLightning = false) {
         const box = document.querySelector('textarea[placeholder*="bc1q"], input[placeholder*="bc1q"]');
         if (box) { box.value = text.split('?')[0].replace(/^bitcoin:/i, ''); box.dispatchEvent(new Event('input')); }
         alert("Address/xpub scanned!");
-      } else {
-        alert("Not a valid QR");
-      }
+      } else alert("Not recognized");
     } catch (e) { alert("No QR detected"); }
   };
   img.src = URL.createObjectURL(file);
 }
 
-cameraInput.onchange = e => scan(e.target.files[0], false);
+btcInput.onchange = e => scan(e.target.files[0], false);
 lnInput.onchange = e => scan(e.target.files[0], true);
 </script>
 
 <style>
-.qr-button { 
-  position: fixed !important; right: 24px; z-index: 9999;
-  width: 64px; height: 64px; border-radius: 50% !important; 
-  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-  background: #000 !important; color: white !important; 
-  border: 4px solid #f7931a;
+.qr-button {
+  position: fixed !important; right: 20px; z-index: 9999;
+  width: 64px; height: 64px; border-radius: 50% !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
   font-size: 36px; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all 0.2s;
+  cursor: pointer; transition: all 0.2s; border: 4px solid white;
 }
-.qr-button:hover { transform: scale(1.15); box-shadow: 0 12px 40px rgba(0,0,0,0.7); }
-.qr-button.camera { bottom: 96px; background: #f7931a !important; }
-.qr-button.lightning { bottom: 24px; background: #00ff9d !important; color: black !important; }
-
-/* REAL ICONS — NO TEXT */
-.qr-button.camera::before { content: "Camera"; }
-.qr-button.lightning::before { content: "Lightning"; }
+.qr-button:hover { transform: scale(1.15); }
+.qr-button.btc { bottom: 96px; background: #f7931a !important; color: white !important; }
+.qr-button.ln { bottom: 20px; background: #00ff9d !important; color: black !important; }
 </style>
 """)
 
