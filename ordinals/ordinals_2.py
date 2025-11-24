@@ -785,7 +785,8 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
 
-   gr.HTML("""
+    # Giant background Ω — nuclear version (visible)
+    gr.HTML("""
     <h1 style="
         position: fixed;
         top: 50%; left: 50%;
@@ -794,7 +795,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         font-weight: 900;
         color: rgba(247,147,26,0.045);
         pointer-events: none;
-        z-index: 9999;
+        z-index: -1;
         margin:0; padding:0;
         user-select: none;
         text-shadow: 0 0 80px rgba(247,147,26,0.3);
@@ -808,10 +809,11 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
       50%     { opacity:0.07; transform: translate(-50%,-50%) scale(1.03); }
     }
     </style>
-    """, elem_id="omega_bg")
+    """)
 
     # Your original CSS
     gr.HTML(f"<style>{css}</style>")
+
     # Title
     gr.Markdown("""
 **Omega Pruner v10.0 — Infinite Edition**
@@ -834,7 +836,7 @@ No logs • No BS • Runs entirely in your browser
 
     with gr.Row():
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
-
+        
     # DUST + THANK-YOU SLIDERS + LIVE % — SAME ROW
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
