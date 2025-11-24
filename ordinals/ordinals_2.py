@@ -288,21 +288,30 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     except:
         return "Invalid hex characters", raw_hex
 
+    # === DEFAULT VALUES (in case parsing fails) ===
+    bump_count = 0
+    fee_rate = 20
+
     try:
         # === COUNT HOW MANY TIMES IT HAS BEEN BUMPED (CORRECT LOGIC) ===
         pos = 4
         vin_len, pos = varint_decode(data, pos)
-        already_bumped = 0
         for _ in range(vin_len):
             pos += 36
             slen, pos = varint_decode(data, pos)
             pos += slen
             seq = int.from_bytes(data[pos:pos+4], 'little')
             pos += 4
-            if seq != 0xfffffffd:  # NOT RBF-enabled = already bumped
-                already_bumped += 1
+            if seq != 0xfffffffd:
+                bump_count += 1
 
-        # === PARSE TX (same as before) ===
+        # === FEE RATE (fallback) ===
+        try:
+            fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
+        except:
+            pass  # keep fee_rate = 20
+
+        # === REST OF PARSING (same as before) ===
         pos = 4
         vin_len, pos = varint_decode(data, pos)
         for _ in range(vin_len):
@@ -326,12 +335,6 @@ def rbf_bump(raw_hex: str, bump: int = 50):
             return "Could not parse outputs", raw_hex
         amount = int.from_bytes(data[first_output_pos:first_output_pos+8], 'little')
 
-        # === FEE RATE (fallback if API down) ===
-        try:
-            fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
-        except:
-            fee_rate = 20
-
         vsize = (len(data) + 3) // 4
         extra = int(vsize * bump)
         if amount <= extra + 546:
@@ -349,10 +352,7 @@ def rbf_bump(raw_hex: str, bump: int = 50):
             tx[pos:pos+4] = b'\xfd\xff\xff\xff'
             pos += 4
 
-        # === FINAL SUCCESS WITH CORRECT BUMP COUNTER ===
-        total_bumps = already_bumped + 1
-        total_rate = fee_rate + (total_bumps * bump)
-
+        # === FINAL SUCCESS WITH YOUR PERFECT COUNTER ===
         counter_text = f"""
         <div style="background:#00ff9d20; padding:12px; border-radius:12px; border:2px solid #00ff9d; margin:15px 0;">
             <b style="color:#00ff9d; font-size:18px;">{bump_count + 1} bump{'s' if bump_count > 0 else ''}!</b><br>
@@ -364,7 +364,6 @@ def rbf_bump(raw_hex: str, bump: int = 50):
 
     except Exception as e:
         return f"Failed to parse transaction: {str(e)}<br>Make sure it's a valid RBF-enabled tx", raw_hex
-
 # ==============================
 # Core Functions
 # ==============================
