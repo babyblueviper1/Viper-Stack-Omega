@@ -785,31 +785,30 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
 
-    # GIANT BACKGROUND OMEGA — FINAL, UNSTOPPABLE VERSION
-    gr.HTML("""
-    <div style="
-        position: fixed !important;
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        font-size: 92vh !important;
-        font-weight: 900 !important;
-        color: rgba(247, 147, 26, 0.038) !important;
-        pointer-events: none !important;
-        z-index: -1 !important;
-        user-select: none !important;
-        text-shadow: 0 0 120px rgba(247,147,26,0.15) !important;
-        opacity: 0.7 !important;
-        animation: breathe 26s infinite ease-in-out !important;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    ">Ω</div>
+   gr.HTML("""
+    <h1 style="
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 88vh;
+        font-weight: 900;
+        color: rgba(247,147,26,0.045);
+        pointer-events: none;
+        z-index: 9999;
+        margin:0; padding:0;
+        user-select: none;
+        text-shadow: 0 0 80px rgba(247,147,26,0.3);
+        opacity: 0.8;
+        animation: omega 20s infinite ease-in-out;
+        font-family: system-ui, sans-serif;
+    ">Ω</h1>
     <style>
-    @keyframes breathe {
-        0%, 100% { opacity: 0.025; transform: translate(-50%, -50%) scale(0.96); }
-        50%      { opacity: 0.055; transform: translate(-50%, -50%) scale(1.04); }
+    @keyframes omega {
+      0%,100% { opacity:0.03; transform: translate(-50%,-50%) scale(0.98); }
+      50%     { opacity:0.07; transform: translate(-50%,-50%) scale(1.03); }
     }
     </style>
-    """)
+    """, elem_id="omega_bg")
 
     # Your original CSS
     gr.HTML(f"<style>{css}</style>")
