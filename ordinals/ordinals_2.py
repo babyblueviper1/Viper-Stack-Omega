@@ -56,26 +56,30 @@ details summary::-webkit-details-marker { display: none; }
   align-items: center; 
   margin: 30px 0;
 }
+/* === GIANT BACKGROUND OMEGA — FINAL, UNKILLABLE VERSION === */
 body::before {
     content: "Ω";
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 90vh;
-    font-weight: 900;
-    color: rgba(247, 147, 26, 0.026);   /* f7931a at 2.6% opacity — barely visible */
-    pointer-events: none;
-    z-index: -1;
-    user-select: none;
-    text-shadow: 0 0 80px rgba(247,147,26,0.08);
-    opacity: 0.4;
-    animation: pulse 20s infinite alternate;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    font-size: 92vh !important;
+    font-weight: 900 !important;
+    color: rgba(247, 147, 26, 0.038) !important;   /* f7931a at ~3.8% opacity */
+    pointer-events: none !important;
+    z-index: -1 !important;
+    user-select: none !important;
+    text-shadow: 0 0 100px rgba(247,147,26,0.12) !important;
+    opacity: 0.6 !important;
+    animation: breathe 28s infinite ease-in-out !important;
 }
-@keyframes pulse {
-    0% { opacity: 0.03; transform: translate(-50%, -50%) scale(0.98); }
-    100% { opacity: 0.05; transform: translate(-50%, -50%) scale(1.02); }
+@keyframes breathe {
+    0%, 100% { opacity: 0.025; transform: translate(-50%, -50%) scale(0.96); }
+    50%      { opacity: 0.05;  transform: translate(-50%, -50%) scale(1.04); }
 }
+
+/* Fallback for ultra-dark mode users */
+.dark body::before { color: rgba(247, 147, 26, 0.06) !important; }
 """
 
 # ==============================
