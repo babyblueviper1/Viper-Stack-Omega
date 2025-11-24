@@ -354,7 +354,7 @@ def rbf_bump(raw_hex: str):
         txid = data[pos:pos+32][::-1].hex()
         vout = int.from_bytes(data[pos+32:pos+36], 'little')
         pos += 36
-        slen, pos = varintdecode(data, pos)
+        slen, pos = varint_decode(data, pos)
         pos += slen
         seq = int.from_bytes(data[pos:pos+4], 'little')
         inputs.append({'sequence': seq, 'seq_pos': pos-4})
@@ -659,7 +659,8 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-gr.HTML("""
+with gr.Blocks(title="Omega Pruner v10") as demo:
+    gr.HTML("""
 <div id="omega-master-container">
   <div class="omega-orbit">
     <div class="omega-core">Ω</div>
