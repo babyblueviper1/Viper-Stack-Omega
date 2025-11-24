@@ -759,59 +759,45 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-gr.HTML("""
-<div style="
-    position: fixed !important;
-    inset: 0 !important;
-    width: 100vw !important; height: 100vh !important;
-    pointer-events: none !important;
-    z-index: -1 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    overflow: hidden !important;
-">
-    <span style="
-        font-size: 92vh;
-        font-weight: 900;
-        background: linear-gradient(135deg, rgba(247,147,26,0.16), rgba(247,147,26,0.07));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        text-shadow: 0 0 140px rgba(247,147,26,0.38);
-        animation: spin 40s linear infinite, breathe 28s ease-in-out infinite;
-        user-select: none;
-        line-height: 1;
-    ">Ω</span>
-</div>
+with gr.Blocks(title="Omega Pruner v10") as demo:
 
-<style>
-@keyframes spin {   from { transform: rotate(0deg);   } to   { transform: rotate(360deg); } }
-@keyframes breathe {
-    0%, 100% { opacity: 0.68; transform: scale(0.96); }
-    50%      { opacity: 1.0;  transform: scale(1.04); }
-}
-</style>
-/* Gradio override: Punch through any dark overlays */
-.gradio-container { position: relative !important; z-index: 0 !important; }
-#omega-bg { isolation: isolate !important; will-change: transform; }
-.omega-symbol { animation-play-state: running !important; }
-</style>
+    # Darker + spinning Ω (pure CSS, bulletproof)
+    gr.HTML("""
+    <div style="
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important; height: 100vh !important;
+        pointer-events: none !important;
+        z-index: -1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+    ">
+        <span style="
+            font-size: 92vh;
+            font-weight: 900;
+            background: linear-gradient(135deg, rgba(247,147,26,0.16), rgba(247,147,26,0.07));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 140px rgba(247,147,26,0.38);
+            animation: spin 40s linear infinite, breathe 28s ease-in-out infinite;
+            user-select: none;
+            line-height: 1;
+        ">Ω</span>
+    </div>
 
-<script>
-// Force re-render on load (Gradio hack)
-window.addEventListener('load', () => {
-    const omega = document.getElementById('omega-bg');
-    if (omega) {
-        omega.style.display = 'none';
-        setTimeout(() => { omega.style.display = 'flex'; }, 100);
+    <style>
+    @keyframes spin   { from { transform: rotate(0deg);   } to   { transform: rotate(360deg); } }
+    @keyframes breathe {
+        0%, 100% { opacity: 0.68; transform: scale(0.96); }
+        50%      { opacity: 1.0;  transform: scale(1.04); }
     }
-});
-</script>
-""", elem_id="omega-bg-container-fixed")
+    </style>
+    """)
 
-
-    # Your normal CSS (keep this)
+    # Your normal CSS
     gr.HTML(f"<style>{css}</style>")
 
     # Title
@@ -835,38 +821,30 @@ No logs • No BS • Runs entirely in your browser
 
     with gr.Row():
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
-        
-    # DUST + THANK-YOU SLIDERS + LIVE % — SAME ROW
+
+    # DUST + THANK-YOU SLIDERS + LIVE %
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
-            dust_threshold = gr.Slider(
-                0, 3000, 546, step=1,
+            dust_threshold = gr.Slider(0, 3000, 546, step=1,
                 label="Dust threshold (sats)",
                 info="UTXOs below this value are ignored"
             )
-
         with gr.Column(scale=1, min_width=300):
-            # Slider with static label
-            dao_percent = gr.Slider(
-                0, 500, 50, step=10,
+            dao_percent = gr.Slider(0, 500, 50, step=10,
                 label="Thank-you to Ω author (basis points)",
                 info="0 bps = keep 100% • 500 bps = 5%"
             )
-            # Separate live label — updates safely
             live_thankyou = gr.Markdown(
                 "<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>"
                 "→ 0.50% of future savings"
                 "</div>"
             )
 
-    # LIVE UPDATE — updates the separate label, no crash
     def update_thankyou_label(bps):
         pct = bps / 100
         return f"<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>→ {pct:.2f}% of future savings</div>"
-
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
-    # DESTINATION + THANK-YOU ADDRESS — CLEAN ROW BELOW
     with gr.Row():
         with gr.Column(scale=4):
             dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
@@ -877,13 +855,11 @@ No logs • No BS • Runs entirely in your browser
                 placeholder="Leave blank to support the Ω author"
             )
 
-    # Buttons
     with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
 
     output_log = gr.HTML()
 
-    # GENERATE BUTTON — FULL WIDTH, IN ITS OWN ROW
     with gr.Row():
         generate_btn = gr.Button(
             "2. Generate Transaction",
@@ -893,11 +869,9 @@ No logs • No BS • Runs entirely in your browser
             elem_classes="full-width"
         )
     gr.Markdown("<small style='color:#888; text-align:center; margin-top:8px;'>"
-            "Includes optional thank-you (you control the amount above)"
-            "</small>")
-    
+                "Includes optional thank-you (you control the amount above)"
+                "</small>")
 
-    # LIGHTNING BOX
     ln_invoice_state = gr.State("")
     with gr.Row(visible=False) as ln_invoice_row:
         ln_invoice = gr.Textbox(
@@ -906,17 +880,15 @@ No logs • No BS • Runs entirely in your browser
             lines=4,
             scale=7
         )
-        # ONE BIG BUTTON THAT FILLS THE ENTIRE RIGHT SIDE
         submit_ln_btn = gr.Button(
             "Generate Lightning Sweep",
             variant="primary",
             size="lg",
             scale=3,
             min_width=220,
-            elem_classes="tall-button"  # ← makes it vertically fill the row
+            elem_classes="tall-button"
         )
 
-    # START OVER — FULL WIDTH, DIRECTLY BELOW GENERATE
     with gr.Row():
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
@@ -925,15 +897,9 @@ No logs • No BS • Runs entirely in your browser
             elem_classes="full-width"
         )
 
-    # === RBF SECTION ===
     gr.Markdown("### Infinite RBF Bump Zone")
-
     with gr.Row():
-        rbf_in = gr.Textbox(
-            label="Raw hex (auto-saved from last tx)",
-            lines=6,
-            scale=8
-        )
+        rbf_in = gr.Textbox(label="Raw hex (auto-saved from last tx)", lines=6, scale=8)
         gr.Button("Copy raw hex").click(
             None, None, None,
             js="() => { const t = document.querySelector('textarea[label*=\"Raw hex\"]'); if(t && t.value) navigator.clipboard.writeText(t.value).then(() => alert('Copied!')); }"
@@ -947,7 +913,7 @@ No logs • No BS • Runs entirely in your browser
     gr.Markdown("<small style='color:#888;'>Bump counter & info appears in main output above</small>")
 
     # ==================================================================
-    # Events — everything at root level, perfectly indented (4 spaces)
+    # Events
     # ==================================================================
     submit_btn.click(
         analysis_pass,
@@ -996,19 +962,18 @@ No logs • No BS • Runs entirely in your browser
         js="""
         (hex) => {
             if (hex && typeof hex === 'string') {
-                try { 
-                    localStorage.setItem('omega_rbf_hex', hex.trim()); 
-                } catch(e) { 
-                    console.warn('localStorage full'); 
-                }
+                try { localStorage.setItem('omega_rbf_hex', hex.trim()); }
+                catch(e) { console.warn('localStorage full'); }
             }
         }
         """
     )
+
+    # Floating QR Scanners + Styles
     gr.HTML("""
     <!-- Floating QR Scanner Buttons -->
     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">Lightning</label>
 
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
@@ -1038,7 +1003,7 @@ No logs • No BS • Runs entirely in your browser
             const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
             if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
             alert("Lightning invoice scanned!");
-            } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
+          } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
             const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
             const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
             if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
@@ -1055,54 +1020,32 @@ No logs • No BS • Runs entirely in your browser
     function loadSavedRBF() {
         const saved = localStorage.getItem('omega_rbf_hex');
         if (!saved) return;
-        const tryLoad = () => {
-            const box = document.querySelector('textarea[label*="Raw hex"]');
-            if (box) { box.value = saved; box.dispatchEvent(new Event('input')); return true; }
-            return false;
-        };
-        if (!tryLoad()) {
-            let attempts = 0;
-            const interval = setInterval(() => {
-                if (tryLoad() || attempts++ > 40) clearInterval(interval);
-            }, 250);
-        }
+        const box = document.querySelector('textarea[label*="Raw hex"]');
+        if (box) box.value = saved;
     }
     loadSavedRBF();
     </script>
 
     <style>
       .qr-fab {
-        position: fixed !important;
-        right: 20px;
-        width: 70px;
-        height: 70px;
-        border-radius: 50%;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 38px;
-        cursor: pointer;
-        transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-        border: 5px solid white;
-        font-weight: bold;
-        user-select: none;
-        z-index: 9999;
+        position: fixed !important; right: 20px; width: 70px; height: 70px;
+        border-radius: 50%; box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 38px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+        border: 5px solid white; font-weight: bold; user-select: none; z-index: 9999;
         text-shadow: 0 2px 8px rgba(0,0,0,0.5);
       }
       .qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
       .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
-      .qr-fab.ln { bottom: 20px; background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
+      .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
     </style>
     """)
 
 if __name__ == "__main__":
-    import os
-    import warnings
+    import os, warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 
     demo.queue(default_concurrency_limit=None, max_size=40)
-
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
@@ -1115,4 +1058,3 @@ if __name__ == "__main__":
         allowed_paths=["./"],
         ssl_verify=False,
     )
-
