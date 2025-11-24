@@ -784,6 +784,30 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
+ gr.HTML("""
+    <div style="
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        font-size: 92vh !important;
+        font-weight: 900 !important;
+        color: rgba(247, 147, 26, 0.038) !important;
+        pointer-events: none !important;
+        z-index: -1 !important;
+        user-select: none !important;
+        text-shadow: 0 0 120px rgba(247,147,26,0.15) !important;
+        opacity: 0.7 !important;
+        animation: breathe 26s infinite ease-in-out;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    ">Ω</div>
+    <style>
+    @keyframes breathe {
+        0%, 100% { opacity: 0.025; transform: translate(-50%, -50%) scale(0.96); }
+        50%      { opacity: 0.055; transform: translate(-50%, -50%) scale(1.04); }
+    }
+    </style>
+    """)
     gr.HTML(f"<style>{css}</style>")
     gr.Markdown("""
 **Omega Pruner v10.0 — Infinite Edition**
