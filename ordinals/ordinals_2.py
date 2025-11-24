@@ -16,6 +16,13 @@ try:
 except ImportError:
     bolt11_decode = None
 
+try:
+    from hdwallet import HDWallet
+    from hdwallet.symbols import BTC as HDWALLET_BTC
+except ImportError:
+    HDWallet = None
+    HDWALLET_BTC = None
+
 # ==============================
 # Constants
 # ==============================
@@ -140,49 +147,87 @@ def get_utxos(addr, dust=546):
 def fetch_all_utxos_from_xpub(xpub: str, dust: int = 546):
     try:
         xpub_clean = xpub.strip()
-        
-        # Derive addresses locally (BIP84 for SegWit; adjust if needed)
-        # Use a lib like: from hdwallet import HDWallet
-        # For now, placeholder — install hdwallet: pip install hdwallet
-        from hdwallet import HDWallet
-        from hdwallet.symbols import BTC  # Or use 'BTC'
-        
-        hdw = HDWallet(symbol=BTC)
+
+        # === Try to import hdwallet gracefully ===
+        try:
+            from hdwallet import HDWallet
+            from hdwallet.symbols import BTC as HDWALLET_BTC
+        except ImportError:
+            return [], "Missing dependency: pip install hdwallet"
+
+        # === Auto-detect xpub type and set correct derivation path ===
+        if xpub_clean.startswith("zpub") or xpub_clean.startswith("vpub"):
+            path_prefix = "m/84'/0'/0'"   # Native SegWit (bc1q)
+        elif xpub_clean.startswith("ypub") or xpub_clean.startswith("upub"):
+            path_prefix = "m/49'/0'/0'"   # Nested SegWit (P2SH-P2WPKH, starts with 3)
+        elif xpub_clean.startswith("xpub"):
+            path_prefix = "m/44'/0'/0'"   # Legacy (starts with 1) — fallback
+        else:
+            return [], "Unsupported xpub prefix (use xpub/ypub/zpub)"
+
+        hdw = HDWallet(symbol=HDWALLET_BTC)
         hdw.from_xpublic_key(xpub_clean)
-        
+
         addresses = []
-        # Receive (0)
-        for i in range(100):  # Gap limit 20, so scan 100 to be safe
-            addr = hdw.from_path(f"m/84'/0'/0'/0/{i}").p2wpkh_address()
-            addresses.append(addr)
-            if i >= 19 and all(get_utxos(addr, dust) == [] for addr in addresses[-20:]):  # Gap limit
-                break
-        
-        # Change (1)
-        for i in range(50):  # Fewer change usually
-            addr = hdw.from_path(f"m/84'/0'/0'/1/{i}").p2wpkh_address()
-            addresses.append(addr)
-            if i >= 19 and all(get_utxos(addr, dust) == [] for addr in addresses[-20:]):
-                break
+        receive_chain = 0
+        change_chain = 1
+        max_per_chain = 100
+        gap_limit = 20
+
+        def scan_chain(chain: int):
+            empty_count = 0
+            for i in range(max_per_chain):
+                path = f"{path_prefix}/{chain}/{i}"
+                try:
+                    if path_prefix == "m/84'/0'/0'":
+                        addr = hdw.from_path(path).p2wpkh_address()
+                    elif path_prefix == "m/49'/0'/0'":
+                        addr = hdw.from_path(path).p2sh_p2wpkh_address()
+                    else:  # m/44'
+                        addr = hdw.from_path(path).p2pkh_address()
+                except:
+                    addr = None
+
+                if not addr:
+                    break
+                addresses.append(addr)
+
+                # Early exit if gap limit reached
+                if i >= gap_limit - 1:
+                    recent = addresses[-(gap_limit):]
+                    if all(len(get_utxos(a, dust)) == 0 for a in recent):
+                        empty_count = gap_limit
+                        break
+
+        # Scan receive (0) and change (1)
+        scan_chain(receive_chain)
+        scan_chain(change_chain)
+
+        # Dedupe just in case
+        addresses = list(dict.fromkeys(addresses))[:200]
 
         all_utxos = []
-        for addr in addresses[:200]:  # Cap at 200
+        for addr in addresses:
             try:
                 utxos = api_get(f"https://blockstream.info/api/address/{addr}/utxo")
             except:
-                utxos = api_get(f"https://mempool.space/api/address/{addr}/utxo")
+                try:
+                    utxos = api_get(f"https://mempool.space/api/address/{addr}/utxo")
+                except:
+                    continue
             confirmed = [u for u in utxos if u.get('status', {}).get('confirmed', True)]
             all_utxos.extend([u for u in confirmed if u['value'] > dust])
-            time.sleep(0.1)  # Rate limit politeness
+            time.sleep(0.08)  # Be nice to public APIs
 
         all_utxos.sort(key=lambda x: x['value'], reverse=True)
         scanned = len(addresses)
         found = len(all_utxos)
-        return all_utxos, f"Derived & scanned {scanned} addresses → {found} UTXOs (local BIP84)"
-    except ImportError:
-        return [], "Install hdwallet: pip install hdwallet"
+
+        addr_type = "Native SegWit" if "84'" in path_prefix else "Nested SegWit" if "49'" in path_prefix else "Legacy"
+        return all_utxos, f"Scanned {scanned} addresses ({addr_type}) → Found {found} UTXOs"
+
     except Exception as e:
-        return [], f"Error: {str(e)}"
+        return [], f"xpub error: {str(e)}"
 
 def format_btc(sats: int) -> str:
     if sats < 100_000:
