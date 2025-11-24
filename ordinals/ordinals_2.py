@@ -935,21 +935,24 @@ No logs • No BS • Runs entirely in your browser
         ]
     )
 
-    rbf_btn.click(
+     rbf_btn.click(
         fn=rbf_bump,
         inputs=rbf_in,
         outputs=[rbf_in, output_log],
         js="""
         (hex) => {
             if (hex && typeof hex === 'string') {
-                try { localStorage.setItem('omega_rbf_hex', hex.trim()); }
-                catch(e) { console.warn('localStorage full'); }
+                try { 
+                    localStorage.setItem('omega_rbf_hex', hex.trim()); 
+                } catch(e) { 
+                    console.warn('localStorage full'); 
+                }
             }
         }
         """
     )
 
-  gr.HTML("""
+    gr.HTML("""
 <label class="qr-fab btc" title="Scan Address / xpub">B</label>
 <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
 
