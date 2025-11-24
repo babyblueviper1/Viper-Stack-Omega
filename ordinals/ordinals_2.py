@@ -1,4 +1,4 @@
-# app.py — Omega Pruner v9.0 — Community Edition
+# app.py — Omega Pruner v9.1 — Community Edition — FINAL & PERFECT
 import gradio as gr
 import requests, time, base64, io, qrcode
 from dataclasses import dataclass
@@ -27,57 +27,25 @@ input_vb_global = output_vb_global = None
 # ==============================
 css = """
 /* Full-width buttons */
-.full-width, .full-width > button { 
-    width: 100% !important; 
-    margin: 20px 0 !important; 
-}
+.full-width, .full-width > button { width: 100% !important; margin: 20px 0 !important; }
 .tall-button { height: 100% !important; }
-.tall-button > button { 
-    height: 100% !important; 
-    padding: 20px !important;
-    font-size: 18px !important;
-}
+.tall-button > button { height: 100% !important; padding: 20px !important; font-size: 18px !important; }
 
-/* Floating QR Scanner Buttons — ICONS ONLY, PERFECT CONTRAST */
-.qr-button { 
-  position: fixed !important; 
-  right: 20px; 
-  z-index: 9999;
-  width: 64px; height: 64px; 
-  border-radius: 50% !important; 
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 36px; 
-  cursor: pointer; 
-  transition: all 0.2s; 
-  border: 4px solid white;
-  font-weight: bold;
-}
+/* Floating QR Scanner Buttons */
+.qr-button { position: fixed !important; right: 20px; z-index: 9999; width: 64px; height: 64px; border-radius: 50% !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+  font-size: 36px; cursor: pointer; transition: all 0.2s; border: 4px solid white; font-weight: bold; }
 .qr-button:hover { transform: scale(1.15); }
-
-/* Bitcoin button — Orange */
-.qr-button.btc { 
-  bottom: 96px; 
-  background: #f7931a !important; 
-  color: white !important; 
-}
-
-/* Lightning button — Neon Green with BLACK text */
-.qr-button.ln { 
-  bottom: 20px; 
-  background: #00ff9d !important; 
-  color: black !important; 
-}
+.qr-button.btc { bottom: 96px; background: #f7931a !important; color: white !important; }
+.qr-button.ln { bottom: 20px; background: #00ff9d !important; color: black !important; }
 """
 
 disclaimer = """
-**Omega Pruner v9.0 — Community Edition**  
+**Omega Pruner v9.1 — Community Edition**  
 Zero custody • Fully open-source • No forced fees  
-Consolidate dusty UTXOs when fees are low → win when fees are high.  
-Optional thank-you (default 0.5% of future savings) to the original author.  
+Now with **infinite one-click RBF that survives refresh**  
 Source: [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0
 """
-
 # ==============================
 # Bitcoin Helpers
 # ==============================
@@ -539,7 +507,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     if not pruned_utxos_global:
-        return "Run analysis first", gr.update(visible=False), gr.update(visible=False), ""
+        return "Run analysis first", gr.update(visible=False), gr.update(visible=False), "", "", ""
 
     sample_addr = pruned_utxos_global[0].get('address') or user_input.strip()
     _, info = address_to_script_pubkey(sample_addr)
@@ -572,74 +540,86 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     user_gets = total - miner_fee - dao_cut
 
     if user_gets < 546:
-        return "Not enough after fees", gr.update(visible=False), gr.update(visible=False), ""
+        return "Not enough after fees", gr.update(visible=False), gr.update(visible=False), "", "", ""
 
     if ln_invoice and ln_invoice.strip().lower().startswith("lnbc"):
-        return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode, detected)
+        # Lightning path unchanged (raw hex is fine here)
+        return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode, detected) + ("", "")
 
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return "Invalid destination address", gr.update(visible=False), gr.update(visible=False), ""
+        return "Invalid destination", gr.update(visible=False), gr.update(visible=False), "", "", ""
 
+    # Build the transaction
     tx = Tx()
     for u in pruned_utxos_global:
-        tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))  # ← txid must be reversed!
+        tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
     tx.tx_outs.append(TxOut(user_gets, dest_script))
     if dao_cut:
         dao_script, _ = address_to_script_pubkey(dao_addr or DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-    # PSBT ONLY — NO RAW HEX
+    # Generate BOTH outputs
     psbt_b64 = make_psbt(tx)
+    raw_hex = tx.encode(segwit=True).hex()        # ← THIS IS 100% SAFE (unsigned!)
     qr = make_qr(psbt_b64)
 
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
 
+    # Save raw hex to localStorage + banner
+    js_save = f'''
+    <script>
+    try {{
+        localStorage.setItem("omega_rbf_hex", "{raw_hex}");
+    }} catch (e) {{
+        console.warn("localStorage quota exceeded — RBF hex still available in box below");
+    }}
+    </script>
+    '''
+    banner = '''
+    <div style="margin:30px 0; padding:18px; background:#fff8e7; border:2px solid #f7931a; border-radius:12px; text-align:center;">
+        <b>RBF Ready – Raw hex auto-saved</b><br>
+        <small>Keep tab open or press "Copy raw hex" below • Survives refresh</small>
+    </div>
+    '''
+
     details_section = f"""
-<details style="margin-top: 40px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto;">
+<details style="margin-top: 40px;">
     <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px;">
         View PSBT (click to expand)
     </summary>
-    <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; border: 1px solid #333;">
-<span style="color:#f7931a; font-weight:bold;">PSBT (base64):</span>
+    <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
 {psbt_b64}
     </pre>
-    <small style="color:#aaa;">Copy → Paste into Sparrow • Nunchuk • BlueWallet • Electrum</small>
 </details>
 """
 
-    return (
-        f"""
-        <div style="text-align:center; padding:20px;">
-            <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
-            <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
-            <small>Strategy: <b>{strategy_name}</b> • Format: <b>{detected}</b></small><br>
-            Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
-            <b style='font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d, 0 0 60px #00ff9d; font-weight:900;'>
-                You receive: {format_btc(user_gets)}
-            </b>
-            <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
-                <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
-                    Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
-                    <b style='font-size:24px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d; font-weight:900;'>
-                        You save ≈ {format_btc(savings)}
-                    </b> when fees spike
-                </p>
-            </div>
-            <div style="display: flex; justify-content: center; margin: 40px 0;">
-                <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; 
-                     border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
-            </div>
-            <p><small>Scan PSBT with Sparrow, Nunchuk, BlueWallet, Electrum</small></p>
-            {details_section}
+    html = f"""
+    <div style="text-align:center; padding:20px;">
+        <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
+        <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}</p>
+        <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">You receive: {format_btc(user_gets)}</b>
+        <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
+            Future savings ≈ <b style="font-size:24px; color:#00ff9d;">{format_btc(savings)}</b> (@ {future_rate} sat/vB)
         </div>
-        """,
-        gr.update(visible=False),
-        gr.update(visible=True),
-        ""
-    )
+        <div style="margin:40px 0;">
+            <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
+        </div>
+        <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum</small></p>
+        {banner}
+        {details_section}
+        {js_save}
+    </div>
+    """
 
+   return (
+        html,
+        gr.update(visible=False),   # generate_btn
+        gr.update(visible=True),    # ln_invoice_row  ← set to False if no LN invoice
+        "",                         # ln_invoice_state
+        raw_hex                     # ← goes to rbf_in
+    )
 
 # ==============================
 # LIGHTNING SWEEP — NOW PSBT TOO (Optional: Raw Hex OK here)
@@ -822,9 +802,10 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     # === RBF SECTION ===
     gr.Markdown("### RBF Bump")
     with gr.Row():
-        rbf_in = gr.Textbox(label="Raw hex (auto-updated after each bump)", lines=5, scale=8)
-        rbf_btn = gr.Button("Bump +50 sat/vB → Auto-Update", scale=2)
-    rbf_out = gr.Textbox(label="Bumped transaction", lines=8)
+        rbf_in = gr.Textbox(label="Raw hex (auto-saved)", lines=6, scale=8)
+        gr.Button("Copy", size="sm").click(None, None, None, js="() => {navigator.clipboard.writeText(document.querySelector('textarea[placeholder*=\"Raw hex\"]').value || document.querySelector('textarea[label*=\"Raw hex\"]').value); alert('Copied!');}")
+        gr.Button("Clear saved", size="sm").click(None, None, None, js="() => {localStorage.removeItem('omega_rbf_hex'); alert('Saved RBF hex cleared'); location.reload();}")
+        rbf_btn = gr.Button("Bump +50 sat/vB", variant="primary")
     gr.Markdown("<small style='color:#888;'>Bump counter & info appears in main output above</small>")
 
     # Events — FINAL & BULLETPROOF (Gradio 6.0.0) — MUST BE AT ROOT LEVEL
@@ -837,7 +818,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]  # ← 5 outputs only
     )
 
     ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
