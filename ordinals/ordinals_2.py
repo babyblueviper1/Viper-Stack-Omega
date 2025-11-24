@@ -68,7 +68,7 @@ disclaimer = """
 Zero custody • Fully open-source • No forced fees  
 Consolidate dusty UTXOs when fees are low → win when fees are high.  
 Optional thank-you (default 0.5% of future savings) to the original author.  
-Source: github.com/omega-pruner/v9 • Apache 2.0
+Source: [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0
 """
 
 # ==============================
