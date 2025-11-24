@@ -65,6 +65,46 @@ details summary::-webkit-details-marker { display: none; }
     .rbf-textbox {
         margin-bottom: 8px !important;
     }
+  /* Mobile RBF perfection — no gaps, perfect stacking */
+    @media (max-width: 768px) {
+        .rbf-buttons-col {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+        }
+        .copy-clear-group {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 4px !important;
+            margin-bottom: 8px !important;
+        }
+        .copy-clear-group > div {
+            width: 100% !important;
+        }
+        .bump-button-mobile {
+            width: 100% !important;
+            margin-top: 4px !important;
+        }
+        .rbf-textbox {
+            margin-bottom: 8px !important;
+        }
+    }
+    @media (min-width: 769px) {
+        .copy-clear-group {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 8px !important;
+            justify-content: flex-start !important;
+        }
+        .copy-clear-group > div {
+            flex: 1 !important;
+            min-width: 120px !important;
+        }
+        .bump-button-mobile {
+            margin-top: 12px !important;
+            width: auto !important;
+        }
+    }
 }
 """
 
@@ -957,8 +997,9 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
             elem_classes="full-width"
         )
 
-        gr.Markdown("### Infinite RBF Bump Zone")
+gr.Markdown("### Infinite RBF Bump Zone")
 
+    # RBF textarea + buttons container
     with gr.Row():
         with gr.Column(scale=8):
             rbf_in = gr.Textbox(
@@ -967,10 +1008,10 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
                 elem_classes="rbf-textbox"
             )
 
-        with gr.Column(scale=2, min_width=120):
-            # These two buttons stack vertically on mobile, stay side-by-side on desktop
-            with gr.Row() if gr.desktop else gr.Column():
-                gr.Button("Copy raw hex", size="sm").click(
+        with gr.Column(scale=4, elem_classes="rbf-buttons-col"):
+            # Copy + Clear buttons (row on desktop, column on mobile via CSS)
+            with gr.Group(elem_classes="copy-clear-group"):
+                gr.Button("Copy raw hex", size="sm", elem_classes="copy-btn").click(
                     None, None, None,
                     js="""
                     () => {
@@ -983,7 +1024,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
                     }
                     """
                 )
-                gr.Button("Clear saved", size="sm").click(
+                gr.Button("Clear saved", size="sm", elem_classes="clear-btn").click(
                     None, None, None,
                     js="""
                     () => {
@@ -994,7 +1035,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
                     """
                 )
 
-            # THE BUMP BUTTON — now directly under Copy/Clear on mobile
+            # Bump button — always below the copy/clear group
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
@@ -1003,6 +1044,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
             )
 
     gr.Markdown("<small style='color:#888; text-align:center;'>Bump counter & info appears above</small>")
+
 
     # ==================================================================
     # Events
