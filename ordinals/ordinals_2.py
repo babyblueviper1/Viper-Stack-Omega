@@ -56,6 +56,26 @@ details summary::-webkit-details-marker { display: none; }
   align-items: center; 
   margin: 30px 0;
 }
+body::before {
+    content: "Ω";
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 90vh;
+    font-weight: 900;
+    color: rgba(247, 147, 26, 0.026);   /* f7931a at 2.6% opacity — barely visible */
+    pointer-events: none;
+    z-index: -1;
+    user-select: none;
+    text-shadow: 0 0 80px rgba(247,147,26,0.08);
+    opacity: 0.4;
+    animation: pulse 20s infinite alternate;
+}
+@keyframes pulse {
+    0% { opacity: 0.03; transform: translate(-50%, -50%) scale(0.98); }
+    100% { opacity: 0.05; transform: translate(-50%, -50%) scale(1.02); }
+}
 """
 
 # ==============================
