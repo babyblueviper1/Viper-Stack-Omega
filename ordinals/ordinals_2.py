@@ -794,8 +794,14 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         0%, 100% { opacity: 0.68; transform: scale(0.96); }
         50%      { opacity: 1.0;  transform: scale(1.04); }
     }
-    /* Nuclear override — this is the line that was missing */
-    .gradio-container > div:first-child { z-index: -999998 !important; }
+   THE MISSING PIECE — forces repaint after Gradio finishes
+    window.addEventListener('load', () => {
+        const omega = document.getElementById('omega-bg');
+        if (omega) {
+            omega.style.display = 'none';
+            setTimeout(() => { omega.style.display = 'flex'; }, 100);
+        }
+    });
     </style>
     """)
 
