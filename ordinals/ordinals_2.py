@@ -943,12 +943,6 @@ gr.HTML("""
             elem_classes="full-width"
         )
 
-    gr.Markdown(
-        "<small style='color:#888; text-align:center; margin-top:8px;'>"
-        "Includes optional thank-you (you control the amount above)"
-        "</small>"
-    )
-
     ln_invoice_state = gr.State("")
 
     with gr.Row(visible=False) as ln_invoice_row:
@@ -973,7 +967,6 @@ gr.HTML("""
             size="lg",
             elem_classes="full-width"
         )
-
     # =================== INFINITE RBF SECTION ===================
     gr.Markdown("### Infinite RBF Bump Zone")
 
