@@ -785,39 +785,39 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
 
-    # Giant background Ω — nuclear version (visible)
+    # GIANT BACKGROUND OMEGA — THIS ONE ACTUALLY WORKS (z-index 9999 + real DOM element)
     gr.HTML("""
-    <h1 style="
-        position: fixed;
-        top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 88vh;
-        font-weight: 900;
-        color: rgba(247,147,26,0.045);
-        pointer-events: none;
-        z-index: -1;
-        margin:0; padding:0;
-        user-select: none;
-        text-shadow: 0 0 80px rgba(247,147,26,0.3);
-        opacity: 0.8;
-        animation: omega 20s infinite ease-in-out;
-        font-family: system-ui, sans-serif;
-    ">Ω</h1>
+    <div style="
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        font-size: 90vh !important;
+        font-weight: 900 !important;
+        color: rgba(247,147,26,0.05) !important;
+        pointer-events: none !important;
+        z-index: 9999 !important;
+        user-select: none !important;
+        text-shadow: 0 0 100px rgba(247,147,26,0.2) !important;
+        opacity: 1 !important;
+        animation: breathe 25s infinite ease-in-out !important;
+        font-family: system-ui, sans-serif !important;
+        line-height: 1 !important;
+    ">Ω</div>
+
     <style>
-    @keyframes omega {
-      0%,100% { opacity:0.03; transform: translate(-50%,-50%) scale(0.98); }
-      50%     { opacity:0.07; transform: translate(-50%,-50%) scale(1.03); }
+    @keyframes breathe {
+        0%, 100% { opacity: 0.03; transform: translate(-50%, -50%) scale(0.97); }
+        50%      { opacity: 0.08; transform: translate(-50%, -50%) scale(1.03); }
     }
     </style>
     """)
-
-    # Your original CSS
+    # Your normal CSS (keep this)
     gr.HTML(f"<style>{css}</style>")
 
     # Title
     gr.Markdown("""
 **Omega Pruner v10.0 — Infinite Edition**
-
 Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh  
 The last UTXO consolidator you'll ever need
 Source: [GitHub](https://github.com/babyblueviper1/Viper-Stack-Omega) – Apache 2.0  
