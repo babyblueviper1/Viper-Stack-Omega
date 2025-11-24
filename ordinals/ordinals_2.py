@@ -995,33 +995,7 @@ No logs • No BS • Runs entirely in your browser
         }
         """
     )
-
-    # Floating QR buttons + giant background Ω (forced)
     gr.HTML("""
-    <!-- Giant Background Omega — Nuclear Version -->
-    <h1 style="
-        position: fixed;
-        top: 50%; left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 88vh;
-        font-weight: 900;
-        color: rgba(247,147,26,0.045);
-        pointer-events: none;
-        z-index: -1;
-        margin:0; padding:0;
-        user-select: none;
-        text-shadow: 0 0 80px rgba(247,147,26,0.3);
-        opacity: 0.8;
-        animation: omega 20s infinite ease-in-out;
-        font-family: system-ui, sans-serif;
-    ">Ω</h1>
-    <style>
-    @keyframes omega {
-      0%,100% { opacity:0.03; transform: translate(-50%,-50%) scale(0.98); }
-      50%     { opacity:0.07; transform: translate(-50%,-50%) scale(1.03); }
-    }
-    </style>
-
     <!-- Floating QR Scanner Buttons -->
     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
     <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
@@ -1054,7 +1028,7 @@ No logs • No BS • Runs entirely in your browser
             const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
             if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
             alert("Lightning invoice scanned!");
-          } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].替え(/^bitcoin:/i,'').trim())) {
+            } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
             const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
             const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
             if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
@@ -1131,4 +1105,4 @@ if __name__ == "__main__":
         allowed_paths=["./"],
         ssl_verify=False,
     )
-   
+
