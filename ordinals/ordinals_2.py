@@ -694,12 +694,16 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     # GENERATE BUTTON — FULL WIDTH, IN ITS OWN ROW
     with gr.Row():
         generate_btn = gr.Button(
-            "2. Generate Transaction → Consolidate & Pay Thank-You",
+            "2. Generate Transaction",
             visible=False,
             variant="primary",
             size="lg",
             elem_classes="full-width"
         )
+    gr.Markdown("<small style='color:#888; text-align:center; margin-top:8px;'>"
+            "Includes optional thank-you (you control the amount above)"
+            "</small>")
+    
 
     # LIGHTNING BOX
     ln_invoice_state = gr.State("")
@@ -763,6 +767,7 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
+     # NUCLEAR START OVER — TOTAL REBIRTH
     start_over_btn.click(
         lambda: (
             "",                            # user_input
@@ -788,13 +793,14 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             rbf_in, rbf_out
         ]
     )
-  # AUTOMATIC RBF CHAIN — BUMP FOREVER WITH ONE CLICK
-  rbf_btn.click(
-      rbf_bump,
-      inputs=rbf_in,
-      outputs=[rbf_out, output_log, rbf_in]  # ← THIS IS THE MAGIC
-    )
 
+    # AUTOMATIC RBF CHAIN — BUMP FOREVER WITH ONE CLICK
+    rbf_btn.click(
+        rbf_bump,
+        inputs=rbf_in,
+        outputs=[rbf_out, output_log, rbf_in]  # ← auto-updates input box
+    )
+    
     # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
     gr.HTML("""
 <!-- Floating QR Scanner Buttons — REAL ICONS ONLY -->
