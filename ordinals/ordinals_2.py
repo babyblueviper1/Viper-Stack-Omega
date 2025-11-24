@@ -235,21 +235,31 @@ class Tx:
     def __post_init__(self):
         self.tx_ins = self.tx_ins or []
         self.tx_outs = self.tx_outs or []
-    def encode(self, segwit=True):
-        parts = [
-            self.version.to_bytes(4, 'little'),
-            encode_varint(len(self.tx_ins)),
-            *[i.encode() for i in self.tx_ins],
-            encode_varint(len(self.tx_outs)),
-            *[o.encode() for o in self.tx_outs],
-            self.locktime.to_bytes(4, 'little')
-        ]
-        if segwit:
-            # Insert SegWit marker + flag after version
-            parts.insert(1, b'\x00\x01')
-            # Insert witness placeholder (4 zero bytes) before locktime — stripped in PSBT
-            parts.insert(-1, b'\x00\x00\x00\x00')
-        return b''.join(parts)
+    
+def _correct_tx_encode(self, segwit=True):
+    parts = [
+        self.version.to_bytes(4, 'little'),
+        encode_varint(len(self.tx_ins)),
+        b''.join(inp.encode() for inp in self.tx_ins),
+        encode_varint(len(self.tx_outs)),
+        b''.join(out.encode() for out in self.tx_outs),
+        self.locktime.to_bytes(4, 'little')
+    ]
+    if segwit:
+        parts.insert(1, b'\x00\x01')
+        parts.insert(-1, b'\x00\x00\x00\x00')
+    return b''.join(parts)
+
+Tx.encode = _correct_tx_encode
+del _correct_tx_encode
+
+def make_psbt(tx: Tx) -> str:
+    raw = tx.encode(segwit=True)
+    if len(raw) >= 8 and raw[-8:-4] == b'\x00\x00\x00\x00':
+        raw = raw[:-4]
+    psbt = b'psbt\xff' + b'\x00' + encode_varint(len(raw)) + raw + b'\x00'
+    return base64.b64encode(psbt).decode()
+# =================================================================
 
 def make_qr(data: str) -> str:
     img = qrcode.make(data, box_size=10, border=4)
@@ -294,7 +304,7 @@ def rbf_bump(raw_hex: str, bump: int = 50):
 
     # === Parse version ===
     version = int.from_bytes(data[pos:pos + 4], 'little')
-    if version < 1 or version > 2:
+    if version not in (1, 2):
         return "Unsupported transaction version (only v1/v2 allowed)", raw_hex
     pos += 4
 
@@ -335,25 +345,26 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     script_len, pos = varint_decode(data, pos)
     pos += script_len
 
+    # Skip remaining outputs
     for _ in range(1, vout_len):
         pos += 8
         slen, pos = varint_decode(data, pos)
         pos += slen
 
-    # === Skip witness data ===
+    # === Skip witness data (only if SegWit) ===
     if is_segwit:
         for _ in range(vin_len):
-            items, pos = varint_decode(data, pos)
-            for _ in range(items):
-                wlen, pos = varint_decode(data, pos)
-                pos += wlen
+            witness_items, pos = varint_decode(data, pos)
+            for _ in range(witness_items):
+                item_len, pos = varint_decode(data, pos)
+                pos += item_len
 
     # === Locktime ===
     if pos + 4 > len(data):
         return "Truncated transaction — failed to parse locktime", raw_hex
     locktime = int.from_bytes(data[pos:pos + 4], 'little')
 
-    # === Critical safety boundary checks ===
+    # === Safety checks ===
     if first_output_pos + 8 > len(data):
         return "Corrupted transaction — cannot read first output amount", raw_hex
 
@@ -361,47 +372,48 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     if current_amount == 0:
         return "First output is 0 — this is an anyone-can-spend output, cannot reduce", raw_hex
 
+    # Estimate vsize (accurate enough for RBF)
     vsize = (len(data) + 3) // 4
     extra_fee = int(vsize * bump)
 
     if current_amount <= extra_fee + 546:
+        needed = extra_fee + 546 - current_amount + 1
         return (
             f"<div style='color:#ff3333; background:#300; padding:16px; border-radius:12px;'>"
             f"<b>Cannot bump +{bump} sat/vB</b><br>"
-            f"Would reduce change output to ≤546 sats (dust)<br>"
-            f"Need at least +{((546 + extra_fee) - current_amount):,} more sats in change"
+            f"Would reduce change output to dust (≤546 sats)<br>"
+            f"Need at least <b>+{needed:,}</b> more sats in change output"
             f"</div>"
         ), raw_hex
 
-    # === Taproot detection (key-path spend) ===
+    # === Detect Taproot key-path spend output ===
     is_taproot = (
         is_segwit and
-        vout_len > 0 and
-        data[first_output_pos + 8:first_output_pos + 9] == b'\x51' and  # OP_1
-        len(data) > first_output_pos + 9 + 32
+        vout_len >= 1 and
+        data[first_output_pos + 8:first_output_pos + 10] == b'\x51\x20'  # OP_1 + 32-byte push
     )
 
     # === RBF signaling analysis ===
-    sequences = [i['sequence'] for i in inputs]
-    rbf_signaled = any(seq < 0xfffffffe for seq in sequences)  # BIP125 rule
+    sequences = [inp['sequence'] for inp in inputs]
+    rbf_signaled = any(seq < 0xfffffffe for seq in sequences)  # BIP125 opt-in
     all_max = all(seq == 0xffffffff for seq in sequences)
 
-    # === Build user-facing warning ===
+    # === User feedback ===
     if is_taproot:
         warning = (
             "<div style='color:#ff9900; background:#332200; padding:14px; border-radius:10px; margin:12px 0; border:2px solid #ff9900;'>"
-            "<b>Taproot Transaction Detected</b><br>"
-            "Sequence-based RBF is ignored in Taproot key-path spends.<br>"
-            "For reliable RBF, your wallet must support:<br>"
-            "• <code>anyone-can-spend</code> output signaling, or<br>"
-            "• Key-path RBF (Sparrow, some hardware wallets)"
+            "<b>Taproot Key-Path Spend Detected</b><br>"
+            "Sequence-based RBF is ignored.<br>"
+            "For reliable replacement, use:<br>"
+            "• Anyone-can-spend output, or<br>"
+            "• Wallet with Key-path RBF support (Sparrow, etc.)"
             "</div>"
         )
         rbf_action = "fee bump only (no sequence change)"
     elif not rbf_signaled and all_max:
         warning = (
             "<div style='color:#00ff9d; background:#003300; padding:14px; border-radius:10px; margin:12px 0; border:2px solid #00ff9d;'>"
-            "<b>RBF signaling added</b> — transaction now replaceable"
+            "<b>RBF signaling added</b> — now replaceable!"
             "</div>"
         )
         rbf_action = "signaling + fee bump"
@@ -416,55 +428,45 @@ def rbf_bump(raw_hex: str, bump: int = 50):
         warning = ""
         rbf_action = "fee bump"
 
-    # === APPLY FEE BUMP — WITH FULL SAFETY COMMENT ===
+    # === APPLY BUMP ===
     tx = bytearray(data)
 
-    # ======================================================================
-    # SAFETY CRITICAL SECTION — DO NOT REMOVE
-    #
-    # We are reducing the first output amount.
-    # This is 100% safe and correct BECAUSE:
-    # • This function is ONLY used on transactions generated by Omega Pruner
-    # • Omega Pruner ALWAYS creates outputs in this order:
-    #       Output 0 → User's main destination (change/sweep) — ALWAYS largest
-    #       Output 1 → Optional DAO thank-you (if any)
-    # • Therefore, Output 0 is always the user's change — reducing it is expected
-    #
-    # If this code were ever used on arbitrary third-party transactions,
-    # this would steal funds from the recipient.
-    # But it never will be — this is by design and by tool scope.
-    # ======================================================================
+    # SAFETY CRITICAL: We reduce the first output
+    # This is 100% safe because Omega Pruner always makes:
+    #   Output 0 = user change (largest)
+    #   Output 1 = optional DAO thank-you
     new_amount = current_amount - extra_fee
     if new_amount < 546:
-        return "Bump would create dust change output (<546 sats) — aborted for safety", raw_hex
+        return "Safety abort: bump would create dust change", raw_hex
 
     tx[output_amount_pos:output_amount_pos + 8] = new_amount.to_bytes(8, 'little')
 
-    # Enable RBF sequence only if not Taproot and not already enabled
+    # Enable RBF signaling (only if needed and allowed)
+    RBF_SEQUENCE = 0xfffffffd
     if not is_taproot and all_max:
         for inp in inputs:
             if inp['sequence'] == 0xffffffff:
-                tx[inp['sequence_pos']:inp['sequence_pos'] + 4] = b'\xfd\xff\xff\xff'
+                tx[inp['sequence_pos']:inp['sequence_pos'] + 4] = RBF_SEQUENCE.to_bytes(4, 'little')
 
     bumped_hex = tx.hex()
 
-    # === Stats & counter ===
+    # === Stats ===
     try:
         fee_rate_api = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=6).json()["fastestFee"]
     except Exception:
         fee_rate_api = "unknown"
 
-    bump_number = sum(1 for s in sequences if s == 0xffffffff)
+    bump_count = sum(1 for s in sequences if s == 0xffffffff)
     if all_max:
-        bump_number += 1  # this bump adds the first signal
+        bump_count += 1  # we're adding the first signal now
 
     info = f"""
     {warning}
     <div style="background:#00ff9d20; padding:18px; border-radius:14px; border:3px solid #00ff9d; margin:20px 0; text-align:center; font-family: monospace;">
-        <b style="font-size:24px; color:#00ff9d;">Bump #{bump_number}</b><br><br>
-        +{bump} sat/vB → +{extra_fee:,} sats added to miner fee<br>
-        Change output reduced from {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b><br><br>
-        <small>Current fastest rate: ~{fee_rate_api} sat/vB • Action: {rbf_action}</small>
+        <b style="font-size:24px; color:#00ff9d;">Bump #{bump_count}</b><br><br>
+        +{bump} sat/vB → +{extra_fee:,} sats to miners<br>
+        Change reduced: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b><br><br>
+        <small>Current fastest: ~{fee_rate_api} sat/vB • {rbf_action}</small>
     </div>
     """
 
@@ -529,35 +531,6 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         """,
         gr.update(visible=True)
     )
-
-# ==============================
-# CORRECT SEGWIT + TAPROOT COMPATIBLE Tx.encode()
-# ==============================
-
-def encode(self, segwit=True):
-    parts = [
-        self.version.to_bytes(4, 'little'),
-        encode_varint(len(self.tx_ins)),
-        b''.join(inp.encode() for inp in self.tx_ins),
-        encode_varint(len(self.tx_outs)),
-        b''.join(out.encode() for out in self.tx_outs),
-        self.locktime.to_bytes(4, 'little')
-    ]
-    if segwit:
-        parts.insert(1, b'\x00\x01')  # marker + flag
-        parts.insert(-1, b'\x00\x00\x00\x00')  # witness placeholder
-    return b''.join(parts)
-
-
-# ==============================
-# PROPER PSBT BUILDER
-# ==============================
-def make_psbt(tx: Tx) -> str:
-    raw = tx.encode(segwit=True)
-    if raw[-8:-4] == b'\x00\x00\x00\x00':  # Check for witness placeholder at end
-        raw = raw[:-4]  # Strip the last 4 zero bytes (more reliable than replace)
-    psbt = b'psbt\xff' + b'\x00' + encode_varint(len(raw)) + raw + b'\x00'
-    return base64.b64encode(psbt).decode()
 
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
