@@ -1,51 +1,55 @@
-# 🜂 Omega Pruner Ω v8.6 — Universal Edition
+# Ω Omega Pruner v9.0 — Community Edition
 
-**Non-custodial • Zero keys touched • Works with EVERY Bitcoin wallet**  
-**Live:** [Omega DAO Pruner v8.6](https://omega-dao-pruner-v8.onrender.com//) 
-**Ignition Date:** November 21, 2025 — v8.6 LIVE
+**Non-custodial • Zero keys touched • Works with literally every Bitcoin wallet**  
+**LIVE:** [https://omega-pruner-v9.onrender.com](https://omega-pruner-v9.onrender.com)  
+**Launch Date:** November 23, 2025 — v9.0 LIVE
 
-### What v8.6 actually does (in 10 seconds flat)
+### What v9.0 actually does (in 8 seconds)
 
-- Paste or **QR-scan** any Bitcoin address (legacy, SegWit, Taproot)  
-- Two floating QR buttons → scan address → scan Lightning invoice  
-- Dust → **spendable Lightning balance instantly** ⚡ (Phoenix, Breez, Muun, WoS…)  
-- Generates **Raw Hex + PSBT + huge scannable QR** for literally every wallet:  
-  Electrum • Sparrow • BlueWallet • Aqua • Zeus • Mutiny • Coldcard • Jade • Trezor • Ledger  
-- Built-in RBF bumper for stuck transactions  
-- Privacy-aware prune strategies (Privacy First → Recommended → Savings Max)  
-- Tiny voluntary 5% DAO cut keeps the lights on (fully on-chain & transparent)  
+- Paste or **QR-scan** any address / xpub (legacy, SegWit, Taproot)  
+- Two floating **icon-only** buttons → **₿** (orange) + **Lightning** (neon green)  
+- Dust → **instant spendable Lightning balance** (Phoenix, Breez, Blink, Muun, Zeus, etc.)  
+- Full-width **Generate Transaction** button → **PSBT + Raw Hex + giant centered QR**  
+- Works with **every** wallet: Sparrow • BlueWallet • Nunchuk • Electrum • Coldcard • Ledger • Trezor  
+- Built-in RBF bumper (paste stuck tx → +50 sat/vB)  
+- **Zero forced fees** — thank-you fully optional (0–5% of future savings)  
+- **Live percentage** shown on slider → crystal clear what you’re giving  
+- **Dynamic future savings** — assumes 6× current fee rate (proven every bull run since 2017)
 
-### Feature matrix – v8.6
+### Feature matrix – v9.0
 
-| Feature                        | Status | Details |
-|--------------------------------|--------|-------|
-| On-chain address QR scanner    | LIVE   | Orange 📷 button (mobile + desktop upload) |
-| Lightning invoice QR scanner   | LIVE   | Green ⚡ button — dust → spendable sats |
-| PSBT + giant scannable QR      | LIVE   | Works with BlueWallet, Aqua, Zeus, Mutiny, hardware wallets |
-| Raw Hex + PSBT base64          | LIVE   | Copy-paste for Electrum / Sparrow / hardware |
-| Lightning sweep (on-chain fallback) | LIVE | Phoenix, Breez, Muun, Wallet of Satoshi, etc. |
-| RBF bumper                     | LIVE   | Paste stuck hex → +50 sat/vB bump (repeatable, free) |
-| Privacy-focused strategies     | LIVE   | Privacy First • Recommended • Savings Max |
-| Mobile-first + PWA ready       | LIVE   | Installable, offline-capable after first load |
-| Zero custody • Zero keys       | ALWAYS | Everything happens in your browser |
+| Feature                            | Status | Details |
+|------------------------------------|--------|-------|
+| Bitcoin address / xpub QR scanner  | LIVE   | Orange ₿ button (mobile + desktop) |
+| Lightning invoice QR scanner       | LIVE   | Neon green Lightning button |
+| Full-width Generate button         | LIVE   | Appears only when ready |
+| Giant centered QR                  | LIVE   | Perfect on mobile & desktop |
+| Raw Hex + PSBT (expandable)        | LIVE   | Copy-paste ready |
+| Lightning sweep (on-chain fallback)| LIVE   | Works with every modern Lightning wallet |
+| RBF bumper                         | LIVE   | Repeatable, free |
+| Live thank-you % on slider         | LIVE   | 0.00% → 5.00% — updates instantly |
+| Dynamic future savings             | LIVE   | 6× current fee — historically proven |
+| Start Over button                  | LIVE   | Full reset — clean slate |
+| Mobile-first + PWA ready           | LIVE   | Installable, offline-capable |
 
 ### Quick start
-1. Paste or scan any Bitcoin address  
-2. Tap **Run Pruner**  
-3. (Optional) Check **Sweep to Lightning** → scan invoice → **Generate Transaction**  
-4. Sign & broadcast with your favorite wallet  
+1. Paste or scan address/xpub  
+2. Choose strategy → click **1. Analyze UTXOs**  
+3. Click **2. Generate Transaction**  
+4. (Optional) Paste Lightning invoice → click **Generate Lightning Sweep**  
+5. Scan QR or copy PSBT → sign & broadcast
 
-That’s it. Dust gone. Fees saved. Swarm surged.
+Dust gone. Fees saved. Future secured.
 
 ### Why it matters
-Every tiny UTXO you have today will cost you **10–50× more** to spend next bull run.  
-Prune when fees are low → pay pennies now instead of dollars later.  
-This is **Bitcoin fee insurance**.
+Every dusty UTXO today will cost you **6–20× more** when fees explode again.  
+v9.0 shows you **exactly** how much you’ll save — using real math, not fear.
 
-Thank you for using Omega Pruner Ω v8.6 — brought to you by the DAO.  
-Come back soon — surge the swarm. 🜂
+Thank you for using Omega Pruner v9.0 — now fully community-owned, forever free, and brutally honest.
 
-**babyblueviper** • November 21, 2025  
+**No custody. No lies. Just Bitcoin.**
+
+**babyblueviper & the swarm** • November 23, 2025  
 **License:** Apache 2.0 • **Source:** https://github.com/babyblueviper1/Viper-Stack-Omega
 
-**Surge the swarm. Ledger’s yours.** 🜂⚡🐍
+**Surge the swarm. The future is yours.** Ω
