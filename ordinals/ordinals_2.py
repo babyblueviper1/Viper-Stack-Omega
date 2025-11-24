@@ -48,6 +48,12 @@ css = """
 .qr-button:hover { transform: scale(1.15); }
 .qr-button.btc { bottom: 96px; background: #f7931a !important; color: white !important; }
 .qr-button.ln { bottom: 20px; background: #00ff9d !important; color: black !important; }
+.qr-center { 
+  display: flex !important; 
+  justify-content: center; 
+  align-items: center; 
+  margin: 30px 0;
+}
 """
 
 # ==============================
@@ -663,7 +669,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             Future savings ≈ <b style="font-size:24px; color:#00ff9d;">{format_btc(savings)}</b> (@ {future_rate} sat/vB)
         </div>
         <div style="margin:40px 0;">
-            <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
+            <div class="qr-center"><img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);"></div>
         </div>
         <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum</small></p>
         <p style="margin:30px 0; color:#f7931a; font-weight:bold;">RBF ready — click "Bump +50 sat/vB" anytime (survives refresh)</p>
@@ -718,7 +724,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
                 {format_btc(user_gets)} to Lightning Instantly
             </b>
             <div style="margin:40px 0;">
-                <img src="{qr}" style="width:460px; max-width:96vw; border:6px solid #00ff9d; border-radius:20px; box-shadow:0 12px 50px rgba(0,255,157,0.5);">
+                <div class="qr-center"><img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #00ff9d; box-shadow:0 12px 50px rgba(0,255,157,0.5);"></div>
             </div>
             <p><small>Scan with Phoenix • Breez • Zeus • Blink • Muun</small></p>
         </div>
