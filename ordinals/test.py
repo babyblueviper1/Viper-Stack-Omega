@@ -659,7 +659,11 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-with gr.Blocks(title="Omega Pruner v10") as demo:
+with gr.Blocks(
+    css=css,                                   # ← ADD THIS
+    theme=gr.themes.Soft(),                    # ← ADD THIS (or Dark())
+    title="Ω Pruner ∞ — Infinite Edition"title="Omega Pruner v10"
+    ) as demo:
     gr.HTML("""
 <div id="omega-master-container">
   <div class="omega-orbit">
@@ -913,7 +917,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         fn=rbf_bump,
         inputs=rbf_in,
         outputs=[rbf_in, output_log],
-        js="""
+        _js="""
         (hex) => {
             if (hex && typeof hex === 'string') {
                 try { localStorage.setItem('omega_rbf_hex', hex.trim()); }
