@@ -252,6 +252,72 @@ def make_qr(data: str) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
 # ==============================
+# RBF BUMP — FINAL, BULLETPROOF VERSION (put it right here!)
+# ==============================
+
+def rbf_bump(raw_hex: str, bump: int = 50):
+    raw_hex = raw_hex.strip()
+    if not raw_hex:
+        return "Paste a raw transaction hex first", raw_hex
+    if len(raw_hex) < 400:
+        return (
+            "Invalid — expected full raw transaction hex<br><br>"
+            "Go to mempool.space → your tx → Advanced → Raw Transaction → copy ALL the hex",
+            raw_hex
+        )
+
+    try:
+        data = bytes.fromhex(raw_hex)
+    except:
+        return "Invalid hex characters", raw_hex
+
+    try:
+        pos = 4
+        vin_len, pos = varint_decode(data, pos)
+        for _ in range(vin_len):
+            pos += 36
+            slen, pos = varint_decode(data, pos)
+            pos += slen + 4
+        vout_len, pos = varint_decode(data, pos)
+        first_output_pos = pos
+        for _ in range(vout_len):
+            pos += 8
+            slen, pos = varint_decode(data, pos)
+            pos += slen
+        if pos < len(data) and data[pos:pos+2] == b'\x00\x01':
+            pos += 2
+            for _ in range(vin_len):
+                wlen, pos = varint_decode(data, pos)
+                pos += wlen
+        pos += 4
+
+        if first_output_pos + 8 > len(data):
+            return "Could not parse outputs — invalid tx format", raw_hex
+        amount = int.from_bytes(data[first_output_pos:first_output_pos+8], 'little')
+
+        vsize = (len(data) + 3) // 4
+        extra = int(vsize * bump)
+        if amount <= extra + 546:
+            return "Not enough for bump — output would be dust", raw_hex
+
+        new_amount = amount - extra
+        tx = bytearray(data)
+        tx[first_output_pos:first_output_pos+8] = new_amount.to_bytes(8, 'little')
+
+        pos = 4 + 1
+        for _ in range(vin_len):
+            pos += 36
+            slen, pos = varint_decode(data, pos)
+            pos += slen
+            tx[pos:pos+4] = b'\xfd\xff\xff\xff'
+            pos += 4
+
+        return tx.hex(), f"Success! Bumped +{bump} sat/vB (+{extra:,} sats fee)"
+
+    except Exception as e:
+        return f"Failed to parse transaction: {str(e)}<br>Make sure it's a valid RBF-enabled tx", raw_hex
+
+# ==============================
 # Core Functions
 # ==============================
 def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
@@ -508,8 +574,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
                 Invoice must be for exactly<br>
                 <b style="color:#f7931a; font-size:36px;">{required_sats:,} sats</b>
             </b><br><br>
-            <small style="color:#ff3333;">(±5,000 sats tolerance allowed)</small>
-        </div>
+            <div style="color:#ff6666; font-size:16px; font-weight:bold; margin-top:14px; text-shadow: 0 0 8px rgba(255,0,0,0.3);">±5,000 sats tolerance allowed</div>
         """
         return msg, gr.update(visible=False), gr.update(visible=True), ln_invoice
 # ==============================
