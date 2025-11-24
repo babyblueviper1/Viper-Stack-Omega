@@ -660,10 +660,10 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    css=css,                                   # ← ADD THIS
-    theme=gr.themes.Soft(),                    # ← ADD THIS (or Dark())
-    title="Ω Pruner ∞ — Infinite Edition"title="Omega Pruner v10"
-    ) as demo:
+    css=css,
+    theme=gr.themes.Soft(),
+    title="Ω Pruner ∞ — Infinite Edition"
+) as demo:
     gr.HTML("""
 <div id="omega-master-container">
   <div class="omega-orbit">
