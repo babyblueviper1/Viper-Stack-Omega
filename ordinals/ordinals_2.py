@@ -762,10 +762,10 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 with gr.Blocks(title="Omega Pruner v10") as demo:
 
     # Darker + spinning Ω (pure CSS, bulletproof)
-    gr.HTML("""
-    <div style="
+    <div id="omega-bg" style="
         position: fixed !important;
         inset: 0 !important;
+        top: 0 !important; left: 0 !important;
         width: 100vw !important; height: 100vh !important;
         pointer-events: none !important;
         z-index: -1 !important;
@@ -773,37 +773,46 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         align-items: center !important;
         justify-content: center !important;
         overflow: hidden !important;
+        background: transparent;
     ">
-        <span style="
-            font-size: 92vh;
-            font-weight: 900;
-            background: linear-gradient(135deg, rgba(247,147,26,0.16), rgba(247,147,26,0.07));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-shadow: 0 0 140px rgba(247,147,26,0.38);
-            animation: spin 40s linear infinite, breathe 28s ease-in-out infinite;
-            user-select: none;
-            line-height: 1;
+        <span class="omega-symbol" style="
+            font-size: 92vh !important;
+            font-weight: 900 !important;
+            background: linear-gradient(135deg, rgba(247,147,26,0.16), rgba(247,147,26,0.07)) !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            background-clip: text !important;
+            color: transparent !important;
+            text-shadow: 0 0 140px rgba(247,147,26,0.38) !important;
+            animation: omega-breath 28s infinite ease-in-out !important;
+            user-select: none !important;
+            line-height: 1 !important;
+            opacity: 0.88 !important;
         ">Ω</span>
     </div>
 
     <style>
-    @keyframes spin   { from { transform: rotate(0deg);   } to   { transform: rotate(360deg); } }
-    @keyframes breathe {
-        0%, 100% { opacity: 0.68; transform: scale(0.96); }
-        50%      { opacity: 1.0;  transform: scale(1.04); }
+    @keyframes omega-breath {
+        0%, 100% { opacity: 0.68; transform: scale(0.96) rotate(0deg);   }
+        50%      { opacity: 1.0;  transform: scale(1.04) rotate(180deg); }
     }
-   THE MISSING PIECE — forces repaint after Gradio finishes
+    /* Nuclear overrides — these are what make it survive Gradio 2025 */
+    .gradio-container { position: relative !important; z-index: 0 !important; }
+    #omega-bg { isolation: isolate !important; will-change: transform, opacity !important; }
+    .omega-symbol { animation-play-state: running !important; }
+    </style>
+
+    <script>
+    // The sacred force-reflow hack — this is why it always appears
     window.addEventListener('load', () => {
         const omega = document.getElementById('omega-bg');
         if (omega) {
             omega.style.display = 'none';
-            setTimeout(() => { omega.style.display = 'flex'; }, 100);
+            setTimeout(() => { omega.style.display = 'flex'; }, 120);
         }
     });
-    </style>
-    """)
+    </script>
+    """, elem_id="omega-bg-container-fixed")
 
     # Your normal CSS
     gr.HTML(f"<style>{css}</style>")
