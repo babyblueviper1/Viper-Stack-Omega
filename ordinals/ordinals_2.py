@@ -1,4 +1,4 @@
-# app.py — Omega Pruner v9.1
+# app.py — Omega Pruner v9.2
 import gradio as gr
 import requests, time, base64, io, qrcode
 from dataclasses import dataclass
@@ -258,7 +258,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 def rbf_bump(raw_hex: str, bump: int = 50):
     raw_hex = raw_hex.strip()
     if not raw_hex:
-        return "Paste a raw transaction hex first", raw_hex
+        return "", "<div style='color:#f7931a;'>Paste a raw transaction hex first</div>"
 
     try:
         data = bytes.fromhex(raw_hex)
@@ -543,8 +543,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         return "Not enough after fees", gr.update(visible=False), gr.update(visible=False), "", "", ""
 
     if ln_invoice and ln_invoice.strip().lower().startswith("lnbc"):
-        # Lightning path unchanged (raw hex is fine here)
-        return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode, detected) + ("", "")
+            return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode, detected)
 
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
@@ -620,7 +619,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 # ==============================
 def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detected="SegWit"):
     if not bolt11_decode:
-        return "bolt11 library missing — Lightning disabled", gr.update(visible=False), gr.update(visible=False), ""
+        return "bolt11 library missing — Lightning disabled", gr.update(visible=False), gr.update(visible=False), "", ""
 
     try:
         decoded = bolt11_decode(invoice)
@@ -630,7 +629,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        if not getattr(decoded, 'payment_address', None):
+        if not getattr(decoded.payment_address):
             raise ValueError("Invoice must support on-chain fallback (payment_address)")
 
         dest_script, _ = address_to_script_pubkey(decoded.payment_address)
@@ -642,48 +641,35 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
             dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
             tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-        # For Lightning: raw hex is acceptable (many LN wallets expect it)
-        raw_hex = tx.encode(for_psbt=False).hex()
+        raw_hex = tx.encode(segwit=True)
+        if raw_hex.endswith(b'\x00\x00\x00\x00'):
+            raw_hex = raw_hex[:-4]
+        raw_hex = raw_hex.hex()
         qr = make_qr(raw_hex)
 
-        details_section = f"""
-        <details style="margin-top: 40px;">
-            <summary style="cursor: pointer; color: #00ff9d; font-weight: bold;">View Raw Hex</summary>
-            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; font-size:11px; overflow-x:auto;">
-{raw_hex}
-            </pre>
-        </details>
+        html = f"""
+        <div style="text-align:center; padding:20px; color:#00ff9d;">
+            <h3>Lightning Sweep Ready</h3>
+            <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d;">
+                {format_btc(user_gets)} to Lightning Instantly
+            </b>
+            <div style="margin:40px 0;">
+                <img src="{qr}" style="width:460px; max-width:96vw; border:6px solid #00ff9d; border-radius:20px; box-shadow:0 12px 50px rgba(0,255,157,0.5);">
+            </div>
+            <p><small>Scan with Phoenix • Breez • Zeus • Blink • Muun</small></p>
+        </div>
         """
 
-        return (
-            f"""
-            <div style="text-align:center; padding:20px; color:#00ff9d;">
-                <h3>Lightning Sweep Ready</h3>
-                <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d;">
-                    {format_btc(user_gets)} → Lightning Instantly
-                </b>
-                <div style="margin:40px 0;">
-                    <img src="{qr}" style="width:460px; max-width:96vw; border:6px solid #00ff9d; border-radius:20px;">
-                </div>
-                <p><small>Scan with Phoenix • Breez • Zeus • Blink • Muun</small></p>
-                {details_section}
-            </div>
-            """,
-            gr.update(visible=False),
-            gr.update(visible=False),
-            invoice
-        )
+        return html, gr.update(visible=False), gr.update(visible=False), invoice, raw_hex
 
     except Exception as e:
         required = total - miner_fee - (0 if selfish_mode else dao_cut)
         return f"""
         <div style="text-align:center; color:#ff3333; padding:30px; background:#300; border-radius:16px;">
-            <b style="font-size:22px;">Lightning Sweep Failed</b><br><br>
-            {str(e)}<br><br>
-            <b>Invoice must be for ~{required:,} sats</b><br>
-            <small>±5,000 sats allowed</small>
+            <b style="font-size:22px;">Lightning Failed</b><br><br>{str(e)}<br><br>
+            Invoice must be for ~{format_btc(required)} (±5k sats)
         </div>
-        """, gr.update(visible=False), gr.update(visible=True), invoice
+        """, gr.update(visible=False), gr.update(visible=True), invoice, ""
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
