@@ -235,7 +235,7 @@ class Tx:
     def __post_init__(self):
         self.tx_ins = self.tx_ins or []
         self.tx_outs = self.tx_outs or []
-    def encode(self):
+    def encode(self, segwit=True):
         parts = [
             self.version.to_bytes(4, 'little'),
             encode_varint(len(self.tx_ins)),
@@ -244,6 +244,11 @@ class Tx:
             *[o.encode() for o in self.tx_outs],
             self.locktime.to_bytes(4, 'little')
         ]
+        if segwit:
+            # Insert SegWit marker + flag after version
+            parts.insert(1, b'\x00\x01')
+            # Insert witness placeholder (4 zero bytes) before locktime — stripped in PSBT
+            parts.insert(-1, b'\x00\x00\x00\x00')
         return b''.join(parts)
 
 def make_qr(data: str) -> str:
@@ -549,10 +554,10 @@ def encode(self, segwit=True):
 # ==============================
 def make_psbt(tx: Tx) -> str:
     raw = tx.encode(segwit=True)
-    raw = raw.replace(b'\x00\x00\x00\x00', b'', 1)  # strip witness
+    if raw[-8:-4] == b'\x00\x00\x00\x00':  # Check for witness placeholder at end
+        raw = raw[:-4]  # Strip the last 4 zero bytes (more reliable than replace)
     psbt = b'psbt\xff' + b'\x00' + encode_varint(len(raw)) + raw + b'\x00'
     return base64.b64encode(psbt).decode()
-
 
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
