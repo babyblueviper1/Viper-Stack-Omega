@@ -139,23 +139,48 @@ def get_utxos(addr, dust=546):
 
 def fetch_all_utxos_from_xpub(xpub: str, dust: int = 546):
     try:
-        import urllib.parse
         xpub_clean = xpub.strip()
-        url = f"https://blockchain.info/multiaddr?active={urllib.parse.quote(xpub_clean)}&n=200"
-        data = requests.get(url, timeout=30).json()
-        addresses = [a["address"] for a in data.get("addresses", [])[:200]]
+        
+        # Derive addresses locally (BIP84 for SegWit; adjust if needed)
+        # Use a lib like: from hdwallet import HDWallet
+        # For now, placeholder — install hdwallet: pip install hdwallet
+        from hdwallet import HDWallet
+        from hdwallet.symbols import BTC  # Or use 'BTC'
+        
+        hdw = HDWallet(symbol=BTC)
+        hdw.from_xpublic_key(xpub_clean)
+        
+        addresses = []
+        # Receive (0)
+        for i in range(100):  # Gap limit 20, so scan 100 to be safe
+            addr = hdw.from_path(f"m/84'/0'/0'/0/{i}").p2wpkh_address()
+            addresses.append(addr)
+            if i >= 19 and all(get_utxos(addr, dust) == [] for addr in addresses[-20:]):  # Gap limit
+                break
+        
+        # Change (1)
+        for i in range(50):  # Fewer change usually
+            addr = hdw.from_path(f"m/84'/0'/0'/1/{i}").p2wpkh_address()
+            addresses.append(addr)
+            if i >= 19 and all(get_utxos(addr, dust) == [] for addr in addresses[-20:]):
+                break
 
         all_utxos = []
-        for addr in addresses:
+        for addr in addresses[:200]:  # Cap at 200
             try:
                 utxos = api_get(f"https://blockstream.info/api/address/{addr}/utxo")
             except:
                 utxos = api_get(f"https://mempool.space/api/address/{addr}/utxo")
             confirmed = [u for u in utxos if u.get('status', {}).get('confirmed', True)]
             all_utxos.extend([u for u in confirmed if u['value'] > dust])
+            time.sleep(0.1)  # Rate limit politeness
 
         all_utxos.sort(key=lambda x: x['value'], reverse=True)
-        return all_utxos, f"Scanned {len(addresses)} addresses → {len(all_utxos)} UTXOs"
+        scanned = len(addresses)
+        found = len(all_utxos)
+        return all_utxos, f"Derived & scanned {scanned} addresses → {found} UTXOs (local BIP84)"
+    except ImportError:
+        return [], "Install hdwallet: pip install hdwallet"
     except Exception as e:
         return [], f"Error: {str(e)}"
 
