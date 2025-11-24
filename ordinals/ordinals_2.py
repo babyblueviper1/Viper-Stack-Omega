@@ -784,7 +784,9 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
- gr.HTML("""
+
+    # GIANT BACKGROUND OMEGA — FINAL, UNSTOPPABLE VERSION
+    gr.HTML("""
     <div style="
         position: fixed !important;
         top: 50% !important;
@@ -798,7 +800,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         user-select: none !important;
         text-shadow: 0 0 120px rgba(247,147,26,0.15) !important;
         opacity: 0.7 !important;
-        animation: breathe 26s infinite ease-in-out;
+        animation: breathe 26s infinite ease-in-out !important;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     ">Ω</div>
     <style>
@@ -808,13 +810,16 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
     }
     </style>
     """)
+
+    # Your original CSS
     gr.HTML(f"<style>{css}</style>")
+
+    # Title
     gr.Markdown("""
 **Omega Pruner v10.0 — Infinite Edition**
 
 Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh  
 The last UTXO consolidator you'll ever need
-
 Source: [GitHub](https://github.com/babyblueviper1/Viper-Stack-Omega) – Apache 2.0  
 No logs • No BS • Runs entirely in your browser
 """)
