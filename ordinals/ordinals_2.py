@@ -1018,15 +1018,15 @@ if __name__ == "__main__":
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    demo.queue(concurrency_count=20, max_size=40)
+    demo.queue(default_concurrency_limit=None, max_size=40)
 
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=True,
         debug=False,
-        enable_queue=True,
-        max_threads=40,
+        enable_queue=True,  # Redundant but explicit
+        max_threads=40,     # Matches your old intent
         show_error=True,
         quiet=True,
         favicon_path="https://bitcoinpruner.com/favicon.ico",
