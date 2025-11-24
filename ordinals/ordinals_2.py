@@ -1025,8 +1025,7 @@ if __name__ == "__main__":
         server_port=int(os.environ.get("PORT", 7860)),
         share=True,
         debug=False,
-        enable_queue=True,  # Redundant but explicit
-        max_threads=40,     # Matches your old intent
+        max_threads=40,
         show_error=True,
         quiet=True,
         favicon_path="https://bitcoinpruner.com/favicon.ico",
