@@ -812,7 +812,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
 
     # Your original CSS
     gr.HTML(f"<style>{css}</style>")
-     # Title
+    # Title
     gr.Markdown("""
 **Omega Pruner v10.0 — Infinite Edition**
 
