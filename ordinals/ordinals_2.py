@@ -396,7 +396,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
                 Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
                 <b style='font-size:24px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d; font-weight:900;'>You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
-                <span style="font-size:14px; color:#999;">
+                <span style="font-size:14px; color:#888;">
                     Fees have exceeded 6× the current rate in every Bitcoin bull cycle since 2017.
                 </span>
             </p>
