@@ -30,6 +30,12 @@ css = """
     width: 100% !important; 
     margin: 20px 0 !important; 
 }
+.tall-button { height: 100% !important; }
+.tall-button > button { 
+    height: 100% !important; 
+    padding: 20px !important;
+    font-size: 18px !important;
+}
 
 /* Floating QR Scanner Buttons — ICONS ONLY, PERFECT CONTRAST */
 .qr-button { 
@@ -386,12 +392,12 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 """
     lightning_hint = f"""
     <div style="margin: 40px 0 20px 0; padding: 18px; background: rgba(0,255,157,0.08); border-radius: 14px; border: 1px solid #00ff9d; max-width: 680px; margin-left: auto; margin-right: auto;">
-    <p style="margin:0; text-align:center; color:#ddd; font-size:16px;">
+    <p style="margin:0; text-align:center; color:#1e90ff; font-size:16px;">
         Lightning invoice must be for exactly<br>
         <b style="font-size:32px; color:#FFD700; text-shadow: 0 0 10px #00ff9d; font-weight:900;">
             {user_gets:,} sats
         </b><br>
-        <small style="color:#00ff9d;">(±5,000 sats tolerance allowed)</small>
+        <small style="color:#1e90ff;">(±5,000 sats tolerance allowed)</small>
     </p>
 </div>
 """
@@ -590,11 +596,18 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
         ln_invoice = gr.Textbox(
             label="Lightning Invoice → paste lnbc… to sweep instantly",
             placeholder="Paste your invoice here",
-            lines=3,
+            lines=4,
             scale=7
         )
-        with gr.Column(scale=2, min_width=180):
-            submit_ln_btn = gr.Button("Generate Lightning Sweep", variant="primary", size="lg")
+        # ONE BIG BUTTON THAT FILLS THE ENTIRE RIGHT SIDE
+        submit_ln_btn = gr.Button(
+            "Generate Lightning Sweep",
+            variant="primary",
+            size="lg",
+            scale=3,
+            min_width=220,
+            elem_classes="tall-button"  # ← makes it vertically fill the row
+        )
 
     # START OVER — FULL WIDTH, DIRECTLY BELOW GENERATE
     with gr.Row():
