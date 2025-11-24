@@ -630,22 +630,18 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     psbt_b64 = make_psbt(tx)
 
     
-   # Generate clean, unsigned, RBF-ready raw hex — 100% compatible with ALL wallets
+  # Generate clean, unsigned, RBF-ready raw hex — 100% compatible with ALL wallets
     unsigned_tx = tx.encode(segwit=True)
 
-# CRITICAL: Strip the empty witness placeholder (4 zero bytes) that appears
-# when there are no signatures yet — this is what breaks many wallets
+    # CRITICAL: Strip the empty witness placeholder (4 zero bytes) when unsigned
     if unsigned_tx.endswith(b'\x00\x00\x00\x00'):
         unsigned_tx = unsigned_tx[:-4]
 
     raw_hex = unsigned_tx.hex()
-    # ← Unsigned, RBF-ready, witness-stripped raw transaction — safe to broadcast or bump forever
-    
+
     qr = make_qr(psbt_b64)
 
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
-
-    status_note = '<p style="margin:30px 0; color:#f7931a; font-weight:bold; text-align:center;">RBF ready — click "Bump +50 sat/vB" anytime (survives refresh)</p>'
 
     details_section = f"""
 <details style="margin-top: 40px;">
@@ -675,14 +671,13 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     </div>
     """
 
-   return (
+    return (
         html,
         gr.update(visible=False),   # generate_btn
-        gr.update(visible=True),    # ln_invoice_row  ← set to False if no LN invoice
-        "",                         # ln_invoice_state
-        raw_hex                     # ← goes to rbf_in
+        gr.update(visible=True),    # ln_invoice_row
+        "",                         # ln_invoice_state (cleared)
+        raw_hex                     # saved for infinite RBF
     )
-
 # ==============================
 # LIGHTNING SWEEP — NOW PSBT TOO (Optional: Raw Hex OK here)
 # ==============================
