@@ -252,6 +252,22 @@ def make_qr(data: str) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
 # ==============================
+# MISSING VARINT DECODER — ADD THIS EXACTLY HERE
+# ==============================
+def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
+    """Decode a Bitcoin varint at position pos, return (value, new_pos)"""
+    val = data[pos]
+    pos += 1
+    if val < 0xfd:
+        return val, pos
+    elif val == 0xfd:
+        return int.from_bytes(data[pos:pos+2], 'little'), pos + 2
+    elif val == 0xfe:
+        return int.from_bytes(data[pos:pos+4], 'little'), pos + 4
+    else:
+        return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
+
+# ==============================
 # RBF BUMP — FINAL, BULLETPROOF VERSION (put it right here!)
 # ==============================
 
