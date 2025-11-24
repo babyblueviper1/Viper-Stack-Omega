@@ -812,8 +812,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
 
     # Your original CSS
     gr.HTML(f"<style>{css}</style>")
-
-    # Title
+     # Title
     gr.Markdown("""
 **Omega Pruner v10.0 — Infinite Edition**
 
@@ -924,8 +923,10 @@ No logs • No BS • Runs entirely in your browser
             size="lg",
             elem_classes="full-width"
         )
+
     # === RBF SECTION ===
     gr.Markdown("### Infinite RBF Bump Zone")
+
     with gr.Row():
         rbf_in = gr.Textbox(
             label="Raw hex (auto-saved from last tx)",
@@ -1004,113 +1005,121 @@ No logs • No BS • Runs entirely in your browser
         """
     )
 
+    # Floating QR buttons + giant background Ω (forced)
     gr.HTML("""
-<label class="qr-fab btc" title="Scan Address / xpub">B</label>
-<label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
-
-<input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
-<input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
-
-<script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-<script>
-// ← Your entire scanner script stays 100% unchanged → just copy-paste it here
-const btcBtn = document.querySelector('.qr-fab.btc');
-const lnBtn = document.querySelector('.qr-fab.ln');
-const btcInput = document.getElementById('qr-scanner-btc');
-const lnInput = document.getElementById('qr-scanner-ln');
-
-btcBtn.onclick = () => btcInput.click();
-lnBtn.onclick = () => lnInput.click();
-
-async function scan(file, isLightning = false) {
-  if (!file) return;
-  const img = new Image();
-  img.onload = async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    canvas.getContext('2d').drawImage(img, 0, 0);
-    try {
-      const result = await ZXing.readBarcodeFromCanvas(canvas);
-      const text = result.text.trim();
-
-      if (isLightning && text.toLowerCase().startsWith('lnbc')) {
-        const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || 
-                    document.querySelector('textarea');
-        if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
-        alert("Lightning invoice scanned!");
-      } else if (!isLightning) {
-        const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-        if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleaned)) {
-          const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
-                      document.querySelector('textarea');
-          if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
-          alert("Address/xpub scanned!");
-        } else alert("Not recognized");
-      } else alert("Not recognized");
-    } catch (e) {
-      alert("No QR code detected");
+    <!-- Giant Background Omega — Nuclear Version -->
+    <h1 style="
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 88vh;
+        font-weight: 900;
+        color: rgba(247,147,26,0.045);
+        pointer-events: none;
+        z-index: -1;
+        margin:0; padding:0;
+        user-select: none;
+        text-shadow: 0 0 80px rgba(247,147,26,0.3);
+        opacity: 0.8;
+        animation: omega 20s infinite ease-in-out;
+        font-family: system-ui, sans-serif;
+    ">Ω</h1>
+    <style>
+    @keyframes omega {
+      0%,100% { opacity:0.03; transform: translate(-50%,-50%) scale(0.98); }
+      50%     { opacity:0.07; transform: translate(-50%,-50%) scale(1.03); }
     }
-  };
-  img.src = URL.createObjectURL(file);
-}
+    </style>
 
-btcInput.onchange = e => scan(e.target.files[0], false);
-lnInput.onchange = e => scan(e.target.files[0], true);
+    <!-- Floating QR Scanner Buttons -->
+    <label class="qr-fab btc" title="Scan Address / xpub">B</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
 
-// RBF auto-load (unchanged)
-function loadSavedRBF() {
-    const saved = localStorage.getItem('omega_rbf_hex');
-    if (!saved) return;
-    const tryLoad = () => {
-        const box = document.querySelector('textarea[label*="Raw hex"]');
-        if (box) { box.value = saved; box.dispatchEvent(new Event('input')); return true; }
-        return false;
-    };
-    if (!tryLoad()) {
-        let attempts = 0;
-        const interval = setInterval(() => {
-            if (tryLoad() || attempts++ > 40) clearInterval(interval);
-        }, 250);
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
+
+    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+    <script>
+    const btcBtn = document.querySelector('.qr-fab.btc');
+    const lnBtn = document.querySelector('.qr-fab.ln');
+    const btcInput = document.getElementById('qr-scanner-btc');
+    const lnInput = document.getElementById('qr-scanner-ln');
+
+    btcBtn.onclick = () => btcInput.click();
+    lnBtn.onclick = () => lnInput.click();
+
+    async function scan(file, isLightning = false) {
+      if (!file) return;
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+          const result = await ZXing.readBarcodeFromCanvas(canvas);
+          const text = result.text.trim();
+          if (isLightning && text.toLowerCase().startsWith('lnbc')) {
+            const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
+            if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
+            alert("Lightning invoice scanned!");
+          } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].替え(/^bitcoin:/i,'').trim())) {
+            const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+            const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
+            if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
+            alert("Address/xpub scanned!");
+          } else alert("Not recognized");
+        } catch (e) { alert("No QR code detected"); }
+      };
+      img.src = URL.createObjectURL(file);
     }
-}
-loadSavedRBF();
-</script>
 
-<style>
-  .qr-fab {
-    position: fixed !important;
-    right: 20px;
-    width: 70px;
-    height: 70px;
-    border-radius: 50%;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 38px;
-    cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-    border: 5px solid white;
-    font-weight: bold;
-    user-select: none;
-    z-index: 9999;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-  }
-  .qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
-  .qr-fab.btc { 
-    bottom: 100px; 
-    background: linear-gradient(135deg, #f7931a, #f9a43f); 
-    color: white;
-  }
-  .qr-fab.ln { 
-    bottom: 20px; 
-    background: linear-gradient(135deg, #00ff9d, #33ffc7); 
-    color: #000;
-    font-size: 42px;   /* Slightly larger bolt = looks perfect */
-  }
-</style>
-""")
+    btcInput.onchange = e => scan(e.target.files[0], false);
+    lnInput.onchange = e => scan(e.target.files[0], true);
+
+    function loadSavedRBF() {
+        const saved = localStorage.getItem('omega_rbf_hex');
+        if (!saved) return;
+        const tryLoad = () => {
+            const box = document.querySelector('textarea[label*="Raw hex"]');
+            if (box) { box.value = saved; box.dispatchEvent(new Event('input')); return true; }
+            return false;
+        };
+        if (!tryLoad()) {
+            let attempts = 0;
+            const interval = setInterval(() => {
+                if (tryLoad() || attempts++ > 40) clearInterval(interval);
+            }, 250);
+        }
+    }
+    loadSavedRBF();
+    </script>
+
+    <style>
+      .qr-fab {
+        position: fixed !important;
+        right: 20px;
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 38px;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+        border: 5px solid white;
+        font-weight: bold;
+        user-select: none;
+        z-index: 9999;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      }
+      .qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
+      .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
+      .qr-fab.ln { bottom: 20px; background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
+    </style>
+    """)
 
 if __name__ == "__main__":
     import os
@@ -1131,3 +1140,4 @@ if __name__ == "__main__":
         allowed_paths=["./"],
         ssl_verify=False,
     )
+   
