@@ -5,6 +5,8 @@ import requests, time, base64, io, qrcode
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import urllib.parse
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 print(f"Gradio version: {gr.__version__}")
 
@@ -1026,10 +1028,25 @@ loadSavedRBF();
 """)
 if __name__ == "__main__":
     import os
-    demo.queue(max_size=30)
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning)  # silence noisy gradio warnings
+
+    demo.queue(
+        concurrency_count=20,   # smooth under load
+        max_size=40             # plenty of breathing room
+    )
+
     demo.launch(
-        theme=gr.themes.Soft(),
-        server_name="0.0.0.0",  # ← CRITICAL: Binds to all interfaces
-        server_port=int(os.environ.get("PORT", 7860)),  # ← Uses Render's $PORT (defaults to 7860 locally)
-        share=True
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        share=True,                     # gradio share link when running locally
+        debug=False,
+        enable_queue=True,              # already queued above, but explicit is good
+        max_threads=40,
+        show_error=True,
+        quiet=True,
+        favicon_path="https://bitcoinpruner.com/favicon.ico",  # looks sexy on every tab
+        # Optional but recommended for public deployments:
+        allowed_paths=["./"],           # security – only serve files from current dir
+        ssl_verify=False,               # prevents occasional cert issues on some hosts
     )
