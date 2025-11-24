@@ -853,13 +853,26 @@ No logs • No BS • Runs entirely in your browser
     # === RBF SECTION ===
     gr.Markdown("### Infinite RBF Bump Zone")
     with gr.Row():
-        rbf_in = gr.Textbox(label="Raw hex (auto-saved from last tx)", lines=6, scale=8)
-        gr.Button("Copy raw hex").click(None,None,None, js="()=>{const t=document.querySelector('textarea[label*=\"Raw hex\"]'); if(t&&t.value)navigator.clipboard.writeText(t.value).then(()=>alert('Copied!')) }")
-        gr.Button("Clear saved").click(None,None,None, js="()=>{localStorage.removeItem('omega_rbf_hex');alert('Cleared');location.reload()}")
-        rbf_btn = gr.Button("Bump +50 sat/vB → Miners", variant="primary")
+        rbf_in = gr.Textbox(
+            label="Raw hex (auto-saved from last tx)",
+            lines=6,
+            scale=8
+        )
+        gr.Button("Copy raw hex").click(
+            None, None, None,
+            js="() => { const t = document.querySelector('textarea[label*=\"Raw hex\"]'); if(t && t.value) navigator.clipboard.writeText(t.value).then(() => alert('Copied!')); }"
+        )
+        gr.Button("Clear saved").click(
+            None, None, None,
+            js="() => { localStorage.removeItem('omega_rbf_hex'); alert('Cleared'); location.reload(); }"
+        )
+        rbf_btn = gr.Button("Bump +50 sat/vB to Miners", variant="primary")
+
     gr.Markdown("<small style='color:#888;'>Bump counter & info appears in main output above</small>")
 
-    # Events — FINAL & BULLETPROOF (Gradio 6.0.0) — MUST BE AT ROOT LEVEL
+    # ==================================================================
+    # Events — everything at root level, perfectly indented (4 spaces)
+    # ==================================================================
     submit_btn.click(
         analysis_pass,
         [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
@@ -869,7 +882,7 @@ No logs • No BS • Runs entirely in your browser
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]  # ← 5 outputs only
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]
     )
 
     ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
@@ -886,12 +899,11 @@ No logs • No BS • Runs entirely in your browser
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
-    # PERFECT Start Over Button (no rbf_out, no crash)
     start_over_btn.click(
         lambda: (
             "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
             "", gr.update(visible=False), gr.update(visible=False),
-            "", "", ""  # user_input → rbf_in cleared
+            "", "", ""
         ),
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
@@ -901,7 +913,6 @@ No logs • No BS • Runs entirely in your browser
         ]
     )
 
-    # === FINAL: Infinite RBF Bump (one-liner, bulletproof, 2025 edition) ===
     rbf_btn.click(
         fn=rbf_bump,
         inputs=rbf_in,
@@ -915,9 +926,10 @@ No logs • No BS • Runs entirely in your browser
         }
         """
     )
-    # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
-   gr.HTML("""
-<!-- Floating QR Scanner Buttons — FINAL WORKING 2025 EDITION -->
+
+    # Floating QR Scanner Buttons — final working version
+    gr.HTML("""
+<!-- Floating QR Scanner Buttons — 2025 Edition -->
 <label class="qr-button btc" title="Scan Address / xpub">B</label>
 <label class="qr-button ln" title="Scan Lightning Invoice">Lightning</label>
 
@@ -925,7 +937,6 @@ No logs • No BS • Runs entirely in your browser
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
 
 <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-
 <script>
 const btcBtn = document.querySelector('.qr-button.btc');
 const lnBtn = document.querySelector('.qr-button.ln');
@@ -949,21 +960,13 @@ async function scan(file, isLightning = false) {
 
       if (isLightning && text.toLowerCase().startsWith('lnbc')) {
         const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]');
-        if (box) {
-          box.value = text;
-          box.dispatchEvent(new Event('input'));
-          box.dispatchEvent(new Event('change'));
-        }
+        if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
         alert("Lightning invoice scanned!");
       } else if (!isLightning) {
         const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-        if (/^(bc1|[13]|xpub|zpub|ypub|tpub)/i.test(cleaned)) {
+        if (/^(bc1|[13]|xpub)/i.test(cleaned)) {
           const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]');
-          if (box) {
-            box.value = cleaned;
-            box.dispatchEvent(new Event('input'));
-            box.dispatchEvent(new Event('change'));
-          }
+          if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
           alert("Address/xpub scanned!");
         } else alert("Not a valid Bitcoin address/xpub");
       } else alert("Not recognized");
@@ -977,21 +980,14 @@ async function scan(file, isLightning = false) {
 btcInput.onchange = e => scan(e.target.files[0], false);
 lnInput.onchange = e => scan(e.target.files[0], true);
 
-// BULLETPROOF RBF hex restore — works even with Gradio async loading
 function loadSavedRBF() {
     const saved = localStorage.getItem('omega_rbf_hex');
     if (!saved) return;
-    
     const tryLoad = () => {
-        const box = document.querySelector('textarea[label*="Raw hex"], textarea[placeholder*="Raw hex"]');
-        if (box) {
-            box.value = saved;
-            box.dispatchEvent(new Event('input'));
-            return true;
-        }
+        const box = document.querySelector('textarea[label*="Raw hex"]');
+        if (box) { box.value = saved; box.dispatchEvent(new Event('input')); return true; }
         return false;
     };
-    
     if (!tryLoad()) {
         let attempts = 0;
         const interval = setInterval(() => {
@@ -999,7 +995,6 @@ function loadSavedRBF() {
         }, 250);
     }
 }
-
 loadSavedRBF();
 </script>
 
@@ -1017,27 +1012,24 @@ loadSavedRBF();
 .qr-button.ln { bottom: 20px; background: #00ff9d !important; color: black !important; }
 </style>
 """)
+
 if __name__ == "__main__":
     import os
     import warnings
-    warnings.filterwarnings("ignore", category=UserWarning)  # silence noisy gradio warnings
+    warnings.filterwarnings("ignore", category=UserWarning)
 
-    demo.queue(
-        concurrency_count=20,   # smooth under load
-        max_size=40             # plenty of breathing room
-    )
+    demo.queue(concurrency_count=20, max_size=40)
 
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
-        share=True,                     # gradio share link when running locally
+        share=True,
         debug=False,
-        enable_queue=True,              # already queued above, but explicit is good
+        enable_queue=True,
         max_threads=40,
         show_error=True,
         quiet=True,
-        favicon_path="https://bitcoinpruner.com/favicon.ico",  # looks sexy on every tab
-        # Optional but recommended for public deployments:
-        allowed_paths=["./"],           # security – only serve files from current dir
-        ssl_verify=False,               # prevents occasional cert issues on some hosts
+        favicon_path="https://bitcoinpruner.com/favicon.ico",
+        allowed_paths=["./"],
+        ssl_verify=False,
     )
