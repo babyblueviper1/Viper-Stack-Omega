@@ -275,6 +275,7 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     raw_hex = raw_hex.strip()
     if not raw_hex:
         return "Paste a raw transaction hex first", raw_hex
+
     if len(raw_hex) < 400:
         return (
             "Invalid — expected full raw transaction hex<br><br>"
@@ -288,6 +289,20 @@ def rbf_bump(raw_hex: str, bump: int = 50):
         return "Invalid hex characters", raw_hex
 
     try:
+        # === COUNT HOW MANY TIMES IT HAS BEEN BUMPED (CORRECT LOGIC) ===
+        pos = 4
+        vin_len, pos = varint_decode(data, pos)
+        already_bumped = 0
+        for _ in range(vin_len):
+            pos += 36
+            slen, pos = varint_decode(data, pos)
+            pos += slen
+            seq = int.from_bytes(data[pos:pos+4], 'little')
+            pos += 4
+            if seq != 0xfffffffd:  # NOT RBF-enabled = already bumped
+                already_bumped += 1
+
+        # === PARSE TX (same as before) ===
         pos = 4
         vin_len, pos = varint_decode(data, pos)
         for _ in range(vin_len):
@@ -308,8 +323,14 @@ def rbf_bump(raw_hex: str, bump: int = 50):
         pos += 4
 
         if first_output_pos + 8 > len(data):
-            return "Could not parse outputs — invalid tx format", raw_hex
+            return "Could not parse outputs", raw_hex
         amount = int.from_bytes(data[first_output_pos:first_output_pos+8], 'little')
+
+        # === FEE RATE (fallback if API down) ===
+        try:
+            fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
+        except:
+            fee_rate = 20
 
         vsize = (len(data) + 3) // 4
         extra = int(vsize * bump)
@@ -328,7 +349,18 @@ def rbf_bump(raw_hex: str, bump: int = 50):
             tx[pos:pos+4] = b'\xfd\xff\xff\xff'
             pos += 4
 
-        return tx.hex(), f"Success! Bumped +{bump} sat/vB (+{extra:,} sats fee)"
+        # === FINAL SUCCESS WITH CORRECT BUMP COUNTER ===
+        total_bumps = already_bumped + 1
+        total_rate = fee_rate + (total_bumps * bump)
+
+        counter_text = f"""
+        <div style="background:#00ff9d20; padding:12px; border-radius:12px; border:2px solid #00ff9d; margin:15px 0;">
+            <b style="color:#00ff9d; font-size:18px;">{bump_count + 1} bump{'s' if bump_count > 0 else ''}!</b><br>
+            Total bump: +{(bump_count + 1) * 50:,} sat/vB • This bump adds +{extra:,} sats
+        </div>
+        """
+
+        return tx.hex(), counter_text
 
     except Exception as e:
         return f"Failed to parse transaction: {str(e)}<br>Make sure it's a valid RBF-enabled tx", raw_hex
