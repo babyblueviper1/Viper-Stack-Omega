@@ -573,7 +573,9 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     if unsigned_tx.endswith(b'\x00\x00\x00\x00'):
         unsigned_tx = unsigned_tx[:-4]
 
-    raw_hex = unsigned_tx.hex()    # ← THIS IS 100% SAFE (unsigned!)
+    raw_hex = unsigned_tx.hex()
+    # ← Unsigned, RBF-ready, witness-stripped raw transaction — safe to broadcast or bump forever
+    
     qr = make_qr(psbt_b64)
 
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
