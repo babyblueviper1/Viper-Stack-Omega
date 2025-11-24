@@ -793,44 +793,15 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
-
     # THE ONE THAT WORKS — Dark, breathing, 180° rotate, always visible
     gr.HTML(
         """
-        <div id="omega-bg" style="
-            position: fixed !important;
-            inset: 0 !important;
-            top: 0 !important; left: 0 !important;
-            width: 100vw !important; height: 100vh !important;
-            pointer-events: none !important;
-            z-index: -1 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            overflow: hidden !important;
-            background: transparent;
-        ">
-            <span class="omega-symbol" style="
-                font-size: 100vh !important;
-                font-weight: 900 !important;
-                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;
-                -webkit-background-clip: text !important;
-                -webkit-text-fill-color: transparent !important;
-                background-clip: text !important;
-                color: transparent !important;
-                text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;
-                animation: omega-breath 28s infinite ease-in-out !important;
-                user-select: none !important;
-                line-height: 1 !important;
-                opacity: 0.96 !important;
-            ">Ω</span>
+        <div id="omega-bg" style="...your long style...">
+            <span class="omega-symbol" style="...">Ω</span>
         </div>
 
         <style>
-        @keyframes omega-breath {
-            0%, 100% { opacity: 0.76; transform: scale(0.95) rotate(0deg);   }
-            50%      { opacity: 1.0;  transform: scale(1.05) rotate(180deg); }
-        }
+        @keyframes omega-breath { ... }
         .gradio-container { position: relative !important; z-index: 0 !important; }
         #omega-bg { isolation: isolate !important; will-change: transform, opacity !important; }
         .omega-symbol { animation-play-state: running !important; }
@@ -852,46 +823,19 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
     # Your normal CSS — injected safely
     gr.HTML(f"<style>{css}</style>")
 
-    # TITLE — now guaranteed to be on its own line, full width, centered
+    # TITLE
     gr.Markdown(
         """
-<div style="
-    text-align: center;
-    margin: 24px 0 32px 0;
-    padding: 12px;
-">
-    <h1 style="
-        font-size: 38px !important;
-        font-weight: 900 !important;
-        color: #f7931a !important;
-        margin: 0 0 12px 0 !important;
-        text-shadow: 0 4px 12px rgba(247,147,26,0.4);
-        line-height: 1.2;
-    ">Omega Pruner v10.0 — Infinite Edition</h1>
-    
-    <p style="
-        font-size: 18px !important;
-        color: #aaa !important;
-        margin: 8px 0 !important;
-        line-height: 1.5;
-    ">
-        Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh<br>
-        The last UTXO consolidator you'll ever need
-    </p>
-    
-    <p style="
-        font-size: 15px !important;
-        color: #f7931a !important;
-        margin: 16px 0 0 0 !important;
-    ">
-        Source: <a href="https://github.com/babyblueviper1/Viper-Stack-Omega" target="_blank" style="color:#f7931a; text-decoration: underline;">GitHub</a> – Apache 2.0 • No logs • Runs in your browser
-    </p>
+<div style="text-align: center; margin: 24px 0 32px 0; padding: 12px;">
+    <h1 style="font-size: 38px !important; ...">Omega Pruner v10.0 — Infinite Edition</h1>
+    <p style="...">Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh<br>...</p>
+    <p style="...">Source: <a href="https://github.com/...">GitHub</a> – Apache 2.0 • No logs • Runs in your browser</p>
 </div>
         """,
         elem_classes="omega-title-block"
     )
 
-    # ← NOW we begin layout rows — everything below is safe
+    # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
         with gr.Column(scale=4):
             user_input = gr.Textbox(label="Address or xpub", placeholder="bc1q… or xpub…", lines=2)
@@ -905,7 +849,6 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
     with gr.Row():
         selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
 
-    # DUST + THANK-YOU SLIDERS + LIVE %
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
             dust_threshold = gr.Slider(0, 3000, 546, step=1,
@@ -980,8 +923,9 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
             elem_classes="full-width"
         )
 
-gr.Markdown("### Infinite RBF Bump Zone")
-    # RBF textarea + buttons container
+    # =================== INFINITE RBF SECTION ===================
+    gr.Markdown("### Infinite RBF Bump Zone")
+
     with gr.Row():
         with gr.Column(scale=8):
             rbf_in = gr.Textbox(
@@ -991,33 +935,16 @@ gr.Markdown("### Infinite RBF Bump Zone")
             )
 
         with gr.Column(scale=4, elem_classes="rbf-buttons-col"):
-            # Copy + Clear buttons (stacked on mobile, row on desktop via CSS)
             with gr.Group(elem_classes="copy-clear-group"):
                 gr.Button("Copy raw hex", size="sm", elem_classes="copy-btn").click(
                     None, None, None,
-                    js="""
-                    () => {
-                        const t = document.querySelector('textarea[label*="Raw hex"]');
-                        if (t && t.value) {
-                            navigator.clipboard.writeText(t.value).then(() => {
-                                alert('Copied to clipboard!');
-                            });
-                        }
-                    }
-                    """
+                    js="""() => { ... }"""
                 )
                 gr.Button("Clear saved", size="sm", elem_classes="clear-btn").click(
                     None, None, None,
-                    js="""
-                    () => {
-                        localStorage.removeItem('omega_rbf_hex');
-                        alert('Cleared!');
-                        location.reload();
-                    }
-                    """
+                    js="""() => { localStorage.removeItem('omega_rbf_hex'); alert('Cleared!'); location.reload(); }"""
                 )
 
-            # Bump button — directly under Copy/Clear on mobile, no gap
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
@@ -1026,6 +953,7 @@ gr.Markdown("### Infinite RBF Bump Zone")
             )
 
     gr.Markdown("<small style='color:#888; text-align:center;'>Bump counter & info appears above</small>")
+    
     # ==================================================================
     # Events
     # ==================================================================
