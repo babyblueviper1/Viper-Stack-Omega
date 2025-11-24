@@ -3,6 +3,7 @@ import gradio as gr
 import requests, time, base64, io, qrcode
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
+import urllib.parse
 
 print(f"Gradio version: {gr.__version__}")
 
@@ -444,7 +445,10 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
     outputs = 1 + (1 if not selfish_mode and dao_percent > 0 else 0)
-    vsize = 10 + inputs + input_vb_global * inputs + output_vb_global * outputs
+    weight = 40 + inputs * (input_vb_global * 4) + outputs * (output_vb_global * 4) + 4  # +4 for segwit flag/locktime
+    if any("witness" in str(u) for u in pruned_utxos_global):  # rough segwit check
+        weight += 2  # flag + marker
+    vsize = (weight + 3) // 4
 
     try:
         fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
@@ -520,7 +524,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
         <small>Strategy: <b>{strategy_name}</b> • Detected: <b>{detected}</b></small><br>
         Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
-        <<b style='font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d, 0 0 60px #00ff9d; font-weight:900;'>You receive: {format_btc(user_gets)}</b>
+        <b style='font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d, 0 0 60px #00ff9d; font-weight:900;'>You receive: {format_btc(user_gets)}</b>
         <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
             <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
                 Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
@@ -798,7 +802,9 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     rbf_btn.click(
         rbf_bump,
         inputs=rbf_in,
-        outputs=[rbf_out, output_log, rbf_in]  # ← auto-updates input box
+        outputs=[rbf_out, output_log]
+    ).then(
+        lambda x: x, rbf_out, rbf_in  # Syncs the bumped tx back to input
     )
     
     # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
