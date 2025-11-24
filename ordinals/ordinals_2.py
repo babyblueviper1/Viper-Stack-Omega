@@ -760,7 +760,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 gr.HTML("""
-<div id="omega-bg" style="
+<div style="
     position: fixed !important;
     inset: 0 !important;
     width: 100vw !important; height: 100vh !important;
@@ -774,22 +774,22 @@ gr.HTML("""
     <span style="
         font-size: 92vh;
         font-weight: 900;
-        background: linear-gradient(135deg, rgba(247,147,26,0.16), rgba(247,147,26,0.07)) !important;
-        -webkit-background-clip: text !important;
-        -webkit-text-fill-color: transparent !important;
-        background-clip: text !important;
-        text-shadow: 0 0 140px rgba(247,147,26,0.38) !important;
-        animation: omega-breath 28s infinite ease-in-out !important;
-        user-select: none !important;
+        background: linear-gradient(135deg, rgba(247,147,26,0.16), rgba(247,147,26,0.07));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: 0 0 140px rgba(247,147,26,0.38);
+        animation: spin 40s linear infinite, breathe 28s ease-in-out infinite;
+        user-select: none;
         line-height: 1;
-        opacity: 0.88;
     ">Ω</span>
 </div>
 
 <style>
-@keyframes omega-breath {
-    0%, 100% { opacity: 0.68; transform: scale(0.96) rotate(0deg); }
-    50%      { opacity: 1.0;  transform: scale(1.04) rotate(180deg); }
+@keyframes spin {   from { transform: rotate(0deg);   } to   { transform: rotate(360deg); } }
+@keyframes breathe {
+    0%, 100% { opacity: 0.68; transform: scale(0.96); }
+    50%      { opacity: 1.0;  transform: scale(1.04); }
 }
 </style>
 /* Gradio override: Punch through any dark overlays */
