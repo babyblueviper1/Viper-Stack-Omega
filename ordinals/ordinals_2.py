@@ -385,15 +385,16 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 </details>
 """
     lightning_hint = f"""
-    <div style="margin: 40px 0 20px 0; padding: 16px; background: rgba(0,255,157,0.08); border-radius: 12px; border: 1px solid #00ff9d; max-width: 680px; margin-left: auto; margin-right: auto;">
-        <p style="margin:0; text-align:center; color:#ddd; font-size:16px;">
-            <b style="color:white; font-size:24px; text-shadow: 0 0 15px #00ff9d;">
-                Lightning invoice must be for exactly<br>{format_btc(user_gets)}
-            </b><br>
-            <small style="color:#00ff9d;">(±5,000 sats tolerance allowed)</small>
-        </p>
-    </div>
-    """
+    <div style="margin: 40px 0 20px 0; padding: 18px; background: rgba(0,255,157,0.08); border-radius: 14px; border: 1px solid #00ff9d; max-width: 680px; margin-left: auto; margin-right: auto;">
+    <p style="margin:0; text-align:center; color:#ddd; font-size:16px;">
+        Lightning invoice must be for exactly<br>
+        <b style="font-size:32px; color:#FFD700; text-shadow: 0 0 10px #00ff9d; font-weight:900;">
+            {user_gets:,} sats
+        </b><br>
+        <small style="color:#00ff9d;">(±5,000 sats tolerance allowed)</small>
+    </p>
+</div>
+"""
     return (
     f"""
     <div style="text-align:center; padding:20px;">
@@ -492,25 +493,19 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
         )
 
     except Exception as e:
-        required = total - miner_fee - (0 if selfish_mode else dao_cut)
+        required_sats = total - miner_fee - (0 if selfish_mode else dao_cut)
         msg = f"""
         <div style="text-align:center; color:#ff3333; padding:30px; background:#33000020; border-radius:16px; border:2px solid #ff5555;">
             <b style="font-size:22px;">Lightning Sweep Failed</b><br><br>
             {str(e)}<br><br>
             <b style="color:#fff; font-size:28px;">
                 Invoice must be for exactly<br>
-                {format_btc(required)}
+                <b style="color:#FFD700; font-size:36px;">{required_sats:,} sats</b>
             </b><br><br>
             <small style="color:#ccc;">(±5,000 sats tolerance allowed)</small>
         </div>
         """
-        return (
-            msg,
-            gr.update(visible=False),  # hide generate button
-            gr.update(visible=True),   # KEEP LIGHTNING BOX OPEN
-            ln_invoice                 # preserve invoice
-        )
-
+        return msg, gr.update(visible=False), gr.update(visible=True), ln_invoice
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
