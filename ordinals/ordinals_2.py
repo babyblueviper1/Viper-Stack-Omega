@@ -800,12 +800,12 @@ with gr.Blocks(title="Omega Pruner v9.1") as demo:
             elem_classes="full-width"
         )
     # === RBF SECTION ===
-    gr.Markdown("### RBF Bump")
+    gr.Markdown("### Infinite RBF Bump Zone")
     with gr.Row():
-        rbf_in = gr.Textbox(label="Raw hex (auto-saved)", lines=6, scale=8)
-        gr.Button("Copy", size="sm").click(None, None, None, js="() => {navigator.clipboard.writeText(document.querySelector('textarea[placeholder*=\"Raw hex\"]').value || document.querySelector('textarea[label*=\"Raw hex\"]').value); alert('Copied!');}")
-        gr.Button("Clear saved", size="sm").click(None, None, None, js="() => {localStorage.removeItem('omega_rbf_hex'); alert('Saved RBF hex cleared'); location.reload();}")
-        rbf_btn = gr.Button("Bump +50 sat/vB", variant="primary")
+        rbf_in = gr.Textbox(label="Raw hex (auto-saved from last tx)", lines=6, scale=8)
+        gr.Button("Copy raw hex").click(None,None,None, js="()=>{const t=document.querySelector('textarea[label*=\"Raw hex\"]'); if(t&&t.value)navigator.clipboard.writeText(t.value).then(()=>alert('Copied!')) }")
+        gr.Button("Clear saved").click(None,None,None, js="()=>{localStorage.removeItem('omega_rbf_hex');alert('Cleared');location.reload()}")
+        rbf_btn = gr.Button("Bump +50 sat/vB → Miners", variant="primary")
     gr.Markdown("<small style='color:#888;'>Bump counter & info appears in main output above</small>")
 
     # Events — FINAL & BULLETPROOF (Gradio 6.0.0) — MUST BE AT ROOT LEVEL
@@ -835,52 +835,46 @@ with gr.Blocks(title="Omega Pruner v9.1") as demo:
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
-     # NUCLEAR START OVER — TOTAL REBIRTH
+    # PERFECT Start Over Button (no rbf_out, no crash)
     start_over_btn.click(
         lambda: (
-            "",                            # user_input
-            "Recommended (40% pruned)",    # prune_choice
-            546,                           # dust_threshold
-            "",                            # dest_addr
-            False,                         # selfish_mode
-            50,                            # dao_percent
-            DEFAULT_DAO_ADDR,              # dao_addr
-            "",                            # output_log
-            gr.update(visible=False),      # generate_btn
-            gr.update(visible=False),      # ln_invoice_row
-            "",                            # ln_invoice
-            "",                            # ln_invoice_state
-            "",                            # rbf_in
-            ""                             # rbf_out
+            "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
+            "", gr.update(visible=False), gr.update(visible=False),
+            "", "", ""  # user_input → rbf_in cleared
         ),
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
             selfish_mode, dao_percent, dao_addr,
             output_log, generate_btn, ln_invoice_row,
-            ln_invoice, ln_invoice_state,
-            rbf_in, rbf_out
+            ln_invoice, ln_invoice_state, rbf_in
         ]
     )
 
-    # AUTOMATIC RBF CHAIN — BUMP FOREVER WITH ONE CLICK
+    # === FINAL: Infinite RBF Bump (one-liner, bulletproof, 2025 edition) ===
     rbf_btn.click(
-        rbf_bump,
+        fn=rbf_bump,
         inputs=rbf_in,
-        outputs=[rbf_out, output_log]
-    ).then(
-        lambda x: x, rbf_out, rbf_in  # Syncs the bumped tx back to input
+        outputs=[rbf_in, output_log],
+        js="""
+        (hex) => {
+            if (hex && typeof hex === 'string') {
+                try { localStorage.setItem('omega_rbf_hex', hex.trim()); }
+                catch(e) { console.warn('localStorage full'); }
+            }
+        }
+        """
     )
-    
     # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
-    gr.HTML("""
-<!-- Floating QR Scanner Buttons — REAL ICONS ONLY -->
+   gr.HTML("""
+<!-- Floating QR Scanner Buttons — FINAL WORKING 2025 EDITION -->
 <label class="qr-button btc" title="Scan Address / xpub">B</label>
-<label class="qr-button ln" title="Scan Lightning Invoice">⚡</label>
+<label class="qr-button ln" title="Scan Lightning Invoice">Lightning</label>
 
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
 
 <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+
 <script>
 const btcBtn = document.querySelector('.qr-button.btc');
 const lnBtn = document.querySelector('.qr-button.ln');
@@ -895,27 +889,67 @@ async function scan(file, isLightning = false) {
   const img = new Image();
   img.onload = async () => {
     const canvas = document.createElement('canvas');
-    canvas.width = img.width; canvas.height = img.height;
+    canvas.width = img.width;
+    canvas.height = img.height;
     canvas.getContext('2d').drawImage(img, 0, 0);
     try {
       const result = await ZXing.readBarcodeFromCanvas(canvas);
       const text = result.text.trim();
+
       if (isLightning && text.toLowerCase().startsWith('lnbc')) {
-        const box = document.querySelector('textarea[placeholder*="lnbc"], input[placeholder*="lnbc"]');
-        if (box) { box.value = text; box.dispatchEvent(new Event('input')); }
+        const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]');
+        if (box) {
+          box.value = text;
+          box.dispatchEvent(new Event('input'));
+          box.dispatchEvent(new Event('change'));
+        }
         alert("Lightning invoice scanned!");
-      } else if (!isLightning && /(bc1|[13]|xpub|zpub|ypub)/i.test(text)) {
-        const box = document.querySelector('textarea[placeholder*="bc1q"], input[placeholder*="bc1q"]');
-        if (box) { box.value = text.split('?')[0].replace(/^bitcoin:/i, ''); box.dispatchEvent(new Event('input')); }
-        alert("Address/xpub scanned!");
+      } else if (!isLightning) {
+        const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+        if (/^(bc1|[13]|xpub|zpub|ypub|tpub)/i.test(cleaned)) {
+          const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]');
+          if (box) {
+            box.value = cleaned;
+            box.dispatchEvent(new Event('input'));
+            box.dispatchEvent(new Event('change'));
+          }
+          alert("Address/xpub scanned!");
+        } else alert("Not a valid Bitcoin address/xpub");
       } else alert("Not recognized");
-    } catch (e) { alert("No QR detected"); }
+    } catch (e) {
+      alert("No QR code detected");
+    }
   };
   img.src = URL.createObjectURL(file);
 }
 
 btcInput.onchange = e => scan(e.target.files[0], false);
 lnInput.onchange = e => scan(e.target.files[0], true);
+
+// BULLETPROOF RBF hex restore — works even with Gradio async loading
+function loadSavedRBF() {
+    const saved = localStorage.getItem('omega_rbf_hex');
+    if (!saved) return;
+    
+    const tryLoad = () => {
+        const box = document.querySelector('textarea[label*="Raw hex"], textarea[placeholder*="Raw hex"]');
+        if (box) {
+            box.value = saved;
+            box.dispatchEvent(new Event('input'));
+            return true;
+        }
+        return false;
+    };
+    
+    if (!tryLoad()) {
+        let attempts = 0;
+        const interval = setInterval(() => {
+            if (tryLoad() || attempts++ > 40) clearInterval(interval);
+        }, 250);
+    }
+}
+
+loadSavedRBF();
 </script>
 
 <style>
@@ -923,15 +957,15 @@ lnInput.onchange = e => scan(e.target.files[0], true);
   position: fixed !important; right: 20px; z-index: 9999;
   width: 64px; height: 64px; border-radius: 50% !important;
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-  font-size: 36px; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all 0.2s; border: 4px solid white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; cursor: pointer; transition: all 0.2s;
+  border: 4px solid white; font-weight: bold; user-select: none;
 }
 .qr-button:hover { transform: scale(1.15); }
 .qr-button.btc { bottom: 96px; background: #f7931a !important; color: white !important; }
 .qr-button.ln { bottom: 20px; background: #00ff9d !important; color: black !important; }
 </style>
 """)
-
 if __name__ == "__main__":
     import os
     demo.queue(max_size=30)
