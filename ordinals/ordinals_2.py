@@ -731,9 +731,10 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
     # === RBF SECTION ===
     gr.Markdown("### RBF Bump")
     with gr.Row():
-        rbf_in = gr.Textbox(label="Raw hex", lines=5, scale=8)
-        rbf_btn = gr.Button("Bump +50 sat/vB", scale=2)
+        rbf_in = gr.Textbox(label="Raw hex (auto-updated after each bump)", lines=5, scale=8)
+        rbf_btn = gr.Button("Bump +50 sat/vB → Auto-Update", scale=2)
     rbf_out = gr.Textbox(label="Bumped transaction", lines=8)
+    gr.Markdown("<small style='color:#888;'>Bump counter & info appears in main output above</small>")
 
     # Events — FINAL & BULLETPROOF (Gradio 6.0.0) — MUST BE AT ROOT LEVEL
     submit_btn.click(
@@ -787,12 +788,12 @@ with gr.Blocks(title="Omega Pruner v9.0") as demo:
             rbf_in, rbf_out
         ]
     )
-    rbf_btn.click(
-        lambda hex: rbf_bump(hex.strip())[0] if hex.strip() else "Paste a raw transaction first",
-        rbf_in, rbf_out
+  # AUTOMATIC RBF CHAIN — BUMP FOREVER WITH ONE CLICK
+  rbf_btn.click(
+      rbf_bump,
+      inputs=rbf_in,
+      outputs=[rbf_out, output_log, rbf_in]  # ← THIS IS THE MAGIC
     )
-
-    gr.Markdown("<hr><small>Made with love by the swarm • Ω lives forever • 2025</small>")
 
     # ———————— FIXED & WORKING QR SCANNERS (2025 edition) ————————
     gr.HTML("""
