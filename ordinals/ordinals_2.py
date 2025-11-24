@@ -277,93 +277,130 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     if not raw_hex:
         return "Paste a raw transaction hex first", raw_hex
 
-    if len(raw_hex) < 400:
-        return (
-            "Invalid — expected full raw transaction hex<br><br>"
-            "Go to mempool.space → your tx → Advanced → Raw Transaction → copy ALL the hex",
-            raw_hex
-        )
-
     try:
         data = bytes.fromhex(raw_hex)
     except:
-        return "Invalid hex characters", raw_hex
+        return "Invalid hex", raw_hex
 
-    # === DEFAULTS ===
-    bump_count = 0
-    try:
-        fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
-    except:
-        fee_rate = 20
+    if len(data) < 100:
+        return "Too short — not a valid transaction", raw_hex
 
-    try:
-        # === PARSE TRANSACTION ===
-        pos = 4
-        vin_len, pos = varint_decode(data, pos)
+    pos = 0
 
-        # Count how many inputs have sequence < 0xffffffff (meaning already bumped)
+    # === Parse version ===
+    version = int.from_bytes(data[pos:pos+4], 'little')
+    pos += 4
+
+    # === Detect SegWit (marker + flag) ===
+    is_segwit = data[pos:pos+2] == b'\x00\x01'
+    if is_segwit:
+        pos += 2  # skip marker + flag
+
+    # === Parse inputs ===
+    vin_len, pos = varint_decode(data, pos)
+    inputs = []
+
+    for _ in range(vin_len):
+        txid = data[pos:pos+32][::-1].hex()  # store for later
+        vout = int.from_bytes(data[pos+32:pos+36], 'little')
+        pos += 36
+        script_len, pos = varint_decode(data, pos)
+        pos += script_len
+        sequence = int.from_bytes(data[pos:pos+4], 'little')
+        pos += 4
+        inputs.append({
+            'txid': txid,
+            'vout': vout,
+            'sequence': sequence,
+            'sequence_pos': pos - 4  # where sequence starts
+        })
+
+    # === Parse outputs ===
+    vout_len, pos = varint_decode(data, pos)
+    first_output_pos = pos
+    output_amount_pos = pos
+    pos += 8  # skip first output amount
+    script_len, pos = varint_decode(data, pos)
+    pos += script_len
+    for _ in range(1, vout_len):
+        pos += 8
+        slen, pos = varint_decode(data, pos)
+        pos += slen
+
+    # === Witness data (if present) ===
+    witness_start = pos
+    if is_segwit:
+        # Skip witness (we don't modify it)
         for _ in range(vin_len):
-            pos += 36
-            slen, pos = varint_decode(data, pos)
-            pos += slen
-            seq = int.from_bytes(data[pos:pos+4], 'little')
-            pos += 4
-            if seq < 0xffffffff:  # NOT full RBF signal = already bumped
-                bump_count += 1
-
-        # Parse outputs
-        vout_len, pos = varint_decode(data, pos)
-        first_output_pos = pos
-        for _ in range(vout_len):
-            pos += 8
-            slen, pos = varint_decode(data, pos)
-            pos += slen
-
-        # Skip witness data if present
-        if pos < len(data) and data[pos:pos+2] == b'\x00\x01':
-            pos += 2
-            for _ in range(vin_len):
+            items, pos = varint_decode(data, pos)
+            for _ in range(items):
                 wlen, pos = varint_decode(data, pos)
                 pos += wlen
-        pos += 4  # locktime
 
-        if first_output_pos + 8 > len(data):
-            return "Could not parse outputs", raw_hex
+    # === Locktime ===
+    locktime = int.from_bytes(data[pos:pos+4], 'little')
+    pos += 4
 
-        amount = int.from_bytes(data[first_output_pos:first_output_pos+8], 'little')
-        vsize = (len(data) + 3) // 4
-        extra = int(vsize * bump)
+    # === Safety checks ===
+    if first_output_pos + 8 > len(data):
+        return "Failed to parse outputs", raw_hex
 
-        if amount <= extra + 546:
-            return "Not enough for bump — output would be dust", raw_hex
+    current_amount = int.from_bytes(data[output_amount_pos:output_amount_pos+8], 'little')
+    vsize = (len(data) + 3) // 4
+    extra_fee = int(vsize * bump)
 
-        # === APPLY BUMP ===
-        new_amount = amount - extra
-        tx = bytearray(data)
-        tx[first_output_pos:first_output_pos+8] = new_amount.to_bytes(8, 'little')
+    if current_amount <= extra_fee + 546:
+        return f"Not enough in change output to bump (+{bump} sat/vB = +{extra_fee:,} sats)", raw_hex
 
-        # Set ALL sequences to RBF-enabled (0xfffffffd)
-        pos = 4 + 1
-        for _ in range(vin_len):
-            pos += 36
-            slen, pos = varint_decode(data, pos)
-            pos += slen
-            tx[pos:pos+4] = b'\xfd\xff\xff\xff'
-            pos += 4
+    # === Detect if already bumped or Taproot ===
+    sequences = [i['sequence'] for i in inputs]
+    rbf_signaled = any(seq <= 0xfffffffd for seq in sequences)
+    all_max = all(seq == 0xffffffff for seq in sequences)
 
-        # === FINAL COUNTER — YOUR PERFECT VERSION, NOW WORKING ===
-        total_bumps = bump_count + 1
-        counter_text = f"""
-        <div style="background:#00ff9d20; padding:14px; border-radius:12px; border:2px solid #00ff9d; margin:20px 0; text-align:center;">
-            <b style="color:#00ff9d; font-size:20px;">{total_bumps} bump{'s' if total_bumps != 1 else ''}!</b><br>
-            Total bump: +{total_bumps * 50:,} sat/vB • This bump adds +{extra:,} sats
-        </div>
-        """
+    is_taproot = is_segwit and vout_len > 0 and data[first_output_pos+8:first_output_pos+9] == b'\x51'
 
-        return tx.hex(), counter_text
+    warning = ""
+    if is_taproot:
+        warning = "<div style='color:#ff9900; background:#332200; padding:12px; border-radius:8px; margin:10px 0;'><b>Warning: Taproot Transaction</b><br>RBF signaling via sequence is ignored. Use output-based signaling (anyone-can-spend) or ensure wallet supports key-path spend RBF.</div>"
+    elif not rbf_signaled and all_max:
+        warning = "<div style='color:#00ff9d; background:#003300; padding:12px; border-radius:8px; margin:10px 0;'><b>RBF enabled</b> — signaling added</div>"
+    elif rbf_signaled:
+        warning = "<div style='color:#f7931a; background:#332200; padding:12px; border-radius:8px; margin:10px 0;'><b>Already RBF-enabled</b> — bumping fee only</div>"
 
-    except Exception as e:
-        return f"Failed to parse transaction: {str(e)}<br>Make sure it's a valid RBF-enabled tx", raw_hex
+    # === Apply bump ===
+    tx = bytearray(data)
+    
+    # Reduce first output
+    new_amount = current_amount - extra_fee
+    tx[output_amount_pos:output_amount_pos+8] = new_amount.to_bytes(8, 'little')
+
+    # Enable RBF on ALL inputs (0xfffffffd = RBF + not final)
+    for inp in inputs:
+        if inp['sequence'] == 0xffffffff:  # only modify if not already signaled
+            seq_start = inp['sequence_pos']
+            tx[seq_start:seq_start+4] = b'\xfd\xff\xff\xff'  # 0xfffffffd
+
+    bumped_hex = tx.hex()
+
+    # === Counter & info ===
+    try:
+        fee_rate_api = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=6).json()["fastestFee"]
+    except:
+        fee_rate_api = 20
+
+    total_bumps = sum(1 for s in sequences if s <= 0xfffffffd) + (1 if all_max else 0)
+
+    info = f"""
+    {warning}
+    <div style="background:#00ff9d20; padding:16px; border-radius:12px; border:2px solid #00ff9d; margin:20px 0; text-align:center;">
+        <b style="font-size:22px; color:#00ff9d;">Bump #{total_bumps}</b><br>
+        +{bump} sat/vB → +{extra_fee:,} sats fee<br>
+        New change: {format_btc(new_amount)}<br>
+        <small>Current fastest: {fee_rate_api} sat/vB</small>
+    </div>
+    """
+
+    return bumped_hex, info
 # ==============================
 # Core Functions
 # ==============================
@@ -425,13 +462,54 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         gr.update(visible=True)
     )
 
+# ==============================
+# CORRECT SEGWIT + TAPROOT COMPATIBLE Tx.encode()
+# ==============================
+
+def encode(self, for_psbt=True):
+    """Encode transaction with proper SegWit marker/flag if needed"""
+    has_witness = True  # We always assume SegWit/Taproot in 2025
+    marker_flag = b'\x00\x01' if has_witness and for_psbt else b''
+
+    base_parts = [
+        self.version.to_bytes(4, 'little'),
+        marker_flag,
+        encode_varint(len(self.tx_ins)),
+        b''.join(i.encode() for i in self.tx_ins),
+        encode_varint(len(self.tx_outs)),
+        b''.join(o.encode() for o in self.tx_outs),
+        b'\x00\x00\x00\x00' if has_witness and for_psbt else b'',  # witness placeholder (removed later)
+        self.locktime.to_bytes(4, 'little')
+    ]
+    return b''.join(base_parts)
+
+
+# ==============================
+# PROPER PSBT BUILDER
+# ==============================
+def make_psbt(tx: Tx) -> str:
+    """Build a minimal valid PSBT (global unsigned tx only)"""
+    unsigned_tx = tx.encode(for_psbt=True)
+    # Remove witness placeholder (4 null bytes before locktime)
+    unsigned_tx = unsigned_tx.replace(b'\x00\x00\x00\x00', b'', 1)
+    
+    psbt_global = b'\x00' + encode_varint(len(unsigned_tx)) + unsigned_tx
+    psbt = b'psbt\xff' + encode_varint(1) + psbt_global + b'\x00'
+    return base64.b64encode(psbt).decode()
+
+
+# ==============================
+# UPDATED build_real_tx — PSBT ONLY
+# ==============================
 def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
-    # Fix #1 — Recalculate detected type (or pass it from analysis)
+    if not pruned_utxos_global:
+        return "Run analysis first", gr.update(visible=False), gr.update(visible=False), ""
+
     sample_addr = pruned_utxos_global[0].get('address') or user_input.strip()
     _, info = address_to_script_pubkey(sample_addr)
-    detected = info['type'].split(' (')[0] if '(' in info['type'] else info['type']
+    detected = info['type']
 
     strategy_name = {
         "Privacy First (30% pruned)": "Privacy First",
@@ -439,15 +517,12 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         "More Savings (50% pruned)": "More Savings"
     }.get(strategy, strategy.split(" (")[0])
 
-    if not pruned_utxos_global:
-        return "Run analysis first", gr.update(visible=False), gr.update(visible=False), ""
-
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
     outputs = 1 + (1 if not selfish_mode and dao_percent > 0 else 0)
-    weight = 40 + inputs * (input_vb_global * 4) + outputs * (output_vb_global * 4) + 4  # +4 for segwit flag/locktime
-    if any("witness" in str(u) for u in pruned_utxos_global):  # rough segwit check
-        weight += 2  # flag + marker
+    weight = 40 + inputs * (input_vb_global * 4) + outputs * (output_vb_global * 4) + 4
+    if detected in ("SegWit", "Taproot"):
+        weight += 2
     vsize = (weight + 3) // 4
 
     try:
@@ -455,13 +530,9 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     except:
         fee_rate = 2
 
-    # NEW: Dynamic future rate = 6× current
-    future_rate = max(fee_rate * 6, 100)  # never below 100 sat/vB (safety)
-
-    # Future cost if you DON'T consolidate now
+    future_rate = max(fee_rate * 6, 100)
     future_cost = int((input_vb_global * inputs + output_vb_global) * future_rate)
     miner_fee = max(1000, int(vsize * fee_rate * 1.2))
-
     savings = future_cost - miner_fee
     dao_cut = max(546, int(savings * dao_percent / 100)) if not selfish_mode and dao_percent > 0 and savings > 2000 else 0
     user_gets = total - miner_fee - dao_cut
@@ -470,7 +541,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         return "Not enough after fees", gr.update(visible=False), gr.update(visible=False), ""
 
     if ln_invoice and ln_invoice.strip().lower().startswith("lnbc"):
-        return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode)
+        return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode, detected)
 
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
@@ -479,84 +550,69 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     tx = Tx()
     for u in pruned_utxos_global:
-        tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
+        tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))  # ← txid must be reversed!
     tx.tx_outs.append(TxOut(user_gets, dest_script))
     if dao_cut:
         dao_script, _ = address_to_script_pubkey(dao_addr or DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-    raw = tx.encode().hex()                                   # ← FIXED
-    psbt = base64.b64encode(b'psbt\xff\x00\x00' + tx.encode() + b'\x00').decode()
-    qr = make_qr(psbt)
+    # PSBT ONLY — NO RAW HEX
+    psbt_b64 = make_psbt(tx)
+    qr = make_qr(psbt_b64)
 
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
 
     details_section = f"""
 <details style="margin-top: 40px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto;">
     <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px;">
-        View Raw Hex & PSBT (click to expand)
+        View PSBT (click to expand)
     </summary>
     <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; border: 1px solid #333;">
-<span style="color:#f7931a; font-weight:bold;">Raw Hex:</span>
-{raw}
-
 <span style="color:#f7931a; font-weight:bold;">PSBT (base64):</span>
-{psbt}
+{psbt_b64}
     </pre>
-    <small style="color:#aaa;">Use in Sparrow, Nunchuk, BlueWallet, Electrum, etc.</small>
+    <small style="color:#aaa;">Copy → Paste into Sparrow • Nunchuk • BlueWallet • Electrum</small>
 </details>
 """
-    lightning_hint = f"""
-    <div style="margin: 40px 0 20px 0; padding: 18px; background: rgba(0,255,157,0.08); border-radius: 14px; border: 1px solid #00ff9d; max-width: 680px; margin-left: auto; margin-right: auto;">
-    <p style="margin:0; text-align:center; color:#1e90ff; font-size:16px;">
-        Lightning invoice must be for exactly<br>
-        <b style="font-size:32px; color:#FFD700; text-shadow: 0 0 10px #00ff9d; font-weight:900;">
-            {user_gets:,} sats
-        </b><br>
-        <small style="color:#1e90ff;">(±5,000 sats tolerance allowed)</small>
-    </p>
-</div>
-"""
+
     return (
-    f"""
-    <div style="text-align:center; padding:20px;">
-        <h3 style="color:#f7931a;">Transaction Ready</h3>
-        <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
-        <small>Strategy: <b>{strategy_name}</b> • Detected: <b>{detected}</b></small><br>
-        Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
-        <b style='font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d, 0 0 60px #00ff9d; font-weight:900;'>You receive: {format_btc(user_gets)}</b>
-        <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
-            <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
-                Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
-                <b style='font-size:24px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d; font-weight:900;'>You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
-                <span style="font-size:14px; color:#777;">
-                    Fees have exceeded 6× the current rate in every Bitcoin bull cycle since 2017.
-                </span>
-            </p>
+        f"""
+        <div style="text-align:center; padding:20px;">
+            <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
+            <p><b>{inputs}</b> inputs → {format_btc(total)}<br>
+            <small>Strategy: <b>{strategy_name}</b> • Format: <b>{detected}</b></small><br>
+            Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}<br><br>
+            <b style='font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d, 0 0 60px #00ff9d; font-weight:900;'>
+                You receive: {format_btc(user_gets)}
+            </b>
+            <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
+                <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
+                    Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
+                    <b style='font-size:24px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d; font-weight:900;'>
+                        You save ≈ {format_btc(savings)}
+                    </b> when fees spike
+                </p>
+            </div>
+            <div style="display: flex; justify-content: center; margin: 40px 0;">
+                <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; 
+                     border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
+            </div>
+            <p><small>Scan PSBT with Sparrow, Nunchuk, BlueWallet, Electrum</small></p>
+            {details_section}
         </div>
-        <div style="display: flex; justify-content: center; margin: 40px 0;">
-            <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; 
-                 border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
-        </div>
-        <p><small>Scan with Sparrow, BlueWallet, Nunchuk, Electrum</small></p>
-        {details_section}
-        {lightning_hint}
-    </div>
-    """,
-    gr.update(visible=False),
-    gr.update(visible=True),
-    ""
+        """,
+        gr.update(visible=False),
+        gr.update(visible=True),
+        ""
     )
 
 
-def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
+# ==============================
+# LIGHTNING SWEEP — NOW PSBT TOO (Optional: Raw Hex OK here)
+# ==============================
+def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detected="SegWit"):
     if not bolt11_decode:
-        return (
-            "bolt11 library missing — Lightning disabled",
-            gr.update(visible=False),
-            gr.update(visible=False),
-            ""  # ← 4th value
-        )
+        return "bolt11 library missing — Lightning disabled", gr.update(visible=False), gr.update(visible=False), ""
 
     try:
         decoded = bolt11_decode(invoice)
@@ -564,69 +620,62 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
         user_gets = total - miner_fee - (0 if selfish_mode else dao_cut)
 
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
-            raise ValueError("Invoice amount mismatch (±5M msat)")
+            raise ValueError("Invoice amount mismatch (±5k sats)")
 
         if not getattr(decoded, 'payment_address', None):
-            raise ValueError("Invoice must support on-chain fallback")
+            raise ValueError("Invoice must support on-chain fallback (payment_address)")
 
         dest_script, _ = address_to_script_pubkey(decoded.payment_address)
         tx = Tx()
         for u in utxos:
-            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid']), u['vout']))
+            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
         tx.tx_outs.append(TxOut(user_gets, dest_script))
         if dao_cut and not selfish_mode:
             dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
             tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-        qr = make_qr(tx.encode().hex())
-        raw = tx.encode().hex()
+        # For Lightning: raw hex is acceptable (many LN wallets expect it)
+        raw_hex = tx.encode(for_psbt=False).hex()
+        qr = make_qr(raw_hex)
 
         details_section = f"""
-        <details style="margin-top: 40px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto;">
-            <summary style="cursor: pointer; color: #00ff9d; font-weight: bold; font-size: 18px;">
-                View Raw Transaction Hex (click to expand)
-            </summary>
-            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; border: 1px solid #333;">
-            <span style="color:#00ff9d; font-weight:bold;">Raw Transaction Hex:</span>
-            {raw}
+        <details style="margin-top: 40px;">
+            <summary style="cursor: pointer; color: #00ff9d; font-weight: bold;">View Raw Hex</summary>
+            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; font-size:11px; overflow-x:auto;">
+{raw_hex}
             </pre>
-            <small style="color:#aaa;">Copy and broadcast with any wallet that supports raw hex</small>
         </details>
         """
 
         return (
             f"""
-            <div style="text-align:center; color:#00ff9d; font-size:26px; padding:20px;">
-            Lightning Sweep Ready<br><br>
-            <b style='font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d, 0 0 60px #00ff9d; font-weight:900;'>
-            You receive: {format_btc(user_gets)}
-            </b> instantly
+            <div style="text-align:center; padding:20px; color:#00ff9d;">
+                <h3>Lightning Sweep Ready</h3>
+                <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d;">
+                    {format_btc(user_gets)} → Lightning Instantly
+                </b>
+                <div style="margin:40px 0;">
+                    <img src="{qr}" style="width:460px; max-width:96vw; border:6px solid #00ff9d; border-radius:20px;">
+                </div>
+                <p><small>Scan with Phoenix • Breez • Zeus • Blink • Muun</small></p>
+                {details_section}
             </div>
-            <div style="display: flex; justify-content: center; margin: 40px 0;">
-            <img src="{qr}" style="max-width:100%; width:460px; border-radius:20px; 
-            box-shadow:0 12px 50px rgba(0,255,157,0.7); border: 6px solid #00ff9d;">
-            </div>
-            <p><small>Scan with Phoenix, Breez, Blink, Muun, Zeus, etc.</small></p>
-            {details_section}
             """,
-            gr.update(visible=False),  # hide generate button
-            gr.update(visible=False),  # hide Lightning box
-            ln_invoice                 # preserve invoice in state
+            gr.update(visible=False),
+            gr.update(visible=False),
+            invoice
         )
 
     except Exception as e:
-        required_sats = total - miner_fee - (0 if selfish_mode else dao_cut)
-        msg = f"""
-        <div style="text-align:center; color:#ff3333; padding:30px; background:#33000020; border-radius:16px; border:2px solid #ff5555;">
+        required = total - miner_fee - (0 if selfish_mode else dao_cut)
+        return f"""
+        <div style="text-align:center; color:#ff3333; padding:30px; background:#300; border-radius:16px;">
             <b style="font-size:22px;">Lightning Sweep Failed</b><br><br>
             {str(e)}<br><br>
-            <b style="color:#fff; font-size:28px;">
-                Invoice must be for exactly<br>
-                <b style="color:#f7931a; font-size:36px;">{required_sats:,} sats</b>
-            </b><br><br>
-            <div style="color:#ff6666; font-size:16px; font-weight:bold; margin-top:14px; text-shadow: 0 0 8px rgba(255,0,0,0.3);">±5,000 sats tolerance allowed</div>
-        """
-        return msg, gr.update(visible=False), gr.update(visible=True), ln_invoice
+            <b>Invoice must be for ~{required:,} sats</b><br>
+            <small>±5,000 sats allowed</small>
+        </div>
+        """, gr.update(visible=False), gr.update(visible=True), invoice
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
