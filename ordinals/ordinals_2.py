@@ -763,44 +763,60 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
 
     # === NUCLEAR GIANT OMEGA — 100% WORKING VERSION ===
     gr.HTML("""
-    <div id="omega-bg" style="
-        position: fixed !important;
-        inset: 0 !important;
-        top: 0 !important; left: 0 !important;
-        width: 100vw !important; height: 100vh !important;
-        pointer-events: none !important;
-        z-index: -999999 !important;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden !important;
-        font-family: system-ui, sans-serif, Arial;
-    ">
-        <span style="
-            font-size: 92vh;
-            font-weight: 900;
-            background: linear-gradient(135deg, rgba(247,147,26,0.09), rgba(247,147,26,0.03));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            color: transparent;
-            text-shadow: 0 0 120px rgba(247,147,26,0.25);
-            animation: omega-breath 28s infinite ease-in-out;
-            user-select: none;
-            line-height: 1;
-        ">Ω</span>
-    </div>
+<div id="omega-bg" style="
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important; left: 0 !important;
+    width: 100vw !important; height: 100vh !important;
+    pointer-events: none !important;
+    z-index: -1 !important; /* Bumped from -999999 for Gradio tolerance */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    font-family: system-ui, sans-serif, Arial !important;
+    background: transparent; /* Ensure no conflicts */
+">
+    <span class="omega-symbol" style="
+        font-size: 92vh !important;
+        font-weight: 900 !important;
+        background: linear-gradient(135deg, rgba(247,147,26,0.09), rgba(247,147,26,0.03)) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        background-clip: text !important;
+        color: transparent !important;
+        text-shadow: 0 0 120px rgba(247,147,26,0.25) !important;
+        animation: omega-breath 28s infinite ease-in-out !important;
+        user-select: none !important;
+        line-height: 1 !important;
+        opacity: 0.8; /* Slight boost for visibility */
+    ">Ω</span>
+</div>
 
-    <style>
-    @keyframes omega-breath {
-        0%, 100% { opacity: 0.6; transform: scale(0.96); }
-        50%      { opacity: 1.0; transform: scale(1.04); }
+<style>
+@keyframes omega-breath {
+    0%, 100% { opacity: 0.6; transform: scale(0.96) rotate(0deg); }
+    50%      { opacity: 1.0; transform: scale(1.04) rotate(180deg); } /* Added subtle rotate for flair */
+}
+/* Gradio override: Punch through any dark overlays */
+.gradio-container { position: relative !important; z-index: 0 !important; }
+#omega-bg { isolation: isolate !important; will-change: transform; }
+.omega-symbol { animation-play-state: running !important; }
+</style>
+
+<script>
+// Force re-render on load (Gradio hack)
+window.addEventListener('load', () => {
+    const omega = document.getElementById('omega-bg');
+    if (omega) {
+        omega.style.display = 'none';
+        setTimeout(() => { omega.style.display = 'flex'; }, 100);
     }
-    /* Force it above Gradio's dark overlay */
-    #omega-bg { z-index: -999999 !important; }
-    .gradio-container { position: static !important; }
-    </style>
-    """, elem_id="omega-bg-container")
+});
+</script>
+""", elem_id="omega-bg-container-fixed")
+
+
     # Your normal CSS (keep this)
     gr.HTML(f"<style>{css}</style>")
 
