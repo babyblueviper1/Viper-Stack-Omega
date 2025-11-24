@@ -679,7 +679,11 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 with gr.Blocks(title="Omega Pruner v9.1") as demo:
     gr.HTML(f"<style>{css}</style>")
-    gr.Markdown("# Omega Pruner v9.1")
+    gr.Markdown("""
+    **Omega Pruner v9.1**  
+    Zero custody • Infinite RBF • Survives refresh • Lightning sweep  
+    Apache 2.0 • No logs • No bs
+    """)
     gr.Markdown(disclaimer)
 
     with gr.Row():
