@@ -866,10 +866,18 @@ gr.HTML("""
     # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
         with gr.Column(scale=4):
-            user_input = gr.Textbox(label="Address or xpub", placeholder="bc1q… or xpub…", lines=2)
+            user_input = gr.Textbox(
+                label="Address or xpub",
+                placeholder="bc1q… or xpub…",
+                lines=2
+            )
         with gr.Column(scale=3):
             prune_choice = gr.Dropdown(
-                ["Privacy First (30% pruned)", "Recommended (40% pruned)", "More Savings (50% pruned)"],
+                choices=[
+                    "Privacy First (30% pruned)",
+                    "Recommended (40% pruned)",
+                    "More Savings (50% pruned)"
+                ],
                 value="Recommended (40% pruned)",
                 label="Strategy"
             )
@@ -879,12 +887,20 @@ gr.HTML("""
 
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
-            dust_threshold = gr.Slider(0, 3000, 546, step=1,
+            dust_threshold = gr.Slider(
+                minimum=0,
+                maximum=3000,
+                value=546,
+                step=1,
                 label="Dust threshold (sats)",
                 info="UTXOs below this value are ignored"
             )
         with gr.Column(scale=1, min_width=300):
-            dao_percent = gr.Slider(0, 500, 50, step=10,
+            dao_percent = gr.Slider(
+                minimum=0,
+                maximum=500,
+                value=50,
+                step=10,
                 label="Thank-you to Ω author (basis points)",
                 info="0 bps = keep 100% • 500 bps = 5%"
             )
@@ -897,11 +913,15 @@ gr.HTML("""
     def update_thankyou_label(bps):
         pct = bps / 100
         return f"<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>→ {pct:.2f}% of future savings</div>"
+
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
     with gr.Row():
         with gr.Column(scale=4):
-            dest_addr = gr.Textbox(label="Destination (optional)", placeholder="Leave blank = same address")
+            dest_addr = gr.Textbox(
+                label="Destination (optional)",
+                placeholder="Leave blank = same address"
+            )
         with gr.Column(scale=3):
             dao_addr = gr.Textbox(
                 label="Thank-you address (optional)",
@@ -922,26 +942,29 @@ gr.HTML("""
             size="lg",
             elem_classes="full-width"
         )
-    gr.Markdown("<small style='color:#888; text-align:center; margin-top:8px;'>"
-                "Includes optional thank-you (you control the amount above)"
-                "</small>")
+
+    gr.Markdown(
+        "<small style='color:#888; text-align:center; margin-top:8px;'>"
+        "Includes optional thank-you (you control the amount above)"
+        "</small>"
+    )
 
     ln_invoice_state = gr.State("")
+
     with gr.Row(visible=False) as ln_invoice_row:
-        ln_invoice = gr.Textbox(
-            label="Lightning Invoice → paste lnbc… to sweep instantly",
-            placeholder="Paste your invoice here",
-            lines=4,
-            scale=7
-        )
-        submit_ln_btn = gr.Button(
-            "Generate Lightning Sweep",
-            variant="primary",
-            size="lg",
-            scale=3,
-            min_width=220,
-            elem_classes="tall-button"
-        )
+        with gr.Column(scale=7):
+            ln_invoice = gr.Textbox(
+                label="Lightning Invoice → paste lnbc… to sweep instantly",
+                placeholder="Paste your invoice here",
+                lines=4
+            )
+        with gr.Column(scale=3):
+            submit_ln_btn = gr.Button(
+                "Generate Lightning Sweep",
+                variant="primary",
+                size="lg",
+                elem_classes="tall-button"
+            )
 
     with gr.Row():
         start_over_btn = gr.Button(
