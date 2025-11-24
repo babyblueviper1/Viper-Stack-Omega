@@ -413,7 +413,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             <p style="margin:0; color:#f7931a; font-size:18px; line-height:1.6;">
                 Future fee rate assumption: <b>{future_rate}</b> sat/vB (6× current)<br>
                 <b style='font-size:24px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d; font-weight:900;'>You save ≈ {format_btc(savings)}</b> if fees hit that level<br>
-                <span style="font-size:14px; color:#888;">
+                <span style="font-size:14px; color:#777;">
                     Fees have exceeded 6× the current rate in every Bitcoin bull cycle since 2017.
                 </span>
             </p>
@@ -506,9 +506,9 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode):
             {str(e)}<br><br>
             <b style="color:#fff; font-size:28px;">
                 Invoice must be for exactly<br>
-                <b style="color:#FFD700; font-size:36px;">{required_sats:,} sats</b>
+                <b style="color:#f7931a; font-size:36px;">{required_sats:,} sats</b>
             </b><br><br>
-            <small style="color:#ccc;">(±5,000 sats tolerance allowed)</small>
+            <small style="color:#ff3333;">(±5,000 sats tolerance allowed)</small>
         </div>
         """
         return msg, gr.update(visible=False), gr.update(visible=True), ln_invoice
