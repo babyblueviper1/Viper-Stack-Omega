@@ -778,18 +778,18 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
             background: transparent;
         ">
             <span class="omega-symbol" style="
-                font-size: 108vh !important;       /* ← TWO LEVELS BIGGER: 100vh → 108vh */
+                font-size: 100vh !important;       /* ← ONE LEVEL SMALLER (perfect size) */
                 font-weight: 900 !important;
-                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;  /* ← ONE SHADE DARKER */
+                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;
                 -webkit-background-clip: text !important;
                 -webkit-text-fill-color: transparent !important;
                 background-clip: text !important;
                 color: transparent !important;
-                text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;  /* ← nuclear deep glow */
+                text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;
                 animation: omega-breath 28s infinite ease-in-out !important;
                 user-select: none !important;
                 line-height: 1 !important;
-                opacity: 0.96 !important;          /* ← almost fully opaque at peak */
+                opacity: 0.96 !important;
             ">Ω</span>
         </div>
 
