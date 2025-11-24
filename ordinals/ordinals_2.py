@@ -760,7 +760,9 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
-   gr.HTML(
+
+    # THE ONE THAT WORKS — Dark, breathing, subtle 180° rotate, always visible
+    gr.HTML(
         """
         <div id="omega-bg" style="
             position: fixed !important;
@@ -802,7 +804,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         </style>
 
         <script>
-        // Force repaint — this is the magic that makes it appear every time
+        // The sacred force-reflow that makes it appear every single time
         window.addEventListener('load', () => {
             const omega = document.getElementById('omega-bg');
             if (omega) {
@@ -814,7 +816,8 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         """,
         elem_id="omega-bg-container-fixed"
     )
-    # Your normal CSS
+
+    # Your normal CSS (buttons, full-width, etc.)
     gr.HTML(f"<style>{css}</style>")
 
     # Title
@@ -990,7 +993,7 @@ No logs • No BS • Runs entirely in your browser
     gr.HTML("""
     <!-- Floating QR Scanner Buttons -->
     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <label class="qr-fab ln" title="Scan Lightning Invoice">Lightning</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
 
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
@@ -1060,7 +1063,7 @@ No logs • No BS • Runs entirely in your browser
 
 if __name__ == "__main__":
     import os, warnings
-    warnings.filterwarnings("ignore", category=UserWarning)
+    warnings.filterWarnings("ignore", category=UserWarning)
 
     demo.queue(default_concurrency_limit=None, max_size=40)
     demo.launch(
