@@ -1,4 +1,5 @@
-# app.py — Omega Pruner v9.2
+# Top comment
+# app.py — Omega Pruner v10.0 — Infinite Edition
 import gradio as gr
 import requests, time, base64, io, qrcode
 from dataclasses import dataclass
@@ -41,9 +42,10 @@ css = """
 """
 
 disclaimer = """
-**Omega Pruner v9.1 — Community Edition**  
-Zero custody • Fully open-source • No forced fees  
-Now with **infinite one-click RBF that survives refresh**  
+**Omega Pruner v10.0 — Infinite Edition**  
+Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh  
+The last UTXO consolidator you'll ever need.
+"""
 Source: [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0
 """
 # ==============================
@@ -673,10 +675,10 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-with gr.Blocks(title="Omega Pruner v9.1") as demo:
+with gr.Blocks(title="Omega Pruner v10") as demo:
     gr.HTML(f"<style>{css}</style>")
     gr.Markdown("""
-    **Omega Pruner v9.1**  
+    **Omega Pruner v10**  
     Zero custody • Infinite RBF • Survives refresh • Lightning sweep  
     Apache 2.0 • No logs • No bs
     """)
