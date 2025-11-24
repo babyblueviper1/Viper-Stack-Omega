@@ -778,25 +778,25 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
             background: transparent;
         ">
             <span class="omega-symbol" style="
-                font-size: 100vh !important;        /* ← +8vh = two levels bigger */
+                font-size: 108vh !important;       /* ← TWO LEVELS BIGGER: 100vh → 108vh */
                 font-weight: 900 !important;
-                background: linear-gradient(135deg, rgba(247,147,26,0.22), rgba(247,147,26,0.11)) !important;  /* ← one shade darker */
+                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;  /* ← ONE SHADE DARKER */
                 -webkit-background-clip: text !important;
                 -webkit-text-fill-color: transparent !important;
                 background-clip: text !important;
                 color: transparent !important;
-                text-shadow: 0 0 180px rgba(247,147,26,0.56) !important;  /* ← deeper, richer glow */
+                text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;  /* ← nuclear deep glow */
                 animation: omega-breath 28s infinite ease-in-out !important;
                 user-select: none !important;
                 line-height: 1 !important;
-                opacity: 0.92 !important;           /* ← slightly more present */
+                opacity: 0.96 !important;          /* ← almost fully opaque at peak */
             ">Ω</span>
         </div>
 
         <style>
         @keyframes omega-breath {
-            0%, 100% { opacity: 0.72; transform: scale(0.96) rotate(0deg);   }
-            50%      { opacity: 1.0;  transform: scale(1.04) rotate(180deg); }
+            0%, 100% { opacity: 0.76; transform: scale(0.95) rotate(0deg);   }
+            50%      { opacity: 1.0;  transform: scale(1.05) rotate(180deg); }
         }
         .gradio-container { position: relative !important; z-index: 0 !important; }
         #omega-bg { isolation: isolate !important; will-change: transform, opacity !important; }
@@ -815,7 +815,6 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         """,
         elem_id="omega-bg-container-fixed"
     )
-
     # Your normal CSS (buttons, full-width, etc.)
     gr.HTML(f"<style>{css}</style>")
 
