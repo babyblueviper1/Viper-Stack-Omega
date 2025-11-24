@@ -56,30 +56,6 @@ details summary::-webkit-details-marker { display: none; }
   align-items: center; 
   margin: 30px 0;
 }
-/* === GIANT BACKGROUND OMEGA — FINAL, UNKILLABLE VERSION === */
-body::before {
-    content: "Ω";
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    font-size: 92vh !important;
-    font-weight: 900 !important;
-    color: rgba(247, 147, 26, 0.038) !important;   /* f7931a at ~3.8% opacity */
-    pointer-events: none !important;
-    z-index: -1 !important;
-    user-select: none !important;
-    text-shadow: 0 0 100px rgba(247,147,26,0.12) !important;
-    opacity: 0.6 !important;
-    animation: breathe 28s infinite ease-in-out !important;
-}
-@keyframes breathe {
-    0%, 100% { opacity: 0.025; transform: translate(-50%, -50%) scale(0.96); }
-    50%      { opacity: 0.05;  transform: translate(-50%, -50%) scale(1.04); }
-}
-
-/* Fallback for ultra-dark mode users */
-.dark body::before { color: rgba(247, 147, 26, 0.06) !important; }
 """
 
 # ==============================
@@ -785,33 +761,46 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
 
-    # GIANT BACKGROUND OMEGA — THIS ONE ACTUALLY WORKS (z-index 9999 + real DOM element)
+    # === NUCLEAR GIANT OMEGA — 100% WORKING VERSION ===
     gr.HTML("""
-    <div style="
+    <div id="omega-bg" style="
         position: fixed !important;
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important;
-        font-size: 90vh !important;
-        font-weight: 900 !important;
-        color: rgba(247,147,26,0.05) !important;
+        inset: 0 !important;
+        top: 0 !important; left: 0 !important;
+        width: 100vw !important; height: 100vh !important;
         pointer-events: none !important;
-        z-index: 9999 !important;
-        user-select: none !important;
-        text-shadow: 0 0 100px rgba(247,147,26,0.2) !important;
-        opacity: 1 !important;
-        animation: breathe 25s infinite ease-in-out !important;
-        font-family: system-ui, sans-serif !important;
-        line-height: 1 !important;
-    ">Ω</div>
+        z-index: -999999 !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden !important;
+        font-family: system-ui, sans-serif, Arial;
+    ">
+        <span style="
+            font-size: 92vh;
+            font-weight: 900;
+            background: linear-gradient(135deg, rgba(247,147,26,0.09), rgba(247,147,26,0.03));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 120px rgba(247,147,26,0.25);
+            animation: omega-breath 28s infinite ease-in-out;
+            user-select: none;
+            line-height: 1;
+        ">Ω</span>
+    </div>
 
     <style>
-    @keyframes breathe {
-        0%, 100% { opacity: 0.03; transform: translate(-50%, -50%) scale(0.97); }
-        50%      { opacity: 0.08; transform: translate(-50%, -50%) scale(1.03); }
+    @keyframes omega-breath {
+        0%, 100% { opacity: 0.6; transform: scale(0.96); }
+        50%      { opacity: 1.0; transform: scale(1.04); }
     }
+    /* Force it above Gradio's dark overlay */
+    #omega-bg { z-index: -999999 !important; }
+    .gradio-container { position: static !important; }
     </style>
-    """)
+    """, elem_id="omega-bg-container")
     # Your normal CSS (keep this)
     gr.HTML(f"<style>{css}</style>")
 
