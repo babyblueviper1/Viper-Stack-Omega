@@ -56,6 +56,16 @@ details summary::-webkit-details-marker { display: none; }
   align-items: center; 
   margin: 30px 0;
 }
+/* Mobile RBF layout perfection */
+@media (max-width: 768px) {
+    .bump-button-mobile {
+        margin-top: 8px !important;
+        width: 100% !important;
+    }
+    .rbf-textbox {
+        margin-bottom: 8px !important;
+    }
+}
 """
 
 # ==============================
@@ -761,7 +771,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 with gr.Blocks(title="Omega Pruner v10") as demo:
 
-    # THE ONE THAT WORKS — Dark, breathing, subtle 180° rotate, always visible
+    # THE ONE THAT WORKS — Dark, breathing, 180° rotate, always visible
     gr.HTML(
         """
         <div id="omega-bg" style="
@@ -778,7 +788,7 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
             background: transparent;
         ">
             <span class="omega-symbol" style="
-                font-size: 100vh !important;       /* ← ONE LEVEL SMALLER (perfect size) */
+                font-size: 100vh !important;
                 font-weight: 900 !important;
                 background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;
                 -webkit-background-clip: text !important;
@@ -815,18 +825,50 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         """,
         elem_id="omega-bg-container-fixed"
     )
-    # Your normal CSS (buttons, full-width, etc.)
+
+    # Your normal CSS — injected safely
     gr.HTML(f"<style>{css}</style>")
 
-    # Title
-    gr.Markdown("""
-**Omega Pruner v10.0 — Infinite Edition**
-Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh  
-The last UTXO consolidator you'll ever need
-Source: [GitHub](https://github.com/babyblueviper1/Viper-Stack-Omega) – Apache 2.0  
-No logs • No BS • Runs entirely in your browser
-""")
+    # TITLE — now guaranteed to be on its own line, full width, centered
+    gr.Markdown(
+        """
+<div style="
+    text-align: center;
+    margin: 24px 0 32px 0;
+    padding: 12px;
+">
+    <h1 style="
+        font-size: 38px !important;
+        font-weight: 900 !important;
+        color: #f7931a !important;
+        margin: 0 0 12px 0 !important;
+        text-shadow: 0 4px 12px rgba(247,147,26,0.4);
+        line-height: 1.2;
+    ">Omega Pruner v10.0 — Infinite Edition</h1>
+    
+    <p style="
+        font-size: 18px !important;
+        color: #aaa !important;
+        margin: 8px 0 !important;
+        line-height: 1.5;
+    ">
+        Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh<br>
+        The last UTXO consolidator you'll ever need
+    </p>
+    
+    <p style="
+        font-size: 15px !important;
+        color: #f7931a !important;
+        margin: 16px 0 0 0 !important;
+    ">
+        Source: <a href="https://github.com/babyblueviper1/Viper-Stack-Omega" target="_blank" style="color:#f7931a; text-decoration: underline;">GitHub</a> – Apache 2.0 • No logs • Runs in your browser
+    </p>
+</div>
+        """,
+        elem_classes="omega-title-block"
+    )
 
+    # ← NOW we begin layout rows — everything below is safe
     with gr.Row():
         with gr.Column(scale=4):
             user_input = gr.Textbox(label="Address or xpub", placeholder="bc1q… or xpub…", lines=2)
@@ -915,20 +957,52 @@ No logs • No BS • Runs entirely in your browser
             elem_classes="full-width"
         )
 
-    gr.Markdown("### Infinite RBF Bump Zone")
-    with gr.Row():
-        rbf_in = gr.Textbox(label="Raw hex (auto-saved from last tx)", lines=6, scale=8)
-        gr.Button("Copy raw hex").click(
-            None, None, None,
-            js="() => { const t = document.querySelector('textarea[label*=\"Raw hex\"]'); if(t && t.value) navigator.clipboard.writeText(t.value).then(() => alert('Copied!')); }"
-        )
-        gr.Button("Clear saved").click(
-            None, None, None,
-            js="() => { localStorage.removeItem('omega_rbf_hex'); alert('Cleared'); location.reload(); }"
-        )
-        rbf_btn = gr.Button("Bump +50 sat/vB to Miners", variant="primary")
+        gr.Markdown("### Infinite RBF Bump Zone")
 
-    gr.Markdown("<small style='color:#888;'>Bump counter & info appears in main output above</small>")
+    with gr.Row():
+        with gr.Column(scale=8):
+            rbf_in = gr.Textbox(
+                label="Raw hex (auto-saved from last tx)",
+                lines=6,
+                elem_classes="rbf-textbox"
+            )
+
+        with gr.Column(scale=2, min_width=120):
+            # These two buttons stack vertically on mobile, stay side-by-side on desktop
+            with gr.Row() if gr.desktop else gr.Column():
+                gr.Button("Copy raw hex", size="sm").click(
+                    None, None, None,
+                    js="""
+                    () => {
+                        const t = document.querySelector('textarea[label*="Raw hex"]');
+                        if (t && t.value) {
+                            navigator.clipboard.writeText(t.value).then(() => {
+                                alert('Copied to clipboard!');
+                            });
+                        }
+                    }
+                    """
+                )
+                gr.Button("Clear saved", size="sm").click(
+                    None, None, None,
+                    js="""
+                    () => {
+                        localStorage.removeItem('omega_rbf_hex');
+                        alert('Cleared!');
+                        location.reload();
+                    }
+                    """
+                )
+
+            # THE BUMP BUTTON — now directly under Copy/Clear on mobile
+            rbf_btn = gr.Button(
+                "Bump +50 sat/vB to Miners",
+                variant="primary",
+                size="lg",
+                elem_classes="bump-button-mobile"
+            )
+
+    gr.Markdown("<small style='color:#888; text-align:center;'>Bump counter & info appears above</small>")
 
     # ==================================================================
     # Events
