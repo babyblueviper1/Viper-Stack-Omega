@@ -56,54 +56,37 @@ details summary::-webkit-details-marker { display: none; }
   align-items: center; 
   margin: 30px 0;
 }
-/* Mobile RBF layout perfection */
-@media (max-width: 768px) {
-    .bump-button-mobile {
-        margin-top: 8px !important;
-        width: 100% !important;
-    }
-    .rbf-textbox {
-        margin-bottom: 8px !important;
-    }
+
   /* Mobile RBF perfection — no gaps, perfect stacking */
-    @media (max-width: 768px) {
-        .rbf-buttons-col {
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: stretch !important;
-        }
-        .copy-clear-group {
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 4px !important;
-            margin-bottom: 8px !important;
-        }
-        .copy-clear-group > div {
-            width: 100% !important;
-        }
-        .bump-button-mobile {
-            width: 100% !important;
-            margin-top: 4px !important;
-        }
-        .rbf-textbox {
-            margin-bottom: 8px !important;
-        }
+  @media (max-width: 768px) {
+    .rbf-buttons-col {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
     }
-    @media (min-width: 769px) {
-        .copy-clear-group {
-            display: flex !important;
-            flex-direction: row !important;
-            gap: 8px !important;
-            justify-content: flex-start !important;
-        }
-        .copy-clear-group > div {
-            flex: 1 !important;
-            min-width: 120px !important;
-        }
-        .bump-button-mobile {
-            margin-top: 12px !important;
-            width: auto !important;
-        }
+    .copy-clear-group {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 6px !important;
+    }
+    .copy-btn, .clear-btn, .bump-button-mobile {
+        width: 100% !important;
+        margin: 0 !important;
+    }
+}
+
+/* Desktop: clean row layout */
+@media (min-width: 769px) {
+    .copy-clear-group {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 10px !important;
+    }
+    .copy-btn, .clear-btn {
+        flex: 1 !important;
+    }
+    .bump-button-mobile {
+        margin-top: 16px !important;
     }
 }
 """
@@ -1009,7 +992,7 @@ gr.Markdown("### Infinite RBF Bump Zone")
             )
 
         with gr.Column(scale=4, elem_classes="rbf-buttons-col"):
-            # Copy + Clear buttons (row on desktop, column on mobile via CSS)
+            # Copy + Clear buttons (stacked on mobile, row on desktop via CSS)
             with gr.Group(elem_classes="copy-clear-group"):
                 gr.Button("Copy raw hex", size="sm", elem_classes="copy-btn").click(
                     None, None, None,
@@ -1035,7 +1018,7 @@ gr.Markdown("### Infinite RBF Bump Zone")
                     """
                 )
 
-            # Bump button — always below the copy/clear group
+            # Bump button — directly under Copy/Clear on mobile, no gap
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
