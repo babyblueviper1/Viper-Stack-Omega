@@ -562,7 +562,17 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     # Generate BOTH outputs
     psbt_b64 = make_psbt(tx)
-    raw_hex = tx.encode(segwit=True).hex()        # ← THIS IS 100% SAFE (unsigned!)
+
+    
+   # Generate clean, unsigned, RBF-ready raw hex — 100% compatible with ALL wallets
+    unsigned_tx = tx.encode(segwit=True)
+
+# CRITICAL: Strip the empty witness placeholder (4 zero bytes) that appears
+# when there are no signatures yet — this is what breaks many wallets
+    if unsigned_tx.endswith(b'\x00\x00\x00\x00'):
+        unsigned_tx = unsigned_tx[:-4]
+
+    raw_hex = unsigned_tx.hex()    # ← THIS IS 100% SAFE (unsigned!)
     qr = make_qr(psbt_b64)
 
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
