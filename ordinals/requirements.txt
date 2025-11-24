@@ -4,3 +4,4 @@ pydantic>=2.8
 qrcode[pil] 
 bip32>=5.0.0 
 bolt11
+hdwallet 
