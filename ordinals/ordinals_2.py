@@ -50,13 +50,6 @@ css = """
 .qr-button.ln { bottom: 20px; background: #00ff9d !important; color: black !important; }
 """
 
-disclaimer = """
-**Omega Pruner v10.0 — Infinite Edition**  
-Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh  
-The last UTXO consolidator you'll ever need.
-"""
-Source: [**GitHub**](https://github.com/babyblueviper1/Viper-Stack-Omega) • Apache 2.0
-"""
 # ==============================
 # Bitcoin Helpers
 # ==============================
@@ -752,11 +745,14 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 with gr.Blocks(title="Omega Pruner v10") as demo:
     gr.HTML(f"<style>{css}</style>")
     gr.Markdown("""
-    **Omega Pruner v10**  
-    Zero custody • Infinite RBF • Survives refresh • Lightning sweep  
-    Apache 2.0 • No logs • No bs
-    """)
-    gr.Markdown(disclaimer)
+**Omega Pruner v10.0 — Infinite Edition**
+
+Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh  
+The last UTXO consolidator you'll ever need
+
+Source: [GitHub](https://github.com/babyblueviper1/Viper-Stack-Omega) – Apache 2.0  
+No logs • No BS • Runs entirely in your browser
+""")
 
     with gr.Row():
         with gr.Column(scale=4):
