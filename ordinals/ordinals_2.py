@@ -567,22 +567,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
 
-    # Save raw hex to localStorage + banner
-    js_save = f'''
-    <script>
-    try {{
-        localStorage.setItem("omega_rbf_hex", "{raw_hex}");
-    }} catch (e) {{
-        console.warn("localStorage quota exceeded — RBF hex still available in box below");
-    }}
-    </script>
-    '''
-    banner = '''
-    <div style="margin:30px 0; padding:18px; background:#fff8e7; border:2px solid #f7931a; border-radius:12px; text-align:center;">
-        <b>RBF Ready – Raw hex auto-saved</b><br>
-        <small>Keep tab open or press "Copy raw hex" below • Survives refresh</small>
-    </div>
-    '''
+    status_note = '<p style="margin:30px 0; color:#f7931a; font-weight:bold; text-align:center;">RBF ready — click "Bump +50 sat/vB" anytime (survives refresh)</p>'
 
     details_section = f"""
 <details style="margin-top: 40px;">
@@ -607,9 +592,8 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
         </div>
         <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum</small></p>
-        {banner}
+        <p style="margin:30px 0; color:#f7931a; font-weight:bold;">RBF ready — click "Bump +50 sat/vB" anytime (survives refresh)</p>
         {details_section}
-        {js_save}
     </div>
     """
 
