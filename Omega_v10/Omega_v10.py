@@ -660,81 +660,85 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    css=css,
     theme=gr.themes.Soft(),
-    title="Ω Pruner ∞ — Infinite Edition"
+    title="Ω Pruner ∞ — Infinite Edition",
+    # css= is DEAD in new Gradio → we inject manually below
 ) as demo:
-    gr.HTML("""
-<div id="omega-master-container">
-  <div class="omega-orbit">
-    <div class="omega-core">Ω</div>
-  </div>
-</div>
+    gr.HTML(f"""
+    <style>
+    {css}
+    </style>
 
-<style>
-  /* Full-screen black + orange Bitcoin vibe */
-  body, .gradio-container {
-    background: #000 !important;
-    overflow: hidden;
-  }
-  
-  #omega-master-container {
-    position: fixed !important;
-    inset: 0;
-    pointer-events: none;
-    z-index: -1;
-  }
-  
-  .omega-orbit {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 600px;
-    height: 600px;
-    margin: -300px 0 0 -300px;
-    animation: slow-spin 44s linear infinite;
-  }
-  
-  .omega-core {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    font-size: 240px;
-    font-weight: bold;
-    transform: translate(-50%, -50%);
-    color: #f7931a;
-    text-shadow: 
-      0 0 40px #f7931a,
-      0 0 80px #f7931a,
-      0 0 120px #ff9d33,
-      0 0 180px #ffaa44;
-    animation: 
-      omega-breath 8s ease-in-out infinite,
-      gentle-float 16s ease-in-out infinite;
-  }
-  
-  @keyframes omega-breath {
-    0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.95); }
-    50%      { opacity: 1.0; transform: translate(-50%, -50%) scale(1.05); }
-  }
-  
-  @keyframes gentle-float {
-    0%, 100% { transform: translate(-50%, -50%) translateY(0); }
-    50%      { transform: translate(-50%, -50%) translateY(-30px); }
-  }
-  
-  @keyframes slow-spin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
-  }
-  
-  /* Mobile scaling */
-  @media (max-width: 768px) {
-    .omega-orbit { width: 400px; height: 400px; margin: -200px 0 0 -200px; }
-    .omega-core { font-size: 160px; }
-  }
-</style>
-""")
+    <div id="omega-master-container">
+      <div class="omega-orbit">
+        <div class="omega-core">Ω</div>
+      </div>
+    </div>
+
+    <style>
+      /* Full-screen black + orange Bitcoin vibe */
+      body, .gradio-container {{
+        background: #000 !important;
+        overflow: hidden;
+      }}
+      
+      #omega-master-container {{
+        position: fixed !important;
+        inset: 0;
+        pointer-events: none;
+        z-index: -1;
+      }}
+      
+      .omega-orbit {{
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 600px;
+        height: 600px;
+        margin: -300px 0 0 -300px;
+        animation: slow-spin 44s linear infinite;
+      }}
+      
+      .omega-core {{
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        font-size: 240px;
+        font-weight: bold;
+        transform: translate(-50%, -50%);
+        color: #f7931a;
+        text-shadow: 
+          0 0 40px #f7931a,
+          0 0 80px #f7931a,
+          0 0 120px #ff9d33,
+          0 0 180px #ffaa44;
+        animation: 
+          omega-breath 8s ease-in-out infinite,
+          gentle-float 16s ease-in-out infinite;
+      }}
+      
+      @keyframes omega-breath {{
+        0%, 100% {{ opacity: 0.6; transform: translate(-50%, -50%) scale(0.95); }}
+        50%      {{ opacity: 1.0; transform: translate(-50%, -50%) scale(1.05); }}
+      }}
+      
+      @keyframes gentle-float {{
+        0%, 100% {{ transform: translate(-50%, -50%) translateY(0); }}
+        50%      {{ transform: translate(-50%, -50%) translateY(-30px); }}
+      }}
+      
+      @keyframes slow-spin {{
+        from {{ transform: rotate(0deg); }}
+        to   {{ transform: rotate(360deg); }}
+      }}
+      
+      /* Mobile scaling */
+      @media (max-width: 768px) {{
+        .omega-orbit {{ width: 400px; height: 400px; margin: -200px 0 0 -200px; }}
+        .omega-core {{ font-size: 160px; }}
+      }}
+    </style>
+    """)
     # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
         with gr.Column(scale=4):
