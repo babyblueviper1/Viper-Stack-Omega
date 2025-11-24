@@ -778,24 +778,24 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
             background: transparent;
         ">
             <span class="omega-symbol" style="
-                font-size: 92vh !important;
+                font-size: 100vh !important;        /* ← +8vh = two levels bigger */
                 font-weight: 900 !important;
-                background: linear-gradient(135deg, rgba(247,147,26,0.16), rgba(247,147,26,0.07)) !important;
+                background: linear-gradient(135deg, rgba(247,147,26,0.22), rgba(247,147,26,0.11)) !important;  /* ← one shade darker */
                 -webkit-background-clip: text !important;
                 -webkit-text-fill-color: transparent !important;
                 background-clip: text !important;
                 color: transparent !important;
-                text-shadow: 0 0 140px rgba(247,147,26,0.38) !important;
+                text-shadow: 0 0 180px rgba(247,147,26,0.56) !important;  /* ← deeper, richer glow */
                 animation: omega-breath 28s infinite ease-in-out !important;
                 user-select: none !important;
                 line-height: 1 !important;
-                opacity: 0.88 !important;
+                opacity: 0.92 !important;           /* ← slightly more present */
             ">Ω</span>
         </div>
 
         <style>
         @keyframes omega-breath {
-            0%, 100% { opacity: 0.68; transform: scale(0.96) rotate(0deg);   }
+            0%, 100% { opacity: 0.72; transform: scale(0.96) rotate(0deg);   }
             50%      { opacity: 1.0;  transform: scale(1.04) rotate(180deg); }
         }
         .gradio-container { position: relative !important; z-index: 0 !important; }
@@ -804,7 +804,6 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
         </style>
 
         <script>
-        // The sacred force-reflow that makes it appear every single time
         window.addEventListener('load', () => {
             const omega = document.getElementById('omega-bg');
             if (omega) {
