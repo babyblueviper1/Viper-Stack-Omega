@@ -759,8 +759,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-with gr.Blocks(title="Omega Pruner v10") as demo:
-    gr.HTML("""
+gr.HTML("""
 <div id="omega-bg" style="
     position: fixed !important;
     inset: 0 !important;
@@ -793,7 +792,23 @@ with gr.Blocks(title="Omega Pruner v10") as demo:
     50%      { opacity: 1.0;  transform: scale(1.04) rotate(180deg); }
 }
 </style>
-""")
+/* Gradio override: Punch through any dark overlays */
+.gradio-container { position: relative !important; z-index: 0 !important; }
+#omega-bg { isolation: isolate !important; will-change: transform; }
+.omega-symbol { animation-play-state: running !important; }
+</style>
+
+<script>
+// Force re-render on load (Gradio hack)
+window.addEventListener('load', () => {
+    const omega = document.getElementById('omega-bg');
+    if (omega) {
+        omega.style.display = 'none';
+        setTimeout(() => { omega.style.display = 'flex'; }, 100);
+    }
+});
+</script>
+""", elem_id="omega-bg-container-fixed")
 
 
     # Your normal CSS (keep this)
