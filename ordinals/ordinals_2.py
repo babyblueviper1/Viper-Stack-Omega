@@ -113,7 +113,7 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, dict]:
         if data and data[0] == 1 and bech32m_verify_checksum('bc', data):
             prog = convertbits(data[1:], 5, 8, False)
             if prog and len(prog) == 32:
-                return b'\x51\x20' + bytes(prog), {'input_vb': 57.5, 'output_vb': 43, 'type': 'Taproot'}
+                return b'\x51\x20' + bytes(prog), {'input_vb': 57, 'output_vb': 43, 'type': 'Taproot'}
 
     return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'fallback'}
 
@@ -470,7 +470,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
 
     vb_map = {
-        'P2PKH': (148, 34), 'P2SH': (91, 32), 'SegWit': (68, 31), 'Taproot': (57.5, 43)
+        'P2PKH': (148, 34), 'P2SH': (91, 32), 'SegWit': (68, 31), 'Taproot': (57, 43)
     }
     input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
 
@@ -524,10 +524,10 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
     outputs = 1 + (1 if not selfish_mode and dao_percent > 0 else 0)
-    weight = 40 + inputs * (input_vb_global * 4) + outputs * (output_vb_global * 4) + 4
+    weight = 40 + inputs * input_vb_global*4 + outputs * output_vb_global*4 + 4
     if detected in ("SegWit", "Taproot"):
         weight += 2
-    vsize = (weight + 3) // 4
+    vsize = (weight + 3) // 4   # ceiling division
 
     try:
         fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
@@ -538,7 +538,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     future_cost = int((input_vb_global * inputs + output_vb_global) * future_rate)
     miner_fee = max(1000, int(vsize * fee_rate * 1.2))
     savings = future_cost - miner_fee
-    dao_cut = max(546, int(savings * dao_percent / 100)) if not selfish_mode and dao_percent > 0 and savings > 2000 else 0
+    dao_cut = max(546, int(savings * dao_percent / 10_000)) if not selfish_mode and dao_percent > 0 and savings > 2000 else 0
     user_gets = total - miner_fee - dao_cut
 
     if user_gets < 546:
