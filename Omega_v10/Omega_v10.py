@@ -1068,34 +1068,28 @@ with gr.Blocks(
         outputs=None
     )
     gr.HTML(
-        """
-        <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const saved = localStorage.getItem('omega_rbf_hex');
-            if (!saved) return;
-
-            const selectors = [
-                'textarea[label*="Raw hex"]',
-                'textarea[label*="raw hex"]',
-                'textarea[placeholder*="raw hex"]',
-                'textarea[data-testid*="textbox"]:last-of-type',
-                'textarea:last-of-type'
-            ];
-
-            let box = null;
-            for (const sel of selectors) {
-                box = document.querySelector(sel);
-                if (box) break;
-            }
-
-            if (box) {
-                box.value = saved.trim();
-                box.dispatchEvent(new Event('input', { bubbles: true }));
-                box.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        });
-        </script>
-        """
+        "<script>"
+        "document.addEventListener('DOMContentLoaded', () => {"
+        "  const saved = localStorage.getItem('omega_rbf_hex');"
+        "  if (!saved) return;"
+        "  const selectors = ["
+        "    'textarea[label*=\"Raw hex\"]',"
+        "    'textarea[label*=\"raw hex\"]',"
+        "    'textarea[placeholder*=\"raw hex\"]',"
+        "    'textarea:last-of-type'"
+        "  ];"
+        "  let box = null;"
+        "  for (const sel of selectors) {"
+        "    box = document.querySelector(sel);"
+        "    if (box) break;"
+        "  }"
+        "  if (box) {"
+        "    box.value = saved.trim();"
+        "    box.dispatchEvent(new Event('input', {bubbles: true}));"
+        "    box.dispatchEvent(new Event('change', {bubbles: true}));"
+        "  }"
+        "});"
+        "</script>"
     )
 
     
