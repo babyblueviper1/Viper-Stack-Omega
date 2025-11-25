@@ -969,7 +969,11 @@ if __name__ == "__main__":
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    demo.queue(max_size=40)
+    # Old way → breaks on Gradio 5.x (Render uses 5.8+ now)
+    # demo.queue(default_concurrency_limit=None, max_size=40)
+
+    # New correct way (2025 Gradio)
+    demo.queue(max_size=40)          # ← this is all you need
 
     demo.launch(
         server_name="0.0.0.0",
@@ -978,8 +982,8 @@ if __name__ == "__main__":
         show_error=True,
         allowed_paths=["./"],
         ssl_verify=False,
-        css="""
-            body, .gradio-container { margin:0 !important; padding:0 !important; overflow-x:hidden !important; }
-            #floating-qr-container { right:16px !important; }
-        """
+        # You can keep these, they still work:
+        # debug=False,
+        # quiet=True,
+        # max_threads=40,
     )
