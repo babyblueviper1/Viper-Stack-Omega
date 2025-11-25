@@ -80,38 +80,67 @@ details summary::-webkit-details-marker { display: none; }
     width: 100% !important;                 /* Full-width fallback */
 }
 
+/* GRADIO 6.0.0 BEEFY BUTTONS — HITS EVERY LAYER, NO CONFLICTS */
 .gr-button,
 .gr-button > div,
-.gr-button button,
-.gr-button [class*="svelte"] {
-    font-size: 1.18rem !important;          /* perfect readable size */
-    font-weight: 600 !important;
-    padding: 16px 24px !important;          /* fat padding */
-    min-height: 60px !important;            /* big tap target */
-    border-radius: 14px !important;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
-    transition: all 0.22s ease !important;
-    line-height: 1.4 !important;
+.gr-button > button,
+.gr-button [class*="svelte"],
+button[class*="svelte"] {
+    font-size: 1.2rem !important;           /* Bigger text — unified for ALL */
+    font-weight: 600 !important;            /* Bold everywhere */
+    padding: 16px 24px !important;          /* Fat padding — overrides defaults */
+    min-height: 60px !important;            /* Big tap targets */
+    border-radius: 12px !important;         /* Curves */
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;  /* Lift */
+    transition: all 0.2s ease !important;   /* Smooth */
+    line-height: 1.4 !important;            /* Fit */
+    width: 100% !important;                 /* Full fallback */
 }
 
-/* PRIMARY BUTTONS (Bump, Generate, Analyze) — EVEN THICCCER */
+/* THICCER PRIMARIES + CUSTOM CLASSES (Analyze secondary gets base; primaries get extra) */
 .gr-button[variant="primary"],
-.gr-button[variant="primary"] button,
-.gr-button-lg,
+.gr-button[variant="primary"] > div,
+.gr-button[variant="primary"] > button,
+.gr-button.size-lg,
 .full-width,
-.bump-with-gap {
-    font-size: 1.35rem !important;          /* HUGE & BOLD */
-    padding: 20px 28px !important;
-    min-height: 68px !important;
-    font-weight: 700 !important;
-    box-shadow: 0 6px 18px rgba(247,147,26,0.35) !important;
+.bump-with-gap,
+.tall-button {
+    font-size: 1.35rem !important;          /* HUGE for Bump/Generate/Lightning/Start Over */
+    padding: 20px 28px !important;          /* Extra fat */
+    min-height: 68px !important;            /* Towering */
+    font-weight: 700 !important;            /* Super bold */
+    box-shadow: 0 6px 18px rgba(247,147,26,0.35) !important;  /* Orange glow */
 }
 
-/* HOVER EFFECT — makes them pop */
-.gr-button:hover button,
-.gr-button:hover {
-    transform: translateY(-3px) !important;
-    box-shadow: 0 10px 24px rgba(0,0,0,0.2) !important;
+/* SECONDARY BUTTONS LIKE ANALYZE — BOOST TO MATCH (no variant="primary") */
+.gr-button[variant="secondary"] button,
+.gr-button[variant="secondary"] > button {
+    font-size: 1.2rem !important;           /* Bigger than default, but not HUGE */
+    padding: 16px 24px !important;
+    min-height: 60px !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1) !important;  /* Subtle secondary shadow */
+}
+
+/* HOVER — FOR ALL */
+.gr-button:hover,
+.gr-button:hover > button,
+.gr-button [class*="svelte"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2) !important;
+    opacity: 0.95 !important;
+}
+
+/* ANTI-CACHE FORCE (Gradio 6 JS re-styling killer) */
+.gr-button button {
+    animation: beefify 0.15s forwards !important;
+}
+@keyframes beefify {
+    from { transform: scale(1); opacity: 1; }
+    to { 
+        font-size: inherit !important; 
+        padding: inherit !important; 
+        min-height: inherit !important; 
+    }
 }
 """
 # ==============================
