@@ -1058,7 +1058,8 @@ with gr.Blocks(
                 catch(e) { console.warn('localStorage full'); }
             }
         }
-        """
+        """,
+        default_concurrency_limit=None
     )
 
     # Floating QR Scanners + Styles
