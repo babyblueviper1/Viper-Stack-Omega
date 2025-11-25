@@ -1047,15 +1047,19 @@ with gr.Blocks(
             with gr.Row():
                 gr.Button("Copy raw hex", size="sm").click(
                     None, None, None,
-                    js="""
+                   js="""
                     () => {
-                        const box = document.querySelector('#rbf-hex-box textarea') || 
-                                   document.querySelector('textarea[data-testid*="textbox"]');
-                        if (box && box.value) {
-                            navigator.clipboard.writeText(box.value.trim());
-                            alert('Copied to clipboard!');
-                        } else alert('Nothing to copy');
-                    }
+                    const box = document.querySelector('#rbf-hex-box textarea') || 
+                           document.querySelector('textarea[data-testid*="textbox"]');
+                    if (box && box.value.trim()) {
+                        navigator.clipboard.writeText(box.value.trim());
+                        const toast = document.createElement('div');
+                        toast.textContent = "Copied!";
+                        toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,255,157,0.95);color:#000;padding:12px 32px;border-radius:50px;font-weight:bold;z-index:10000;box-shadow:0 8px 32px rgba(0,0,0,0.5);animation:toastPop 1.8s ease forwards;';
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 1800);
+                        }
+                            }
                     """
                 )
 
@@ -1155,43 +1159,87 @@ with gr.Blocks(
     btcBtn.onclick = () => btcInput.click();
     lnBtn.onclick = () => lnInput.click();
 
-    async function scan(file, isLightning = false) {
-      if (!file) return;
-      const img = new Image();
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        try {
-          const result = await ZXing.readBarcodeFromCanvas(canvas);
-          const text = result.text.trim();
-          if (isLightning && text.toLowerCase().startsWith('lnbc')) {
-            const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
-            if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
-            alert("Lightning invoice scanned!");
-          } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
-            const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-            const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
-            if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
-            alert("Address/xpub scanned!");
-          } else alert("Not recognized");
-        } catch (e) { alert("No QR code detected"); }
-      };
-      img.src = URL.createObjectURL(file);
-    }
+// ——— TOAST FUNCTION ———
+function showToast(message, isError = false) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed !important;
+        bottom: 100px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        background: ${isError ? '#300' : 'rgba(0,0,0,0.88)'} !important;
+        color: ${isError ? '#ff3366' : '#00ff9d'} !important;
+        padding: 14px 28px !important;
+        border-radius: 50px !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        z-index: 10000 !important;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+        backdrop-filter: blur(10px) !important;
+        border: 2px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
+        animation: toastPop 2s ease forwards !important;
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+}
 
-    btcInput.onchange = e => scan(e.target.files[0], false);
-    lnInput.onchange = e => scan(e.target.files[0], true);
+// Add this keyframes once (if not already present)
+if (!document.querySelector('#toast-style')) {
+    const style = document.createElement('style');
+    style.id = 'toast-style';
+    style.textContent = `
+        @keyframes toastPop {
+            0%   { transform: translateX(-50%) translateY(20px); opacity: 0; }
+            15%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+            85%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+            100% { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+        }
+    `;
+    document.head.appendChild(style);
+}
 
-    function loadSavedRBF() {
-        const saved = localStorage.getItem('omega_rbf_hex');
-        if (!saved) return;
-        const box = document.querySelector('textarea[label*="Raw hex"]');
-        if (box) box.value = saved;
+async function scan(file, isLightning = false) {
+  if (!file) return;
+  const img = new Image();
+  img.onload = async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    try {
+      const result = await ZXing.readBarcodeFromCanvas(canvas);
+      const text = result.text.trim();
+      if (isLightning && text.toLowerCase().startsWith('lnbc')) {
+        const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
+        if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
+        showToast("Lightning invoice scanned!");
+      } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
+        const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+        const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
+        if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
+        showToast("Address / xpub scanned!");
+      } else {
+        showToast("Not a valid Bitcoin QR", true);
+      }
+    } catch (e) {
+      showToast("No QR code detected", true);
     }
-    loadSavedRBF();
-    </script>
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+btcInput.onchange = e => scan(e.target.files[0], false);
+lnInput.onchange = e => scan(e.target.files[0], true);
+
+function loadSavedRBF() {
+    const saved = localStorage.getItem('omega_rbf_hex');
+    if (!saved) return;
+    const box = document.querySelector('textarea[label*="Raw hex"]');
+    if (box) box.value = saved;
+}
+loadSavedRBF();
+</script>
 
     """)
 
@@ -1200,7 +1248,7 @@ with gr.Blocks(
         """
         <div style="margin: 60px 0 30px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
             <strong>Ωmega Pruner v10.0 — Infinite Edition</strong><br>
-            <a href="https://github.com/omega-pruner/v10" target="_blank" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
+            <a href="https://github.com/omega-pruner/v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
                 GitHub • Open Source • Apache 2.0
             </a><br>
             <small>Made with skull and lightning for the Bitcoin plebs • Never sell your coins</small>
