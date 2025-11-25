@@ -1012,14 +1012,13 @@ with gr.Blocks(
                 variant="primary",
                 size="lg",
                 elem_classes="full-width bump-with-gap"
-            )
     # ==================================================================
     # Events
     # ==================================================================
     submit_btn.click(
         analysis_pass,
         [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-        [output_log, generate_btn,generate_row]
+        [output_log, generate_btn, generate_row]
     )
 
     generate_btn.click(
@@ -1032,13 +1031,13 @@ with gr.Blocks(
         lambda: (
             "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
             "", gr.update(visible=False), gr.update(visible=False), "", ""
-    ),
+        ),
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
             selfish_mode, dao_percent, dao_addr,
             output_log, generate_btn, generate_row, rbf_in
-    ]
-)
+        ]
+    )
 
     rbf_btn.click(
         fn=rbf_bump,
@@ -1056,102 +1055,102 @@ with gr.Blocks(
     )
 
     # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
-gr.HTML("""
-<!-- Floating BTC Scanner Button -->
-<label class="qr-fab btc" title="Scan Address / xpub">B</label>
-<input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
+    gr.HTML("""
+    <!-- Floating BTC Scanner Button -->
+    <label class="qr-fab btc" title="Scan Address / xpub">B</label>
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
-<script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-<script>
-// Toast function — beautiful, non-blocking
-function showToast(message, isError = false) {
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.cssText = `
-        position: fixed !important;
-        bottom: 100px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
-        color: ${isError ? '#ff3366' : '#00ff9d'} !important;
-        padding: 16px 36px !important;
-        border-radius: 50px !important;
-        font-weight: bold !important;
-        font-size: 17px !important;
-        z-index: 10000 !important;
-        box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
-        backdrop-filter: blur(12px) !important;
-        border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
-        animation: toastPop 2.4s ease forwards !important;
-    `;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2400);
-}
+    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+    <script>
+    // Toast function — beautiful, non-blocking
+    function showToast(message, isError = false) {
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed !important;
+            bottom: 100px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
+            color: ${isError ? '#ff3366' : '#00ff9d'} !important;
+            padding: 16px 36px !important;
+            border-radius: 50px !important;
+            font-weight: bold !important;
+            font-size: 17px !important;
+            z-index: 10000 !important;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
+            backdrop-filter: blur(12px) !important;
+            border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
+            animation: toastPop 2.4s ease forwards !important;
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2400);
+    }
 
-// Toast animation
-if (!document.querySelector('#toast-style')) {
-    const style = document.createElement('style');
-    style.id = 'toast-style';
-    style.textContent = `
-        @keyframes toastPop {
-            0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
-            12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-            88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-            100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
-        }
-    `;
-    document.head.appendChild(style);
-}
-
-// BTC Scanner
-const btcBtn = document.querySelector('.qr-fab.btc');
-const btcInput = document.getElementById('qr-scanner-btc');
-btcBtn.onclick = () => btcInput.click();
-
-async function scanBTC(file) {
-    if (!file) return;
-    const img = new Image();
-    img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        try {
-            const result = await ZXing.readBarcodeFromCanvas(canvas);
-            const text = result.text.trim();
-            const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-
-            if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
-                const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
-                           document.querySelector('textarea');
-                if (box) {
-                    box.value = cleanText;
-                    box.dispatchEvent(new Event('input'));
-                    box.dispatchEvent(new Event('change'));
-                }
-                showToast("Address / xpub scanned!");
-            } else {
-                showToast("Not a Bitcoin address or xpub", true);
+    // Toast animation
+    if (!document.querySelector('#toast-style')) {
+        const style = document.createElement('style');
+        style.id = 'toast-style';
+        style.textContent = `
+            @keyframes toastPop {
+                0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
+                12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+                88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+                100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
             }
-        } catch (e) {
-            showToast("No QR detected", true);
-        }
-    };
-    img.src = URL.createObjectURL(file);
-}
+        `;
+        document.head.appendChild(style);
+    }
 
-btcInput.onchange = e => scanBTC(e.target.files[0]);
+    // BTC Scanner
+    const btcBtn = document.querySelector('.qr-fab.btc');
+    const btcInput = document.getElementById('qr-scanner-btc');
+    btcBtn.onclick = () => btcInput.click();
 
-// Restore saved RBF hex
-function loadSavedRBF() {
-    const saved = localStorage.getItem('omega_rbf_hex');
-    if (!saved) return;
-    const box = document.querySelector('textarea[label*="Raw hex"]');
-    if (box) box.value = saved;
-}
-loadSavedRBF();
-</script>
-""")
+    async function scanBTC(file) {
+        if (!file) return;
+        const img = new Image();
+        img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            try {
+                const result = await ZXing.readBarcodeFromCanvas(canvas);
+                const text = result.text.trim();
+                const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+
+                if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
+                    const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
+                               document.querySelector('textarea');
+                    if (box) {
+                        box.value = cleanText;
+                        box.dispatchEvent(new Event('input'));
+                        box.dispatchEvent(new Event('change'));
+                    }
+                    showToast("Address / xpub scanned!");
+                } else {
+                    showToast("Not a Bitcoin address or xpub", true);
+                }
+            } catch (e) {
+                showToast("No QR detected", true);
+            }
+        };
+        img.src = URL.createObjectURL(file);
+    }
+
+    btcInput.onchange = e => scanBTC(e.target.files[0]);
+
+    // Restore saved RBF hex
+    function loadSavedRBF() {
+        const saved = localStorage.getItem('omega_rbf_hex');
+        if (!saved) return;
+        const box = document.querySelector('textarea[label*="Raw hex"]');
+        if (box) box.value = saved;
+    }
+    loadSavedRBF();
+    </script>
+    """)
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
     gr.Markdown(
@@ -1161,28 +1160,8 @@ loadSavedRBF();
             <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
                 GitHub • Open Source • Apache 2.0
             </a><br>
-            <small>Prune today. Win forever • Ωs</small>
+            <small>Prune today. Win forever. • Ω</small>
         </div>
         """,
         elem_id="omega-footer"
-    )
-if __name__ == "__main__":
-    import os
-    import warnings
-
-    warnings.filterwarnings("ignore", category=UserWarning)
-
-    demo.queue(default_concurrency_limit=None, max_size=40)
-
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),
-        share=True,
-        debug=False,
-        max_threads=40,
-        show_error=True,
-        quiet=True,
-        allowed_paths=["./"],
-        ssl_verify=False,
-        css=css
     )
