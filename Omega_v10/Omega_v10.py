@@ -89,6 +89,14 @@ details summary::-webkit-details-marker { display: none; }
         flex: 1;
     }
 }
+qr-center { 
+    display: flex !important; 
+    justify-content: center !important; 
+    align-items: center !important; 
+    width: 100% !important;
+    margin: 40px 0 !important;
+    padding: 10px 0 !important;
+}
 """
 # ==============================
 # Bitcoin Helpers
