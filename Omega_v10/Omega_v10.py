@@ -969,21 +969,21 @@ if __name__ == "__main__":
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    # Old way → breaks on Gradio 5.x (Render uses 5.8+ now)
-    # demo.queue(default_concurrency_limit=None, max_size=40)
+    # Gradio 6.0+ correct queue setup (unchanged, but with concurrency for performance)
+    demo.queue(
+        max_size=40,                    # Your queue limit
+        default_concurrency_limit=40    # Allows parallel processing (was missing; prevents hangs)
+    )
 
-    # New correct way (2025 Gradio)
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
-        share=True,
+        # share=True,                  # Ignored on Render – remove or keep for local
         show_error=True,
         allowed_paths=["./"],
-        ssl_verify=False,
-        enable_queue=True,
-        max_queue_size=40,
-        # You can keep these, they still work:
-        # debug=False,
-        # quiet=True,
-        # max_threads=40,
+        # ssl_verify=False,            # Deprecated in 6.0+ – remove to avoid warnings
+        root_path="/"                   # Ensures clean routing on Render/HF
+        # debug=False,                 # Optional: Set True for troubleshooting
+        # quiet=True,                  # Optional: Suppress logs
+        # max_threads=40,              # Still works, but concurrency_limit above is better
     )
