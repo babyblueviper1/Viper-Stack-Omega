@@ -5,6 +5,36 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import urllib.parse
 import warnings
+from gradio.themes import Base
+from gradio.themes.utils import colors, sizes
+
+class OmegaTheme(Base):
+    def __init__(self):
+        super().__init__(
+            primary_hue=colors.amber,  # Your orange #f7931a vibe
+            neutral_hue=colors.gray,
+            spacing_size=sizes.spacing_md,  # Base spacing
+            radius_size=sizes.radius_md,
+            text_size=sizes.text_lg,
+            font=[gr.themes.GoogleFont("Inter")]  # Clean font, optional
+        )
+        # Override button CSS vars for beef
+        self.set(
+            button_primary_font_size=sizes.text_lg,  # 1.35rem for primaries
+            button_secondary_font_size=sizes.text_md,  # 1.2rem for secondary (Analyze)
+            button_padding=sizes.spacing_xl,  # Fat padding: 20px 28px
+            button_min_height="68px",  # Towering height for primaries
+            button_secondary_min_height="60px",  # Beef for Analyze
+            button_border_radius=sizes.radius_md,  # 12px curves
+            button_primary_shadow="0 6px 18px rgba(247,147,26,0.35)",  # Orange glow
+            button_shadow="0 4px 14px rgba(0,0,0,0.12)",  # Base lift
+        )
+        # Tame row gaps to 20px (overrides default ~40-60px)
+        self.set(
+            block_padding=sizes.spacing_sm,  # Tighter internal row padding
+            row_gap="20px",  # Exact 20px between rows (your tasteful gap)
+            column_gap="16px"  # Side spacing if needed
+        )
 warnings.filterwarnings("ignore", category=UserWarning)
 
 print(f"Gradio version: {gr.__version__}")
@@ -69,79 +99,7 @@ details summary::-webkit-details-marker { display: none; }
     margin-top: 20px !important;    /* perfect gap above Bump button */
     width: 100% !important;
 }
-.gr-button button {
-    font-size: 1.1rem !important;          /* Bigger text for all buttons */
-    font-weight: 600 !important;            /* Bold & punchy */
-    padding: 14px 20px !important;          /* Taller + wider padding */
-    min-height: 56px !important;            /* Perfect mobile tap target */
-    border-radius: 12px !important;         /* Softer, modern corners */
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;  /* Subtle lift */
-    transition: all 0.2s ease !important;   /* Smooth hovers */
-    width: 100% !important;                 /* Full-width fallback */
-}
 
-/* GRADIO 6.0.0 BEEFY BUTTONS — HITS EVERY LAYER, NO CONFLICTS */
-.gr-button,
-.gr-button > div,
-.gr-button > button,
-.gr-button [class*="svelte"],
-button[class*="svelte"] {
-    font-size: 1.2rem !important;           /* Bigger text — unified for ALL */
-    font-weight: 600 !important;            /* Bold everywhere */
-    padding: 16px 24px !important;          /* Fat padding — overrides defaults */
-    min-height: 60px !important;            /* Big tap targets */
-    border-radius: 12px !important;         /* Curves */
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;  /* Lift */
-    transition: all 0.2s ease !important;   /* Smooth */
-    line-height: 1.4 !important;            /* Fit */
-    width: 100% !important;                 /* Full fallback */
-}
-
-/* THICCER PRIMARIES + CUSTOM CLASSES (Analyze secondary gets base; primaries get extra) */
-.gr-button[variant="primary"],
-.gr-button[variant="primary"] > div,
-.gr-button[variant="primary"] > button,
-.gr-button.size-lg,
-.full-width,
-.bump-with-gap,
-.tall-button {
-    font-size: 1.35rem !important;          /* HUGE for Bump/Generate/Lightning/Start Over */
-    padding: 20px 28px !important;          /* Extra fat */
-    min-height: 68px !important;            /* Towering */
-    font-weight: 700 !important;            /* Super bold */
-    box-shadow: 0 6px 18px rgba(247,147,26,0.35) !important;  /* Orange glow */
-}
-
-/* SECONDARY BUTTONS LIKE ANALYZE — BOOST TO MATCH (no variant="primary") */
-.gr-button[variant="secondary"] button,
-.gr-button[variant="secondary"] > button {
-    font-size: 1.2rem !important;           /* Bigger than default, but not HUGE */
-    padding: 16px 24px !important;
-    min-height: 60px !important;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1) !important;  /* Subtle secondary shadow */
-}
-
-/* HOVER — FOR ALL */
-.gr-button:hover,
-.gr-button:hover > button,
-.gr-button [class*="svelte"]:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2) !important;
-    opacity: 0.95 !important;
-}
-
-/* ANTI-CACHE FORCE (Gradio 6 JS re-styling killer) */
-.gr-button button {
-    animation: beefify 0.15s forwards !important;
-}
-@keyframes beefify {
-    from { transform: scale(1); opacity: 1; }
-    to { 
-        font-size: inherit !important; 
-        padding: inherit !important; 
-        min-height: inherit !important; 
-    }
-}
 """
 # ==============================
 # Bitcoin Helpers
@@ -845,7 +803,8 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Omega v10 — Infinite Edition"
+    title="Omega v10 — Infinite Edition",
+    theme=OmegaTheme
 ) as demo:
     gr.Markdown(
         """
@@ -860,56 +819,7 @@ with gr.Blocks(
         """,
         elem_id="omega-title"
     )
-    # ——— GAP-FIXING INLINE CSS + JS OVERRIDE (Gradio 6.0.0 PROOF) ———
-    gr.HTML(
-        """
-        <style>
-        /* Global row gap killer — 20px between all full-width buttons */
-        .gr-row + .gr-row {
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-        }
-        .gr-row + .gr-row .gr-button,
-        .gr-row + .gr-row .full-width {
-            margin-top: 20px !important;  /* Your exact tasteful gap */
-        }
-        /* Ensure Analyze (secondary) gets the same beef as others */
-        .gr-button[variant="secondary"] {
-            min-height: 60px !important;
-            padding: 16px 24px !important;
-            font-size: 1.2rem !important;
-        }
-        </style>
-        <script>
-        // FORCE APPLY AFTER GRADIO LOADS (beats Svelte re-styling)
-        setTimeout(() => {
-            const buttons = document.querySelectorAll('.gr-button button, .full-width button');
-            buttons.forEach(btn => {
-                btn.style.fontSize = '1.2rem';
-                btn.style.padding = '16px 24px';
-                btn.style.minHeight = '60px';
-                btn.style.borderRadius = '12px';
-                btn.style.fontWeight = '600';
-                if (btn.closest('[variant="primary"]') || btn.closest('.full-width')) {
-                    btn.style.fontSize = '1.35rem';
-                    btn.style.padding = '20px 28px';
-                    btn.style.minHeight = '68px';
-                    btn.style.fontWeight = '700';
-                    btn.style.boxShadow = '0 6px 18px rgba(247,147,26,0.35)';
-                }
-                // Gap force for rows
-                const rows = document.querySelectorAll('.gr-row + .gr-row');
-                rows.forEach(row => {
-                    row.style.marginTop = '0';
-                });
-                const nextButtons = document.querySelectorAll('.gr-row + .gr-row .gr-button');
-                nextButtons.forEach(b => b.style.marginTop = '20px');
-            });
-        }, 100);  // 100ms delay — after Gradio renders
-        </script>
-        """,
-        elem_id="gap-fixer-override"
-    )
+    
     gr.HTML(
         """
         <div id="omega-bg" style="
