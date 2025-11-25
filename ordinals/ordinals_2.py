@@ -773,8 +773,8 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     return (
         html,
-        gr.update(visible=False), # generate_btn
-        gr.update(visible=False), # generate_row
+        gr.update(visible=True), # generate_btn
+        gr.update(visible=True), # generate_row
         gr.update(visible=True),  # ln_invoice_row
         "",                         # ln_invoice_state (cleared)
         raw_hex                     # saved for infinite RBF
