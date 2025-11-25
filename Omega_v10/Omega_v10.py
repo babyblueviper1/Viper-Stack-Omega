@@ -1021,7 +1021,7 @@ with gr.Blocks(
     gr.HTML("""
     <!-- Floating QR Scanner Buttons -->
     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">&#9889;</label> 
 
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
