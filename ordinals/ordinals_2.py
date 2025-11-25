@@ -798,15 +798,25 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        # FIXED: Extract fallback from tags (bolt11 library stores it nested)
+        # FINAL FIX: correctly extract fallback_address from Tag objects
         fallback_addr = None
-        for tag in (decoded.tags or []):
-            if tag.get('tag') == 'fallback_address' and tag.get('data'):
-                fallback_addr = tag['data']
+        for tag in decoded.tags:
+            if hasattr(tag, 'name') and tag.name == 'fallback_address' and tag.data:
+                fallback_addr = tag.data
                 break
+            # Some versions use 'p' tag with version prefix
+            if hasattr(tag, 'name') and tag.name == 'p' and tag.data:
+                # data is bytes like b'0bc1q...' → strip version byte if present
+                addr_bytes = tag.data
+                if addr_bytes[0] in (0, 1):  # version byte
+                    addr_bytes = addr_bytes[1:]
+                try:
+                    fallback_addr = addr_bytes.decode()
+                except:
+                    continue
 
         if not fallback_addr:
-            raise ValueError("Invoice must support on-chain fallback (no fallback in tags)")
+            raise ValueError("Invoice must support on-chain fallback (no fallback found)")
 
         dest_script, _ = address_to_script_pubkey(fallback_addr)
         tx = Tx()
