@@ -699,127 +699,62 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-with gr.Blocks(
-    title="Omega v10 — Infinite Edition",
-) as demo:
-    # ←←← THIS MUST BE THE VERY FIRST COMPONENT ←←←
-    gr.HTML("""
-    <style>
-    #floating-qr-container {
-        position: fixed !important;
-        right: 20px !important;
-        bottom: 20px !important;
-        z-index: 999999 !important;
-        pointer-events: none !important;
-    }
-    #floating-qr-container > * {
-        pointer-events: auto !important;
-    }
-    .qr-fab {
-        position: fixed !important;
-        width: 70px !important;
-        height: 70px !important;
-        border-radius: 50% !important;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 38px !important;
-        cursor: pointer !important;
-        transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
-        border: 5px solid white !important;
-        font-weight: bold !important;
-        user-select: none !important;
-        text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
-    }
-    .qr-fab:hover { transform: scale(1.18) !important; box-shadow: 0 16px 50px rgba(0,0,0,0.8) !important; }
-    .qr-fab.btc { bottom: 100px !important; right: 20px !important; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white !important; }
-    .qr-fab.ln  { bottom: 20px  !important; right: 20px !important; background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000 !important; font-size: 42px !important; }
-    </style>
+with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
 
-    <div id="floating-qr-container">
-        <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-        <label class="qr-fab ln"  title="Scan Lightning Invoice">&#9889</label>
-    </div>
-
-    <input type="file" accept="image/*" capture="environment" id="qr-btc" style="display:none">
-    <input type="file" accept="image/*" capture="environment" id="qr-ln"  style="display:none">
-    """, elem_id="floating-qr-container")
-    
+    # ─────────────────────── FLOATING QR BUTTONS (Gradio 6 safe) ───────────────────────
     gr.HTML(
-        """
-        <div id="omega-bg" style="
-            position: fixed !important;
-            inset: 0 !important;
-            top: 0 !important; left: 0 !important;
-            width: 100vw !important; height: 100vh !important;
-            pointer-events: none !important;
-            z-index: -1 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            overflow: hidden !important;
-            background: transparent;
-        ">
-            <span class="omega-symbol" style="
-                font-size: 100vh !important;
-                font-weight: 900 !important;
-                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;
-                -webkit-background-clip: text !important;
-                -webkit-text-fill-color: transparent !important;
-                background-clip: text !important;
-                color: transparent !important;
-                text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;
-                animation: omega-breath 28s infinite ease-in-out !important;
-                user-select: none !important;
-                line-height: 1 !important;
-                opacity: 0.96 !important;
-            ">Ω</span>
-        </div>
+        "<style>"
+        "#floating-qr-container{position:fixed!important;right:20px!important;bottom:20px!important;"
+        "z-index:999999!important;pointer-events:none!important}"
+        "#floating-qr-container>*{pointer-events:auto!important}"
+        ".qr-fab{position:fixed!important;width:70px!important;height:70px!important;border-radius:50%!important;"
+        "box-shadow:0 10px 40px rgba(0,0,0,0.7)!important;display:flex!important;align-items:center!important;"
+        "justify-content:center!important;font-size:38px!important;cursor:pointer!important;"
+        "border:5px solid white!important;font-weight:bold!important;user-select:none!important;"
+        "text-shadow:0 2px 8px rgba(0,0,0,0.5)!important;transition:all .25s cubic-bezier(.4,0,.2,1)!important}"
+        ".qr-fab:hover{transform:scale(1.18)!important;box-shadow:0 16px 50px rgba(0,0,0,0.8)!important}"
+        ".qr-fab.btc{bottom:100px!important;background:linear-gradient(135deg,#f7931a,#f9a43f);color:white!important}"
+        ".qr-fab.ln{bottom:20px!important;background:linear-gradient(135deg,#00ff9d,#33ffc7);color:#000!important;font-size:42px!important}"
+        "</style>"
+        "<div id='floating-qr-container'>"
+        "<label class='qr-fab btc' title='Scan Address / xpub'>B</label>"
+        "<label class='qr-fab ln' title='Scan Lightning Invoice'>Lightning</label>"
+        "</div>"
+        "<input type='file' accept='image/*' capture='environment' id='qr-btc' style='display:none'>"
+        "<input type='file' accept='image/*' capture='environment' id='qr-ln' style='display:none'>",
+        elem_id="floating-qr-container"
+    )
 
-        <style>
-        @keyframes omega-breath {
-            0%, 100% { opacity: 0.76; transform: scale(0.95) rotate(0deg);   }
-            50%      { opacity: 1.0;  transform: scale(1.05) rotate(180deg); }
-        }
-        .gradio-container { 
-            position: relative !important; 
-            z-index: 0 !important; 
-            background: transparent !important;
-            overflow-y: auto !important;
-        }
-        body { overflow-y: auto !important; }
-        #omega-bg { 
-            isolation: isolate !important; 
-            will-change: transform, opacity !important; 
-        }
-        .omega-symbol { 
-            animation-play-state: running !important; 
-        }
-        </style>
-
-        <script>
-        // The sacred force-reflow — makes it appear 100% of the time
-        window.addEventListener('load', () => {
-            const omega = document.getElementById('omega-bg');
-            if (omega) {
-                omega.style.display = 'none';
-                setTimeout(() => { omega.style.display = 'flex'; }, 120);
-            }
-        });
-        </script>
-        """,
+    # ─────────────────────── OMEGA BACKGROUND + HEADER (Gradio 6 safe) ───────────────────────
+    gr.HTML(
+        "<div id='omega-bg' style='position:fixed;inset:0;z-index:-1;pointer-events:none;display:flex;"
+        "align-items:center;justify-content:center;overflow:hidden'>"
+        "<span style='font-size:100vh;font-weight:900;background:linear-gradient(135deg,rgba(247,147,26,0.28),rgba(247,147,26,0.15));"
+        "-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 220px rgba(247,147,26,0.72);"
+        "animation:omega-breath 28s infinite ease-in-out;user-select:none;opacity:0.96'>Ω</span>"
+        "</div>"
+        "<style>"
+        "@keyframes omega-breath{0%,100%{opacity:.76;transform:scale(.95) rotate(0deg)}"
+        "50%{opacity:1;transform:scale(1.05) rotate(180deg)}}"
+        "</style>"
+        "<script>"
+        "window.addEventListener('load',()=>{"
+        "const el=document.getElementById('omega-bg');if(el){el.style.display='none';"
+        "setTimeout(()=>{el.style.display='flex'},120)}});"
+        "</script>",
         elem_id="omega-bg-container-fixed"
     )
-   gr.HTML(
+
+    # ─────────────────────── MAIN HEADER TEXT ───────────────────────
+    gr.HTML(
         "<div style='text-align:center;margin:24px 0 32px 0;padding:12px;pointer-events:none'>"
-        "<h1 style='font-size:38px !important;font-weight:900 !important;color:#f7931a !important;"
-        "margin:0 0 12px 0 !important;text-shadow:0 4px 12px rgba(247,147,26,0.4);line-height:1.2'>"
+        "<h1 style='font-size:38px!important;font-weight:900!important;color:#f7931a!important;"
+        "margin:0 0 12px 0!important;text-shadow:0 4px 12px rgba(247,147,26,0.4);line-height:1.2'>"
         "Omega Pruner v10.0 — Infinite Edition</h1>"
-        "<p style='font-size:18px !important;color:#aaa !important;margin:8px 0 !important;line-height:1.5'>"
+        "<p style='font-size:18px!important;color:#aaa!important;margin:8px 0!important;line-height:1.5'>"
         "Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh<br>"
         "The last UTXO consolidator you'll ever need</p>"
-        "<p style='font-size:15px !important;color:#f7931a !important;margin:16px 0 0 0 !important'>"
+        "<p style='font-size:15px!important;color:#f7931a!important;margin:16px 0 0 0!important'>"
         "Source: <a href='https://github.com/babyblueviper1/Viper-Stack-Omega' target='_blank' "
         "style='color:#f7931a;text-decoration:underline'>GitHub</a> – Apache 2.0 • No logs • Runs in your browser</p>"
         "</div>"
