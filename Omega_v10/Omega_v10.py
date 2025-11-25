@@ -726,38 +726,41 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
     )
 
     # ─────────────────────── OMEGA BACKGROUND + HEADER (Gradio 6 safe) ───────────────────────
+    # 1. GIANT OMEGA BACKGROUND — restored + fixed for Gradio 6.0
     gr.HTML(
-        "<div id='omega-bg' style='position:fixed;inset:0;z-index:-1;pointer-events:none;display:flex;"
-        "align-items:center;justify-content:center;overflow:hidden'>"
-        "<span style='font-size:100vh;font-weight:900;background:linear-gradient(135deg,rgba(247,147,26,0.28),rgba(247,147,26,0.15));"
-        "-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 220px rgba(247,147,26,0.72);"
-        "animation:omega-breath 28s infinite ease-in-out;user-select:none;opacity:0.96'>Ω</span>"
+        "<div style='position:fixed;inset:0;z-index:-1;pointer-events:none;display:flex;"
+        "align-items:center;justify-content:center;overflow:hidden;background:transparent'>"
+        "<div style='font-size:90vh;font-weight:900;color:transparent;"
+        "background:linear-gradient(135deg,rgba(247,147,26,0.28),rgba(247,147,26,0.15));"
+        "-webkit-background-clip:text;background-clip:text;"
+        "text-shadow:0 0 220px rgba(247,147,26,0.72);"
+        "animation:breath 28s infinite ease-in-out;user-select:none'>Ω</div>"
         "</div>"
         "<style>"
-        "@keyframes omega-breath{0%,100%{opacity:.76;transform:scale(.95) rotate(0deg)}"
+        "@keyframes breath{0%,100%{opacity:.76;transform:scale(.95) rotate(0deg)}"
         "50%{opacity:1;transform:scale(1.05) rotate(180deg)}}"
-        "</style>"
-        "<script>"
-        "window.addEventListener('load',()=>{"
-        "const el=document.getElementById('omega-bg');if(el){el.style.display='none';"
-        "setTimeout(()=>{el.style.display='flex'},120)}});"
-        "</script>",
-        elem_id="omega-bg-container-fixed"
+        "</style>",
+        elem_id="omega-bg"
     )
 
-    # ─────────────────────── MAIN HEADER TEXT ───────────────────────
+    # 2. HEADER TEXT — now using gr.Markdown (no gray box, no shift)
     gr.Markdown(
-        '<div style="text-align:center;margin:24px 0 32px 0;padding:12px;pointer-events:none">'
-        '<h1 style="font-size:38px!important;font-weight:900!important;color:#f7931a!important;'
-        'margin:0 0 12px 0!important;text-shadow:0 4px 12px rgba(247,147,26,0.4);line-height:1.2">'
-        'Omega Pruner v10.0 — Infinite Edition</h1>'
-        '<p style="font-size:18px!important;color:#aaa!important;margin:8px 0!important;line-height:1.5">'
-        'Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh<br>'
-        'The last UTXO consolidator you\'ll ever need</p>'
-        '<p style="font-size:15px!important;color:#f7931a!important;margin:16px 0 0 0!important">'
-        'Source: <a href="https://github.com/babyblueviper1/Viper-Stack-Omega" target="_blank" '
-        'style="color:#f7931a;text-decoration:underline">GitHub</a> – Apache 2.0 • No logs • Runs in your browser</p>'
-        '</div>'
+        """
+        <div style="text-align:center;margin:32px 0 40px 0;padding:12px;pointer-events:none">
+            <h1 style="font-size:38px!important;font-weight:900!important;color:#f7931a!important;
+                       margin:0 0 12px 0!important;text-shadow:0 4px 12px rgba(247,147,26,0.4);line-height:1.2">
+                Omega Pruner v10.0 — Infinite Edition
+            </h1>
+            <p style="font-size:18px!important;color:#aaa!important;margin:8px 0!important;line-height:1.5">
+                Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh<br>
+                The last UTXO consolidator you'll ever need
+            </p>
+            <p style="font-size:15px!important;color:#f7931a!important;margin:16px 0 0 0!important">
+                Source: <a href="https://github.com/babyblueviper1/Viper-Stack-Omega" target="_blank"
+                style="color:#f7931a;text-decoration:underline">GitHub</a> – Apache 2.0 • No logs
+            </p>
+        </div>
+        """
     )
       
     # ====================== LAYOUT STARTS HERE ======================
