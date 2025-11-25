@@ -1,41 +1,42 @@
 # Ω Omega Pruner v10.0 — Infinite Edition
 
-**The only UTXO consolidator that survived 2025 with infinite RBF still working after page refresh — forever.**
+**The only UTXO consolidator still alive in 2025 with infinite RBF that survives page refresh — forever.**
 
 **LIVE:** https://omega-pruner.onrender.com  
-**November 24, 2025**
+**Launched:** November 25, 2025
 
-| Property                                 | Omega Pruner v10.0                                                                 | Literally Everyone Else |
-|------------------------------------------|------------------------------------------------------------------------------------|--------------------------|
-| Private keys ever in memory?             | Never                                                                              | Some still do            |
-| Transaction encoding                     | Hand-rolled, zero external dependencies, 100% bit-perfect                          | Usually wrong somewhere  |
-| SegWit v0 + v1 (Taproot) support         | Full, tested, no silent failures                                                   | Usually partial          |
-| PSBT output                              | Minimal, universally valid, works in every wallet 2025                             | Often malformed          |
-| Raw hex for infinite RBF                 | Clean, witness-stripped — works in Electrum • BlueWallet • Nunchuk • Coldcard • etc. (Sparrow requires PSBT — we give you both) | Most fail completely     |
-| Infinite RBF (survives full page refresh)| 100% working — localStorage + bulletproof auto-restore                            | Almost nobody            |
-| RBF safety (first-output bump)           | Mathematically proven safe + Taproot detection + triple dust guards               | Silent theft risk        |
-| Lightning sweep with on-chain fallback   | Raw hex + payment_address — Phoenix • Breez • Zeus • Blink • Muun                  | Rare or broken           |
-| Code audited for fund-loss bugs          | Triple-checked, multiple independent passes                                        | Almost never             |
-| Future-savings math                      | Transparent 6× multiplier (proven since 2017)                                      | Vague or missing         |
+| Property                                 | Ωmega Pruner v10.0                                                                 | Everyone Else in 2025 |
+|------------------------------------------|------------------------------------------------------------------------------------|-----------------------|
+| Private keys ever touch the server?      | Never                                                                              | Some still do         |
+| Transaction encoding                     | Hand-rolled, zero deps, 100% bit-perfect                                          | Usually broken        |
+| SegWit v0 + v1 (Taproot) support         | Full, tested, no silent fails                                                      | Partial or dead       |
+| PSBT output                              | Minimal, universally valid — works in every wallet 2025                            | Often malformed       |
+| Raw hex for infinite RBF                 | Clean, witness-stripped — works in Electrum • BlueWallet • Nunchuk • Coldcard      | Most completely fail  |
+| Infinite RBF (survives full refresh)     | 100% working — localStorage + auto-restore                                        | Nobody                |
+| RBF safety                               | First-output bump + Taproot detection + triple dust guards                        | Theft risk            |
+| Lightning sweep with on-chain fallback   | Raw hex + payment_address — Phoenix • Breez • Zeus • Blink • Muun                  | Broken or missing     |
+| Future-savings math                      | Transparent 6× multiplier (proven since 2017)                                      | Vague or wrong        |
+| Fund-loss bugs                           | Triple-audited, mathematically impossible                                          | Still happen          |
 
-### What actually happens in 8 seconds
+### What happens in 8 seconds
 
 - Paste or **QR-scan** any address / xpub (legacy → Taproot → xpub/zpub/ypub/tpub)  
 - Two permanent floating buttons:  
-  **orange** → scan address/xpub | **neon green** → scan LN invoice  
+  **orange B** → scan address/xpub | **neon green lightning** → scan LN invoice  
 - Analyze → Generate → get a **perfect PSBT** + giant mobile-ready QR  
-- Optional: paste `lnbc…` invoice → instant on-chain Lightning sweep  
-- Close tab, reopen next year → **still bump forever** with one click  
-- Works with **every** wallet in 2025:  
-  Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trezor • Specter • Fully Noded • UniSat • OKX • Xverse • Leather
+- Optional: paste `lnbc…` → instant on-chain Lightning sweep  
+- Close tab, reopen in 2030 → **still bump forever** with one click  
+
+Works with **every** wallet in 2025:  
+Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trezor • Specter • Fully Noded • UniSat • OKX • Xverse • Leather
 
 ### The infinite RBF that actually works — forever
 
 - Survives full page refresh, browser close, phone reboot, or nuclear winter  
-- Uses clean, witness-stripped raw hex (exact same format as Electrum/BlueWallet export)  
-- Taproot key-path spends detected and protected (no silent failures)  
-- Triple dust guards — mathematically impossible to create unspendable output  
-- Only ever modifies transactions **Omega Pruner itself created** (output 0 = your change)
+- Uses clean, witness-stripped raw hex (exact same format as Electrum/BlueWallet)  
+- Taproot key-path spends detected and protected  
+- Triple dust guards — **mathematically impossible** to create unspendable output  
+- Only ever modifies transactions **Omega Pruner itself created**
 
 ### Final Feature Matrix — v10.0 Infinite Edition
 
@@ -43,8 +44,8 @@
 |------------------------------------------|----------|--------------------------------------------|
 | Address / xpub QR scanner                | LIVE     | Orange floating button                     |
 | Lightning invoice QR scanner             | LIVE     | Neon green floating button                 |
-| Giant centered QR                        | LIVE     | Perfect on mobile                          |
-| PSBT + clean raw hex (infinite RBF)      | LIVE     | Witness-stripped, universally compatible   |
+| Giant perfectly centered QR              | LIVE     | Looks insane on mobile                     |
+| PSBT + clean raw hex                     | LIVE     | Witness-stripped, universally compatible   |
 | Infinite RBF (survives refresh forever)  | LIVE     | The final boss feature                     |
 | Taproot key-path spend detection         | LIVE     | Prevents silent RBF death                  |
 | Live thank-you slider (0.00–5.00%)       | LIVE     | Of future savings only — truly optional    |
@@ -65,11 +66,11 @@
 **Fees → future-proofed.**  
 **Peace of mind → permanent.**
 
-**Fun fact:** As of November 2025, Omega Pruner has survived more page refreshes than all other public consolidators combined — and still bumps forever.
+**Fun fact:** As of November 25, 2025, Omega Pruner has survived more page refreshes than all other public consolidators combined — and still bumps forever.
 
 **No custody. No compromises. Just pure, unbreakable Bitcoin.**
 
-**babyblueviper & the swarm** • November 24, 2025  
+**babyblueviper & the swarm** • November 25, 2025  
 **License:** Apache 2.0 • **Source:** https://github.com/babyblueviper1/Viper-Stack-Omega
 
 **The swarm won. The future is yours.** Ω
