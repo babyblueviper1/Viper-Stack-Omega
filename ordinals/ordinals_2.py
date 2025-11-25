@@ -5,36 +5,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import urllib.parse
 import warnings
-from gradio.themes import Base
-from gradio.themes.utils import colors, sizes
 
-class OmegaTheme(Base):
-    def __init__(self):
-        super().__init__(
-            primary_hue=colors.amber,  # Your orange #f7931a vibe
-            neutral_hue=colors.gray,
-            spacing_size=sizes.spacing_md,  # Base spacing
-            radius_size=sizes.radius_md,
-            text_size=sizes.text_lg,
-            font=[gr.themes.GoogleFont("Inter")]  # Clean font, optional
-        )
-        # Override button CSS vars for beef
-        self.set(
-            button_primary_font_size=sizes.text_lg,  # 1.35rem for primaries
-            button_secondary_font_size=sizes.text_md,  # 1.2rem for secondary (Analyze)
-            button_padding=sizes.spacing_xl,  # Fat padding: 20px 28px
-            button_min_height="68px",  # Towering height for primaries
-            button_secondary_min_height="60px",  # Beef for Analyze
-            button_border_radius=sizes.radius_md,  # 12px curves
-            button_primary_shadow="0 6px 18px rgba(247,147,26,0.35)",  # Orange glow
-            button_shadow="0 4px 14px rgba(0,0,0,0.12)",  # Base lift
-        )
-        # Tame row gaps to 20px (overrides default ~40-60px)
-        self.set(
-            block_padding=sizes.spacing_sm,  # Tighter internal row padding
-            row_gap="20px",  # Exact 20px between rows (your tasteful gap)
-            column_gap="16px"  # Side spacing if needed
-        )
 warnings.filterwarnings("ignore", category=UserWarning)
 
 print(f"Gradio version: {gr.__version__}")
@@ -804,7 +775,6 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 with gr.Blocks(
     title="Omega v10 — Infinite Edition",
-    theme=OmegaTheme
 ) as demo:
     gr.Markdown(
         """
