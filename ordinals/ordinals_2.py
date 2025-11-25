@@ -125,16 +125,47 @@ details summary::-webkit-details-marker { display: none; }
     font-size: 0.95rem !important;
 }
 
-/* Floating QR Buttons — untouched, still perfect */
-.qr-fab { position: fixed !important; right: 20px; z-index: 9999; width: 70px; height: 70px;
-  border-radius: 50%; box-shadow: 0 10px 40px rgba(0,0,0,0.7); display: flex;
-  align-items: center; justify-content: center; font-size: 38px; cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4,0,0.2,1); border: 5px solid white;
-  font-weight: bold; user-select: none; text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+.qr-fab {
+  position: fixed !important;
+  right: 20px !important;
+  width: 70px !important;
+  height: 70px !important;
+  border-radius: 50% !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 38px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
+  border: 5px solid white !important;
+  user-select: none !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+  z-index: 9999 !important;
 }
-.qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
-.qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
-.qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
+
+.qr-fab:hover {
+  transform: scale(1.18) !important;
+  box-shadow: 0 16px 50px rgba(0,0,0,0.8) !important;
+}
+
+.qr-fab.btc  { bottom: 100px !important; background: linear-gradient(135deg, #f7931a, #f9a43f) !important; color: white !important; }
+.qr-fab.ln   { bottom: 20px  !important; background: linear-gradient(135deg, #00ff9d, #33ffc7) !important; color: #000 !important; font-size: 42px !important; }
+
+qr-center {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 40px 0 !important;
+}
+.qr-center img {
+  width: 460px !important;
+  max-width: 96vw !important;
+  border-radius: 20px !important;
+  border: 6px solid #f7931a !important;
+  box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
+}
 """
 # ==============================
 # Bitcoin Helpers
@@ -1187,19 +1218,6 @@ with gr.Blocks(
     loadSavedRBF();
     </script>
 
-    <style>
-      .qr-fab {
-        position: fixed !important; right: 20px; width: 70px; height: 70px;
-        border-radius: 50%; box-shadow: 0 10px 40px rgba(0,0,0,0.7);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 38px; cursor: pointer; transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-        border: 5px solid white; font-weight: bold; user-select: none; z-index: 9999;
-        text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      }
-      .qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
-      .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
-      .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
-    </style>
     """)
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
