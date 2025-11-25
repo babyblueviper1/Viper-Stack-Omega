@@ -1021,7 +1021,7 @@ with gr.Blocks(
     gr.HTML("""
     <!-- Floating QR Scanner Buttons -->
     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <label class="qr-fab ln" title="Scan Lightning Invoice">&#9889;</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
 
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
@@ -1048,7 +1048,7 @@ with gr.Blocks(
           const result = await ZXing.readBarcodeFromCanvas(canvas);
           const text = result.text.trim();
           if (isLightning && text.toLowerCase().startsWith('lnbc')) {
-            const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
+            const box = document.querySelector('textarea[placeholder*="lnbc"]') || document.querySelector('textarea');
             if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
             alert("Lightning invoice scanned!");
           } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
@@ -1075,7 +1075,7 @@ with gr.Blocks(
     </script>
 
     <style>
-      .qr-fab {{
+      .qr-fab {
         position: fixed !important;
         right: 20px;
         width: 70px;
@@ -1093,10 +1093,10 @@ with gr.Blocks(
         user-select: none;
         z-index: 9999;
         text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      }}
-      .qr-fab:hover {{ transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }}
-      .qr-fab.btc {{ bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }}
-      .qr-fab.ln  {{ bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }}
+      }
+      .qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
+      .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
+      .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
     </style>
     """)
     
