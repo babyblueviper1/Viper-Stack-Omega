@@ -798,14 +798,14 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        # FINAL WORKING VERSION — tested with real Phoenix invoice
+        # FINAL FIX — uses the ACTUAL field name: tag_name (with underscore)
         fallback_addr = None
         for tag in decoded.tags:
-            if tag.tagname == "p":  # This is the fallback address tag in bolt11
+            if getattr(tag, 'tag_name', None) == 'p':
                 data = tag.data
-                if isinstance(data, (bytes, bytearray)):
+                if isinstance(data, (bytes, bytearray)) and len(data) >= 2:
                     # Strip version byte (0=P2PKH, 1=P2WPKH, etc.)
-                    addr_bytes = data[1:] if len(data) > 1 else data
+                    addr_bytes = data[1:]
                     try:
                         fallback_addr = addr_bytes.decode('ascii')
                         break
@@ -816,15 +816,12 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
                     break
 
         if not fallback_addr:
-            raise ValueError("No on-chain fallback address found in invoice (Phoenix/Breez required)")
+            raise ValueError("No on-chain fallback address in invoice (Phoenix/Breez required)")
 
-        # Validate it's a real Bitcoin address
-        try:
-            dest_script, _ = address_to_script_pubkey(fallback_addr)
-        except:
-            raise ValueError(f"Invalid fallback address: {fallback_addr}")
+        # Validate address
+        dest_script, _ = address_to_script_pubkey(fallback_addr)
 
-        # Build the sweep transaction
+        # Build sweep
         tx = Tx()
         for u in utxos:
             tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
