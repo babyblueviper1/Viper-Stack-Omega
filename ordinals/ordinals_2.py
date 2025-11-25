@@ -36,16 +36,97 @@ input_vb_global = output_vb_global = None
 # CSS
 # ==============================
 css = """
-/* Full-width buttons */
-.full-width, .full-width > button { width: 100% !important; margin: 20px 0 !important; }
-.tall-button { height: 100% !important; }
-.tall-button > button { height: 100% !important; padding: 20px !important; font-size: 18px !important; }
+/* —————————————————————— ΩMEGA PRUNER v10 — INFINITE EDITION CSS —————————————————————— */
+
+/* 1. SANE, BEAUTIFUL GAPS — GRADIO 6+ FIX */
+.gr-row {
+    gap: 14px !important;
+}
+.gr-row:has(.full-width),
+.gr-row:has(.bump-with-gap),
+.gr-row:has(.gr-button.size-lg) {
+    gap: 16px !important;
+}
+
+/* Slightly bigger breathing room between Generate → Start Over */
+#generate-and-startover-row {
+    gap: 22px !important;
+}
+
+/* Kill any rogue margins/padding that fight us */
+.full-width, .full-width > div, .full-width button,
+.bump-with-gap, .bump-with-gap > div, .bump-with-gap button {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 2. BEEFY, PREMIUM BUTTONS — HITS EVERY LAYER Gradio 6 uses */
+.gr-button button,
+.gr-button > div,
+.gr-button > button,
+.gr-button [class*="svelte"],
+button[class*="svelte"] {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+    padding: 16px 28px !important;
+    min-height: 62px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
+    transition: all 0.22s ease !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    text-align: center !important;
+}
+
+/* PRIMARY & LARGE BUTTONS = ABSOLUTE UNITS */
+.gr-button[variant="primary"],
+.gr-button.size-lg,
+.full-width,
+.bump-with-gap,
+.tall-button {
+    font-size: 1.38rem !important;
+    font-weight: 750 !important;
+    padding: 22px 32px !important;
+    min-height: 72px !important;
+    box-shadow: 0 6px 20px rgba(247,147,26,0.38) !important;
+}
+
+/* SECONDARY BUTTONS — STILL THICC, BUT NOT DOMINANT */
+.gr-button[variant="secondary"] button,
+.gr-button[variant="secondary"] > button {
+    font-size: 1.28rem !important;
+    font-weight: 600 !important;
+    padding: 18px 28px !important;
+    min-height: 64px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+}
+
+/* HOVER — ALL BUTTONS GET THE GLOW-UP */
+.gr-button:hover button,
+.gr-button:hover > button,
+.gr-button:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.22) !important;
+}
+
+/* PRIMARY HOVER = ORANGE SUPERNOVA */
+.gr-button[variant="primary"]:hover,
+.gr-button.size-lg:hover {
+    box-shadow: 0 14px 32px rgba(247,147,26,0.5) !important;
+    transform: translateY(-4px) !important;
+}
+
+/* 3. MISC FIXES YOU ALREADY HAD */
 details summary { list-style: none; cursor: pointer; }
 details summary::-webkit-details-marker { display: none; }
 
-/* Floating QR Buttons */
-.qr-fab {
-  position: fixed !important; right: 20px; z-index: 9999; width: 70px; height: 70px;
+#rbf-hex-box textarea {
+    font-family: 'Courier New', monospace !important;
+    font-size: 0.95rem !important;
+}
+
+/* Floating QR Buttons — untouched, still perfect */
+.qr-fab { position: fixed !important; right: 20px; z-index: 9999; width: 70px; height: 70px;
   border-radius: 50%; box-shadow: 0 10px 40px rgba(0,0,0,0.7); display: flex;
   align-items: center; justify-content: center; font-size: 38px; cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1); border: 5px solid white;
@@ -54,23 +135,6 @@ details summary::-webkit-details-marker { display: none; }
 .qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
 .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
 .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
-
-
-#rbf-hex-box textarea {
-    font-family: 'Courier New', monospace !important;
-    font-size: 0.95rem !important;
-}
-
-.full-width {
-    width: 100% !important;
-    margin: 20px 0 0 0 !important;   /* fallback if bump-with-gap not used */
-}
-
-.bump-with-gap {
-    margin-top: 20px !important;    /* perfect gap above Bump button */
-    width: 100% !important;
-}
-
 """
 # ==============================
 # Bitcoin Helpers
