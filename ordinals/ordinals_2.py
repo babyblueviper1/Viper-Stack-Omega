@@ -1,4 +1,3 @@
-# Top comment
 # app.py — Omega Pruner v10.0 — Infinite Edition
 import gradio as gr
 import requests, time, base64, io, qrcode
@@ -33,64 +32,64 @@ pruned_utxos_global = None
 input_vb_global = output_vb_global = None
 
 # ==============================
-# CSS + Disclaimer
+# CSS
 # ==============================
 css = """
 /* Full-width buttons */
 .full-width, .full-width > button { width: 100% !important; margin: 20px 0 !important; }
 .tall-button { height: 100% !important; }
 .tall-button > button { height: 100% !important; padding: 20px !important; font-size: 18px !important; }
-details summary { list-style: none; }
+details summary { list-style: none; cursor: pointer; }
 details summary::-webkit-details-marker { display: none; }
 
-/* Floating QR Scanner Buttons */
-.qr-button { position: fixed !important; right: 20px; z-index: 9999; width: 64px; height: 64px; border-radius: 50% !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
-  font-size: 36px; cursor: pointer; transition: all 0.2s; border: 4px solid white; font-weight: bold; }
-.qr-button:hover { transform: scale(1.15); }
-.qr-button.btc { bottom: 96px; background: #f7931a !important; color: white !important; }
-.qr-button.ln { bottom: 20px; background: #00ff9d !important; color: black !important; }
-.qr-center { 
-  display: flex !important; 
-  justify-content: center; 
-  align-items: center; 
-  margin: 30px 0;
+/* Floating QR Buttons */
+.qr-fab {
+  position: fixed !important; right: 20px; z-index: 9999; width: 70px; height: 70px;
+  border-radius: 50%; box-shadow: 0 10px 40px rgba(0,0,0,0.7); display: flex;
+  align-items: center; justify-content: center; font-size: 38px; cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1); border: 5px solid white;
+  font-weight: bold; user-select: none; text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+.qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
+.qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
+.qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
+
+/* === RBF SECTION == */
+.rbf-buttons-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-  /* Mobile RBF perfection — no gaps, perfect stacking */
-  @media (max-width: 768px) {
-    .rbf-buttons-col {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-    }
+.copy-clear-group {
+    display: flex;
+    gap: 8px;
+}
+
+/* Mobile: stack everything vertically, no gaps */
+@media (max-width: 768px) {
     .copy-clear-group {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 6px !important;
+        flex-direction: column;
     }
-    .copy-btn, .clear-btn, .bump-button-mobile {
+    .copy-clear-group > div {
+        width: 100% !important;
+    }
+    .bump-button {
         width: 100% !important;
         margin: 0 !important;
     }
 }
 
-/* Desktop: clean row layout */
+/* Desktop: Copy + Clear side-by-side */
 @media (min-width: 769px) {
     .copy-clear-group {
-        display: flex !important;
-        flex-direction: row !important;
-        gap: 10px !important;
+        flex-direction: row;
     }
-    .copy-btn, .clear-btn {
-        flex: 1 !important;
-    }
-    .bump-button-mobile {
-        margin-top: 16px !important;
+    .copy-clear-group > div {
+        flex: 1;
     }
 }
 """
-
 # ==============================
 # Bitcoin Helpers
 # ==============================
@@ -792,6 +791,8 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
+with gr.Blocks(title="Omega Pruner v10") as demo:
+
 gr.HTML("""
 <div id="omega-master-container">
   <div class="omega-orbit">
@@ -971,6 +972,7 @@ gr.HTML("""
     gr.Markdown("### Infinite RBF Bump Zone")
 
     with gr.Row():
+        # Left: the hex textbox
         with gr.Column(scale=8):
             rbf_in = gr.Textbox(
                 label="Raw hex (auto-saved from last tx)",
@@ -978,26 +980,41 @@ gr.HTML("""
                 elem_classes="rbf-textbox"
             )
 
-        with gr.Column(scale=4, elem_classes="rbf-buttons-col"):
+        # Right: buttons column
+        with gr.Column(scale=4, elem_classes="rbf-buttons-column"):
+            # Copy + Clear group
             with gr.Group(elem_classes="copy-clear-group"):
-                gr.Button("Copy raw hex", size="sm", elem_classes="copy-btn").click(
+                gr.Button("Copy raw hex", size="sm").click(
                     None, None, None,
-                    js="""() => { ... }"""
+                    js="""
+                    () => {
+                        const t = document.querySelector('textarea[label*="Raw hex"]');
+                        if(t && t.value){
+                            navigator.clipboard.writeText(t.value);
+                            alert("Copied!");
+                        }
+                    }
+                    """
                 )
-                gr.Button("Clear saved", size="sm", elem_classes="clear-btn").click(
+                gr.Button("Clear saved", size="sm").click(
                     None, None, None,
-                    js="""() => { localStorage.removeItem('omega_rbf_hex'); alert('Cleared!'); location.reload(); }"""
+                    js="""
+                    () => {
+                        localStorage.removeItem('omega_rbf_hex');
+                        alert('Cleared!');
+                        location.reload();
+                    }
+                    """
                 )
 
+            # The big bump button
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
                 size="lg",
-                elem_classes="bump-button-mobile"
+                elem_classes="bump-button"
             )
-
     gr.Markdown("<small style='color:#888; text-align:center;'>Bump counter & info appears above</small>")
-    
     # ==================================================================
     # Events
     # ==================================================================
