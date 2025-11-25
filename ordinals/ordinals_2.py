@@ -69,22 +69,33 @@ details summary::-webkit-details-marker { display: none; }
     margin-top: 20px !important;    /* perfect gap above Bump button */
     width: 100% !important;
 }
-/* BIGGER, BEEFIER BUTTONS — PERFECT FOR FINGER TAPS */
-.gradio-container .gr-button {
-    font-size: 1.1rem !important;     /* bigger text */
-    font-weight: 600 !important;      /* bold and confident */
-    padding: 14px 20px !important;    /* taller + wider */
-    min-height: 56px !important;      /* perfect tap target */
-    border-radius: 12px !important;   /* softer corners */
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-    transition: all 0.2s ease !important;
+.gr-button button {
+    font-size: 1.1rem !important;          /* Bigger text for all buttons */
+    font-weight: 600 !important;            /* Bold & punchy */
+    padding: 14px 20px !important;          /* Taller + wider padding */
+    min-height: 56px !important;            /* Perfect mobile tap target */
+    border-radius: 12px !important;         /* Softer, modern corners */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;  /* Subtle lift */
+    transition: all 0.2s ease !important;   /* Smooth hovers */
+    width: 100% !important;                 /* Full-width fallback */
 }
 
-/* Even bigger for the main actions */
-.gr-button-lg, .full-width, .bump-with-gap {
-    font-size: 1.25rem !important;    /* HUGE text on Bump / Generate */
-    padding: 18px 24px !important;
-    min-height: 64px !important;
+/* EXTRA THICC FOR PRIMARY / LARGE BUTTONS (Bump, Generate, etc.) */
+.gr-button[variant="primary"] button,
+.gr-button-lg button,
+.full-width button,
+.bump-with-gap button {
+    font-size: 1.25rem !important;          /* HUGE, readable text */
+    padding: 18px 24px !important;          /* Even more padding */
+    min-height: 64px !important;            /* Towering tap zones */
+    box-shadow: 0 6px 16px rgba(247,147,26,0.3) !important;  /* Orange glow */
+}
+
+/* Hover magic — makes them feel alive */
+.gr-button button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2) !important;
+    opacity: 0.95 !important;
 }
 """
 # ==============================
