@@ -2,7 +2,7 @@
 
 **The only UTXO consolidator still alive in 2025 with infinite RBF that survives page refresh — forever.**
 
-**LIVE:** https://omega-pruner.onrender.com  
+**LIVE:** [https://omega-v10.onrender.com  ](https://omega-v10.onrender.com/)
 **Launched:** November 25, 2025
 
 | Property                                 | Ωmega Pruner v10.0                                                                 | Everyone Else in 2025 |
