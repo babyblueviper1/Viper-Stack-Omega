@@ -650,7 +650,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             Click <b>Generate Transaction</b> to continue
         </div>
         """,
-        gr.update(visible=True)
+        gr.update(visible=True), gr.update(visible=True)
     )
 
 # ==============================
@@ -773,8 +773,9 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     return (
         html,
-        gr.update(visible=False),   # generate_btn
-        gr.update(visible=True),    # ln_invoice_row
+        gr.update(visible=False), # generate_btn
+        gr.update(visible=False), # generate_row
+        gr.update(visible=True),  # ln_invoice_row
         "",                         # ln_invoice_state (cleared)
         raw_hex                     # saved for infinite RBF
     )
@@ -991,7 +992,7 @@ with gr.Blocks(
 
     output_log = gr.HTML()
 
-    with gr.Row():
+    with gr.Row(visible=False) as generate_row:    # ← starts hidden = 0px height
         generate_btn = gr.Button(
             "2. Generate Transaction",
             visible=False,
@@ -1103,13 +1104,13 @@ with gr.Blocks(
     start_over_btn.click(
         lambda: (
             "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
-            "", gr.update(visible=False), gr.update(visible=False),
+            "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
             "", "", ""
         ),
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
             selfish_mode, dao_percent, dao_addr,
-            output_log, generate_btn, ln_invoice_row,
+            output_log, generate_btn, generate_row, ln_invoice_row,
             ln_invoice, ln_invoice_state, rbf_in
         ]
     )
