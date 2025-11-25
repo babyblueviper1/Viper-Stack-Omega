@@ -1059,7 +1059,7 @@ with gr.Blocks(
             }
         }
         """,
-        default_concurrency_limit=None
+        concurrency_limit=None
     )
 
     # Floating QR Scanners + Styles
