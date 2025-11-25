@@ -691,41 +691,71 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 with gr.Blocks(
     title="Omega v10 — Infinite Edition",
 ) as demo:
-    gr.HTML(f"""
- <div style="
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important; height: 100vh !important;
-        pointer-events: none !important;
-        z-index: -1 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        overflow: hidden !important;
-    ">
-        <span style="
-            font-size: 100vh !important;        /* our final agreed size */
-            font-weight: 900 !important;
-            background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;  /* our final color */
-            -webkit-background-clip: text !important;
-            -webkit-text-fill-color: transparent !important;
-            background-clip: text !important;
-            color: transparent !important;
-            text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;  /* our final glow */
-            animation: spin 44s linear infinite, breathe 28s ease-in-out infinite !important;
-            user-select: none !important;
-            line-height: 1 !important;
-        ">Ω</span>
-    </div>
+    gr.HTML(
+        """
+        <div id="omega-bg" style="
+            position: fixed !important;
+            inset: 0 !important;
+            top: 0 !important; left: 0 !important;
+            width: 100vw !important; height: 100vh !important;
+            pointer-events: none !important;
+            z-index: -1 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            overflow: hidden !important;
+            background: transparent;
+        ">
+            <span class="omega-symbol" style="
+                font-size: 100vh !important;
+                font-weight: 900 !important;
+                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;
+                -webkit-background-clip: text !important;
+                -webkit-text-fill-color: transparent !important;
+                background-clip: text !important;
+                color: transparent !important;
+                text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;
+                animation: omega-breath 28s infinite ease-in-out !important;
+                user-select: none !important;
+                line-height: 1 !important;
+                opacity: 0.96 !important;
+            ">Ω</span>
+        </div>
 
-    <style>
-    @keyframes spin   { from { transform: rotate(0deg);   } to   { transform: rotate(360deg); } }
-    @keyframes breathe {
-        0%, 100% { opacity: 0.76; transform: scale(0.95); }
-        50%      { opacity: 1.0;  transform: scale(1.05); }
-    }
-    </style>
-    """)
+        <style>
+        @keyframes omega-breath {
+            0%, 100% { opacity: 0.76; transform: scale(0.95) rotate(0deg);   }
+            50%      { opacity: 1.0;  transform: scale(1.05) rotate(180deg); }
+        }
+        .gradio-container { 
+            position: relative !important; 
+            z-index: 0 !important; 
+            background: transparent !important;
+            overflow-y: auto !important;
+        }
+        body { overflow-y: auto !important; }
+        #omega-bg { 
+            isolation: isolate !important; 
+            will-change: transform, opacity !important; 
+        }
+        .omega-symbol { 
+            animation-play-state: running !important; 
+        }
+        </style>
+
+        <script>
+        // The sacred force-reflow — makes it appear 100% of the time
+        window.addEventListener('load', () => {
+            const omega = document.getElementById('omega-bg');
+            if (omega) {
+                omega.style.display = 'none';
+                setTimeout(() => { omega.style.display = 'flex'; }, 120);
+            }
+        });
+        </script>
+        """,
+        elem_id="omega-bg-container-fixed"
+    )
       
     # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
