@@ -794,6 +794,19 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 with gr.Blocks(
     title="Omega v10 — Infinite Edition",
 ) as demo:
+    gr.Markdown(
+        """
+        <div style="text-align: center; padding: 20px 0 10px;">
+            <h1 style="font-size: 3.2rem; margin: 0; background: linear-gradient(135deg, #f7931a, #ff9900); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 30px rgba(247,147,26,0.4);">
+                Ωmega Pruner v10
+            </h1>
+            <h2 style="font-size: 1.7rem; color: #f7931a; margin: 8px 0 30px; font-weight: 600;">
+                Infinite Edition — RBF Forever • Sweep to Lightning • Privacy First
+            </h2>
+        </div>
+        """,
+        elem_id="omega-title"
+    )
     gr.HTML(
         """
         <div id="omega-bg" style="
