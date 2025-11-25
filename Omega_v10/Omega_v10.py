@@ -1067,28 +1067,28 @@ with gr.Blocks(
     </script>
 
     <style>
-      .qr-fab {
-        position: fixed !important;
-        right: 20px !important;
-        width: 70px !important;
-        height: 70px !important;
-        border-radius: 50% !important;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 38px !important;
-        cursor: pointer !important;
-        transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
-        border: 5px solid white !important;
-        font-weight: bold !important;
-        user-select: none !important;
-        z-index: 9999 !important;
-        text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+      .qr-fab { 
+        position: fixed !important; 
+        right: 20px !important; 
+        width: 70px !important; 
+        height: 70px !important; 
+        border-radius: 50% !important; 
+        box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important; 
+        display: flex !important; 
+        align-items: center !important; 
+        justify-content: center !important; 
+        font-size: 38px !important; 
+        cursor: pointer !important; 
+        transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important; 
+        border: 5px solid white !important; 
+        font-weight: bold !important; 
+        user-select: none !important; 
+        z-index: 9999 !important; 
+        text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important; 
       }
       .qr-fab:hover { transform: scale(1.18) !important; box-shadow: 0 16px 50px rgba(0,0,0,0.8) !important; }
       .qr-fab.btc { bottom: 100px !important; background: linear-gradient(135deg,#f7931a,#f9a43f) !important; color: white !important; }
-      .qr-fab.ln  { bottom: 20px !important;  background: linear-gradient(135deg,#00ff9d,#33ffc7) !important; color: #000 !important; font-size: 42px !important; }
+      .qr-fab.ln { bottom: 20px !important; background: linear-gradient(135deg,#00ff9d,#33ffc7) !important; color: #000 !important; font-size: 42px !important; }
     </style>
     """)
     
