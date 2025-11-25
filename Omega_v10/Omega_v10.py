@@ -660,8 +660,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Ω Pruner ∞ — Infinite Edition",
-    theme=gr.themes.Soft()
+    title="Omega v10 — Infinite Edition",
 ) as demo:
     gr.HTML(f"""
     <style>
@@ -1011,9 +1010,14 @@ if __name__ == "__main__":
     demo.queue(default_concurrency_limit=None, max_size=40)
 
     demo.launch(
-    server_name="0.0.0.0",
-    server_port=int(os.environ.get("PORT", 7860)),
-    share=True,
-    favicon_path="https://bitcoinpruner.com/favicon.ico",
-    # no title, no theme here anymore
-)
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        share=True,
+        debug=False,
+        max_threads=40,
+        show_error=True,
+        quiet=True,
+        favicon_path="https://bitcoinpruner.com/favicon.ico",
+        allowed_paths=["./"],
+        ssl_verify=False,
+    )
