@@ -1019,8 +1019,8 @@ with gr.Blocks(
 
     # Floating QR Scanners + Styles
      gr.HTML("""
-    <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <label class="qr-fab ln" title="Scan Lightning Invoice">&#9889</label>
+     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">&#9889;</label>
 
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
@@ -1063,17 +1063,32 @@ with gr.Blocks(
     lnInput.onchange = e => scan(e.target.files[0], true);
 
     const saved = localStorage.getItem('omega_rbf_hex');
-    if (saved) {
-        const box = document.querySelector('textarea[label*="Raw hex"]');
-        if (box) box.value = saved;
-    }
+    if (saved) document.querySelector('textarea[label*="Raw hex"]')?.value = saved;
     </script>
 
     <style>
-      .qr_fab{position:fixed!important;right:20px;width:70px;height:70px;border_radius:50%;box_shadow:0_10px_40px_rgba(0,0,0,0.7);display:flex;align_items:center;justify_content:center;font_size:38px;cursor:pointer;transition:all_0.25s_cubic_bezier(0.4,0,0.2,1);border:5px_solid_white;font_weight:bold;user_select:none;z_index:9999;text_shadow:0_2px_8px_rgba(0,0,0,0.5)}
-      .qr_fab:hover{transform:scale(1.18);box_shadow:0_16px_50px_rgba(0,0,0,0.8)}
-      .qr_fab.btc{bottom:100px;background:linear_gradient(135deg,#f7931a,#f9a43f);color:white}
-      .qr_fab.ln{bottom:20px;background:linear_gradient(135deg,#00ff9d,#33ffc7);color:#000;font_size:42px}
+      .qr-fab {
+        position: fixed !important;
+        right: 20px !important;
+        width: 70px !important;
+        height: 70px !important;
+        border-radius: 50% !important;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 38px !important;
+        cursor: pointer !important;
+        transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
+        border: 5px solid white !important;
+        font-weight: bold !important;
+        user-select: none !important;
+        z-index: 9999 !important;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+      }
+      .qr-fab:hover { transform: scale(1.18) !important; box-shadow: 0 16px 50px rgba(0,0,0,0.8) !important; }
+      .qr-fab.btc { bottom: 100px !important; background: linear-gradient(135deg,#f7931a,#f9a43f) !important; color: white !important; }
+      .qr-fab.ln  { bottom: 20px !important;  background: linear-gradient(135deg,#00ff9d,#33ffc7) !important; color: #000 !important; font-size: 42px !important; }
     </style>
     """)
     
