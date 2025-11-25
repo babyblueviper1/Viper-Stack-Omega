@@ -39,120 +39,89 @@ css = """
 /* —————————————————————— ΩMEGA PRUNER v10 — INFINITE EDITION CSS —————————————————————— */
 
 /* 1. SANE, BEAUTIFUL GAPS — GRADIO 6+ FIX */
-.gr-row {
-    gap: 14px !important;
-}
+.gr-row { gap: 14px !important; }
 .gr-row:has(.full-width),
 .gr-row:has(.bump-with-gap),
-.gr-row:has(.gr-button.size-lg) {
-    gap: 16px !important;
-}
+.gr-row:has(.gr-button.size-lg) { gap: 16px !important; }
+#generate-and-startover-row { gap: 22px !important; }
 
-/* Slightly bigger breathing room between Generate → Start Over */
-#generate-and-startover-row {
-    gap: 22px !important;
-}
-
-/* Kill any rogue margins/padding that fight us */
+/* Kill rogue margins/padding */
 .full-width, .full-width > div, .full-width button,
 .bump-with-gap, .bump-with-gap > div, .bump-with-gap button {
-    margin: 0 !important;
-    padding: 0 !important;
+    margin: 0 !important; padding: 0 !important;
 }
 
-/* 2. BEEFY, PREMIUM BUTTONS — HITS EVERY LAYER Gradio 6 uses */
-.gr-button button,
-.gr-button > div,
-.gr-button > button,
-.gr-button [class*="svelte"],
-button[class*="svelte"] {
-    font-size: 1.25rem !important;
-    font-weight: 600 !important;
-    padding: 16px 28px !important;
-    min-height: 62px !important;
-    border-radius: 14px !important;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
-    transition: all 0.22s ease !important;
-    line-height: 1.4 !important;
-    width: 100% !important;
-    text-align: center !important;
+/* 2. BEEFY PREMIUM BUTTONS */
+.gr-button button, .gr-button > div, .gr-button > button,
+.gr-button [class*="svelte"], button[class*="svelte"] {
+    font-size: 1.25rem !important; font-weight: 600 !important;
+    padding: 16px 28px !important; min-height: 62px !important;
+    border-radius: 14px !important; box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
+    transition: all 0.22s ease !important; line-height: 1.4 !important;
+    width: 100% !important; text-align: center !important;
 }
-
-/* PRIMARY & LARGE BUTTONS = ABSOLUTE UNITS */
-.gr-button[variant="primary"],
-.gr-button.size-lg,
-.full-width,
-.bump-with-gap,
-.tall-button {
-    font-size: 1.38rem !important;
-    font-weight: 750 !important;
-    padding: 22px 32px !important;
-    min-height: 72px !important;
+.gr-button[variant="primary"], .gr-button.size-lg,
+.full-width, .bump-with-gap, .tall-button {
+    font-size: 1.38rem !important; font-weight: 750 !important;
+    padding: 22px 32px !important; min-height: 72px !important;
     box-shadow: 0 6px 20px rgba(247,147,26,0.38) !important;
 }
-
-/* SECONDARY BUTTONS — STILL THICC, BUT NOT DOMINANT */
 .gr-button[variant="secondary"] button,
 .gr-button[variant="secondary"] > button {
-    font-size: 1.28rem !important;
-    font-weight: 600 !important;
-    padding: 18px 28px !important;
-    min-height: 64px !important;
+    font-size: 1.28rem !important; font-weight: 600 !important;
+    padding: 18px 28px !important; min-height: 64px !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
 }
-
-/* HOVER — ALL BUTTONS GET THE GLOW-UP */
-.gr-button:hover button,
-.gr-button:hover > button,
-.gr-button:hover {
+.gr-button:hover button, .gr-button:hover > button, .gr-button:hover {
     transform: translateY(-3px) !important;
     box-shadow: 0 12px 28px rgba(0,0,0,0.22) !important;
 }
-
-/* PRIMARY HOVER = ORANGE SUPERNOVA */
-.gr-button[variant="primary"]:hover,
-.gr-button.size-lg:hover {
+.gr-button[variant="primary"]:hover, .gr-button.size-lg:hover {
     box-shadow: 0 14px 32px rgba(247,147,26,0.5) !important;
     transform: translateY(-4px) !important;
 }
 
-/* 3. MISC FIXES YOU ALREADY HAD */
+/* 3. MISC FIXES */
 details summary { list-style: none; cursor: pointer; }
 details summary::-webkit-details-marker { display: none; }
+#rbf-hex-box textarea { font-family: 'Courier New', monospace !important; font-size: 0.95rem !important; }
 
-#rbf-hex-box textarea {
-    font-family: 'Courier New', monospace !important;
-    font-size: 0.95rem !important;
-}
-
+/* ——— FAB BUTTONS ——— */
 .qr-fab {
-  position: fixed !important;
-  right: 20px !important;
-  width: 70px !important;
-  height: 70px !important;
+  position: fixed !important; right: 20px !important;
+  width: 70px !important; height: 70px !important;
   border-radius: 50% !important;
   box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 38px !important;
-  font-weight: bold !important;
-  cursor: pointer !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  font-size: 38px !important; font-weight: bold !important; cursor: pointer !important;
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
-  border: 5px solid white !important;
-  user-select: none !important;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
-  z-index: 9999 !important;
+  border: 5px solid white !important; user-select: none !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important; z-index: 9999 !important;
+  animation: pulse 4s infinite ease-in-out !important;   /* ← SUBTLE PULSE */
 }
-
 .qr-fab:hover {
   transform: scale(1.18) !important;
   box-shadow: 0 16px 50px rgba(0,0,0,0.8) !important;
+  animation: none !important;   /* stop pulse on hover → feels snappier */
 }
-
 .qr-fab.btc  { bottom: 100px !important; background: linear-gradient(135deg, #f7931a, #f9a43f) !important; color: white !important; }
 .qr-fab.ln   { bottom: 20px  !important; background: linear-gradient(135deg, #00ff9d, #33ffc7) !important; color: #000 !important; font-size: 42px !important; }
 
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+/* ——— DIM GIANT Ω WHEN TYPING ——— */
+input:focus ~ #omega-bg-container-fixed,
+textarea:focus ~ #omega-bg-container-fixed,
+input:focus-within ~ #omega-bg-container-fixed,
+textarea:focus-within ~ #omega-bg-container-fixed {
+    opacity: 0.22 !important;
+    transition: opacity 0.5s ease !important;
+}
+
+/* ——— QR CENTERING & STYLING ——— */
 .qr-center {
   display: flex !important;
   justify-content: center !important;
@@ -165,6 +134,10 @@ details summary::-webkit-details-marker { display: none; }
   border-radius: 20px !important;
   border: 6px solid #f7931a !important;
   box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
+}
+.qr-center.ln img {
+  border: 6px solid #00ff9d !important;
+  box-shadow: 0 12px 50px rgba(0,255,157,0.5) !important;
 }
 """
 # ==============================
@@ -850,8 +823,9 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
                 {format_btc(user_gets)} to Lightning Instantly
             </b>
             <div style="margin:40px 0;">
-                <div class="qr-center"><img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #00ff9d; box-shadow:0 12px 50px rgba(0,255,157,0.5);"></div>
-            </div>
+            <div class="qr-center ln"><img src="{qr}">
+            </div>  
+        </div>
             <p><small>Scan with Phoenix • Breez • Zeus • Blink • Muun</small></p>
         </div>
         """
@@ -1224,7 +1198,7 @@ with gr.Blocks(
     gr.Markdown(
         """
         <div style="margin: 60px 0 30px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
-            <strong>Ωmega Pruner v10 — Infinite Edition</strong><br>
+            <strong>Ωmega Pruner v10.0 — Infinite Edition</strong><br>
             <a href="https://github.com/omega-pruner/v10" target="_blank" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
                 GitHub • Open Source • Apache 2.0
             </a><br>
