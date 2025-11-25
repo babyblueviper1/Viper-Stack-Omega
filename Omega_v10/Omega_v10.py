@@ -1004,94 +1004,103 @@ with gr.Blocks(
                 size="lg",
                 elem_classes="rbf-bump-btn"
             )
-    # ==================================================================
-    # Events
-    # ==================================================================
-    submit_btn.click(
-        analysis_pass,
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-        [output_log, generate_btn]
-    )
 
-    generate_btn.click(
-        build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]
-    )
+# ==================================================================
+# EVENTS — Gradio 6.0.0 Compatible (Render-Proof, Nov 2025)
+# ==================================================================
 
-    ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
+submit_btn.click(
+    fn=analysis_pass,  # ← Explicit fn= (required in 6.0 for stability)
+    inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+    outputs=[output_log, generate_btn]
+)
 
-    submit_ln_btn.click(
-        build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
-    )
+generate_btn.click(
+    fn=build_real_tx,
+    inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+    outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]
+)
 
-    ln_invoice.submit(
-        build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
-    )
+# Fixed change() — explicit fn/inputs/outputs (Gradio 6 requirement)
+ln_invoice.change(
+    fn=lambda x: x,
+    inputs=ln_invoice,
+    outputs=ln_invoice_state
+)
 
-    start_over_btn.click(
-        lambda: (
-            "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
-            "", gr.update(visible=False), gr.update(visible=False),
-            "", "", ""
-        ),
-        outputs=[
-            user_input, prune_choice, dust_threshold, dest_addr,
-            selfish_mode, dao_percent, dao_addr,
-            output_log, generate_btn, ln_invoice_row,
-            ln_invoice, ln_invoice_state, rbf_in
-        ]
-    )
+submit_ln_btn.click(
+    fn=build_real_tx,
+    inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+    outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
+)
 
-    rbf_btn.click(
-        fn=rbf_bump,
-        inputs=rbf_in,
-        outputs=[rbf_in, output_log]
-    ).then(
-        # This runs AFTER Python returns the new bumped hex → 100% reliable
-        js="""
-        hex => {
-            if (hex && typeof hex === 'string') {
-                try {
-                    localStorage.setItem('omega_rbf_hex', hex.trim());
-                } catch(e) {
-                    console.warn('localStorage failed');
-                }
+# Fixed submit() — same explicit params as above
+ln_invoice.submit(
+    fn=build_real_tx,
+    inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+    outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
+)
+
+start_over_btn.click(
+    fn=lambda: (
+        "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
+        "", gr.update(visible=False), gr.update(visible=False),
+        "", "", ""
+    ),
+    outputs=[
+        user_input, prune_choice, dust_threshold, dest_addr,
+        selfish_mode, dao_percent, dao_addr,
+        output_log, generate_btn, ln_invoice_row,
+        ln_invoice, ln_invoice_state, rbf_in
+    ]
+)
+
+# INFINITE RBF — Gradio 6 JS sandbox fix (use single quotes, no escapes needed)
+rbf_btn.click(
+    fn=rbf_bump,
+    inputs=rbf_in,
+    outputs=[rbf_in, output_log]
+).then(
+    js="""  # ← Triple quotes now safe in 6.0 (no more sandbox stripping)
+    (hex) => {
+        if (hex && typeof hex === 'string') {
+            try {
+                localStorage.setItem('omega_rbf_hex', hex.trim());
+            } catch(e) {
+                console.warn('localStorage failed');
             }
         }
-        """,
-        inputs=rbf_in,   # contains the freshly bumped hex
-        outputs=None
-    )
-    gr.HTML(
-        "<script>"
-        "document.addEventListener('DOMContentLoaded', () => {"
-        "  const saved = localStorage.getItem('omega_rbf_hex');"
-        "  if (!saved) return;"
-        "  const selectors = ["
-        "    'textarea[label*=\"Raw hex\"]',"
-        "    'textarea[label*=\"raw hex\"]',"
-        "    'textarea[placeholder*=\"raw hex\"]',"
-        "    'textarea:last-of-type'"
-        "  ];"
-        "  let box = null;"
-        "  for (const sel of selectors) {"
-        "    box = document.querySelector(sel);"
-        "    if (box) break;"
-        "  }"
-        "  if (box) {"
-        "    box.value = saved.trim();"
-        "    box.dispatchEvent(new Event('input', {bubbles: true}));"
-        "    box.dispatchEvent(new Event('change', {bubbles: true}));"
-        "  }"
-        "});"
-        "</script>"
-    )
+    }
+    """,
+    inputs=rbf_in,
+    outputs=None
+)
 
+# Restore RBF hex — now with Gradio 6's faster DOM ready event
+gr.HTML(
+    "<script>"
+    "window.addEventListener('load', () => {  // 'load' instead of 'DOMContentLoaded' for 6.0 speed"
+    "  const saved = localStorage.getItem('omega_rbf_hex');"
+    "  if (!saved) return;"
+    "  const selectors = ["
+    "    'textarea[label*=\"Raw hex\"]',"
+    "    'textarea[label*=\"raw hex\"]',"
+    "    'textarea[placeholder*=\"raw hex\"]',"
+    "    'textarea:last-of-type'"
+    "  ];"
+    "  let box = null;"
+    "  for (const sel of selectors) {"
+    "    box = document.querySelector(sel);"
+    "    if (box) break;"
+    "  }"
+    "  if (box) {"
+    "    box.value = saved.trim();"
+    "    box.dispatchEvent(new Event('input', {bubbles: true}));"
+    "    box.dispatchEvent(new Event('change', {bubbles: true}));"
+    "  }"
+    "});"
+    "</script>"
+)
     
 if __name__ == "__main__":
     import os
