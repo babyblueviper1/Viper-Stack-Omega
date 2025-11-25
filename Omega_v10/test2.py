@@ -54,40 +54,20 @@ details summary::-webkit-details-marker { display: none; }
 .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
 .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
 
-/* === RBF SECTION == */
-.rbf-buttons-column {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+
+#rbf-hex-box textarea {
+    font-family: 'Courier New', monospace !important;
+    font-size: 0.95rem !important;
 }
 
-.copy-clear-group {
-    display: flex;
-    gap: 8px;
+.full-width {
+    width: 100% !important;
+    margin: 20px 0 0 0 !important;   /* fallback if bump-with-gap not used */
 }
 
-/* Mobile: stack everything vertically, no gaps */
-@media (max-width: 768px) {
-    .copy-clear-group {
-        flex-direction: column;
-    }
-    .copy-clear-group > div {
-        width: 100% !important;
-    }
-    .bump-button {
-        width: 100% !important;
-        margin: 0 !important;
-    }
-}
-
-/* Desktop: Copy + Clear side-by-side */
-@media (min-width: 769px) {
-    .copy-clear-group {
-        flex-direction: row;
-    }
-    .copy-clear-group > div {
-        flex: 1;
-    }
+.bump-with-gap {
+    margin-top: 20px !important;    /* perfect gap above Bump button */
+    width: 100% !important;
 }
 """
 # ==============================
@@ -981,48 +961,49 @@ with gr.Blocks(
     gr.Markdown("### Infinite RBF Bump Zone")
 
     with gr.Row():
-        # Left: the hex textbox
         with gr.Column(scale=8):
             rbf_in = gr.Textbox(
                 label="Raw hex (auto-saved from last tx)",
                 lines=6,
-                elem_classes="rbf-textbox"
+                elem_id="rbf-hex-box"
             )
 
-        # Right: buttons column
-        with gr.Column(scale=4, elem_classes="rbf-buttons-column"):
-            # Copy + Clear group
-            with gr.Group(elem_classes="copy-clear-group"):
+        with gr.Column(scale=4):
+            # Copy + Clear — perfectly spaced
+            with gr.Row():
                 gr.Button("Copy raw hex", size="sm").click(
                     None, None, None,
                     js="""
                     () => {
-                        const t = document.querySelector('textarea[label*="Raw hex"]');
-                        if(t && t.value){
-                            navigator.clipboard.writeText(t.value);
-                            alert("Copied!");
-                        }
+                        const box = document.querySelector('#rbf-hex-box textarea') || 
+                                   document.querySelector('textarea[data-testid*="textbox"]');
+                        if (box && box.value) {
+                            navigator.clipboard.writeText(box.value.trim());
+                            alert('Copied to clipboard!');
+                        } else alert('Nothing to copy');
                     }
                     """
                 )
+
                 gr.Button("Clear saved", size="sm").click(
                     None, None, None,
                     js="""
                     () => {
                         localStorage.removeItem('omega_rbf_hex');
-                        alert('Cleared!');
-                        location.reload();
+                        const box = document.querySelector('#rbf-hex-box textarea');
+                        if (box) box.value = '';
+                        alert('Cleared & ready for new tx');
                     }
                     """
                 )
 
-            # The big bump button
+            # Bump button with CSS gap
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
                 size="lg",
-                elem_classes="bump-button"
-            )    
+                elem_classes="full-width bump-with-gap"
+            )
     # ==================================================================
     # Events
     # ==================================================================
@@ -1077,7 +1058,8 @@ with gr.Blocks(
                 catch(e) { console.warn('localStorage full'); }
             }
         }
-        """
+        """,
+        concurrency_limit=None
     )
 
     # Floating QR Scanners + Styles
