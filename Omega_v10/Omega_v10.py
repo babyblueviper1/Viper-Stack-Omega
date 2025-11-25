@@ -104,9 +104,6 @@ details summary::-webkit-details-marker { display: none; }
     display: block !important;
     margin: 0 auto !important;
 }
-/* Fix Gradio 6.0 body shift and button cutoff */
-body, .gradio-container { margin:0 !important; padding:0 !important; overflow-x:hidden !important; }
-#floating-qr-container { right:12px !important; }  /* pulls buttons in from edge */
 """
 # ==============================
 # Bitcoin Helpers
