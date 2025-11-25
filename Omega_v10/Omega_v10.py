@@ -1017,7 +1017,6 @@ if __name__ == "__main__":
         max_threads=40,
         show_error=True,
         quiet=True,
-        favicon_path="https://bitcoinpruner.com/favicon.ico",
         allowed_paths=["./"],
         ssl_verify=False,
     )
