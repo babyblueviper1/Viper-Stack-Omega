@@ -1039,7 +1039,6 @@ with gr.Blocks(
             output_log, generate_btn, generate_row, rbf_in
     ]
 )
-    )
 
     rbf_btn.click(
         fn=rbf_bump,
