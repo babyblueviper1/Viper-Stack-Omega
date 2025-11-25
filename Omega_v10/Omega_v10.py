@@ -13,10 +13,6 @@ print(f"Gradio version: {gr.__version__}")
 # ==============================
 # Optional deps
 # ==============================
-try:
-    from bolt11 import decode as bolt11_decode
-except ImportError:
-    bolt11_decode = None
 
 try:
     from hdwallet import HDWallet
@@ -105,7 +101,6 @@ details summary::-webkit-details-marker { display: none; }
   animation: none !important;   /* stop pulse on hover → feels snappier */
 }
 .qr-fab.btc  { bottom: 100px !important; background: linear-gradient(135deg, #f7931a, #f9a43f) !important; color: white !important; }
-.qr-fab.ln   { bottom: 20px  !important; background: linear-gradient(135deg, #00ff9d, #33ffc7) !important; color: #000 !important; font-size: 42px !important; }
 
 @keyframes pulse {
   0%, 100% { transform: scale(1); }
@@ -151,10 +146,7 @@ textarea:focus-within ~ #omega-bg-container-fixed {
   border: 6px solid #f7931a !important;
   box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
 }
-.qr-center.ln img {
-  border: 6px solid #00ff9d !important;
-  box-shadow: 0 12px 50px rgba(0,255,157,0.5) !important;
-}
+
 """
 # ==============================
 # Bitcoin Helpers
@@ -676,7 +668,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
 # ==============================
-def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice):
+def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     if not pruned_utxos_global:
@@ -714,9 +706,6 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     if user_gets < 546:
         return "Not enough after fees", gr.update(visible=False), gr.update(visible=False), "", "", ""
-
-    if ln_invoice and ln_invoice.strip().lower().startswith("lnbc"):
-            return lightning_sweep_flow(pruned_utxos_global, ln_invoice.strip(), miner_fee, dao_cut, selfish_mode, detected)
 
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
@@ -795,67 +784,9 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         html,
         gr.update(visible=True), # generate_btn
         gr.update(visible=True), # generate_row
-        gr.update(visible=True),  # ln_invoice_row
-        "",                         # ln_invoice_state (cleared)
         raw_hex                     # saved for infinite RBF
     )
-# ==============================
-# LIGHTNING SWEEP — NOW PSBT TOO (Optional: Raw Hex OK here)
-# ==============================
-def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detected="SegWit"):
-    if not bolt11_decode:
-        return "bolt11 library missing — Lightning disabled", gr.update(visible=False), gr.update(visible=False), "", ""
 
-    try:
-        decoded = bolt11_decode(invoice)
-        total = sum(u['value'] for u in utxos)
-        user_gets = total - miner_fee - (0 if selfish_mode else dao_cut)
-
-        if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
-            raise ValueError("Invoice amount mismatch (±5k sats)")
-
-        if not decoded.fallback_address:
-            raise ValueError("Invoice must support on-chain fallback (payment_address)")
-
-        dest_script, _ = address_to_script_pubkey(decoded.payment_address)
-        tx = Tx()
-        for u in utxos:
-            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
-        tx.tx_outs.append(TxOut(user_gets, dest_script))
-        if dao_cut and not selfish_mode:
-            dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
-            tx.tx_outs.append(TxOut(dao_cut, dao_script))
-
-        raw_hex = tx.encode(segwit=True)
-        if raw_hex.endswith(b'\x00\x00\x00\x00'):
-            raw_hex = raw_hex[:-4]
-        raw_hex = raw_hex.hex()
-        qr = make_qr(raw_hex)
-
-        html = f"""
-        <div style="text-align:center; padding:20px; color:#00ff9d;">
-            <h3>Lightning Sweep Ready</h3>
-            <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d;">
-                {format_btc(user_gets)} to Lightning Instantly
-            </b>
-            <div style="margin:40px 0;">
-            <div class="qr-center ln"><img src="{qr}">
-            </div>  
-        </div>
-            <p><small>Scan with Phoenix • Breez • Zeus • Blink • Muun</small></p>
-        </div>
-        """
-
-        return html, gr.update(visible=False), gr.update(visible=False), invoice, raw_hex
-
-    except Exception as e:
-        required = total - miner_fee - (0 if selfish_mode else dao_cut)
-        return f"""
-        <div style="text-align:center; color:#ff3333; padding:30px; background:#300; border-radius:16px;">
-            <b style="font-size:22px;">Lightning Failed</b><br><br>{str(e)}<br><br>
-            Invoice must be for ~{format_btc(required)} (±5k sats)
-        </div>
-        """, gr.update(visible=False), gr.update(visible=True), invoice, ""
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
@@ -869,7 +800,7 @@ with gr.Blocks(
                 Ωmega Pruner v10
             </h1>
             <h2 style="font-size: 1.7rem; color: #f7931a; margin: 8px 0 30px; font-weight: 600;">
-                Infinite Edition — RBF Forever • Sweep to Lightning • Privacy First
+                Infinite Edition — RBF Forever • Privacy First
             </h2>
         </div>
         """,
@@ -1023,22 +954,6 @@ with gr.Blocks(
             elem_classes="full-width"
         )
 
-    ln_invoice_state = gr.State("")
-
-    with gr.Row(visible=False) as ln_invoice_row:
-        with gr.Column(scale=7):
-            ln_invoice = gr.Textbox(
-                label="Lightning Invoice → paste lnbc… to sweep instantly",
-                placeholder="Paste your invoice here",
-                lines=4
-            )
-        with gr.Column(scale=3):
-            submit_ln_btn = gr.Button(
-                "Generate Lightning Sweep",
-                variant="primary",
-                size="lg",
-                elem_classes="tall-button"
-            )
 
     with gr.Row():
         start_over_btn = gr.Button(
@@ -1109,36 +1024,20 @@ with gr.Blocks(
 
     generate_btn.click(
         build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, generate_row, ln_invoice_row, ln_invoice_state, rbf_in]
-    )
-
-    ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
-
-    submit_ln_btn.click(
-        build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
-    )
-
-    ln_invoice.submit(
-        build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        outputs=[output_log, generate_btn, generate_row, rbf_in]
     )
 
     start_over_btn.click(
-        lambda: (
+       lambda: (
             "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
-            "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
-            "", "", ""
-        ),
+            "", gr.update(visible=False), gr.update(visible=False), ""
+        )
         outputs=[
-            user_input, prune_choice, dust_threshold, dest_addr,
-            selfish_mode, dao_percent, dao_addr,
-            output_log, generate_btn, generate_row, ln_invoice_row,
-            ln_invoice, ln_invoice_state, rbf_in
-        ]
+        user_input, prune_choice, dust_threshold, dest_addr,
+        selfish_mode, dao_percent, dao_addr,
+        output_log, generate_btn, generate_row, rbf_in
+    ]
     )
 
     rbf_btn.click(
@@ -1156,26 +1055,15 @@ with gr.Blocks(
         concurrency_limit=None
     )
 
-    # Floating QR Scanners + Styles
-    gr.HTML("""
-    <!-- Floating QR Scanner Buttons -->
-    <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
+    # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
+gr.HTML("""
+<!-- Floating BTC Scanner Button -->
+<label class="qr-fab btc" title="Scan Address / xpub">B</label>
+<input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
-    <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
-    <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
-
-    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-    <script>
-    const btcBtn = document.querySelector('.qr-fab.btc');
-    const lnBtn = document.querySelector('.qr-fab.ln');
-    const btcInput = document.getElementById('qr-scanner-btc');
-    const lnInput = document.getElementById('qr-scanner-ln');
-
-    btcBtn.onclick = () => btcInput.click();
-    lnBtn.onclick = () => lnInput.click();
-
-// ——— TOAST FUNCTION ———
+<script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+<script>
+// Toast function — beautiful, non-blocking
 function showToast(message, isError = false) {
     const toast = document.createElement('div');
     toast.textContent = message;
@@ -1184,70 +1072,77 @@ function showToast(message, isError = false) {
         bottom: 100px !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
-        background: ${isError ? '#300' : 'rgba(0,0,0,0.88)'} !important;
+        background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
         color: ${isError ? '#ff3366' : '#00ff9d'} !important;
-        padding: 14px 28px !important;
+        padding: 16px 36px !important;
         border-radius: 50px !important;
         font-weight: bold !important;
-        font-size: 16px !important;
+        font-size: 17px !important;
         z-index: 10000 !important;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
-        backdrop-filter: blur(10px) !important;
-        border: 2px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
-        animation: toastPop 2s ease forwards !important;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
+        backdrop-filter: blur(12px) !important;
+        border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
+        animation: toastPop 2.4s ease forwards !important;
     `;
     document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
+    setTimeout(() => toast.remove(), 2400);
 }
 
-// Add this keyframes once (if not already present)
+// Toast animation
 if (!document.querySelector('#toast-style')) {
     const style = document.createElement('style');
     style.id = 'toast-style';
     style.textContent = `
         @keyframes toastPop {
-            0%   { transform: translateX(-50%) translateY(20px); opacity: 0; }
-            15%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-            85%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-            100% { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+            0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
+            12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+            88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+            100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
         }
     `;
     document.head.appendChild(style);
 }
 
-async function scan(file, isLightning = false) {
-  if (!file) return;
-  const img = new Image();
-  img.onload = async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    canvas.getContext('2d').drawImage(img, 0, 0);
-    try {
-      const result = await ZXing.readBarcodeFromCanvas(canvas);
-      const text = result.text.trim();
-      if (isLightning && text.toLowerCase().startsWith('lnbc')) {
-        const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
-        if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
-        showToast("Lightning invoice scanned!");
-      } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
-        const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-        const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
-        if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
-        showToast("Address / xpub scanned!");
-      } else {
-        showToast("Not a valid Bitcoin QR", true);
-      }
-    } catch (e) {
-      showToast("No QR code detected", true);
-    }
-  };
-  img.src = URL.createObjectURL(file);
+// BTC Scanner
+const btcBtn = document.querySelector('.qr-fab.btc');
+const btcInput = document.getElementById('qr-scanner-btc');
+btcBtn.onclick = () => btcInput.click();
+
+async function scanBTC(file) {
+    if (!file) return;
+    const img = new Image();
+    img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+            const result = await ZXing.readBarcodeFromCanvas(canvas);
+            const text = result.text.trim();
+            const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+
+            if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
+                const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
+                           document.querySelector('textarea');
+                if (box) {
+                    box.value = cleanText;
+                    box.dispatchEvent(new Event('input'));
+                    box.dispatchEvent(new Event('change'));
+                }
+                showToast("Address / xpub scanned!");
+            } else {
+                showToast("Not a Bitcoin address or xpub", true);
+            }
+        } catch (e) {
+            showToast("No QR detected", true);
+        }
+    };
+    img.src = URL.createObjectURL(file);
 }
 
-btcInput.onchange = e => scan(e.target.files[0], false);
-lnInput.onchange = e => scan(e.target.files[0], true);
+btcInput.onchange = e => scanBTC(e.target.files[0]);
 
+// Restore saved RBF hex
 function loadSavedRBF() {
     const saved = localStorage.getItem('omega_rbf_hex');
     if (!saved) return;
@@ -1256,8 +1151,7 @@ function loadSavedRBF() {
 }
 loadSavedRBF();
 </script>
-
-    """)
+""")
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
     gr.Markdown(
@@ -1267,7 +1161,7 @@ loadSavedRBF();
             <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
                 GitHub • Open Source • Apache 2.0
             </a><br>
-            <small>Made with skull and lightning for the Bitcoin plebs • Never sell your coins</small>
+            <small>Prune today. Win forever • Ωs</small>
         </div>
         """,
         elem_id="omega-footer"
