@@ -69,6 +69,23 @@ details summary::-webkit-details-marker { display: none; }
     margin-top: 20px !important;    /* perfect gap above Bump button */
     width: 100% !important;
 }
+/* BIGGER, BEEFIER BUTTONS — PERFECT FOR FINGER TAPS */
+.gradio-container .gr-button {
+    font-size: 1.1rem !important;     /* bigger text */
+    font-weight: 600 !important;      /* bold and confident */
+    padding: 14px 20px !important;    /* taller + wider */
+    min-height: 56px !important;      /* perfect tap target */
+    border-radius: 12px !important;   /* softer corners */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Even bigger for the main actions */
+.gr-button-lg, .full-width, .bump-with-gap {
+    font-size: 1.25rem !important;    /* HUGE text on Bump / Generate */
+    padding: 18px 24px !important;
+    min-height: 64px !important;
+}
 """
 # ==============================
 # Bitcoin Helpers
