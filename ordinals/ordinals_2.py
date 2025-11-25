@@ -817,6 +817,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 with gr.Blocks(
     title="Omega v10 — Infinite Edition",
+    css=css,
 ) as demo:
     gr.Markdown(
         """
@@ -1177,8 +1178,6 @@ with gr.Blocks(
       .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
     </style>
     """)
-
-    output_log = gr.HTML()   # ← change from gr.HTML() earlier to here, or keep it here
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
     gr.Markdown(
