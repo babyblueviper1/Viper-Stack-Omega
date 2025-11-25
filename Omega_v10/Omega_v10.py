@@ -54,16 +54,40 @@ details summary::-webkit-details-marker { display: none; }
 .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
 .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
 
-/* RBF Mobile Perfection */
-@media (max-width: 768px) {
-  .rbf-buttons-col { display: flex !important; flex-direction: column !important; gap: 8px !important; }
-  .copy-clear-group { display: flex !important; flex-direction: column !important; gap: 6px !important; }
-  .copy-btn, .clear-btn, .bump-button-mobile { width: 100% !important; margin: 0 !important; }
+/* === RBF SECTION == */
+.rbf-buttons-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
+
+.copy-clear-group {
+    display: flex;
+    gap: 8px;
+}
+
+/* Mobile: stack everything vertically, no gaps */
+@media (max-width: 768px) {
+    .copy-clear-group {
+        flex-direction: column;
+    }
+    .copy-clear-group > div {
+        width: 100% !important;
+    }
+    .bump-button {
+        width: 100% !important;
+        margin: 0 !important;
+    }
+}
+
+/* Desktop: Copy + Clear side-by-side */
 @media (min-width: 769px) {
-  .copy-clear-group { display: flex !important; flex-direction: row !important; gap: 10px !important; }
-  .copy-btn, .clear-btn { flex: 1 !important; }
-  .bump-button-mobile { margin-top: 16px !important; }
+    .copy-clear-group {
+        flex-direction: row;
+    }
+    .copy-clear-group > div {
+        flex: 1;
+    }
 }
 """
 # ==============================
@@ -845,6 +869,7 @@ with gr.Blocks(
     gr.Markdown("### Infinite RBF Bump Zone")
 
     with gr.Row():
+        # Left: the hex textbox
         with gr.Column(scale=8):
             rbf_in = gr.Textbox(
                 label="Raw hex (auto-saved from last tx)",
@@ -852,18 +877,18 @@ with gr.Blocks(
                 elem_classes="rbf-textbox"
             )
 
-        with gr.Column(scale=2, min_width=120):
-            # These two buttons stack vertically on mobile, stay side-by-side on desktop
-            with gr.Row() if gr.desktop else gr.Column():
+        # Right: buttons column
+        with gr.Column(scale=4, elem_classes="rbf-buttons-column"):
+            # Copy + Clear group
+            with gr.Group(elem_classes="copy-clear-group"):
                 gr.Button("Copy raw hex", size="sm").click(
                     None, None, None,
                     js="""
                     () => {
                         const t = document.querySelector('textarea[label*="Raw hex"]');
-                        if (t && t.value) {
-                            navigator.clipboard.writeText(t.value).then(() => {
-                                alert('Copied to clipboard!');
-                            });
+                        if(t && t.value){
+                            navigator.clipboard.writeText(t.value);
+                            alert("Copied!");
                         }
                     }
                     """
@@ -879,14 +904,13 @@ with gr.Blocks(
                     """
                 )
 
-            # THE BUMP BUTTON — now directly under Copy/Clear on mobile
+            # The big bump button
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
                 size="lg",
-                elem_classes="bump-button-mobile"
+                elem_classes="bump-button"
             )
-
     gr.Markdown("<small style='color:#888; text-align:center;'>Bump counter & info appears above</small>")
     
     # ==================================================================
