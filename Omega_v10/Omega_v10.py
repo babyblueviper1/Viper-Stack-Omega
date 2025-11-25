@@ -1056,25 +1056,26 @@ start_over_btn.click(
 )
 
 # INFINITE RBF — Gradio 6 JS sandbox fix (use single quotes, no escapes needed)
-rbf_btn.click(
-    fn=rbf_bump,
-    inputs=rbf_in,
-    outputs=[rbf_in, output_log]
-).then(
-    js="""  # ← Triple quotes now safe in 6.0 (no more sandbox stripping)
-    (hex) => {
-        if (hex && typeof hex === 'string') {
-            try {
-                localStorage.setItem('omega_rbf_hex', hex.trim());
-            } catch(e) {
-                console.warn('localStorage failed');
-            }
-        }
-    }
-    """,
-    inputs=rbf_in,
-    outputs=None
-)
+    rbf_btn.click(
+        fn=rbf_bump,
+        inputs=rbf_in,
+        outputs=[rbf_in, output_log]
+    ).then(
+        # ←←← THIS IS THE BULLETPROOF WAY IN GRADIO 6.0 ←←←
+        js=(
+            "(hex) => {\n"
+            "  if (hex && typeof hex === 'string') {\n"
+            "    try {\n"
+            "      localStorage.setItem('omega_rbf_hex', hex.trim());\n"
+            "    } catch(e) {\n"
+            "      console.warn('localStorage failed');\n"
+            "    }\n"
+            "  }\n"
+            "}"
+        ),
+        inputs=rbf_in,
+        outputs=None
+    )
 
 # Restore RBF hex — now with Gradio 6's faster DOM ready event
 gr.HTML(
