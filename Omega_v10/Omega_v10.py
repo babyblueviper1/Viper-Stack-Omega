@@ -728,22 +728,28 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
         elem_id="floating-qr-container"
     )
 
-    # ─────────────────────── OMEGA BACKGROUND + HEADER (Gradio 6 safe) ───────────────────────
-    # 1. GIANT OMEGA BACKGROUND — restored + fixed for Gradio 6.0
+    # GIANT BREATHING OMEGA — FIXED & RESTORED (Gradio 6.0 + Render 2025)
     gr.HTML(
-        "<div style='position:fixed;inset:0;z-index:-1;pointer-events:none;display:flex;"
-        "align-items:center;justify-content:center;overflow:hidden;background:transparent'>"
-        "<div style='font-size:90vh;font-weight:900;color:transparent;"
-        "background:linear-gradient(135deg,rgba(247,147,26,0.28),rgba(247,147,26,0.15));"
-        "-webkit-background-clip:text;background-clip:text;"
-        "text-shadow:0 0 220px rgba(247,147,26,0.72);"
-        "animation:breath 28s infinite ease-in-out;user-select:none'>Ω</div>"
-        "</div>"
         "<style>"
-        "@keyframes breath{0%,100%{opacity:.76;transform:scale(.95) rotate(0deg)}"
-        "50%{opacity:1;transform:scale(1.05) rotate(180deg)}}"
-        "</style>",
-        elem_id="omega-bg"
+        "body, .gradio-container { margin:0 !important; padding:0 !important; overflow-x:hidden !important; }"
+        "#mega-omega {"
+        "  position:fixed !important; inset:0 !important; z-index:-1 !important; pointer-events:none !important;"
+        "  display:flex !important; align-items:center !important; justify-content:center !important;"
+        "}"
+        "#mega-omega span {"
+        "  font-size:90vh !important; font-weight:900 !important; color:transparent !important;"
+        "  background:linear-gradient(135deg,rgba(247,147,26,0.28),rgba(247,147,26,0.15)) !important;"
+        "  -webkit-background-clip:text !important; background-clip:text !important;"
+        "  text-shadow:0 0 220px rgba(247,147,26,0.72) !important;"
+        "  animation:breath 28s infinite ease-in-out !important; user-select:none !important;"
+        "}"
+        "@keyframes breath {"
+        "  0%,100% {opacity:.76; transform:scale(.95) rotate(0deg)}"
+        "  50%     {opacity:1.0; transform:scale(1.05) rotate(180deg)}"
+        "}"
+        "</style>"
+        "<div id='mega-omega'><span>Ω</span></div>",
+        elem_id="mega-omega-container"
     )
 
     # 2. HEADER TEXT — now using gr.Markdown (no gray box, no shift)
