@@ -749,21 +749,7 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
     <div id="mega-omega"><span>Ω</span></div>
     """)
 
-    # ─────────────────────── HEADER ───────────────────────
-    gr.Markdown("""
-    <div style="text-align:center;margin:32px auto 40px;padding:12px;max-width:90%;pointer-events:none">
-        <h1 style="font-size:38px!important;font-weight:900!important;color:#f7931a!important;margin:0 0 12px 0!important;text-shadow:0 4px 12px rgba(247,147,26,0.4);line-height:1.2">
-            Omega Pruner v10.0 — Infinite Edition
-        </h1>
-        <p style="font-size:18px!important;color:#aaa!important;margin:8px 0!important;line-height:1.5">
-            Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh<br>
-            The last UTXO consolidator you'll ever need
-        </p>
-        <p style="font-size:15px!important;color:#f7931a!important;margin:16px 0 0 0!important">
-            Source: <a href="https://github.com/babyblueviper1/Viper-Stack-Omega" target="_blank" style="color:#f7931a;text-decoration:underline">GitHub</a> – Apache 2.0 • No logs
-        </p>
-    </div>
-    """)
+  
       
     # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
