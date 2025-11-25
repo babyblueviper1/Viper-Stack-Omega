@@ -1020,7 +1020,7 @@ with gr.Blocks(
     # Floating QR Scanners + Styles
      gr.HTML("""
     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <label class="qr-fab ln" title="Scan Lightning Invoice">&#9889;</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
 
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
@@ -1070,10 +1070,10 @@ with gr.Blocks(
     </script>
 
     <style>
-      .qr-fab{position:fixed!important;right:20px;width:70px;height:70px;border-radius:50%;box-shadow:0 10px 40px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;font-size:38px;cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);border:5px solid white;font-weight:bold;user-select:none;z-index:9999;text-shadow:0 2px 8px rgba(0,0,0,.5)}
-      .qr-fab:hover{transform:scale(1.18);box-shadow:0 16px 50px rgba(0,0,0,.8)}
-      .qr-fab.btc{bottom:100px;background:linear-gradient(135deg,#f7931a,#f9a43f);color:white}
-      .qr-fab.ln{bottom:20px;background:linear-gradient(135deg,#00ff9d,#33ffc7);color:#000;font-size:42px}
+      .qr_fab{position:fixed!important;right:20px;width:70px;height:70px;border_radius:50%;box_shadow:0_10px_40px_rgba(0,0,0,0.7);display:flex;align_items:center;justify_content:center;font_size:38px;cursor:pointer;transition:all_0.25s_cubic_bezier(0.4,0,0.2,1);border:5px_solid_white;font_weight:bold;user_select:none;z_index:9999;text_shadow:0_2px_8px_rgba(0,0,0,0.5)}
+      .qr_fab:hover{transform:scale(1.18);box_shadow:0_16px_50px_rgba(0,0,0,0.8)}
+      .qr_fab.btc{bottom:100px;background:linear_gradient(135deg,#f7931a,#f9a43f);color:white}
+      .qr_fab.ln{bottom:20px;background:linear_gradient(135deg,#00ff9d,#33ffc7);color:#000;font_size:42px}
     </style>
     """)
     
