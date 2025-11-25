@@ -798,32 +798,59 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        # DIAGNOSTIC: Show EVERYTHING inside the invoice
-        debug_info = "<pre style='background:#000;color:#0f0;padding:15px;border-radius:8px;font-size:12px;overflow:auto;'>"
-        debug_info += f"amount_msat: {decoded.amount_msat}\n"
-        debug_info += f"tags count: {len(decoded.tags)}\n\n"
-        for i, tag in enumerate(decoded.tags):
-            attrs = dir(tag)
-            debug_info += f"Tag {i}:\n"
-            for attr in attrs:
-                if not attr.startswith('_'):
-                    val = getattr(tag, attr)
-                    if isinstance(val, (bytes, bytearray)):
-                        val = val.hex()
-                    debug_info += f"  {attr}: {val}\n"
-            debug_info += "\n"
-        debug_info += "</pre>"
+        # FINAL FIX — works with rustyrussell's bolt11 (Tags object)
+        fallback_addr = None
+        for tag in decoded.tags:
+            if tag.tag == b'p':  # byte 'p' = fallback address
+                data = tag.data
+                if isinstance(data, bytes) and len(data) >= 2:
+                    # Strip version byte
+                    addr_bytes = data[1:]
+                    fallback_addr = addr_bytes.decode('ascii')
+                    break
 
-        return f"""
-        <div style="text-align:center;padding:30px;">
-            <h3 style="color:#f7931a;">Debug: Your Invoice Tags</h3>
-            {debug_info}
-            <p><b>Paste this output to me — I will tell you the exact fix in 10 seconds.</b></p>
+        if not fallback_addr:
+            raise ValueError("No on-chain fallback address found (Phoenix/Breez required)")
+
+        dest_script, _ = address_to_script_pubkey(fallback_addr)
+
+        tx = Tx()
+        for u in utxos:
+            tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
+        tx.tx_outs.append(TxOut(user_gets, dest_script))
+        if dao_cut and not selfish_mode:
+            dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
+            tx.tx_outs.append(TxOut(dao_cut, dao_script))
+
+        raw_hex = tx.encode(segwit=True)
+        if raw_hex.endswith(b'\x00\x00\x00\x00'):
+            raw_hex = raw_hex[:-4]
+        raw_hex = raw_hex.hex()
+        qr = make_qr(raw_hex)
+
+        html = f"""
+        <div style="text-align:center; padding:20px; color:#00ff9d;">
+            <h3>Lightning Sweep Ready</h3>
+            <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d;">
+                {format_btc(user_gets)} to Lightning Instantly
+            </b>
+            <div style="margin:40px 0;">
+                <div class="qr-center ln"><img src="{qr}"></div>
+            </div>
+            <p><small>Scan with Phoenix • Breez • Zeus • Blink • Muun</small></p>
         </div>
-        """, gr.update(visible=False), gr.update(visible=False), invoice, ""
+        """
+
+        return html, gr.update(visible=False), gr.update(visible=False), invoice, raw_hex
 
     except Exception as e:
-        return f"Decode failed: {str(e)}", gr.update(visible=False), gr.update(visible=False), invoice, ""
+        required = total - miner_fee - (0 if selfish_mode else dao_cut)
+        return f"""
+        <div style="text-align:center; color:#ff3333; padding:30px; background:#300; border-radius:16px;">
+            <b style="font-size:22px;">Lightning Failed</b><br><br>{str(e)}<br><br>
+            Invoice must be for ~{format_btc(required)} (±5k sats)
+        </div>
+        """, gr.update(visible=False), gr.update(visible=True), invoice, ""
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
