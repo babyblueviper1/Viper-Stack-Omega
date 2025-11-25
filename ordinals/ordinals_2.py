@@ -754,7 +754,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
         <div style="margin:40px 0;">
             <div class="qr-center">
-                <img src="{qr}" style="width:460px; max-width:96vw; border-radius:20px; border:6px solid #f7931a; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
+                <img src="{qr}">
             </div>
         </div>
 
@@ -1070,7 +1070,7 @@ with gr.Blocks(
                         localStorage.removeItem('omega_rbf_hex');
                         const box = document.querySelector('#rbf-hex-box textarea');
                         if (box) box.value = '';
-                        alert('Cleared & ready for new tx');
+                        showToast("Cleared & ready for new tx");
                     }
                     """
                 )
