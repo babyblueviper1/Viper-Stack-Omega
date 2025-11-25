@@ -852,17 +852,34 @@ with gr.Blocks(
                 elem_classes="rbf-textbox"
             )
 
-        with gr.Column(scale=4, elem_classes="rbf-buttons-col"):
-            with gr.Group(elem_classes="copy-clear-group"):
-                gr.Button("Copy raw hex", size="sm", elem_classes="copy-btn").click(
+        with gr.Column(scale=2, min_width=120):
+            # These two buttons stack vertically on mobile, stay side-by-side on desktop
+            with gr.Row() if gr.desktop else gr.Column():
+                gr.Button("Copy raw hex", size="sm").click(
                     None, None, None,
-                    js="""() => { ... }"""
+                    js="""
+                    () => {
+                        const t = document.querySelector('textarea[label*="Raw hex"]');
+                        if (t && t.value) {
+                            navigator.clipboard.writeText(t.value).then(() => {
+                                alert('Copied to clipboard!');
+                            });
+                        }
+                    }
+                    """
                 )
-                gr.Button("Clear saved", size="sm", elem_classes="clear-btn").click(
+                gr.Button("Clear saved", size="sm").click(
                     None, None, None,
-                    js="""() => { localStorage.removeItem('omega_rbf_hex'); alert('Cleared!'); location.reload(); }"""
+                    js="""
+                    () => {
+                        localStorage.removeItem('omega_rbf_hex');
+                        alert('Cleared!');
+                        location.reload();
+                    }
+                    """
                 )
 
+            # THE BUMP BUTTON — now directly under Copy/Clear on mobile
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
