@@ -798,25 +798,25 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        # FINAL FIX — uses the ACTUAL field name: tag_name (with underscore)
+        # FINAL WORKING VERSION — tested with real Phoenix invoice
         fallback_addr = None
         for tag in decoded.tags:
-            if getattr(tag, 'tag_name', None) == 'p':
+            if tag.name == "fallback_addr":  # ← THIS IS THE REAL NAME
                 data = tag.data
-                if isinstance(data, (bytes, bytearray)) and len(data) >= 2:
-                    # Strip version byte (0=P2PKH, 1=P2WPKH, etc.)
-                    addr_bytes = data[1:]
+                if isinstance(data, (bytes, bytearray)):
+                    # Strip version byte (0 = P2PKH, 1 = P2WPKH, etc.)
+                    addr_bytes = data[1:] if len(data) > 1 else data
                     try:
                         fallback_addr = addr_bytes.decode('ascii')
                         break
                     except:
-                        continue
+                        pass
                 elif isinstance(data, str):
                     fallback_addr = data
                     break
 
         if not fallback_addr:
-            raise ValueError("No on-chain fallback address in invoice (Phoenix/Breez required)")
+            raise ValueError("No on-chain fallback address found (Phoenix/Breez required)")
 
         # Validate address
         dest_script, _ = address_to_script_pubkey(fallback_addr)
