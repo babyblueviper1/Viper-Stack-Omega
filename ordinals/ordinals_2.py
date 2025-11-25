@@ -80,22 +80,38 @@ details summary::-webkit-details-marker { display: none; }
     width: 100% !important;                 /* Full-width fallback */
 }
 
-/* EXTRA THICC FOR PRIMARY / LARGE BUTTONS (Bump, Generate, etc.) */
-.gr-button[variant="primary"] button,
-.gr-button-lg button,
-.full-width button,
-.bump-with-gap button {
-    font-size: 1.25rem !important;          /* HUGE, readable text */
-    padding: 18px 24px !important;          /* Even more padding */
-    min-height: 64px !important;            /* Towering tap zones */
-    box-shadow: 0 6px 16px rgba(247,147,26,0.3) !important;  /* Orange glow */
+.gr-button,
+.gr-button > div,
+.gr-button button,
+.gr-button [class*="svelte"] {
+    font-size: 1.18rem !important;          /* perfect readable size */
+    font-weight: 600 !important;
+    padding: 16px 24px !important;          /* fat padding */
+    min-height: 60px !important;            /* big tap target */
+    border-radius: 14px !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
+    transition: all 0.22s ease !important;
+    line-height: 1.4 !important;
 }
 
-/* Hover magic — makes them feel alive */
-.gr-button button:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2) !important;
-    opacity: 0.95 !important;
+/* PRIMARY BUTTONS (Bump, Generate, Analyze) — EVEN THICCCER */
+.gr-button[variant="primary"],
+.gr-button[variant="primary"] button,
+.gr-button-lg,
+.full-width,
+.bump-with-gap {
+    font-size: 1.35rem !important;          /* HUGE & BOLD */
+    padding: 20px 28px !important;
+    min-height: 68px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 6px 18px rgba(247,147,26,0.35) !important;
+}
+
+/* HOVER EFFECT — makes them pop */
+.gr-button:hover button,
+.gr-button:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.2) !important;
 }
 """
 # ==============================
