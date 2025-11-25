@@ -89,11 +89,6 @@ details summary::-webkit-details-marker { display: none; }
         flex: 1;
     }
 }
-.gradio-container {
-    background: transparent !important;
-    overflow-y: auto !important;
-}
-body { overflow-y: auto !important; }
 """
 # ==============================
 # Bitcoin Helpers
