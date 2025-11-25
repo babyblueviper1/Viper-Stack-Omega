@@ -120,6 +120,22 @@ textarea:focus-within ~ #omega-bg-container-fixed {
     opacity: 0.22 !important;
     transition: opacity 0.5s ease !important;
 }
+/* ——— KEEP GRADIO'S NATIVE BOTTOM BUTTONS SKINNY & NORMAL ——— */
+.gradio-container .bottom-buttons .gr-button,
+.gradio-container footer .gr-button,
+.gradio-container button[data-testid="block-settings"],
+.gradio-container button[title="Show API"],
+.gradio-container button[title="View API"],
+.gradio-container button[title="Clear"],
+.gradio-container button[title="Stop"] {
+    all: revert !important;
+    font-size: 0.9rem !important;
+    padding: 8px 14px !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+}
 
 /* ——— QR CENTERING & STYLING ——— */
 .qr-center {
