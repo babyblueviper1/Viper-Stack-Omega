@@ -933,6 +933,7 @@ with gr.Blocks(
                 label="Address or xpub",
                 placeholder="bc1q… or xpub…",
                 lines=2
+                autofocus=True
             )
         with gr.Column(scale=3):
             prune_choice = gr.Dropdown(
