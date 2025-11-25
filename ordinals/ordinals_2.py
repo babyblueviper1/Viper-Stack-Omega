@@ -120,6 +120,18 @@ button[class*="svelte"] {
     min-height: 60px !important;
     box-shadow: 0 3px 10px rgba(0,0,0,0.1) !important;  /* Subtle secondary shadow */
 }
+/* TAME THE GAP BETWEEN FULL-WIDTH BUTTON ROWS — keep some space, not a canyon */
+.gr-row + .gr-row .full-width,
+.gr-row + .gr-row .bump-with-gap,
+.gr-row + .gr-row .tall-button {
+    margin-top: 20px !important;   /* ← perfect 20px gap instead of 60+px */
+}
+
+/* Optional: make the very first full-width button have normal top margin */
+.full-width:first-child,
+.bump-with-gap:first-child {
+    margin-top: 32px !important;   /* nice breathing room from content above */
+}
 
 /* HOVER — FOR ALL */
 .gr-button:hover,
