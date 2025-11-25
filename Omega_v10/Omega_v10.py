@@ -981,22 +981,10 @@ with gr.Blocks(
                 """
             )
 
-            # Clear button — standalone, with margin
-            clear_btn = gr.Button(
-                "Clear saved",
-                size="sm",
-                elem_classes="rbf-clear-btn"
-            ).click(
+            clear_btn = gr.Button("Clear saved", size="sm", elem_classes="rbf-clear-btn").click(
                 None, None, None,
-                js="""
-                () => {
-                    localStorage.removeItem('omega_rbf_hex');
-                    alert('Cleared!');
-                    location.reload();
-                }
-                """
+                js="()=>{localStorage.removeItem('omega_rbf_hex');alert('Cleared!');location.reload()}"
             )
-
             # Bump button — full width, big gap above
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
