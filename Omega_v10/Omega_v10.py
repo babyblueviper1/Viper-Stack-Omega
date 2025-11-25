@@ -899,7 +899,7 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
 # EVENTS — Gradio 6.0.0 Compatible (Render-Proof, Nov 2025)
 # ==================================================================
 
-submit_btn.click(
+    submit_btn.click(
         fn=analysis_pass,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
         outputs=[output_log, generate_btn]
