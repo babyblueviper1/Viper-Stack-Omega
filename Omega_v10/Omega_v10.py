@@ -63,33 +63,37 @@ details summary::-webkit-details-marker { display: none; }
 
 .copy-clear-group {
     display: flex !important;
-    flex-direction: column !important;   /* mobile: stacked */
-    gap: 14px !important;                /* ← THIS IS THE KEY: adds breathing room */
+    flex-direction: column !important;     /* mobile: stacked */
+    gap: 16px !important;                   /* ← THIS IS THE NUCLEAR GAP */
     width: 100% !important;
-    margin-bottom: 8px !important;
+    margin: 0 0 16px 0 !important;
+    padding: 0 !important;
 }
 
 .copy-clear-group > div {
     width: 100% !important;
     margin: 0 !important;
+    padding: 0 !important;
 }
 
-/* Desktop: side-by-side with proper horizontal gap */
+/* Desktop: side-by-side with big gap */
 @media (min-width: 769px) {
     .copy-clear-group {
         flex-direction: row !important;
-        gap: 18px !important;            /* ← generous space on desktop */
-        margin-bottom: 12px !important;
+        gap: 24px !important;               /* ← huge, beautiful gap on desktop */
+        margin-bottom: 20px !important;
     }
     .copy-clear-group > div {
         flex: 1 !important;
     }
 }
 
-/* Optional: make the buttons look crisp */
+/* Force buttons to have their own background and padding */
 .copy-clear-group button {
+    width: 100% !important;
     margin: 0 !important;
-    padding: 10px 16px !important;
+    padding: 12px 16px !important;
+    box-sizing: border-box !important;
 }
 qr-center { 
     display: flex !important; 
@@ -1008,7 +1012,7 @@ with gr.Blocks(
     gr.HTML("""
     <!-- Floating QR Scanner Buttons -->
     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">&#9889;</label>
 
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
