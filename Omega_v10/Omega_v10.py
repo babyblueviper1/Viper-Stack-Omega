@@ -91,12 +91,9 @@ details summary::-webkit-details-marker { display: none; }
 }
 .gradio-container {
     background: transparent !important;
-    min-height: 100vh !important;
     overflow-y: auto !important;
-    position: relative !important;
 }
-body { overflow-y: auto !important; background: transparent !important; }
-#omega-bg { z-index: -1 !important; }
+body { overflow-y: auto !important; }
 """
 # ==============================
 # Bitcoin Helpers
@@ -695,80 +692,41 @@ with gr.Blocks(
     title="Omega v10 — Infinite Edition",
 ) as demo:
     gr.HTML(f"""
-    <style>
-    {css}
-    </style>
-
-    <div id="omega-master-container">
-      <div class="omega-orbit">
-        <div class="omega-core">Ω</div>
-      </div>
+ <div style="
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important; height: 100vh !important;
+        pointer-events: none !important;
+        z-index: -1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
+    ">
+        <span style="
+            font-size: 100vh !important;        /* our final agreed size */
+            font-weight: 900 !important;
+            background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;  /* our final color */
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            background-clip: text !important;
+            color: transparent !important;
+            text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;  /* our final glow */
+            animation: spin 44s linear infinite, breathe 28s ease-in-out infinite !important;
+            user-select: none !important;
+            line-height: 1 !important;
+        ">Ω</span>
     </div>
 
     <style>
-      /* Full-screen black + orange Bitcoin vibe */
-      body, .gradio-container {{
-        background: #000 !important;
-        overflow: hidden;
-      }}
-      
-      #omega-master-container {{
-        position: fixed !important;
-        inset: 0;
-        pointer-events: none;
-        z-index: -1;
-      }}
-      
-      .omega-orbit {{
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 600px;
-        height: 600px;
-        margin: -300px 0 0 -300px;
-        animation: slow-spin 44s linear infinite;
-      }}
-      
-      .omega-core {{
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        font-size: 240px;
-        font-weight: bold;
-        transform: translate(-50%, -50%);
-        color: #f7931a;
-        text-shadow: 
-          0 0 40px #f7931a,
-          0 0 80px #f7931a,
-          0 0 120px #ff9d33,
-          0 0 180px #ffaa44;
-        animation: 
-          omega-breath 8s ease-in-out infinite,
-          gentle-float 16s ease-in-out infinite;
-      }}
-      
-      @keyframes omega-breath {{
-        0%, 100% {{ opacity: 0.6; transform: translate(-50%, -50%) scale(0.95); }}
-        50%      {{ opacity: 1.0; transform: translate(-50%, -50%) scale(1.05); }}
-      }}
-      
-      @keyframes gentle-float {{
-        0%, 100% {{ transform: translate(-50%, -50%) translateY(0); }}
-        50%      {{ transform: translate(-50%, -50%) translateY(-30px); }}
-      }}
-      
-      @keyframes slow-spin {{
-        from {{ transform: rotate(0deg); }}
-        to   {{ transform: rotate(360deg); }}
-      }}
-      
-      /* Mobile scaling */
-      @media (max-width: 768px) {{
-        .omega-orbit {{ width: 400px; height: 400px; margin: -200px 0 0 -200px; }}
-        .omega-core {{ font-size: 160px; }}
-      }}
+    @keyframes spin   { from { transform: rotate(0deg);   } to   { transform: rotate(360deg); } }
+    @keyframes breathe {
+        0%, 100% { opacity: 0.76; transform: scale(0.95); }
+        50%      { opacity: 1.0;  transform: scale(1.05); }
+    }
     </style>
     """)
+      
     # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
         with gr.Column(scale=4):
