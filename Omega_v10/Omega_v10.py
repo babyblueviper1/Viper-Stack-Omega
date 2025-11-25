@@ -917,7 +917,7 @@ with gr.Blocks() as demo:
         fn=rbf_bump,
         inputs=rbf_in,
         outputs=[rbf_in, output_log],
-        _js="""
+        js="""
         (hex) => {
             if (hex && typeof hex === 'string') {
                 try { localStorage.setItem('omega_rbf_hex', hex.trim()); }
