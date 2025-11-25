@@ -69,6 +69,79 @@ details summary::-webkit-details-marker { display: none; }
     margin-top: 20px !important;    /* perfect gap above Bump button */
     width: 100% !important;
 }
+.gr-button button {
+    font-size: 1.1rem !important;          /* Bigger text for all buttons */
+    font-weight: 600 !important;            /* Bold & punchy */
+    padding: 14px 20px !important;          /* Taller + wider padding */
+    min-height: 56px !important;            /* Perfect mobile tap target */
+    border-radius: 12px !important;         /* Softer, modern corners */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;  /* Subtle lift */
+    transition: all 0.2s ease !important;   /* Smooth hovers */
+    width: 100% !important;                 /* Full-width fallback */
+}
+
+/* GRADIO 6.0.0 BEEFY BUTTONS — HITS EVERY LAYER, NO CONFLICTS */
+.gr-button,
+.gr-button > div,
+.gr-button > button,
+.gr-button [class*="svelte"],
+button[class*="svelte"] {
+    font-size: 1.2rem !important;           /* Bigger text — unified for ALL */
+    font-weight: 600 !important;            /* Bold everywhere */
+    padding: 16px 24px !important;          /* Fat padding — overrides defaults */
+    min-height: 60px !important;            /* Big tap targets */
+    border-radius: 12px !important;         /* Curves */
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;  /* Lift */
+    transition: all 0.2s ease !important;   /* Smooth */
+    line-height: 1.4 !important;            /* Fit */
+    width: 100% !important;                 /* Full fallback */
+}
+
+/* THICCER PRIMARIES + CUSTOM CLASSES (Analyze secondary gets base; primaries get extra) */
+.gr-button[variant="primary"],
+.gr-button[variant="primary"] > div,
+.gr-button[variant="primary"] > button,
+.gr-button.size-lg,
+.full-width,
+.bump-with-gap,
+.tall-button {
+    font-size: 1.35rem !important;          /* HUGE for Bump/Generate/Lightning/Start Over */
+    padding: 20px 28px !important;          /* Extra fat */
+    min-height: 68px !important;            /* Towering */
+    font-weight: 700 !important;            /* Super bold */
+    box-shadow: 0 6px 18px rgba(247,147,26,0.35) !important;  /* Orange glow */
+}
+
+/* SECONDARY BUTTONS LIKE ANALYZE — BOOST TO MATCH (no variant="primary") */
+.gr-button[variant="secondary"] button,
+.gr-button[variant="secondary"] > button {
+    font-size: 1.2rem !important;           /* Bigger than default, but not HUGE */
+    padding: 16px 24px !important;
+    min-height: 60px !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1) !important;  /* Subtle secondary shadow */
+}
+
+/* HOVER — FOR ALL */
+.gr-button:hover,
+.gr-button:hover > button,
+.gr-button [class*="svelte"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2) !important;
+    opacity: 0.95 !important;
+}
+
+/* ANTI-CACHE FORCE (Gradio 6 JS re-styling killer) */
+.gr-button button {
+    animation: beefify 0.15s forwards !important;
+}
+@keyframes beefify {
+    from { transform: scale(1); opacity: 1; }
+    to { 
+        font-size: inherit !important; 
+        padding: inherit !important; 
+        min-height: inherit !important; 
+    }
+}
 """
 # ==============================
 # Bitcoin Helpers
@@ -772,7 +845,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Omega v10 — Infinite Edition",
+    title="Omega v10 — Infinite Edition"
 ) as demo:
     gr.Markdown(
         """
@@ -1134,8 +1207,6 @@ with gr.Blocks(
     </style>
     """)
 
-    output_log = gr.HTML()   # ← change from gr.HTML() earlier to here, or keep it here
-
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
     gr.Markdown(
         """
@@ -1167,4 +1238,5 @@ if __name__ == "__main__":
         quiet=True,
         allowed_paths=["./"],
         ssl_verify=False,
+        css=css
     )
