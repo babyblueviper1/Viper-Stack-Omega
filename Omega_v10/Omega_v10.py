@@ -814,7 +814,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        if not getattr(decoded.payment_address):
+        if not decoded.fallback_address:
             raise ValueError("Invoice must support on-chain fallback (payment_address)")
 
         dest_script, _ = address_to_script_pubkey(decoded.payment_address)
