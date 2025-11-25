@@ -900,66 +900,60 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
 # ==================================================================
 
 submit_btn.click(
-    fn=analysis_pass,  # ← Explicit fn= (required in 6.0 for stability)
-    inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-    outputs=[output_log, generate_btn]
-)
+        fn=analysis_pass,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        outputs=[output_log, generate_btn]
+    )
 
-generate_btn.click(
-    fn=build_real_tx,
-    inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-    outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]
-)
+    generate_btn.click(
+        fn=build_real_tx,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]
+    )
 
-# Fixed change() — explicit fn/inputs/outputs (Gradio 6 requirement)
-ln_invoice.change(
-    fn=lambda x: x,
-    inputs=ln_invoice,
-    outputs=ln_invoice_state
-)
+    ln_invoice.change(
+        fn=lambda x: x,
+        inputs=ln_invoice,
+        outputs=ln_invoice_state
+    )
 
-submit_ln_btn.click(
-    fn=build_real_tx,
-    inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-    outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
-)
+    submit_ln_btn.click(
+        fn=build_real_tx,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
+    )
 
-# Fixed submit() — same explicit params as above
-ln_invoice.submit(
-    fn=build_real_tx,
-    inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-    outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
-)
+    ln_invoice.submit(
+        fn=build_real_tx,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
+        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
+    )
 
-start_over_btn.click(
-    fn=lambda: (
-        "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
-        "", gr.update(visible=False), gr.update(visible=False),
-        "", "", ""
-    ),
-    outputs=[
-        user_input, prune_choice, dust_threshold, dest_addr,
-        selfish_mode, dao_percent, dao_addr,
-        output_log, generate_btn, ln_invoice_row,
-        ln_invoice, ln_invoice_state, rbf_in
-    ]
-)
+    start_over_btn.click(
+        fn=lambda: (
+            "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
+            "", gr.update(visible=False), gr.update(visible=False),
+            "", "", ""
+        ),
+        outputs=[
+            user_input, prune_choice, dust_threshold, dest_addr,
+            selfish_mode, dao_percent, dao_addr,
+            output_log, generate_btn, ln_invoice_row,
+            ln_invoice, ln_invoice_state, rbf_in
+        ]
+    )
 
-# INFINITE RBF — Gradio 6 JS sandbox fix (use single quotes, no escapes needed)
+    # INFINITE RBF — 100% bulletproof on Gradio 6. perfect indentation
     rbf_btn.click(
         fn=rbf_bump,
         inputs=rbf_in,
         outputs=[rbf_in, output_log]
     ).then(
-        # ←←← THIS IS THE BULLETPROOF WAY IN GRADIO 6.0 ←←←
         js=(
             "(hex) => {\n"
             "  if (hex && typeof hex === 'string') {\n"
-            "    try {\n"
-            "      localStorage.setItem('omega_rbf_hex', hex.trim());\n"
-            "    } catch(e) {\n"
-            "      console.warn('localStorage failed');\n"
-            "    }\n"
+            "    try { localStorage.setItem('omega_rbf_hex', hex.trim()); }\n"
+            "    catch(e) { console.warn('localStorage failed'); }\n"
             "  }\n"
             "}"
         ),
@@ -967,42 +961,29 @@ start_over_btn.click(
         outputs=None
     )
 
-# Restore RBF hex — now with Gradio 6's faster DOM ready event
-gr.HTML(
-    "<script>"
-    "window.addEventListener('load', () => {  // 'load' instead of 'DOMContentLoaded' for 6.0 speed"
-    "  const saved = localStorage.getItem('omega_rbf_hex');"
-    "  if (!saved) return;"
-    "  const selectors = ["
-    "    'textarea[label*=\"Raw hex\"]',"
-    "    'textarea[label*=\"raw hex\"]',"
-    "    'textarea[placeholder*=\"raw hex\"]',"
-    "    'textarea:last-of-type'"
-    "  ];"
-    "  let box = null;"
-    "  for (const sel of selectors) {"
-    "    box = document.querySelector(sel);"
-    "    if (box) break;"
-    "  }"
-    "  if (box) {"
-    "    box.value = saved.trim();"
-    "    box.dispatchEvent(new Event('input', {bubbles: true}));"
-    "    box.dispatchEvent(new Event('change', {bubbles: true}));"
-    "  }"
-    "});"
-    "</script>"
-)
-    
+    # Restore saved RBF hex on load — perfect indentation, no triple quotes
+    gr.HTML(
+        "<script>"
+        "window.addEventListener('load', () => {"
+        "  const saved = localStorage.getItem('omega_rbf_hex');"
+        "  if (!saved) return;"
+        "  const box = document.querySelector('textarea[label*=\"Raw hex\"]') ||"
+        "              document.querySelector('textarea:last-of-type');"
+        "  if (box) {"
+        "    box.value = saved.trim();"
+        "    box.dispatchEvent(new Event('input', {bubbles: true}));"
+        "    box.dispatchEvent(new Event('change', {bubbles: true}));"
+        "  }"
+        "});"
+        "</script>"
+    )
+
 if __name__ == "__main__":
     import os
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    # Old way → breaks on Gradio 5.x (Render uses 5.8+ now)
-    # demo.queue(default_concurrency_limit=None, max_size=40)
-
-    # New correct way (2025 Gradio)
-    demo.queue(max_size=40)          # ← this is all you need
+    demo.queue(max_size=40)
 
     demo.launch(
         server_name="0.0.0.0",
@@ -1010,9 +991,5 @@ if __name__ == "__main__":
         share=True,
         show_error=True,
         allowed_paths=["./"],
-        ssl_verify=False,
-        # You can keep these, they still work:
-        # debug=False,
-        # quiet=True,
-        # max_threads=40,
+        ssl_verify=False
     )
