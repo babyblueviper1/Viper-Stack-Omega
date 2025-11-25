@@ -1078,13 +1078,13 @@ with gr.Blocks(
     submit_btn.click(
         analysis_pass,
         [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-        [output_log, generate_btn]
+        [output_log, generate_btn,generate_row]
     )
 
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]
+        outputs=[output_log, generate_btn, generate_row, ln_invoice_row, ln_invoice_state, rbf_in]
     )
 
     ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
