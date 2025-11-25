@@ -788,7 +788,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 # ==============================
 def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detected="SegWit"):
     if not bolt11_decode:
-        return "bolt11 library missing — Lightning disabled", gr.update(visible=False), gr.update(visible=False), "", ""
+        return "bolt11 missing", gr.update(visible=False), gr.update(visible=False), "", ""
 
     try:
         decoded = bolt11_decode(invoice)
@@ -798,19 +798,56 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        # FINAL FIX — works with rustyrussell's bolt11 (Tags object)
+        # NUCLEAR FALLBACK EXTRACTOR — works with ANY bolt11 library
         fallback_addr = None
-        for tag in decoded.tags:
-            if tag.tag == b'p':  # byte 'p' = fallback address
-                data = tag.data
-                if isinstance(data, bytes) and len(data) >= 2:
-                    # Strip version byte
-                    addr_bytes = data[1:]
-                    fallback_addr = addr_bytes.decode('ascii')
+        tags = decoded.tags
+
+        # Some versions: list of objects, some: custom Tags object → convert to list
+        if not isinstance(tags, (list, tuple)):
+            try:
+                tags = list(tags)  # This works for rustyrussell's Tags object
+            except:
+                tags = []
+
+        for tag in tags:
+            # Try every possible way to get the tag identifier and data
+            tag_id = None
+            tag_data = None
+
+            # Method 1: .tag (bytes)
+            if hasattr(tag, 'tag'):
+                tag_id = tag.tag
+                tag_data = getattr(tag, 'data', None)
+
+            # Method 2: .name or .tag_name
+            elif hasattr(tag, 'name'):
+                tag_id = getattr(tag, 'name', None)
+                tag_data = getattr(tag, 'data', None)
+            elif hasattr(tag, 'tag_name'):
+                tag_id = tag.tag_name
+                tag_data = getattr(tag, 'data', None)
+
+            # Convert tag_id to comparable form
+            if isinstance(tag_id, (bytes, bytearray)):
+                tag_id_str = tag_id.decode('ascii', errors='ignore')
+            elif isinstance(tag_id, int):
+                tag_id_str = chr(tag_id) if 0 <= tag_id <= 255 else None
+            else:
+                tag_id_str = str(tag_id)
+
+            # Check if this is the fallback tag ('p')
+            if tag_id_str == 'p' and tag_data:
+                if isinstance(tag_data, (bytes, bytearray)) and len(tag_data) >= 2:
+                    addr = tag_data[1:].decode('ascii', errors='ignore')
+                    if addr.startswith(('1', '3', 'bc1')):
+                        fallback_addr = addr
+                        break
+                elif isinstance(tag_data, str) and tag_data.startswith(('1', '3', 'bc1')):
+                    fallback_addr = tag_data
                     break
 
         if not fallback_addr:
-            raise ValueError("No on-chain fallback address found (Phoenix/Breez required)")
+            raise ValueError("No on-chain fallback found — use Phoenix/Breez with fallback enabled")
 
         dest_script, _ = address_to_script_pubkey(fallback_addr)
 
@@ -848,7 +885,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         return f"""
         <div style="text-align:center; color:#ff3333; padding:30px; background:#300; border-radius:16px;">
             <b style="font-size:22px;">Lightning Failed</b><br><br>{str(e)}<br><br>
-            Invoice must be for ~{format_btc(required)} (±5k sats)
+            Need ~{format_btc(required)} (±5k sats)
         </div>
         """, gr.update(visible=False), gr.update(visible=True), invoice, ""
 # ==============================
