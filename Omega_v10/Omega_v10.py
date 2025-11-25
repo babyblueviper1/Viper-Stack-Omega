@@ -1032,7 +1032,7 @@ with gr.Blocks(
         lambda: (
             "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
             "", gr.update(visible=False), gr.update(visible=False), "", ""
-        ),
+        )
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
             selfish_mode, dao_percent, dao_addr,
