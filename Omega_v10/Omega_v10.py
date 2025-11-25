@@ -1050,34 +1050,60 @@ with gr.Blocks(
     rbf_btn.click(
         fn=rbf_bump,
         inputs=rbf_in,
-        outputs=[rbf_in, output_log],
+        outputs=[rbf_in, output_log]
+    ).then(
+        # This runs AFTER Python returns the new bumped hex → 100% reliable
         js="""
-        (hex) => {
+        hex => {
             if (hex && typeof hex === 'string') {
-                try { localStorage.setItem('omega_rbf_hex', hex.trim()); }
-                catch(e) { console.warn('localStorage full'); }
+                try {
+                    localStorage.setItem('omega_rbf_hex', hex.trim());
+                } catch(e) {
+                    console.warn('localStorage failed');
+                }
             }
         }
-        """
+        """,
+        inputs=rbf_in,   # contains the freshly bumped hex
+        outputs=None
     )
+    gr.HTML("""
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const saved = localStorage.getItem('omega_rbf_hex');
+        if (saved) {
+            const box = document.querySelector('textarea[label*="Raw hex"]') || 
+                        document.querySelector('textarea[data-testid*="textbox"]');
+            if (box) {
+                box.value = saved;
+                box.dispatchEvent(new Event('input'));
+            }
+        }
+    });
+    </script>
+    """)
 
     
 if __name__ == "__main__":
     import os
     import warnings
-
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    demo.queue(default_concurrency_limit=None, max_size=40)
+    # Old way → breaks on Gradio 5.x (Render uses 5.8+ now)
+    # demo.queue(default_concurrency_limit=None, max_size=40)
+
+    # New correct way (2025 Gradio)
+    demo.queue(max_size=40)          # ← this is all you need
 
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=True,
-        debug=False,
-        max_threads=40,
         show_error=True,
-        quiet=True,
         allowed_paths=["./"],
         ssl_verify=False,
+        # You can keep these, they still work:
+        # debug=False,
+        # quiet=True,
+        # max_threads=40,
     )
