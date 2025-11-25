@@ -964,15 +964,15 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
         "</script>"
     )
 
-if __name__ == "__main__":
+f __name__ == "__main__":
     import os
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    # GRADIO 6.0.0 ON RENDER.COM — CORRECT PARAMETERS (Nov 2025)
+    # GRADIO 6.0.0 ON RENDER.COM — MINIMAL & WORKING (Nov 2025)
     demo.queue(
-        default_concurrency_limit=40,   # ← FIXED: This is the right name
-        max_size=100
+        default_concurrency_limit=40,   # Handles 40 parallel events
+        max_size=100                    # Max queued requests
     )
 
     demo.launch(
@@ -982,6 +982,5 @@ if __name__ == "__main__":
         show_error=True,
         allowed_paths=["./"],
         ssl_verify=False,
-        enable_queue=True,              # Forces queue mode
-        favicon_path=None,              # Optional but safe
+        max_threads=40                  # Max total threads (safe default)
     )
