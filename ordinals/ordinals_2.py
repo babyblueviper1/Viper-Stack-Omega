@@ -132,6 +132,15 @@ button[class*="svelte"] {
 .bump-with-gap:first-child {
     margin-top: 32px !important;   /* nice breathing room from content above */
 }
+.gr-row + .gr-row {
+    margin-top: -24px !important;   /* pulls the next row up */
+    padding-top: 0 !important;
+}
+
+/* then give the actual button a clean controlled gap */
+.gr-row + .gr-row .gr-button {
+    margin-top: 20px !important;    /* this is your perfect ~20px breathing room */
+}
 
 /* HOVER — FOR ALL */
 .gr-button:hover,
