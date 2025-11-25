@@ -973,8 +973,6 @@ if __name__ == "__main__":
     # demo.queue(default_concurrency_limit=None, max_size=40)
 
     # New correct way (2025 Gradio)
-    demo.queue(max_size=40)          # ← this is all you need
-
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
@@ -982,6 +980,8 @@ if __name__ == "__main__":
         show_error=True,
         allowed_paths=["./"],
         ssl_verify=False,
+        enable_queue=True,
+        max_queue_size=40,
         # You can keep these, they still work:
         # debug=False,
         # quiet=True,
