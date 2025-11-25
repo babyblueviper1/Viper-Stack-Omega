@@ -967,19 +967,23 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
 if __name__ == "__main__":
     import os
     import warnings
-
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    demo.queue(default_concurrency_limit=None, max_size=40)
+    # Old way → breaks on Gradio 5.x (Render uses 5.8+ now)
+    # demo.queue(default_concurrency_limit=None, max_size=40)
+
+    # New correct way (2025 Gradio)
+    demo.queue(max_size=40)          # ← this is all you need
 
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=True,
-        debug=False,
-        max_threads=40,
         show_error=True,
-        quiet=True,
         allowed_paths=["./"],
         ssl_verify=False,
+        # You can keep these, they still work:
+        # debug=False,
+        # quiet=True,
+        # max_threads=40,
     )
