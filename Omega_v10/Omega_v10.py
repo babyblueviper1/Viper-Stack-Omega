@@ -969,11 +969,11 @@ if __name__ == "__main__":
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    # Old way → breaks on Gradio 5.x (Render uses 5.8+ now)
-    # demo.queue(default_concurrency_limit=None, max_size=40)
-
-    # New correct way (2025 Gradio)
-    demo.queue(max_size=40)          # ← this is all you need
+    # GRADIO 6.0+ ON RENDER.COM — THE ONLY WAY THAT WORKS (Nov 2025)
+    demo.queue(
+        concurrency_limit=40,   # or just 40, or "default"
+        max_size=100
+    )
 
     demo.launch(
         server_name="0.0.0.0",
@@ -982,8 +982,7 @@ if __name__ == "__main__":
         show_error=True,
         allowed_paths=["./"],
         ssl_verify=False,
-        # You can keep these, they still work:
-        # debug=False,
-        # quiet=True,
-        # max_threads=40,
+        # These two lines are critical for Gradio 6 on Render:
+        enable_queue=True,        # ← forces queue even if you forget .queue()
+        favicon_path=None,
     )
