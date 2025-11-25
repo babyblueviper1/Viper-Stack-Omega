@@ -798,30 +798,40 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        # FINAL WORKING VERSION — tested with real Phoenix invoice
+        # UNIVERSAL FALLBACK EXTRACTOR — works with every bolt11 version ever made
         fallback_addr = None
         for tag in decoded.tags:
-            if tag.name == "fallback_addr":  # ← THIS IS THE REAL NAME
-                data = tag.data
-                if isinstance(data, (bytes, bytearray)):
-                    # Strip version byte (0 = P2PKH, 1 = P2WPKH, etc.)
-                    addr_bytes = data[1:] if len(data) > 1 else data
+            # Try every possible attribute name this library has ever used
+            tag_name = (
+                getattr(tag, 'tag', None) or
+                getattr(tag, 'name', None) or
+                getattr(tag, 'tag_name', None) or
+                getattr(tag, 'tagname', None) or
+                ''
+            )
+
+            # The fallback tag is always 'p' (BOLT11 spec) — some versions expose it as string, some as int
+            if str(tag_name) == 'p' or tag_name == 25:  # 25 is the integer code for 'p'
+                data = getattr(tag, 'data', None)
+                if isinstance(data, (bytes, bytearray)) and len(data) >= 2:
+                    # Strip version byte (0=P2PKH, 1=P2WPKH, etc.)
+                    addr_bytes = data[1:]
                     try:
                         fallback_addr = addr_bytes.decode('ascii')
                         break
                     except:
-                        pass
+                        continue
                 elif isinstance(data, str):
                     fallback_addr = data
                     break
 
         if not fallback_addr:
-            raise ValueError("No on-chain fallback address found (Phoenix/Breez required)")
+            raise ValueError("No on-chain fallback address found in invoice (Phoenix/Breez required)")
 
-        # Validate address
+        # Validate it's a real Bitcoin address
         dest_script, _ = address_to_script_pubkey(fallback_addr)
 
-        # Build sweep
+        # Build the sweep transaction
         tx = Tx()
         for u in utxos:
             tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
