@@ -949,9 +949,7 @@ with gr.Blocks(
                 variant="primary",
                 size="lg",
                 elem_classes="bump-button"
-            )
-    gr.Markdown("<small style='color:#888; text-align:center;'>Bump counter & info appears above</small>")
-    
+            )    
     # ==================================================================
     # Events
     # ==================================================================
