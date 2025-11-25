@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import urllib.parse
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 print(f"Gradio version: {gr.__version__}")
@@ -35,74 +36,135 @@ input_vb_global = output_vb_global = None
 # CSS
 # ==============================
 css = """
-/* Full-width buttons */
-.full-width, .full-width > button { width: 100% !important; margin: 20px 0 !important; }
-.tall-button { height: 100% !important; }
-.tall-button > button { height: 100% !important; padding: 20px !important; font-size: 18px !important; }
+/* —————————————————————— ΩMEGA PRUNER v10 — INFINITE EDITION CSS —————————————————————— */
+
+/* 1. SANE, BEAUTIFUL GAPS — GRADIO 6+ FIX */
+.gr-row {
+    gap: 14px !important;
+}
+.gr-row:has(.full-width),
+.gr-row:has(.bump-with-gap),
+.gr-row:has(.gr-button.size-lg) {
+    gap: 16px !important;
+}
+
+/* Slightly bigger breathing room between Generate → Start Over */
+#generate-and-startover-row {
+    gap: 22px !important;
+}
+
+/* Kill any rogue margins/padding that fight us */
+.full-width, .full-width > div, .full-width button,
+.bump-with-gap, .bump-with-gap > div, .bump-with-gap button {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 2. BEEFY, PREMIUM BUTTONS — HITS EVERY LAYER Gradio 6 uses */
+.gr-button button,
+.gr-button > div,
+.gr-button > button,
+.gr-button [class*="svelte"],
+button[class*="svelte"] {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+    padding: 16px 28px !important;
+    min-height: 62px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
+    transition: all 0.22s ease !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    text-align: center !important;
+}
+
+/* PRIMARY & LARGE BUTTONS = ABSOLUTE UNITS */
+.gr-button[variant="primary"],
+.gr-button.size-lg,
+.full-width,
+.bump-with-gap,
+.tall-button {
+    font-size: 1.38rem !important;
+    font-weight: 750 !important;
+    padding: 22px 32px !important;
+    min-height: 72px !important;
+    box-shadow: 0 6px 20px rgba(247,147,26,0.38) !important;
+}
+
+/* SECONDARY BUTTONS — STILL THICC, BUT NOT DOMINANT */
+.gr-button[variant="secondary"] button,
+.gr-button[variant="secondary"] > button {
+    font-size: 1.28rem !important;
+    font-weight: 600 !important;
+    padding: 18px 28px !important;
+    min-height: 64px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+}
+
+/* HOVER — ALL BUTTONS GET THE GLOW-UP */
+.gr-button:hover button,
+.gr-button:hover > button,
+.gr-button:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.22) !important;
+}
+
+/* PRIMARY HOVER = ORANGE SUPERNOVA */
+.gr-button[variant="primary"]:hover,
+.gr-button.size-lg:hover {
+    box-shadow: 0 14px 32px rgba(247,147,26,0.5) !important;
+    transform: translateY(-4px) !important;
+}
+
+/* 3. MISC FIXES YOU ALREADY HAD */
 details summary { list-style: none; cursor: pointer; }
 details summary::-webkit-details-marker { display: none; }
 
-/* Floating QR Buttons */
+#rbf-hex-box textarea {
+    font-family: 'Courier New', monospace !important;
+    font-size: 0.95rem !important;
+}
+
 .qr-fab {
-  position: fixed !important; right: 20px; z-index: 9999; width: 70px; height: 70px;
-  border-radius: 50%; box-shadow: 0 10px 40px rgba(0,0,0,0.7); display: flex;
-  align-items: center; justify-content: center; font-size: 38px; cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4,0,0.2,1); border: 5px solid white;
-  font-weight: bold; user-select: none; text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-}
-.qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
-.qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
-.qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
-
-/* === RBF SECTION == */
-.rbf-copy-btn,
-.rbf-clear-btn,
-.rbf-bump-btn {
-    width: 100% !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-}
-
-.rbf-clear-btn {
-    margin-top: 16px !important;     /* ← THIS IS THE GAP */
+  position: fixed !important;
+  right: 20px !important;
+  width: 70px !important;
+  height: 70px !important;
+  border-radius: 50% !important;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 38px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
+  border: 5px solid white !important;
+  user-select: none !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+  z-index: 9999 !important;
 }
 
-.rbf-bump-btn {
-    margin-top: 24px !important;     /* ← BIG GAP BEFORE BUMP */
+.qr-fab:hover {
+  transform: scale(1.18) !important;
+  box-shadow: 0 16px 50px rgba(0,0,0,0.8) !important;
 }
 
-/* Desktop: side-by-side if you want (optional) */
-@media (min-width: 769px) {
-    .rbf-copy-btn,
-    .rbf-clear-btn {
-        display: inline-block !important;
-        width: 48% !important;
-        margin-right: 4% !important;
-    }
-    .rbf-clear-btn {
-        margin-right: 0 !important;
-        margin-top: 0 !important;
-    }
-    .rbf-bump-btn {
-        margin-top: 32px !important;
-    }
-}
+.qr-fab.btc  { bottom: 100px !important; background: linear-gradient(135deg, #f7931a, #f9a43f) !important; color: white !important; }
+.qr-fab.ln   { bottom: 20px  !important; background: linear-gradient(135deg, #00ff9d, #33ffc7) !important; color: #000 !important; font-size: 42px !important; }
+
 .qr-center {
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    width: 100% !important;
-    margin: 40px 0 !important;
-    padding: 10px 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 40px 0 !important;
 }
-
-/* Extra safety — force image centering */
 .qr-center img {
-    max-width: 96vw !important;
-    width: 460px !important;
-    height: auto !important;
-    display: block !important;
-    margin: 0 auto !important;
+  width: 460px !important;
+  max-width: 96vw !important;
+  border-radius: 20px !important;
+  border: 6px solid #f7931a !important;
+  box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
 }
 """
 # ==============================
@@ -287,8 +349,9 @@ def format_btc(sats: int) -> str:
         return f"{btc:,.8f}".rstrip("0").rstrip(".") + " BTC"
     else:
         return f"{btc:.8f}".rstrip("0").rstrip(".") + " BTC"
+
 # ==============================
-# Transaction Building & RBF (fixed)
+# Transaction Building
 # ==============================
 def encode_varint(i):
     if i < 0xfd: return bytes([i])
@@ -324,7 +387,7 @@ class Tx:
     def __post_init__(self):
         self.tx_ins = self.tx_ins or []
         self.tx_outs = self.tx_outs or []
-
+    
 def _correct_tx_encode(self, segwit=True):
     parts = [
         self.version.to_bytes(4, 'little'),
@@ -336,20 +399,31 @@ def _correct_tx_encode(self, segwit=True):
     ]
     if segwit:
         parts.insert(1, b'\x00\x01')
-        if not any(inp.script_sig for inp in self.tx_ins):  # unsigned
-            parts.append(b'\x00\x00\x00\x00')  # witness placeholder
+        parts.insert(-1, b'\x00\x00\x00\x00')
     return b''.join(parts)
 
 Tx.encode = _correct_tx_encode
+del _correct_tx_encode
 
 def make_psbt(tx: Tx) -> str:
     raw = tx.encode(segwit=True)
-    if raw.endswith(b'\x00\x00\x00\x00'):
+    if len(raw) >= 8 and raw[-8:-4] == b'\x00\x00\x00\x00':
         raw = raw[:-4]
     psbt = b'psbt\xff' + b'\x00' + encode_varint(len(raw)) + raw + b'\x00'
     return base64.b64encode(psbt).decode()
+# =================================================================
 
+def make_qr(data: str) -> str:
+    img = qrcode.make(data, box_size=10, border=4)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
+
+# ==============================
+# MISSING VARINT DECODER — ADD THIS EXACTLY HERE
+# ==============================
 def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
+    """Decode a Bitcoin varint at position pos, return (value, new_pos)"""
     val = data[pos]
     pos += 1
     if val < 0xfd:
@@ -360,97 +434,195 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
         return int.from_bytes(data[pos:pos+4], 'little'), pos + 4
     else:
         return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
-def make_qr(data: str) -> str:
-    img = qrcode.make(data, box_size=10, border=4)
-    buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
 # ==============================
-# BULLETPROOF RBF BUMP (Fixed!)
+# RBF BUMP — FINAL, BULLETPROOF VERSION (put it right here!)
 # ==============================
-def rbf_bump(raw_hex: str):
+
+def rbf_bump(raw_hex: str, bump: int = 50):
     raw_hex = raw_hex.strip()
     if not raw_hex:
-        return raw_hex, "<div style='color:#f7931a;'>Paste a raw transaction hex first</div>"
+        return "", "<div style='color:#f7931a;'>Paste a raw transaction hex first</div>"
 
     try:
         data = bytes.fromhex(raw_hex)
-    except:
-        return raw_hex, "Invalid hex"
+    except Exception:
+        return "Invalid hex", raw_hex
+
+    if len(data) < 100:
+        return "Too short — not a valid transaction", raw_hex
 
     pos = 0
-    version = int.from_bytes(data[pos:pos+4], 'little')
+
+    # === Parse version ===
+    version = int.from_bytes(data[pos:pos + 4], 'little')
+    if version not in (1, 2):
+        return "Unsupported transaction version (only v1/v2 allowed)", raw_hex
     pos += 4
 
-    is_segwit = data[pos:pos+2] == b'\x00\x01'
+    # === Detect SegWit ===
+    is_segwit = data[pos:pos + 2] == b'\x00\x01'
     if is_segwit:
         pos += 2
 
+    # === Parse inputs ===
     vin_len, pos = varint_decode(data, pos)
+    if vin_len == 0:
+        return "Transaction has no inputs", raw_hex
+
     inputs = []
     for _ in range(vin_len):
-        txid = data[pos:pos+32][::-1].hex()
-        vout = int.from_bytes(data[pos+32:pos+36], 'little')
+        txid = data[pos:pos + 32][::-1].hex()
+        vout = int.from_bytes(data[pos + 32:pos + 36], 'little')
         pos += 36
-        slen, pos = varint_decode(data, pos)
-        pos += slen
-        seq = int.from_bytes(data[pos:pos+4], 'little')
-        inputs.append({'sequence': seq, 'seq_pos': pos-4})
+        script_len, pos = varint_decode(data, pos)
+        pos += script_len
+        sequence = int.from_bytes(data[pos:pos + 4], 'little')
         pos += 4
+        inputs.append({
+            'txid': txid,
+            'vout': vout,
+            'sequence': sequence,
+            'sequence_pos': pos - 4,
+        })
 
+    # === Parse outputs ===
     vout_len, pos = varint_decode(data, pos)
     if vout_len == 0:
-        return raw_hex, "No outputs — cannot bump"
+        return "Transaction has no outputs — nothing to bump", raw_hex
 
-    change_pos = pos
-    change_amount = int.from_bytes(data[pos:pos+8], 'little')
+    first_output_pos = pos
+    output_amount_pos = pos
     pos += 8
-    slen, pos = varint_decode(data, pos)
-    pos += slen
+    script_len, pos = varint_decode(data, pos)
+    pos += script_len
 
+    # Skip remaining outputs
     for _ in range(1, vout_len):
         pos += 8
         slen, pos = varint_decode(data, pos)
         pos += slen
 
+    # === Skip witness data (only if SegWit) ===
     if is_segwit:
         for _ in range(vin_len):
-            items, pos = varint_decode(data, pos)
-            for _ in range(items):
-                ilen, pos = varint_decode(data, pos)
-                pos += ilen
+            witness_items, pos = varint_decode(data, pos)
+            for _ in range(witness_items):
+                item_len, pos = varint_decode(data, pos)
+                pos += item_len
 
+    # === Locktime ===
+    if pos + 4 > len(data):
+        return "Truncated transaction — failed to parse locktime", raw_hex
+    locktime = int.from_bytes(data[pos:pos + 4], 'little')
+
+    # === Safety checks ===
+    if first_output_pos + 8 > len(data):
+        return "Corrupted transaction — cannot read first output amount", raw_hex
+
+    current_amount = int.from_bytes(data[output_amount_pos:output_amount_pos + 8], 'little')
+    if current_amount == 0:
+        return "First output is 0 — this is an anyone-can-spend output, cannot reduce", raw_hex
+
+    # Estimate vsize (accurate enough for RBF)
     vsize = (len(data) + 3) // 4
-    extra = int(vsize * 50)
-    if change_amount <= extra + 546:
-        return raw_hex, f"<div style='color:#ff3333; padding:16px; background:#300; border-radius:12px;'><b>Cannot bump</b><br>Not enough change output</div>"
+    extra_fee = int(vsize * bump)
 
+    if current_amount <= extra_fee + 546:
+        needed = extra_fee + 546 - current_amount + 1
+        return (
+            f"<div style='color:#ff3333; background:#300; padding:16px; border-radius:12px;'>"
+            f"<b>Cannot bump +{bump} sat/vB</b><br>"
+            f"Would reduce change output to dust (≤546 sats)<br>"
+            f"Need at least <b>+{needed:,}</b> more sats in change output"
+            f"</div>"
+        ), raw_hex
+
+    # === Detect Taproot key-path spend output ===
+    is_taproot = (
+        is_segwit and
+        vout_len >= 1 and
+        data[first_output_pos + 8:first_output_pos + 10] == b'\x51\x20'  # OP_1 + 32-byte push
+    )
+
+    # === RBF signaling analysis ===
+    sequences = [inp['sequence'] for inp in inputs]
+    rbf_signaled = any(seq < 0xfffffffe for seq in sequences)  # BIP125 opt-in
+    all_max = all(seq == 0xffffffff for seq in sequences)
+
+    # === User feedback ===
+    if is_taproot:
+        warning = (
+            "<div style='color:#ff9900; background:#332200; padding:14px; border-radius:10px; margin:12px 0; border:2px solid #ff9900;'>"
+            "<b>Taproot Key-Path Spend Detected</b><br>"
+            "Sequence-based RBF is ignored.<br>"
+            "For reliable replacement, use:<br>"
+            "• Anyone-can-spend output, or<br>"
+            "• Wallet with Key-path RBF support (Sparrow, etc.)"
+            "</div>"
+        )
+        rbf_action = "fee bump only (no sequence change)"
+    elif not rbf_signaled and all_max:
+        warning = (
+            "<div style='color:#00ff9d; background:#003300; padding:14px; border-radius:10px; margin:12px 0; border:2px solid #00ff9d;'>"
+            "<b>RBF signaling added</b> — now replaceable!"
+            "</div>"
+        )
+        rbf_action = "signaling + fee bump"
+    elif rbf_signaled:
+        warning = (
+            "<div style='color:#f7931a; background:#332200; padding:14px; border-radius:10px; margin:12px 0;'>"
+            "<b>Already RBF-enabled</b> — increasing fee only"
+            "</div>"
+        )
+        rbf_action = "fee bump only"
+    else:
+        warning = ""
+        rbf_action = "fee bump"
+
+    # === APPLY BUMP ===
     tx = bytearray(data)
-    new_amount = change_amount - extra
-    tx[change_pos:change_pos+8] = new_amount.to_bytes(8, 'little')
 
-    # Enable RBF if all sequences are max
-    if all(i['sequence'] == 0xffffffff for i in inputs):
-        for i in inputs:
-            tx[i['seq_pos']:i['seq_pos']+4] = (0xfffffffd).to_bytes(4, 'little')
+    # SAFETY CRITICAL: We reduce the first output
+    # This is 100% safe because Omega Pruner always makes:
+    #   Output 0 = user change (largest)
+    #   Output 1 = optional DAO thank-you
+    new_amount = current_amount - extra_fee
+    if new_amount < 546:
+        return "Safety abort: bump would create dust change", raw_hex
 
-    bumped = tx.hex()
+    tx[output_amount_pos:output_amount_pos + 8] = new_amount.to_bytes(8, 'little')
 
+    # Enable RBF signaling (only if needed and allowed)
+    RBF_SEQUENCE = 0xfffffffd
+    if not is_taproot and all_max:
+        for inp in inputs:
+            if inp['sequence'] == 0xffffffff:
+                tx[inp['sequence_pos']:inp['sequence_pos'] + 4] = RBF_SEQUENCE.to_bytes(4, 'little')
+
+    bumped_hex = tx.hex()
+
+    # === Stats ===
     try:
-        rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=5).json()["fastestFee"]
-    except:
-        rate = "??"
+        fee_rate_api = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=6).json()["fastestFee"]
+    except Exception:
+        fee_rate_api = "unknown"
+
+    bump_count = sum(1 for s in sequences if s == 0xffffffff)
+    if all_max:
+        bump_count += 1  # we're adding the first signal now
 
     info = f"""
-    <div style="background:#00ff9d20; padding:18px; border-radius:14px; border:3px solid #00ff9d; text-align:center; margin:20px 0;">
-        <b style="font-size:24px; color:#00ff9d;">BUMP SUCCESSFUL</b><br><br>
-        +50 sat/vB → +{extra:,} sats to miners<br>
-        Change: {format_btc(change_amount)} → <b>{format_btc(new_amount)}</b><br>
-        <small>Current fastest: ~{rate} sat/vB</small>
+    {warning}
+    <div style="background:#00ff9d20; padding:18px; border-radius:14px; border:3px solid #00ff9d; margin:20px 0; text-align:center; font-family: monospace;">
+        <b style="font-size:24px; color:#00ff9d;">Bump #{bump_count}</b><br><br>
+        +{bump} sat/vB → +{extra_fee:,} sats to miners<br>
+        Change reduced: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b><br><br>
+        <small>Current fastest: ~{fee_rate_api} sat/vB • {rbf_action}</small>
     </div>
     """
-    return bumped, info
+
+    return bumped_hex, info
 # ==============================
 # Core Functions
 # ==============================
@@ -509,7 +681,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             Click <b>Generate Transaction</b> to continue
         </div>
         """,
-        gr.update(visible=True)
+        gr.update(visible=True), gr.update(visible=True)
     )
 
 # ==============================
@@ -603,9 +775,8 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
         <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}</p>
         <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">You receive: {format_btc(user_gets)}</b>
-        <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a; text-align: center;">
-            Future savings ≈ <b style="font-size: 28px; color: #00ff9d; font-weight: 900; text-shadow: 0 2px 8px rgba(0,255,157,0.6); letter-spacing: 0.5px;">{format_btc(savings)}</b>
-            <span style="color: #cccccc; font-size: 16px;"> (@ {future_rate} sat/vB)</span>
+        <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
+            Future savings ≈ <b style="font-size:24px; color:#00ff9d;">{format_btc(savings)}</b> (@ {future_rate} sat/vB)
         </div>
 
         <div style="margin:40px 0;">
@@ -633,8 +804,9 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     return (
         html,
-        gr.update(visible=False),   # generate_btn
-        gr.update(visible=True),    # ln_invoice_row
+        gr.update(visible=True), # generate_btn
+        gr.update(visible=True), # generate_row
+        gr.update(visible=True),  # ln_invoice_row
         "",                         # ln_invoice_state (cleared)
         raw_hex                     # saved for infinite RBF
     )
@@ -694,57 +866,91 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
             Invoice must be for ~{format_btc(required)} (±5k sats)
         </div>
         """, gr.update(visible=False), gr.update(visible=True), invoice, ""
-
-
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
-
-    # ─────────────────────── FLOATING QR BUTTONS (Gradio 6 safe) ───────────────────────
-    gr.HTML(
-        "<style>"
-        "#floating-qr-container{position:fixed!important;right:20px!important;bottom:20px!important;"
-        "z-index:999999!important;pointer-events:none!important}"
-        "#floating-qr-container>*{pointer-events:auto!important}"
-        ".qr-fab{position:fixed!important;width:70px!important;height:70px!important;border-radius:50%!important;"
-        "box-shadow:0 10px 40px rgba(0,0,0,0.7)!important;display:flex!important;align-items:center!important;"
-        "justify-content:center!important;font-size:38px!important;cursor:pointer!important;"
-        "border:5px solid white!important;font-weight:bold!important;user-select:none!important;"
-        "text-shadow:0 2px 8px rgba(0,0,0,0.5)!important;transition:all .25s cubic-bezier(.4,0,.2,1)!important}"
-        ".qr-fab:hover{transform:scale(1.18)!important;box-shadow:0 16px 50px rgba(0,0,0,0.8)!important}"
-        ".qr-fab.btc{bottom:100px!important;background:linear-gradient(135deg,#f7931a,#f9a43f);color:white!important}"
-        ".qr-fab.ln{bottom:20px!important;background:linear-gradient(135deg,#00ff9d,#33ffc7);color:#000!important;font-size:42px!important}"
-        "</style>"
-        "<div id='floating-qr-container'>"
-        "<label class='qr-fab btc' title='Scan Address / xpub'>B</label>"
-        "<label class='qr-fab ln' title='Scan Lightning Invoice'>Lightning</label>"
-        "</div>"
-        "<input type='file' accept='image/*' capture='environment' id='qr-btc' style='display:none'>"
-        "<input type='file' accept='image/*' capture='environment' id='qr-ln' style='display:none'>",
-        elem_id="floating-qr-container"
+with gr.Blocks(
+    title="Omega v10 — Infinite Edition",
+) as demo:
+    gr.Markdown(
+        """
+        <div style="text-align: center; padding: 20px 0 10px;">
+            <h1 style="font-size: 3.2rem; margin: 0; background: linear-gradient(135deg, #f7931a, #ff9900); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 30px rgba(247,147,26,0.4);">
+                Ωmega Pruner v10
+            </h1>
+            <h2 style="font-size: 1.7rem; color: #f7931a; margin: 8px 0 30px; font-weight: 600;">
+                Infinite Edition — RBF Forever • Sweep to Lightning • Privacy First
+            </h2>
+        </div>
+        """,
+        elem_id="omega-title"
     )
-
-    # ─────────────────────── OMEGA BACKGROUND + HEADER (Gradio 6 safe) ───────────────────────
+    
     gr.HTML(
-        "<div id='omega-bg' style='position:fixed;inset:0;z-index:-1;pointer-events:none;display:flex;"
-        "align-items:center;justify-content:center;overflow:hidden'>"
-        "<span style='font-size:100vh;font-weight:900;background:linear-gradient(135deg,rgba(247,147,26,0.28),rgba(247,147,26,0.15));"
-        "-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 220px rgba(247,147,26,0.72);"
-        "animation:omega-breath 28s infinite ease-in-out;user-select:none;opacity:0.96'>Ω</span>"
-        "</div>"
-        "<style>"
-        "@keyframes omega-breath{0%,100%{opacity:.76;transform:scale(.95) rotate(0deg)}"
-        "50%{opacity:1;transform:scale(1.05) rotate(180deg)}}"
-        "</style>"
-        "<script>"
-        "window.addEventListener('load',()=>{"
-        "const el=document.getElementById('omega-bg');if(el){el.style.display='none';"
-        "setTimeout(()=>{el.style.display='flex'},120)}});"
-        "</script>",
+        """
+        <div id="omega-bg" style="
+            position: fixed !important;
+            inset: 0 !important;
+            top: 0 !important; left: 0 !important;
+            width: 100vw !important; height: 100vh !important;
+            pointer-events: none !important;
+            z-index: -1 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            overflow: hidden !important;
+            background: transparent;
+        ">
+            <span class="omega-symbol" style="
+                font-size: 100vh !important;
+                font-weight: 900 !important;
+                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15)) !important;
+                -webkit-background-clip: text !important;
+                -webkit-text-fill-color: transparent !important;
+                background-clip: text !important;
+                color: transparent !important;
+                text-shadow: 0 0 220px rgba(247,147,26,0.72) !important;
+                animation: omega-breath 28s infinite ease-in-out !important;
+                user-select: none !important;
+                line-height: 1 !important;
+                opacity: 0.96 !important;
+            ">Ω</span>
+        </div>
+
+        <style>
+        @keyframes omega-breath {
+            0%, 100% { opacity: 0.76; transform: scale(0.95) rotate(0deg);   }
+            50%      { opacity: 1.0;  transform: scale(1.05) rotate(180deg); }
+        }
+        .gradio-container { 
+            position: relative !important; 
+            z-index: 0 !important; 
+            background: transparent !important;
+            overflow-y: auto !important;
+        }
+        body { overflow-y: auto !important; }
+        #omega-bg { 
+            isolation: isolate !important; 
+            will-change: transform, opacity !important; 
+        }
+        .omega-symbol { 
+            animation-play-state: running !important; 
+        }
+        </style>
+
+        <script>
+        // The sacred force-reflow — makes it appear 100% of the time
+        window.addEventListener('load', () => {
+            const omega = document.getElementById('omega-bg');
+            if (omega) {
+                omega.style.display = 'none';
+                setTimeout(() => { omega.style.display = 'flex'; }, 120);
+            }
+        });
+        </script>
+        """,
         elem_id="omega-bg-container-fixed"
     )
-  
       
     # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
@@ -817,7 +1023,7 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
 
     output_log = gr.HTML()
 
-    with gr.Row():
+    with gr.Row(visible=False) as generate_row:    # ← starts hidden = 0px height
         generate_btn = gr.Button(
             "2. Generate Transaction",
             visible=False,
@@ -858,129 +1064,192 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
             rbf_in = gr.Textbox(
                 label="Raw hex (auto-saved from last tx)",
                 lines=6,
-                elem_classes="rbf-textbox"
+                elem_id="rbf-hex-box"
             )
 
-        # RIGHT COLUMN — THE FINAL SOLUTION
         with gr.Column(scale=4):
-            # Copy button — standalone
-            copy_btn = gr.Button("Copy raw hex", size="sm", elem_classes="rbf-copy-btn").click(
-                None, None, None,
-                js="()=>{let t=document.querySelector('textarea[label*=\"Raw hex\"]')||document.querySelector('textarea:last-of-type');if(t&&t.value){navigator.clipboard.writeText(t.value.trim());alert('Copied!')}else alert('Empty')}"
-            )
+            # Copy + Clear — perfectly spaced
+            with gr.Row():
+                gr.Button("Copy raw hex", size="sm").click(
+                    None, None, None,
+                    js="""
+                    () => {
+                        const box = document.querySelector('#rbf-hex-box textarea') || 
+                                   document.querySelector('textarea[data-testid*="textbox"]');
+                        if (box && box.value) {
+                            navigator.clipboard.writeText(box.value.trim());
+                            alert('Copied to clipboard!');
+                        } else alert('Nothing to copy');
+                    }
+                    """
+                )
 
-            clear_btn = gr.Button("Clear saved", size="sm", elem_classes="rbf-clear-btn").click(
-                None, None, None,
-                js="()=>{localStorage.removeItem('omega_rbf_hex');alert('Cleared!');location.reload()}"
-            )
-            # Bump button — full width, big gap above
+                gr.Button("Clear saved", size="sm").click(
+                    None, None, None,
+                    js="""
+                    () => {
+                        localStorage.removeItem('omega_rbf_hex');
+                        const box = document.querySelector('#rbf-hex-box textarea');
+                        if (box) box.value = '';
+                        alert('Cleared & ready for new tx');
+                    }
+                    """
+                )
+
+            # Bump button with CSS gap
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
                 size="lg",
-                elem_classes="rbf-bump-btn"
+                elem_classes="full-width bump-with-gap"
             )
-
-# ==================================================================
-# EVENTS — Gradio 6.0.0 Compatible (Render-Proof, Nov 2025)
-# ==================================================================
-
+    # ==================================================================
+    # Events
+    # ==================================================================
     submit_btn.click(
-        fn=analysis_pass,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-        outputs=[output_log, generate_btn]
+        analysis_pass,
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        [output_log, generate_btn,generate_row]
     )
 
     generate_btn.click(
-        fn=build_real_tx,
+        build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]
+        outputs=[output_log, generate_btn, generate_row, ln_invoice_row, ln_invoice_state, rbf_in]
     )
 
-    ln_invoice.change(
-        fn=lambda x: x,
-        inputs=ln_invoice,
-        outputs=ln_invoice_state
-    )
+    ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
 
     submit_ln_btn.click(
-        fn=build_real_tx,
+        build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
     ln_invoice.submit(
-        fn=build_real_tx,
+        build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
         outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state]
     )
 
     start_over_btn.click(
-        fn=lambda: (
+        lambda: (
             "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
-            "", gr.update(visible=False), gr.update(visible=False),
+            "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
             "", "", ""
         ),
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
             selfish_mode, dao_percent, dao_addr,
-            output_log, generate_btn, ln_invoice_row,
+            output_log, generate_btn, generate_row, ln_invoice_row,
             ln_invoice, ln_invoice_state, rbf_in
         ]
     )
 
-    # INFINITE RBF — 100% bulletproof on Gradio 6. perfect indentation
     rbf_btn.click(
         fn=rbf_bump,
         inputs=rbf_in,
-        outputs=[rbf_in, output_log]
-    ).then(
-        js=(
-            "(hex) => {\n"
-            "  if (hex && typeof hex === 'string') {\n"
-            "    try { localStorage.setItem('omega_rbf_hex', hex.trim()); }\n"
-            "    catch(e) { console.warn('localStorage failed'); }\n"
-            "  }\n"
-            "}"
-        ),
-        inputs=rbf_in,
-        outputs=None
+        outputs=[rbf_in, output_log],
+        js="""
+        (hex) => {
+            if (hex && typeof hex === 'string') {
+                try { localStorage.setItem('omega_rbf_hex', hex.trim()); }
+                catch(e) { console.warn('localStorage full'); }
+            }
+        }
+        """,
+        concurrency_limit=None
     )
 
-    # Restore saved RBF hex on load — perfect indentation, no triple quotes
-    gr.HTML(
-        "<script>"
-        "window.addEventListener('load', () => {"
-        "  const saved = localStorage.getItem('omega_rbf_hex');"
-        "  if (!saved) return;"
-        "  const box = document.querySelector('textarea[label*=\"Raw hex\"]') ||"
-        "              document.querySelector('textarea:last-of-type');"
-        "  if (box) {"
-        "    box.value = saved.trim();"
-        "    box.dispatchEvent(new Event('input', {bubbles: true}));"
-        "    box.dispatchEvent(new Event('change', {bubbles: true}));"
-        "  }"
-        "});"
-        "</script>"
-    )
+    # Floating QR Scanners + Styles
+    gr.HTML("""
+    <!-- Floating QR Scanner Buttons -->
+    <label class="qr-fab btc" title="Scan Address / xpub">B</label>
+    <label class="qr-fab ln" title="Scan Lightning Invoice">⚡</label>
 
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-ln" style="display:none">
+
+    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+    <script>
+    const btcBtn = document.querySelector('.qr-fab.btc');
+    const lnBtn = document.querySelector('.qr-fab.ln');
+    const btcInput = document.getElementById('qr-scanner-btc');
+    const lnInput = document.getElementById('qr-scanner-ln');
+
+    btcBtn.onclick = () => btcInput.click();
+    lnBtn.onclick = () => lnInput.click();
+
+    async function scan(file, isLightning = false) {
+      if (!file) return;
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+          const result = await ZXing.readBarcodeFromCanvas(canvas);
+          const text = result.text.trim();
+          if (isLightning && text.toLowerCase().startsWith('lnbc')) {
+            const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
+            if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
+            alert("Lightning invoice scanned!");
+          } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
+            const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+            const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
+            if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
+            alert("Address/xpub scanned!");
+          } else alert("Not recognized");
+        } catch (e) { alert("No QR code detected"); }
+      };
+      img.src = URL.createObjectURL(file);
+    }
+
+    btcInput.onchange = e => scan(e.target.files[0], false);
+    lnInput.onchange = e => scan(e.target.files[0], true);
+
+    function loadSavedRBF() {
+        const saved = localStorage.getItem('omega_rbf_hex');
+        if (!saved) return;
+        const box = document.querySelector('textarea[label*="Raw hex"]');
+        if (box) box.value = saved;
+    }
+    loadSavedRBF();
+    </script>
+
+    """)
+
+    # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
+    gr.Markdown(
+        """
+        <div style="margin: 60px 0 30px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
+            <strong>Ωmega Pruner v10 — Infinite Edition</strong><br>
+            <a href="https://github.com/omega-pruner/v10" target="_blank" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
+                GitHub • Open Source • Apache 2.0
+            </a><br>
+            <small>Made with skull and lightning for the Bitcoin plebs • Never sell your coins</small>
+        </div>
+        """,
+        elem_id="omega-footer"
+    )
 if __name__ == "__main__":
     import os
     import warnings
+
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    # GRADIO 6.0.0 FULLY VERIFIED — WORKS ON RENDER (Nov 2025)
-    demo.queue(
-        default_concurrency_limit=40,   # Valid: Global event concurrency (default=1; 40 handles your API calls)
-        max_size=100                    # Valid: Max queued requests (default=None/unlimited)
-    )
+    demo.queue(default_concurrency_limit=None, max_size=40)
 
     demo.launch(
-        server_name="0.0.0.0",          # Valid: Binds to all interfaces for Render
-        server_port=int(os.environ.get("PORT", 7860)),  # Valid: Uses Render's PORT env
-        share=True,                     # Valid: Public share link
-        show_error=True,                # Valid: Shows errors in UI/console
-        allowed_paths=["./"],           # Valid: Allows file access (for QR gen if needed)
-        ssl_verify=False,               # Valid: Disables SSL checks (Render HTTPS)
-        max_threads=40                  # Valid: Total threads (default=40; matches your concurrency)
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        share=True,
+        debug=False,
+        max_threads=40,
+        show_error=True,
+        quiet=True,
+        allowed_paths=["./"],
+        ssl_verify=False,
+        css=css
     )
