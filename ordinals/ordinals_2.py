@@ -798,10 +798,17 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        if not getattr(decoded.payment_address):
-            raise ValueError("Invoice must support on-chain fallback (payment_address)")
+        # FIXED: Extract fallback from tags (bolt11 library stores it nested)
+        fallback_addr = None
+        for tag in (decoded.tags or []):
+            if tag.get('tag') == 'fallback_address' and tag.get('data'):
+                fallback_addr = tag['data']
+                break
 
-        dest_script, _ = address_to_script_pubkey(decoded.payment_address)
+        if not fallback_addr:
+            raise ValueError("Invoice must support on-chain fallback (no fallback in tags)")
+
+        dest_script, _ = address_to_script_pubkey(fallback_addr)
         tx = Tx()
         for u in utxos:
             tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
@@ -823,9 +830,8 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
                 {format_btc(user_gets)} to Lightning Instantly
             </b>
             <div style="margin:40px 0;">
-            <div class="qr-center ln"><img src="{qr}">
-            </div>  
-        </div>
+                <div class="qr-center ln"><img src="{qr}"></div>
+            </div>
             <p><small>Scan with Phoenix • Breez • Zeus • Blink • Muun</small></p>
         </div>
         """
