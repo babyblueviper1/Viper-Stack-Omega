@@ -798,27 +798,30 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
         if abs(user_gets * 1000 - (decoded.amount_msat or 0)) > 5_000_000:
             raise ValueError("Invoice amount mismatch (±5k sats)")
 
-        # FINAL FIX: correctly extract fallback_address from Tag objects
+        # FINAL FIX: Extract fallback from tag 'p' (Phoenix format)
         fallback_addr = None
         for tag in decoded.tags:
-            if hasattr(tag, 'name') and tag.name == 'fallback_address' and tag.data:
-                fallback_addr = tag.data
-                break
-            # Some versions use 'p' tag with version prefix
-            if hasattr(tag, 'name') and tag.name == 'p' and tag.data:
-                # data is bytes like b'0bc1q...' → strip version byte if present
-                addr_bytes = tag.data
-                if addr_bytes[0] in (0, 1):  # version byte
-                    addr_bytes = addr_bytes[1:]
-                try:
-                    fallback_addr = addr_bytes.decode()
-                except:
-                    continue
+            if tag.name == 'p':  # This is the fallback address tag
+                data = tag.data
+                if isinstance(data, bytes):
+                    # Strip version byte (0 = legacy, 1 = bech32) and decode
+                    if len(data) > 1:
+                        addr_bytes = data[1:] if data[0] in (0, 1) else data
+                        fallback_addr = addr_bytes.decode('utf-8')
+                        break
+                elif isinstance(data, str):
+                    fallback_addr = data
+                    break
 
         if not fallback_addr:
-            raise ValueError("Invoice must support on-chain fallback (no fallback found)")
+            raise ValueError("Invoice must support on-chain fallback (no 'p' tag found)")
 
+        # Validate it's a real address
         dest_script, _ = address_to_script_pubkey(fallback_addr)
+        if len(dest_script) < 20:
+            raise ValueError("Invalid fallback address in invoice")
+
+        # Build sweep tx
         tx = Tx()
         for u in utxos:
             tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
