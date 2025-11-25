@@ -153,7 +153,7 @@ details summary::-webkit-details-marker { display: none; }
 .qr-fab.btc  { bottom: 100px !important; background: linear-gradient(135deg, #f7931a, #f9a43f) !important; color: white !important; }
 .qr-fab.ln   { bottom: 20px  !important; background: linear-gradient(135deg, #00ff9d, #33ffc7) !important; color: #000 !important; font-size: 42px !important; }
 
-qr-center {
+.qr-center {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
