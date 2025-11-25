@@ -1152,6 +1152,21 @@ with gr.Blocks(
     </style>
     """)
 
+    output_log = gr.HTML()   # ← change from gr.HTML() earlier to here, or keep it here
+
+    # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
+    gr.Markdown(
+        """
+        <div style="margin: 60px 0 30px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
+            <strong>Ωmega Pruner v10 — Infinite Edition</strong><br>
+            <a href="https://github.com/omega-pruner/v10" target="_blank" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
+                GitHub • Open Source • Apache 2.0
+            </a><br>
+            <small>Made with skull and lightning for the Bitcoin plebs • Never sell your coins</small>
+        </div>
+        """,
+        elem_id="omega-footer"
+    )
 if __name__ == "__main__":
     import os
     import warnings
