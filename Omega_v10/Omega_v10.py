@@ -62,32 +62,34 @@ details summary::-webkit-details-marker { display: none; }
 }
 
 .copy-clear-group {
-    display: flex;
-    gap: 8px;
+    display: flex !important;
+    flex-direction: column !important;   /* mobile: stacked */
+    gap: 14px !important;                /* ← THIS IS THE KEY: adds breathing room */
+    width: 100% !important;
+    margin-bottom: 8px !important;
 }
 
-/* Mobile: stack everything vertically, no gaps */
-@media (max-width: 768px) {
-    .copy-clear-group {
-        flex-direction: column;
-    }
-    .copy-clear-group > div {
-        width: 100% !important;
-    }
-    .bump-button {
-        width: 100% !important;
-        margin: 0 !important;
-    }
+.copy-clear-group > div {
+    width: 100% !important;
+    margin: 0 !important;
 }
 
-/* Desktop: Copy + Clear side-by-side */
+/* Desktop: side-by-side with proper horizontal gap */
 @media (min-width: 769px) {
     .copy-clear-group {
-        flex-direction: row;
+        flex-direction: row !important;
+        gap: 18px !important;            /* ← generous space on desktop */
+        margin-bottom: 12px !important;
     }
     .copy-clear-group > div {
-        flex: 1;
+        flex: 1 !important;
     }
+}
+
+/* Optional: make the buttons look crisp */
+.copy-clear-group button {
+    margin: 0 !important;
+    padding: 10px 16px !important;
 }
 qr-center { 
     display: flex !important; 
@@ -759,6 +761,43 @@ with gr.Blocks(
         """,
         elem_id="omega-bg-container-fixed"
     )
+    gr.Markdown(
+    """
+<div style="
+    text-align: center;
+    margin: 24px 0 32px 0;
+    padding: 12px;
+">
+    <h1 style="
+        font-size: 38px !important;
+        font-weight: 900 !important;
+        color: #f7931a !important;
+        margin: 0 0 12px 0 !important;
+        text-shadow: 0 4px 12px rgba(247,147,26,0.4);
+        line-height: 1.2;
+    ">Omega Pruner v10.0 — Infinite Edition</h1>
+    
+    <p style="
+        font-size: 18px !important;
+        color: #aaa !important;
+        margin: 8px 0 !important;
+        line-height: 1.5;
+    ">
+        Zero custody • Infinite one-click RBF • Lightning sweep • Survives refresh<br>
+        The last UTXO consolidator you'll ever need
+    </p>
+    
+    <p style="
+        font-size: 15px !important;
+        color: #f7931a !important;
+        margin: 16px 0 0 0 !important;
+    ">
+        Source: <a href="https://github.com/babyblueviper1/Viper-Stack-Omega" target="_blank" style="color:#f7931a; text-decoration: underline;">GitHub</a> – Apache 2.0 • No logs • Runs in your browser
+    </p>
+</div>
+    """,
+    elem_classes="omega-title-block"
+)
       
     # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
