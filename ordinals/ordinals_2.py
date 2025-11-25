@@ -1152,19 +1152,6 @@ with gr.Blocks(
     </style>
     """)
 
-    gr.Markdown(
-        """
-        <div style="margin: 40px 0 20px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9;">
-            <strong>Ωmega Pruner v10 — Infinite Edition</strong><br>
-            <a href="https://github.com/yourusername/omega-pruner" target="_blank" style="color: #f7931a; text-decoration: none;">
-                GitHub • Open Source • Apache 2.0
-            </a><br>
-            <small>Made with ☠️ and ⚡ for the Bitcoin plebs • Never sell your coins</small>
-        </div>
-        """,
-        elem_id="omega-footer"
-    )
-
 if __name__ == "__main__":
     import os
     import warnings
