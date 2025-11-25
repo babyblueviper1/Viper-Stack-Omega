@@ -969,9 +969,9 @@ if __name__ == "__main__":
     import warnings
     warnings.filterwarnings("ignore", category=UserWarning)
 
-    # GRADIO 6.0+ ON RENDER.COM — THE ONLY WAY THAT WORKS (Nov 2025)
+    # GRADIO 6.0.0 ON RENDER.COM — CORRECT PARAMETERS (Nov 2025)
     demo.queue(
-        concurrency_limit=40,   # or just 40, or "default"
+        default_concurrency_limit=40,   # ← FIXED: This is the right name
         max_size=100
     )
 
@@ -982,7 +982,6 @@ if __name__ == "__main__":
         show_error=True,
         allowed_paths=["./"],
         ssl_verify=False,
-        # These two lines are critical for Gradio 6 on Render:
-        enable_queue=True,        # ← forces queue even if you forget .queue()
-        favicon_path=None,
+        enable_queue=True,              # Forces queue mode
+        favicon_path=None,              # Optional but safe
     )
