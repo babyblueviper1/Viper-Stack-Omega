@@ -932,7 +932,7 @@ with gr.Blocks(
             user_input = gr.Textbox(
                 label="Address or xpub",
                 placeholder="bc1q… or xpub…",
-                lines=2
+                lines=2,
                 autofocus=True
             )
         with gr.Column(scale=3):
