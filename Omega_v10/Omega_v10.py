@@ -964,21 +964,9 @@ with gr.Blocks(
         # RIGHT COLUMN — THE FINAL SOLUTION
         with gr.Column(scale=4):
             # Copy button — standalone
-            copy_btn = gr.Button(
-                "Copy raw hex",
-                size="sm",
-                elem_classes="rbf-copy-btn"
-            ).click(
+            copy_btn = gr.Button("Copy raw hex", size="sm", elem_classes="rbf-copy-btn").click(
                 None, None, None,
-                js="""
-                () => {
-                    const t = document.querySelector('textarea[label*="Raw hex"]');
-                    if (t && t.value) {
-                        navigator.clipboard.writeText(t.value);
-                        alert("Copied!");
-                    }
-                }
-                """
+                js="()=>{let t=document.querySelector('textarea[label*=\"Raw hex\"]')||document.querySelector('textarea:last-of-type');if(t&&t.value){navigator.clipboard.writeText(t.value.trim());alert('Copied!')}else alert('Empty')}"
             )
 
             clear_btn = gr.Button("Clear saved", size="sm", elem_classes="rbf-clear-btn").click(
