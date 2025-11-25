@@ -1031,7 +1031,6 @@ with gr.Blocks(
     const lnBtn = document.querySelector('.qr-fab.ln');
     const btcInput = document.getElementById('qr-scanner-btc');
     const lnInput = document.getElementById('qr-scanner-ln');
-
     btcBtn.onclick = () => btcInput.click();
     lnBtn.onclick = () => lnInput.click();
 
@@ -1060,24 +1059,21 @@ with gr.Blocks(
       };
       img.src = URL.createObjectURL(file);
     }
-
     btcInput.onchange = e => scan(e.target.files[0], false);
     lnInput.onchange = e => scan(e.target.files[0], true);
 
-    function loadSavedRBF() {
-        const saved = localStorage.getItem('omega_rbf_hex');
-        if (!saved) return;
+    const saved = localStorage.getItem('omega_rbf_hex');
+    if (saved) {
         const box = document.querySelector('textarea[label*="Raw hex"]');
         if (box) box.value = saved;
     }
-    loadSavedRBF();
     </script>
 
     <style>
-      .qr-fab {position:fixed !important;right:20px;width:70px;height:70px;border-radius:50%;box-shadow:0 10px 40px rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;font-size:38px;cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);border:5px solid white;font-weight:bold;user-select:none;z-index:9999;text-shadow:0 2px 8px rgba(0,0,0,0.5)}
-      .qr-fab:hover {transform:scale(1.18);box-shadow:0 16px 50px rgba(0,0,0,0.8)}
-      .qr-fab.btc {bottom:100px;background:linear-gradient(135deg,#f7931a,#f9a43f);color:white}
-      .qr-fab.ln {bottom:20px;background:linear-gradient(135deg,#00ff9d,#33ffc7);color:#000;font-size:42px}
+      .qr-fab{position:fixed!important;right:20px;width:70px;height:70px;border-radius:50%;box-shadow:0 10px 40px rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;font-size:38px;cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);border:5px solid white;font-weight:bold;user-select:none;z-index:9999;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+      .qr-fab:hover{transform:scale(1.18);box-shadow:0 16px 50px rgba(0,0,0,.8)}
+      .qr-fab.btc{bottom:100px;background:linear-gradient(135deg,#f7931a,#f9a43f);color:white}
+      .qr-fab.ln{bottom:20px;background:linear-gradient(135deg,#00ff9d,#33ffc7);color:#000;font-size:42px}
     </style>
     """)
     
