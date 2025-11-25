@@ -816,8 +816,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Omega v10 — Infinite Edition",
-    css=css,
+    title="Omega v10 — Infinite Edition"
 ) as demo:
     gr.Markdown(
         """
@@ -1210,4 +1209,5 @@ if __name__ == "__main__":
         quiet=True,
         allowed_paths=["./"],
         ssl_verify=False,
+        css=css
     )
