@@ -1020,4 +1020,5 @@ if __name__ == "__main__":
     ssl_verify=False,
     # ADD THESE NEW LINES:
     title="Ω Pruner ∞ — Infinite Edition",
-    theme=gr.themes.Soft(),
+    theme=gr.themes.Soft()
+    )
