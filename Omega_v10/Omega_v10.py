@@ -1248,7 +1248,7 @@ loadSavedRBF();
         """
         <div style="margin: 60px 0 30px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
             <strong>Ωmega Pruner v10.0 — Infinite Edition</strong><br>
-            <a href="https://github.com/omega-pruner/v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
+            <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
                 GitHub • Open Source • Apache 2.0
             </a><br>
             <small>Made with skull and lightning for the Bitcoin plebs • Never sell your coins</small>
