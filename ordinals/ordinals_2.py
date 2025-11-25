@@ -120,27 +120,6 @@ button[class*="svelte"] {
     min-height: 60px !important;
     box-shadow: 0 3px 10px rgba(0,0,0,0.1) !important;  /* Subtle secondary shadow */
 }
-/* TAME THE GAP BETWEEN FULL-WIDTH BUTTON ROWS — keep some space, not a canyon */
-.gr-row + .gr-row .full-width,
-.gr-row + .gr-row .bump-with-gap,
-.gr-row + .gr-row .tall-button {
-    margin-top: 20px !important;   /* ← perfect 20px gap instead of 60+px */
-}
-
-/* Optional: make the very first full-width button have normal top margin */
-.full-width:first-child,
-.bump-with-gap:first-child {
-    margin-top: 32px !important;   /* nice breathing room from content above */
-}
-.gr-row + .gr-row {
-    margin-top: -24px !important;   /* pulls the next row up */
-    padding-top: 0 !important;
-}
-
-/* then give the actual button a clean controlled gap */
-.gr-row + .gr-row .gr-button {
-    margin-top: 20px !important;    /* this is your perfect ~20px breathing room */
-}
 
 /* HOVER — FOR ALL */
 .gr-button:hover,
@@ -880,6 +859,56 @@ with gr.Blocks(
         </div>
         """,
         elem_id="omega-title"
+    )
+    # ——— GAP-FIXING INLINE CSS + JS OVERRIDE (Gradio 6.0.0 PROOF) ———
+    gr.HTML(
+        """
+        <style>
+        /* Global row gap killer — 20px between all full-width buttons */
+        .gr-row + .gr-row {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+        .gr-row + .gr-row .gr-button,
+        .gr-row + .gr-row .full-width {
+            margin-top: 20px !important;  /* Your exact tasteful gap */
+        }
+        /* Ensure Analyze (secondary) gets the same beef as others */
+        .gr-button[variant="secondary"] {
+            min-height: 60px !important;
+            padding: 16px 24px !important;
+            font-size: 1.2rem !important;
+        }
+        </style>
+        <script>
+        // FORCE APPLY AFTER GRADIO LOADS (beats Svelte re-styling)
+        setTimeout(() => {
+            const buttons = document.querySelectorAll('.gr-button button, .full-width button');
+            buttons.forEach(btn => {
+                btn.style.fontSize = '1.2rem';
+                btn.style.padding = '16px 24px';
+                btn.style.minHeight = '60px';
+                btn.style.borderRadius = '12px';
+                btn.style.fontWeight = '600';
+                if (btn.closest('[variant="primary"]') || btn.closest('.full-width')) {
+                    btn.style.fontSize = '1.35rem';
+                    btn.style.padding = '20px 28px';
+                    btn.style.minHeight = '68px';
+                    btn.style.fontWeight = '700';
+                    btn.style.boxShadow = '0 6px 18px rgba(247,147,26,0.35)';
+                }
+                // Gap force for rows
+                const rows = document.querySelectorAll('.gr-row + .gr-row');
+                rows.forEach(row => {
+                    row.style.marginTop = '0';
+                });
+                const nextButtons = document.querySelectorAll('.gr-row + .gr-row .gr-button');
+                nextButtons.forEach(b => b.style.marginTop = '20px');
+            });
+        }, 100);  // 100ms delay — after Gradio renders
+        </script>
+        """,
+        elem_id="gap-fixer-override"
     )
     gr.HTML(
         """
