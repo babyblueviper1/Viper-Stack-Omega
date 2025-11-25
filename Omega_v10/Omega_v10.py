@@ -699,11 +699,33 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
-with gr.Blocks(title="Omega v10 — Infinite Edition", css="""
-    body, .gradio-container { margin:0 !important; padding:0 !important; overflow-x:hidden !important; }
-""") as demo:
+with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
 
-    # 1. GIANT BREATHING OMEGA — works 100% in Gradio 6.0
+    # ─────────────────────── FLOATING QR BUTTONS (Gradio 6 safe) ───────────────────────
+    gr.HTML(
+        "<style>"
+        "#floating-qr-container{position:fixed!important;right:16px!important;bottom:20px!important;"
+        "z-index:999999!important;pointer-events:none!important}"
+        "#floating-qr-container>*{pointer-events:auto!important}"
+        ".qr-fab{position:fixed!important;width:70px!important;height:70px!important;border-radius:50%!important;"
+        "box-shadow:0 10px 40px rgba(0,0,0,0.7)!important;display:flex!important;align-items:center!important;"
+        "justify-content:center!important;font-size:38px!important;cursor:pointer!important;"
+        "border:5px solid white!important;font-weight:bold!important;user-select:none!important;"
+        "text-shadow:0 2px 8px rgba(0,0,0,0.5)!important;transition:all .25s cubic-bezier(.4,0,.2,1)!important}"
+        ".qr-fab:hover{transform:scale(1.18)!important;box-shadow:0 16px 50px rgba(0,0,0,0.8)!important}"
+        ".qr-fab.btc{bottom:100px!important;background:linear-gradient(135deg,#f7931a,#f9a43f);color:white!important}"
+        ".qr-fab.ln{bottom:20px!important;background:linear-gradient(135deg,#00ff9d,#33ffc7);color:#000!important;font-size:42px!important}"
+        "</style>"
+        "<div id='floating-qr-container'>"
+        "<label class='qr-fab btc' title='Scan Address / xpub'>B</label>"
+        "<label class='qr-fab ln' title='Scan Lightning Invoice'>Lightning</label>"
+        "</div>"
+        "<input type='file' accept='image/*' capture='environment' id='qr-btc' style='display:none'>"
+        "<input type='file' accept='image/*' capture='environment' id='qr-ln' style='display:none'>",
+        elem_id="floating-qr-container"
+    )
+
+    # ─────────────────────── GIANT OMEGA BACKGROUND ───────────────────────
     gr.HTML("""
     <style>
     #mega-omega {
@@ -722,36 +744,12 @@ with gr.Blocks(title="Omega v10 — Infinite Edition", css="""
         0%,100%{opacity:.76; transform:scale(.95) rotate(0deg)}
         50%    {opacity:1.0; transform:scale(1.05) rotate(180deg)}
     }
+    body, .gradio-container { margin:0 !important; padding:0 !important; overflow-x:hidden !important; }
     </style>
     <div id="mega-omega"><span>Ω</span></div>
     """)
 
-    # 2. FLOATING QR BUTTONS — perfect position, never cut off
-    gr.HTML("""
-    <style>
-    #floating-qr-container{position:fixed!important;right:16px!important;bottom:20px!important;
-        z-index:999999!important;pointer-events:none!important}
-    #floating-qr-container>*{pointer-events:auto!important}
-    .qr-fab{position:fixed!important;width:70px!important;height:70px!important;
-        border-radius:50%!important;box-shadow:0 10px 40px rgba(0,0,0,.7)!important;
-        display:flex!important;align-items:center!important;justify-content:center!important;
-        font-size:38px!important;cursor:pointer!important;border:5px solid white!important;
-        font-weight:bold!important;user-select:none!important;
-        text-shadow:0 2px 8px rgba(0,0,0,.5)!important;
-        transition:all .25s cubic-bezier(.4,0,.2,1)!important}
-    .qr-fab:hover{transform:scale(1.18)!important;box-shadow:0 16px 50px rgba(0,0,0,.8)!important}
-    .qr-fab.btc{bottom:100px!important;background:linear-gradient(135deg,#f7931a,#f9a43f);color:white!important}
-    .qr-fab.ln {bottom:20px!important;background:linear-gradient(135deg,#00ff9d,#33ffc7);color:#000!important;font-size:42px!important}
-    </style>
-    <div id="floating-qr-container">
-        <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-        <label class="qr-fab ln" title="Scan Lightning Invoice">Lightning</label>
-    </div>
-    <input type="file" accept="image/*" capture="environment" id="qr-btc" style="display:none">
-    <input type="file" accept="image/*" capture="environment" id="qr-ln" style="display:none">
-    """)
-
-    # 3. HEADER — clean, no gray box, no shift
+    # ─────────────────────── HEADER ───────────────────────
     gr.Markdown("""
     <div style="text-align:center;margin:32px auto 40px;padding:12px;max-width:90%;pointer-events:none">
         <h1 style="font-size:38px!important;font-weight:900!important;color:#f7931a!important;margin:0 0 12px 0!important;text-shadow:0 4px 12px rgba(247,147,26,0.4);line-height:1.2">
@@ -998,5 +996,9 @@ if __name__ == "__main__":
         share=True,
         show_error=True,
         allowed_paths=["./"],
-        ssl_verify=False
+        ssl_verify=False,
+        css="""
+            body, .gradio-container { margin:0 !important; padding:0 !important; overflow-x:hidden !important; }
+            #floating-qr-container { right:16px !important; }
+        """
     )
