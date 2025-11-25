@@ -55,53 +55,54 @@ details summary::-webkit-details-marker { display: none; }
 .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
 
 /* === RBF SECTION == */
-.rbf-buttons-column {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.copy-clear-group {
-    display: flex !important;
-    flex-direction: column !important;     /* mobile: stacked */
-    gap: 16px !important;                   /* ← THIS IS THE NUCLEAR GAP */
-    width: 100% !important;
-    margin: 0 0 16px 0 !important;
-    padding: 0 !important;
-}
-
-.copy-clear-group > div {
+.rbf-copy-btn,
+.rbf-clear-btn,
+.rbf-bump-btn {
     width: 100% !important;
     margin: 0 !important;
-    padding: 0 !important;
-}
-
-/* Desktop: side-by-side with big gap */
-@media (min-width: 769px) {
-    .copy-clear-group {
-        flex-direction: row !important;
-        gap: 24px !important;               /* ← huge, beautiful gap on desktop */
-        margin-bottom: 20px !important;
-    }
-    .copy-clear-group > div {
-        flex: 1 !important;
-    }
-}
-
-/* Force buttons to have their own background and padding */
-.copy-clear-group button {
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 12px 16px !important;
     box-sizing: border-box !important;
 }
-qr-center { 
-    display: flex !important; 
-    justify-content: center !important; 
-    align-items: center !important; 
+
+.rbf-clear-btn {
+    margin-top: 16px !important;     /* ← THIS IS THE GAP */
+}
+
+.rbf-bump-btn {
+    margin-top: 24px !important;     /* ← BIG GAP BEFORE BUMP */
+}
+
+/* Desktop: side-by-side if you want (optional) */
+@media (min-width: 769px) {
+    .rbf-copy-btn,
+    .rbf-clear-btn {
+        display: inline-block !important;
+        width: 48% !important;
+        margin-right: 4% !important;
+    }
+    .rbf-clear-btn {
+        margin-right: 0 !important;
+        margin-top: 0 !important;
+    }
+    .rbf-bump-btn {
+        margin-top: 32px !important;
+    }
+}
+.qr-center {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
     width: 100% !important;
     margin: 40px 0 !important;
     padding: 10px 0 !important;
+}
+
+/* Extra safety — force image centering */
+.qr-center img {
+    max-width: 96vw !important;
+    width: 460px !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
 }
 """
 # ==============================
@@ -909,7 +910,6 @@ with gr.Blocks(
     gr.Markdown("### Infinite RBF Bump Zone")
 
     with gr.Row():
-        # Left: the hex textbox
         with gr.Column(scale=8):
             rbf_in = gr.Textbox(
                 label="Raw hex (auto-saved from last tx)",
@@ -917,40 +917,49 @@ with gr.Blocks(
                 elem_classes="rbf-textbox"
             )
 
-        # Right: buttons column
-        with gr.Column(scale=4, elem_classes="rbf-buttons-column"):
-            # Copy + Clear group
-            with gr.Group(elem_classes="copy-clear-group"):
-                gr.Button("Copy raw hex", size="sm").click(
-                    None, None, None,
-                    js="""
-                    () => {
-                        const t = document.querySelector('textarea[label*="Raw hex"]');
-                        if(t && t.value){
-                            navigator.clipboard.writeText(t.value);
-                            alert("Copied!");
-                        }
+        # RIGHT COLUMN — THE FINAL SOLUTION
+        with gr.Column(scale=4):
+            # Copy button — standalone
+            copy_btn = gr.Button(
+                "Copy raw hex",
+                size="sm",
+                elem_classes="rbf-copy-btn"
+            ).click(
+                None, None, None,
+                js="""
+                () => {
+                    const t = document.querySelector('textarea[label*="Raw hex"]');
+                    if (t && t.value) {
+                        navigator.clipboard.writeText(t.value);
+                        alert("Copied!");
                     }
-                    """
-                )
-                gr.Button("Clear saved", size="sm").click(
-                    None, None, None,
-                    js="""
-                    () => {
-                        localStorage.removeItem('omega_rbf_hex');
-                        alert('Cleared!');
-                        location.reload();
-                    }
-                    """
-                )
+                }
+                """
+            )
 
-            # The big bump button
+            # Clear button — standalone, with margin
+            clear_btn = gr.Button(
+                "Clear saved",
+                size="sm",
+                elem_classes="rbf-clear-btn"
+            ).click(
+                None, None, None,
+                js="""
+                () => {
+                    localStorage.removeItem('omega_rbf_hex');
+                    alert('Cleared!');
+                    location.reload();
+                }
+                """
+            )
+
+            # Bump button — full width, big gap above
             rbf_btn = gr.Button(
                 "Bump +50 sat/vB to Miners",
                 variant="primary",
                 size="lg",
-                elem_classes="bump-button"
-            )    
+                elem_classes="rbf-bump-btn"
+            )
     # ==================================================================
     # Events
     # ==================================================================
@@ -1019,11 +1028,54 @@ with gr.Blocks(
 
     <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
     <script>
-    // your scanner JS here (unchanged)
+    const btcBtn = document.querySelector('.qr-fab.btc');
+    const lnBtn = document.querySelector('.qr-fab.ln');
+    const btcInput = document.getElementById('qr-scanner-btc');
+    const lnInput = document.getElementById('qr-scanner-ln');
+
+    btcBtn.onclick = () => btcInput.click();
+    lnBtn.onclick = () => lnInput.click();
+
+    async function scan(file, isLightning = false) {
+      if (!file) return;
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+          const result = await ZXing.readBarcodeFromCanvas(canvas);
+          const text = result.text.trim();
+          if (isLightning && text.toLowerCase().startsWith('lnbc')) {
+            const box = document.querySelector('textarea[placeholder*="lnbc"], textarea[label*="Lightning"]') || document.querySelector('textarea');
+            if (box) { box.value = text; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
+            alert("Lightning invoice scanned!");
+          } else if (!isLightning && /^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(text.split('?')[0].replace(/^bitcoin:/i, '').trim())) {
+            const cleaned = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+            const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
+            if (box) { box.value = cleaned; box.dispatchEvent(new Event('input')); box.dispatchEvent(new Event('change')); }
+            alert("Address/xpub scanned!");
+          } else alert("Not recognized");
+        } catch (e) { alert("No QR code detected"); }
+      };
+      img.src = URL.createObjectURL(file);
+    }
+
+    btcInput.onchange = e => scan(e.target.files[0], false);
+    lnInput.onchange = e => scan(e.target.files[0], true);
+
+    function loadSavedRBF() {
+        const saved = localStorage.getItem('omega_rbf_hex');
+        if (!saved) return;
+        const box = document.querySelector('textarea[label*="Raw hex"]');
+        if (box) box.value = saved;
+    }
+    loadSavedRBF();
     </script>
 
     <style>
-      .qr-fab {
+      .qr-fab {{
         position: fixed !important;
         right: 20px;
         width: 70px;
@@ -1041,10 +1093,10 @@ with gr.Blocks(
         user-select: none;
         z-index: 9999;
         text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-      }
-      .qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
-      .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
-      .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
+      }}
+      .qr-fab:hover {{ transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }}
+      .qr-fab.btc {{ bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }}
+      .qr-fab.ln  {{ bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }}
     </style>
     """)
     
