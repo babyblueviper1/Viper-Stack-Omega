@@ -704,7 +704,7 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
     # ─────────────────────── FLOATING QR BUTTONS (Gradio 6 safe) ───────────────────────
     gr.HTML(
         "<style>"
-        "#floating-qr-container{position:fixed!important;right:16px!important;bottom:20px!important;"
+        "#floating-qr-container{position:fixed!important;right:20px!important;bottom:20px!important;"
         "z-index:999999!important;pointer-events:none!important}"
         "#floating-qr-container>*{pointer-events:auto!important}"
         ".qr-fab{position:fixed!important;width:70px!important;height:70px!important;border-radius:50%!important;"
@@ -725,30 +725,25 @@ with gr.Blocks(title="Omega v10 — Infinite Edition") as demo:
         elem_id="floating-qr-container"
     )
 
-    # ─────────────────────── GIANT OMEGA BACKGROUND ───────────────────────
-    gr.HTML("""
-    <style>
-    #mega-omega {
-        position:fixed !important; inset:0 !important; z-index:-1 !important;
-        pointer-events:none !important; display:flex !important;
-        align-items:center !important; justify-content:center !important;
-    }
-    #mega-omega span {
-        font-size:90vh; font-weight:900; color:transparent;
-        background:linear-gradient(135deg,rgba(247,147,26,0.28),rgba(247,147,26,0.15));
-        -webkit-background-clip:text; background-clip:text;
-        text-shadow:0 0 220px rgba(247,147,26,0.72);
-        animation:breath 28s infinite ease-in-out; user-select:none;
-    }
-    @keyframes breath{
-        0%,100%{opacity:.76; transform:scale(.95) rotate(0deg)}
-        50%    {opacity:1.0; transform:scale(1.05) rotate(180deg)}
-    }
-    body, .gradio-container { margin:0 !important; padding:0 !important; overflow-x:hidden !important; }
-    </style>
-    <div id="mega-omega"><span>Ω</span></div>
-    """)
-
+    # ─────────────────────── OMEGA BACKGROUND + HEADER (Gradio 6 safe) ───────────────────────
+    gr.HTML(
+        "<div id='omega-bg' style='position:fixed;inset:0;z-index:-1;pointer-events:none;display:flex;"
+        "align-items:center;justify-content:center;overflow:hidden'>"
+        "<span style='font-size:100vh;font-weight:900;background:linear-gradient(135deg,rgba(247,147,26,0.28),rgba(247,147,26,0.15));"
+        "-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 220px rgba(247,147,26,0.72);"
+        "animation:omega-breath 28s infinite ease-in-out;user-select:none;opacity:0.96'>Ω</span>"
+        "</div>"
+        "<style>"
+        "@keyframes omega-breath{0%,100%{opacity:.76;transform:scale(.95) rotate(0deg)}"
+        "50%{opacity:1;transform:scale(1.05) rotate(180deg)}}"
+        "</style>"
+        "<script>"
+        "window.addEventListener('load',()=>{"
+        "const el=document.getElementById('omega-bg');if(el){el.style.display='none';"
+        "setTimeout(()=>{el.style.display='flex'},120)}});"
+        "</script>",
+        elem_id="omega-bg-container-fixed"
+    )
   
       
     # ====================== LAYOUT STARTS HERE ======================
