@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import urllib.parse
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 print(f"Gradio version: {gr.__version__}")
@@ -35,16 +36,97 @@ input_vb_global = output_vb_global = None
 # CSS
 # ==============================
 css = """
-/* Full-width buttons */
-.full-width, .full-width > button { width: 100% !important; margin: 20px 0 !important; }
-.tall-button { height: 100% !important; }
-.tall-button > button { height: 100% !important; padding: 20px !important; font-size: 18px !important; }
+/* —————————————————————— ΩMEGA PRUNER v10 — INFINITE EDITION CSS —————————————————————— */
+
+/* 1. SANE, BEAUTIFUL GAPS — GRADIO 6+ FIX */
+.gr-row {
+    gap: 14px !important;
+}
+.gr-row:has(.full-width),
+.gr-row:has(.bump-with-gap),
+.gr-row:has(.gr-button.size-lg) {
+    gap: 16px !important;
+}
+
+/* Slightly bigger breathing room between Generate → Start Over */
+#generate-and-startover-row {
+    gap: 22px !important;
+}
+
+/* Kill any rogue margins/padding that fight us */
+.full-width, .full-width > div, .full-width button,
+.bump-with-gap, .bump-with-gap > div, .bump-with-gap button {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 2. BEEFY, PREMIUM BUTTONS — HITS EVERY LAYER Gradio 6 uses */
+.gr-button button,
+.gr-button > div,
+.gr-button > button,
+.gr-button [class*="svelte"],
+button[class*="svelte"] {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+    padding: 16px 28px !important;
+    min-height: 62px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
+    transition: all 0.22s ease !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    text-align: center !important;
+}
+
+/* PRIMARY & LARGE BUTTONS = ABSOLUTE UNITS */
+.gr-button[variant="primary"],
+.gr-button.size-lg,
+.full-width,
+.bump-with-gap,
+.tall-button {
+    font-size: 1.38rem !important;
+    font-weight: 750 !important;
+    padding: 22px 32px !important;
+    min-height: 72px !important;
+    box-shadow: 0 6px 20px rgba(247,147,26,0.38) !important;
+}
+
+/* SECONDARY BUTTONS — STILL THICC, BUT NOT DOMINANT */
+.gr-button[variant="secondary"] button,
+.gr-button[variant="secondary"] > button {
+    font-size: 1.28rem !important;
+    font-weight: 600 !important;
+    padding: 18px 28px !important;
+    min-height: 64px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+}
+
+/* HOVER — ALL BUTTONS GET THE GLOW-UP */
+.gr-button:hover button,
+.gr-button:hover > button,
+.gr-button:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.22) !important;
+}
+
+/* PRIMARY HOVER = ORANGE SUPERNOVA */
+.gr-button[variant="primary"]:hover,
+.gr-button.size-lg:hover {
+    box-shadow: 0 14px 32px rgba(247,147,26,0.5) !important;
+    transform: translateY(-4px) !important;
+}
+
+/* 3. MISC FIXES YOU ALREADY HAD */
 details summary { list-style: none; cursor: pointer; }
 details summary::-webkit-details-marker { display: none; }
 
-/* Floating QR Buttons */
-.qr-fab {
-  position: fixed !important; right: 20px; z-index: 9999; width: 70px; height: 70px;
+#rbf-hex-box textarea {
+    font-family: 'Courier New', monospace !important;
+    font-size: 0.95rem !important;
+}
+
+/* Floating QR Buttons — untouched, still perfect */
+.qr-fab { position: fixed !important; right: 20px; z-index: 9999; width: 70px; height: 70px;
   border-radius: 50%; box-shadow: 0 10px 40px rgba(0,0,0,0.7); display: flex;
   align-items: center; justify-content: center; font-size: 38px; cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1); border: 5px solid white;
@@ -53,95 +135,6 @@ details summary::-webkit-details-marker { display: none; }
 .qr-fab:hover { transform: scale(1.18); box-shadow: 0 16px 50px rgba(0,0,0,0.8); }
 .qr-fab.btc { bottom: 100px; background: linear-gradient(135deg, #f7931a, #f9a43f); color: white; }
 .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
-
-
-#rbf-hex-box textarea {
-    font-family: 'Courier New', monospace !important;
-    font-size: 0.95rem !important;
-}
-
-.full-width {
-    width: 100% !important;
-    margin: 20px 0 0 0 !important;   /* fallback if bump-with-gap not used */
-}
-
-.bump-with-gap {
-    margin-top: 20px !important;    /* perfect gap above Bump button */
-    width: 100% !important;
-}
-.gr-button button {
-    font-size: 1.1rem !important;          /* Bigger text for all buttons */
-    font-weight: 600 !important;            /* Bold & punchy */
-    padding: 14px 20px !important;          /* Taller + wider padding */
-    min-height: 56px !important;            /* Perfect mobile tap target */
-    border-radius: 12px !important;         /* Softer, modern corners */
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;  /* Subtle lift */
-    transition: all 0.2s ease !important;   /* Smooth hovers */
-    width: 100% !important;                 /* Full-width fallback */
-}
-
-/* GRADIO 6.0.0 BEEFY BUTTONS — HITS EVERY LAYER, NO CONFLICTS */
-.gr-button,
-.gr-button > div,
-.gr-button > button,
-.gr-button [class*="svelte"],
-button[class*="svelte"] {
-    font-size: 1.2rem !important;           /* Bigger text — unified for ALL */
-    font-weight: 600 !important;            /* Bold everywhere */
-    padding: 16px 24px !important;          /* Fat padding — overrides defaults */
-    min-height: 60px !important;            /* Big tap targets */
-    border-radius: 12px !important;         /* Curves */
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;  /* Lift */
-    transition: all 0.2s ease !important;   /* Smooth */
-    line-height: 1.4 !important;            /* Fit */
-    width: 100% !important;                 /* Full fallback */
-}
-
-/* THICCER PRIMARIES + CUSTOM CLASSES (Analyze secondary gets base; primaries get extra) */
-.gr-button[variant="primary"],
-.gr-button[variant="primary"] > div,
-.gr-button[variant="primary"] > button,
-.gr-button.size-lg,
-.full-width,
-.bump-with-gap,
-.tall-button {
-    font-size: 1.35rem !important;          /* HUGE for Bump/Generate/Lightning/Start Over */
-    padding: 20px 28px !important;          /* Extra fat */
-    min-height: 68px !important;            /* Towering */
-    font-weight: 700 !important;            /* Super bold */
-    box-shadow: 0 6px 18px rgba(247,147,26,0.35) !important;  /* Orange glow */
-}
-
-/* SECONDARY BUTTONS LIKE ANALYZE — BOOST TO MATCH (no variant="primary") */
-.gr-button[variant="secondary"] button,
-.gr-button[variant="secondary"] > button {
-    font-size: 1.2rem !important;           /* Bigger than default, but not HUGE */
-    padding: 16px 24px !important;
-    min-height: 60px !important;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1) !important;  /* Subtle secondary shadow */
-}
-
-/* HOVER — FOR ALL */
-.gr-button:hover,
-.gr-button:hover > button,
-.gr-button [class*="svelte"]:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2) !important;
-    opacity: 0.95 !important;
-}
-
-/* ANTI-CACHE FORCE (Gradio 6 JS re-styling killer) */
-.gr-button button {
-    animation: beefify 0.15s forwards !important;
-}
-@keyframes beefify {
-    from { transform: scale(1); opacity: 1; }
-    to { 
-        font-size: inherit !important; 
-        padding: inherit !important; 
-        min-height: inherit !important; 
-    }
-}
 """
 # ==============================
 # Bitcoin Helpers
@@ -657,7 +650,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             Click <b>Generate Transaction</b> to continue
         </div>
         """,
-        gr.update(visible=True)
+        gr.update(visible=True), gr.update(visible=True)
     )
 
 # ==============================
@@ -780,8 +773,9 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     return (
         html,
-        gr.update(visible=False),   # generate_btn
-        gr.update(visible=True),    # ln_invoice_row
+        gr.update(visible=True), # generate_btn
+        gr.update(visible=True), # generate_row
+        gr.update(visible=True),  # ln_invoice_row
         "",                         # ln_invoice_state (cleared)
         raw_hex                     # saved for infinite RBF
     )
@@ -845,7 +839,7 @@ def lightning_sweep_flow(utxos, invoice, miner_fee, dao_cut, selfish_mode, detec
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Omega v10 — Infinite Edition"
+    title="Omega v10 — Infinite Edition",
 ) as demo:
     gr.Markdown(
         """
@@ -860,6 +854,7 @@ with gr.Blocks(
         """,
         elem_id="omega-title"
     )
+    
     gr.HTML(
         """
         <div id="omega-bg" style="
@@ -997,7 +992,7 @@ with gr.Blocks(
 
     output_log = gr.HTML()
 
-    with gr.Row():
+    with gr.Row(visible=False) as generate_row:    # ← starts hidden = 0px height
         generate_btn = gr.Button(
             "2. Generate Transaction",
             visible=False,
@@ -1083,13 +1078,13 @@ with gr.Blocks(
     submit_btn.click(
         analysis_pass,
         [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-        [output_log, generate_btn]
+        [output_log, generate_btn,generate_row]
     )
 
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, ln_invoice_state],
-        outputs=[output_log, generate_btn, ln_invoice_row, ln_invoice_state, rbf_in]
+        outputs=[output_log, generate_btn, generate_row, ln_invoice_row, ln_invoice_state, rbf_in]
     )
 
     ln_invoice.change(lambda x: x, ln_invoice, ln_invoice_state)
@@ -1109,13 +1104,13 @@ with gr.Blocks(
     start_over_btn.click(
         lambda: (
             "", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
-            "", gr.update(visible=False), gr.update(visible=False),
+            "", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),
             "", "", ""
         ),
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
             selfish_mode, dao_percent, dao_addr,
-            output_log, generate_btn, ln_invoice_row,
+            output_log, generate_btn, generate_row, ln_invoice_row,
             ln_invoice, ln_invoice_state, rbf_in
         ]
     )
