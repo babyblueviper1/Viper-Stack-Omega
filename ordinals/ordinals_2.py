@@ -1022,9 +1022,7 @@ with gr.Blocks(
                 variant="primary",
                 size="lg",
                 elem_classes="bump-button"
-            )
-    gr.Markdown("<small style='color:#888; text-align:center;'>Bump counter & info appears above</small>")
-    
+            )    
     # ==================================================================
     # Events
     # ==================================================================
@@ -1153,6 +1151,19 @@ with gr.Blocks(
       .qr-fab.ln  { bottom: 20px;  background: linear-gradient(135deg, #00ff9d, #33ffc7); color: #000; font-size: 42px; }
     </style>
     """)
+
+    gr.Markdown(
+        """
+        <div style="margin: 40px 0 20px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9;">
+            <strong>Ωmega Pruner v10 — Infinite Edition</strong><br>
+            <a href="https://github.com/yourusername/omega-pruner" target="_blank" style="color: #f7931a; text-decoration: none;">
+                GitHub • Open Source • Apache 2.0
+            </a><br>
+            <small>Made with ☠️ and ⚡ for the Bitcoin plebs • Never sell your coins</small>
+        </div>
+        """,
+        elem_id="omega-footer"
+    )
 
 if __name__ == "__main__":
     import os
