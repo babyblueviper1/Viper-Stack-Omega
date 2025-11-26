@@ -4,7 +4,6 @@
 
 **LIVE:** https://omega-v10.onrender.com  
 **Launched:** November 26, 2025  
-**v10.1 Update:** Future-fee apocalypse slider (3×–20×) added — watch savings explode
 
 | Property                                 | Ωmega Pruner v10.0                                          | Everyone Else in 2025 |
 |------------------------------------------|------------------------------------------------------------|-----------------------|
