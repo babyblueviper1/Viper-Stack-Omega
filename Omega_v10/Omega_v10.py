@@ -427,185 +427,104 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 
 def rbf_bump(raw_hex: str, bump: int = 50):
-    # Ultra-defensive: if Gradio somehow lost it, try to recover from JS
+    # === Recover from localStorage (keep this) ===
     if not raw_hex or not raw_hex.strip():
         try:
             import js
             saved = js.localStorage.getItem("omega_rbf_hex")
-            if saved and len(saved) > 200:
+            if saved and len(saved) > 400:
                 raw_hex = saved
-                print("RBF hex recovered from localStorage fallback")
         except:
             pass
 
     if not raw_hex or not raw_hex.strip():
         return "", "<div style='color:#f7931a; text-align:center; padding:20px;'>No transaction to bump yet — generate one first</div>"
-    
-    # Critical guard — Gradio sometimes passes None or empty
-    if not raw_hex or not isinstance(raw_hex, str):
-        return "", "<div style='color:#f7931a; text-align:center; padding:20px;'>No transaction to bump yet — generate one first</div>"
 
     raw_hex = raw_hex.strip()
-    if not raw_hex:
-        return "", "<div style='color:#f7931a; text-align:center; padding:20px;'>Paste a raw transaction hex first</div>"
-
     try:
         data = bytes.fromhex(raw_hex)
-    except Exception:
-        return "Invalid hex", raw_hex
-
-    if len(data) < 100:
-        return "Too short — not a valid transaction", raw_hex
+    except:
+        return "", "Invalid hex"
 
     pos = 0
-
-    # Parse version
-    version = int.from_bytes(data[pos:pos + 4], 'little')
-    if version not in (1, 2):
-        return "Unsupported transaction version (only v1/v2 allowed)", raw_hex
+    version = int.from_bytes(data[pos:pos+4], 'little')
     pos += 4
+    is_segwit = data[pos:pos+2] == b'\x00\x01'
+    if is_segwit: pos += 2
 
-    # Detect SegWit
-    is_segwit = data[pos:pos + 2] == b'\x00\x01'
-    if is_segwit:
-        pos += 2
-
-    # Parse inputs
+    # === Parse inputs (with correct sequence positions) ===
     vin_len, pos = varint_decode(data, pos)
-    if vin_len == 0:
-        return "Transaction has no inputs", raw_hex
-
     inputs = []
     for _ in range(vin_len):
-        txid = data[pos:pos + 32][::-1].hex()
-        vout = int.from_bytes(data[pos + 32:pos + 36], 'little')
+        txid = data[pos:pos+32][::-1].hex()
+        vout = int.from_bytes(data[pos+32:pos+36], 'little')
         pos += 36
         script_len, pos = varint_decode(data, pos)
         pos += script_len
-        sequence = int.from_bytes(data[pos:pos + 4], 'little')
+        sequence = int.from_bytes(data[pos:pos+4], 'little')
+        seq_pos = pos  # ← this is the correct position!
         pos += 4
-        inputs.append({
-            'txid': txid,
-            'vout': vout,
-            'sequence': sequence,
-            'sequence_pos': pos - 4,
-        })
+        inputs.append({'sequence': sequence, 'seq_pos': seq_pos})
 
-    # Parse outputs
+    # === Parse first output (change) ===
     vout_len, pos = varint_decode(data, pos)
     if vout_len == 0:
-        return "Transaction has no outputs — nothing to bump", raw_hex
-
-    first_output_pos = pos
-    output_amount_pos = pos
+        return "", "No outputs"
+    amount_pos = pos
+    current_amount = int.from_bytes(data[pos:pos+8], 'little')
     pos += 8
     script_len, pos = varint_decode(data, pos)
     pos += script_len
-
-    # Skip remaining outputs
     for _ in range(1, vout_len):
         pos += 8
         slen, pos = varint_decode(data, pos)
         pos += slen
 
-    # Skip witness data (if SegWit)
+    # Skip witness + locktime safely
     if is_segwit:
-        for _ in range(vin_len):
-            witness_items, pos = varint_decode(data, pos)
-            for _ in range(witness_items):
-                item_len, pos = varint_decode(data, pos)
-                pos += item_len
+        try:
+            for _ in range(vin_len):
+                items, pos = varint_decode(data, pos)
+                for _ in range(items):
+                    ilen, pos = varint_decode(data, pos)
+                    pos += ilen
+        except: pass
+    if pos + 4 <= len(data):
+        pos += 4
 
-    # Locktime
-    if pos + 4 > len(data):
-        return "Truncated transaction — failed to parse locktime", raw_hex
-    int.from_bytes(data[pos:pos + 4], 'little')
-    pos += 4
-
-    # Safety checks
-    current_amount = int.from_bytes(data[output_amount_pos:output_amount_pos + 8], 'little')
-    if current_amount == 0:
-        return "First output is 0 — this is an anyone-can-spend output, cannot reduce", raw_hex
-
+    # === Safety & fee calc ===
     vsize = (len(data) + 3) // 4
-    extra_fee = int(vsize * bump)
-
+    extra_fee = vsize * bump
     if current_amount <= extra_fee + 546:
-        needed = extra_fee + 546 - current_amount + 1
-        return (
-            f"<div style='color:#ff3333; background:#300; padding:16px; border-radius:12px;'>"
-            f"<b>Cannot bump +{bump} sat/vB</b><br>"
-            f"Would reduce change output to dust (≤546 sats)<br>"
-            f"Need at least <b>+{needed:,}</b> more sats in change output"
-            f"</div>"
-        ), raw_hex
+        return raw_hex, f"<div style='color:#ff3333; background:#300; padding:16px; border-radius:12px;'>Not enough change left for +{bump} sat/vB<br>Need {(extra_fee + 546 - current_amount):,} more sats</div>"
 
-    # Detect Taproot
-    is_taproot = (
-        is_segwit and
-        vout_len >= 1 and
-        data[first_output_pos + 8:first_output_pos + 10] == b'\x51\x20'
-    )
-
-    # RBF signaling
-    sequences = [inp['sequence'] for inp in inputs]
-    rbf_signaled = any(seq < 0xfffffffe for seq in sequences)
-    all_max = all(seq == 0xffffffff for seq in sequences)
-
-    # User feedback
-    if is_taproot:
-        warning = (
-            "<div style='color:#ff9900; background:#332200; padding:14px; border-radius:10px; margin:12px 0; border:2px solid #ff9900;'>"
-            "<b>Taproot Key-Path Spend Detected</b><br>"
-            "Sequence-based RBF is ignored.<br>"
-            "Use anyone-can-spend output or Sparrow for reliable RBF."
-            "</div>"
-        )
-        rbf_action = "fee bump only"
-    elif not rbf_signaled and all_max:
-        warning = "<div style='color:#00ff9d; background:#003300; padding:14px; border-radius:10px; border:2px solid #00ff9d; margin:12px 0;'>"
-        warning += "<b>RBF signaling added</b> — now replaceable!</div>"
-        rbf_action = "signaling + fee bump"
-    elif rbf_signaled:
-        warning = "<div style='color:#f7931a; background:#332200; padding:14px; border-radius:10px; margin:12px 0;'>"
-        warning += "<b>Already RBF-enabled</b> — increasing fee only</div>"
-        rbf_action = "fee bump only"
-    else:
-        warning = ""
-        rbf_action = "fee bump"
-
-    # Apply bump
+    # === APPLY BUMP ===
     tx = bytearray(data)
     new_amount = current_amount - extra_fee
-    tx[output_amount_pos:output_amount_pos + 8] = new_amount.to_bytes(8, 'little')
+    tx[amount_pos:amount_pos+8] = new_amount.to_bytes(8, 'little')
 
-    # Add RBF signaling if needed
-    if not is_taproot and all_max:
+    # Add RBF signaling ONCE (only if still missing)
+    needs_rbf = all(inp['sequence'] == 0xffffffff for inp in inputs)
+    if needs_rbf:
         for inp in inputs:
-            if inp['sequence'] == 0xffffffff:
-                tx[inp['sequence_pos']:inp['sequence_pos'] + 4] = (0xfffffffd).to_bytes(4, 'little')
+            tx[inp['seq_pos']:inp['seq_pos']+4] = (0xfffffffd).to_bytes(4, 'little')
 
-    bumped_hex = tx.hex()
+    new_hex = tx.hex()
 
-    # Stats
-    try:
-        fee_rate_api = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=6).json()["fastestFee"]
-    except:
-        fee_rate_api = "unknown"
-
-    bump_count = sum(1 for s in sequences if s == 0xffffffff) + (1 if all_max else 0)
+    # === Correct bump counter ===
+    total_bumps = sum(1 for inp in inputs if inp['sequence'] != 0xffffffff)
+    if needs_rbf:
+        total_bumps += 1  # because we just added it
 
     info = f"""
-    {warning}
-    <div style="background:#00ff9d20; padding:18px; border-radius:14px; border:3px solid #00ff9d; margin:20px 0; text-align:center; font-family: monospace;">
-        <b style="font-size:24px; color:#00ff9d;">Bump #{bump_count}</b><br><br>
+    <div style="background:#00ff9d20; padding:20px; border-radius:14px; border:3px solid #00ff9d; margin:20px 0; text-align:center; font-family: monospace;">
+        <b style="font-size:28px; color:#00ff9d;">BUMP #{total_bumps}</b><br><br>
         +{bump} sat/vB → +{extra_fee:,} sats to miners<br>
-        Change reduced: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b><br><br>
-        <small>Current fastest: ~{fee_rate_api} sat/vB • {rbf_action}</small>
+        Change reduced: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b>
     </div>
     """
 
-    return bumped_hex, info
+    return new_hex, info
 # ==============================
 # Core Functions
 # ==============================
