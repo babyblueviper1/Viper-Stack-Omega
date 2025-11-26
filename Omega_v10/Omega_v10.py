@@ -1030,18 +1030,7 @@ with gr.Blocks(
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
         outputs=[output_log, generate_btn, generate_row, rbf_in],
         queue=False,
-        js="""
-       (raw_hex) => {
-        if (raw_hex) {
-            const box = document.querySelector('#rbf-hex-box textarea');
-            if (box) {
-                box.value = raw_hex;
-                box.dispatchEvent(new Event('input'));
-                box.dispatchEvent(new Event('change'));
-            }
-        }
-    }
-    """
+        js=
     )
     start_over_btn.click(
         lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
