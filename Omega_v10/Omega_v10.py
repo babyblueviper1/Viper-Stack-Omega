@@ -423,79 +423,6 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
         return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
 
 # ==============================
-# RBF BUMP — FINAL, BULLETPROOF VERSION (put it right here!)
-# ==============================
-
-def rbf_bump(raw_hex: str, bump: int = 50):
-    if not raw_hex or len(raw_hex := raw_hex.strip()) < 400:
-        return raw_hex, "<div style='color:#f7931a;padding:20px;text-align:center;'>Generate a transaction first</div>"
-
-    try:
-        data = bytes.fromhex(raw_hex)
-    except:
-        return raw_hex, "Invalid hex"
-
-    # --- SUPER SAFE WAY TO FIND CHANGE OUTPUT (first output) ---
-    try:
-        pos = 4
-        if len(data) > pos + 1 and data[pos:pos+2] == b'\x00\x01':
-            pos += 2
-
-        # Skip inputs roughly
-        vin_len = data[pos]
-        pos += 1 + vin_len * 50  # safe over-estimate
-
-        # First output amount
-        if len(data) < pos + 9:
-            return raw_hex, "Tx too short"
-        amount_pos = pos
-        current_amount = int.from_bytes(data[pos:pos+8], 'little')
-    except:
-        return raw_hex, "Failed to read tx"
-
-    vsize = (len(data) + 3) // 4
-    extra_fee = vsize * bump
-
-    if current_amount <= extra_fee + 546:
-        return raw_hex, f"<div style='color:#ff3333;background:#300;padding:16px;border-radius:12px;'>Not enough change (+{bump} sat/vB)</div>"
-
-    # --- APPLY BUMP ---
-    tx = bytearray(data)
-    new_amount = current_amount - extra_fee
-    tx[amount_pos:amount_pos+8] = new_amount.to_bytes(8, 'little')
-
-    # Enable RBF on first bump (simple heuristic)
-    try:
-        for i in range(20):  # max 20 inputs
-            seq_pos = 41 + i*50 + (2 if data[4:6] == b'\x00\x01' else 0)
-            if seq_pos + 4 >= len(tx):
-                break
-            if tx[seq_pos:seq_pos+4] == b'\xff\xff\xff\xff':
-                tx[seq_pos:seq_pos+4] = b'\xfd\xff\xff\xff'
-    except:
-        pass
-
-    new_hex = tx.hex()
-
-    # --- COUNTER & SAVE ---
-    try:
-        import js
-        count = int(js.localStorage.getItem("bump_count") or "0") + 1
-        js.localStorage.setItem("bump_count", str(count))
-        js.localStorage.setItem("omega_rbf_hex", new_hex)
-    except:
-        count = 1
-
-    info = f"""
-    <div style="background:#00ff9d20;padding:30px;border-radius:16px;border:5px solid #00ff9d;text-align:center;margin:20px 0;">
-        <h1 style="color:#00ff9d;margin:0;font-size:42px;">BUMP #{count}</h1>
-        <p style="margin:10px 0;font-size:18px;">+{bump} sat/vB → +{extra_fee:,} sats to miners</p>
-        <p>Change: {format_btc(current_amount)} → <b style="color:#00ff9d;font-size:22px;">{format_btc(new_amount)}</b></p>
-    </div>
-    """
-
-    return new_hex, info
-# ==============================
 # Core Functions
 # ==============================
 def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
@@ -678,7 +605,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Omega v10 — Infinite Edition",
+    title="Omega v10",
 ) as demo:
     gr.Markdown(
         """
@@ -686,9 +613,6 @@ with gr.Blocks(
             <h1 style="font-size: 3.2rem; margin: 0; background: linear-gradient(135deg, #f7931a, #ff9900); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 30px rgba(247,147,26,0.4);">
                 Ωmega Pruner v10
             </h1>
-            <h2 style="font-size: 1.7rem; color: #f7931a; margin: 8px 0 30px; font-weight: 600;">
-                Infinite Edition — RBF Forever • Privacy First
-            </h2>
         </div>
         """,
         elem_id="omega-title"
@@ -849,32 +773,7 @@ with gr.Blocks(
             elem_classes="full-width"
         )
 
-    # =================== INFINITE RBF SECTION ===================
-    gr.Markdown("### Infinite RBF Bump Zone")
 
-    with gr.Row():
-        with gr.Column(scale=8):
-            rbf_in = gr.Textbox(
-                label="Raw hex (auto-saved from last tx)",
-                lines=6,
-                elem_id="rbf-hex-box",
-                buttons=["copy"]
-            )
-        
-
-        with gr.Column(scale=4):
-            clear_rbf_btn = gr.Button(
-                "Clear RBF Hex",
-                variant="secondary",
-                size="lg",
-                elem_classes="bump-with-gap"
-            )
-            rbf_btn = gr.Button(
-                "Bump +50 sat/vB to Miners",
-                variant="primary",
-                size="lg",
-                elem_classes="full-width bump-with-gap"
-            )
     # ==================================================================
     # Events
     # ==================================================================
@@ -899,22 +798,7 @@ with gr.Blocks(
             output_log, generate_btn, generate_row, rbf_in
         ]
     )
-    rbf_btn.click(
-        fn=rbf_bump,
-        inputs=rbf_in,
-        outputs=[rbf_in, output_log],
-        queue=True
-        )
-    clear_rbf_btn.click(
-        lambda: ("", ""),
-        outputs=[rbf_in, output_log],
-        js="""
-        () => {
-        localStorage.removeItem('omega_rbf_hex');
-        localStorage.removeItem('omega_bump_count');
-        }
-        """
-    )
+
 
     # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
     gr.HTML("""
@@ -952,10 +836,11 @@ if (!document.getElementById('toast-style')) {
     document.head.appendChild(s);
 }
 
-// QR Scanner — perfect
+// QR Scanner — perfect and untouched
 document.querySelector('.qr-fab.btc')?.addEventListener('click', () => 
     document.getElementById('qr-scanner-btc').click()
 );
+
 document.getElementById('qr-scanner-btc').onchange = async e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -968,57 +853,19 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
             const res = await ZXing.readBarcodeFromCanvas(canvas);
             const txt = res.text.trim().split('?')[0].replace(/^bitcoin:/i, '');
             if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(txt)) {
-                const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || document.querySelector('textarea');
+                const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
+                           document.querySelector('textarea');
                 if (box) {
                     box.value = txt;
                     box.dispatchEvent(new Event('input', {bubbles:true}));
                     box.dispatchEvent(new Event('change', {bubbles:true}));
                 }
                 showToast("Scanned!");
-            } else showToast("Not BTC address/xpub", true);
-        } catch { showToast("No QR", true); }
+            } else showToast("Not a BTC address/xpub", true);
+        } catch { showToast("No QR detected", true); }
     };
     img.src = URL.createObjectURL(file);
 };
-
-// ————————————————————————————————
-// INFINITE RBF — THIS ONE WORKS
-// ————————————————————————————————
-let isBumping = false;
-
-// Catch bump button click
-document.addEventListener('click', e => {
-    if (e.target?.textContent?.includes('Bump +50')) {
-        isBumping = true;
-    }
-    if (e.target?.textContent?.includes('Start Over')) {
-        localStorage.removeItem('omega_rbf_hex');
-        localStorage.removeItem('omega_bump_count');
-    }
-});
-
-// Save new hex ONLY when we just bumped
-document.addEventListener('gradio', e => {
-    if (!isBumping) return;
-    const hex = e.detail?.output?.data?.[0];
-    if (hex && typeof hex === 'string' && hex.length > 800 && /^[0-9a-fA-F]+$/.test(hex)) {
-        localStorage.setItem('omega_rbf_hex', hex);
-        isBumping = false;
-    }
-});
-
-// Restore saved hex on page load
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        const saved = localStorage.getItem('omega_rbf_hex');
-        const box = document.querySelector('#rbf-hex-box textarea');
-        if (saved && box && box.value.trim().length < 800) {
-            box.value = saved;
-            box.dispatchEvent(new Event('input', {bubbles:true}));
-            box.dispatchEvent(new Event('change', {bubbles:true}));
-        }
-    }, 700);
-});
 </script>
 """)
 
@@ -1026,7 +873,7 @@ window.addEventListener('load', () => {
     gr.Markdown(
         """
         <div style="margin: 60px 0 30px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
-            <strong>Ωmega Pruner v10.0 — Infinite Edition</strong><br>
+            <strong>Ωmega Pruner v10.0</strong><br>
             <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
                 GitHub • Open Source • Apache 2.0
             </a><br>
