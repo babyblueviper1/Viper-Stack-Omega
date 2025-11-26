@@ -958,6 +958,19 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
         """,
         elem_id="omega-footer"
     )
+
+   # ——— OFFICIAL OMEGA THUMBNAIL — LIVE EVERYWHERE ———
+    gr.HTML("""
+    <meta property="og:title" content="Ωmega Pruner v10.0 — NUCLEAR EDITION">
+    <meta property="og:description" content="The last UTXO consolidator alive in 2025. NUCLEAR PRUNE — max 3 inputs. Only the strongest survive.">
+    <meta property="og:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Glowing Ωmega Pruner Symbol">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    """, visible=False)
+    
 if __name__ == "__main__":
     import os
     import warnings
@@ -978,3 +991,4 @@ if __name__ == "__main__":
         ssl_verify=False,
         css=css
     )
+
