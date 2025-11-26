@@ -967,7 +967,7 @@ with gr.Blocks(
                 label="Raw hex (auto-saved from last tx)",
                 lines=6,
                 elem_id="rbf-hex-box",
-                show_copy_button=True  # ← Direct parameter — works in Gradio 6.0.1
+                buttons=["copy"]
             )
         
 
@@ -1030,44 +1030,113 @@ with gr.Blocks(
 
     # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
     gr.HTML("""
-    <!-- Floating BTC Scanner Button -->
+<!-- Floating BTC Scanner Button -->
     <label class="qr-fab btc" title="Scan Address / xpub">B</label>
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
     <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-<script>
-// Toast function (unchanged - perfect)
-function showToast(message, isError = false) { ... }  // ← keep your existing toast code
-
-// BTC Scanner (unchanged)
-const btcBtn = document.querySelector('.qr-fab.btc');
-const btcInput = document.getElementById('qr-scanner-btc');
-btcBtn.onclick = () => btcInput.click();
-async function scanBTC(file) { ... }  // ← keep your scanner
-btcInput.onchange = e => scanBTC(e.target.files[0]);
-
-// === CRITICAL: Fixed RBF restore with proper Gradio sync ===
-function loadSavedRBF() {
-    const saved = localStorage.getItem('omega_rbf_hex');
-    if (!saved) return;
-    
-    const box = document.querySelector('#rbf-hex-box textarea');
-    if (!box) return;
-    
-    // Only restore if empty (prevents overwrite)
-    if (box.value.trim() === '') {
-        box.value = saved.trim();
-        // These two lines are MAGIC — force Gradio server to see the value
-        box.dispatchEvent(new Event('input', { bubbles: true }));
-        box.dispatchEvent(new Event('change', { bubbles: true }));
+    <script>
+    // Toast function — beautiful, non-blocking
+    function showToast(message, isError = false) {
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed !important;
+            bottom: 100px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
+            color: ${isError ? '#ff3366' : '#00ff9d'} !important;
+            padding: 16px 36px !important;
+            border-radius: 50px !important;
+            font-weight: bold !important;
+            font-size: 17px !important;
+            z-index: 10000 !important;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
+            backdrop-filter: blur(12px) !important;
+            border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
+            animation: toastPop 2.4s ease forwards !important;
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2400);
     }
-}
 
-// Run on load
-window.addEventListener('load', loadSavedRBF);
-// Also run after Gradio fully mounts (double safety)
-document.addEventListener('DOMContentLoaded', () => setTimeout(loadSavedRBF, 500));
-</script>
+    // Toast animation
+    if (!document.querySelector('#toast-style')) {
+        const style = document.createElement('style');
+        style.id = 'toast-style';
+        style.textContent = `
+            @keyframes toastPop {
+                0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
+                12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+                88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+                100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // BTC Scanner
+    const btcBtn = document.querySelector('.qr-fab btc');
+    const btcInput = document.getElementById('qr-scanner-btc');
+    btcBtn.onclick = () => btcInput.click();
+
+    async function scanBTC(file) {
+        if (!file) return;
+        const img = new Image();
+        img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            try {
+                const result = await ZXing.readBarcodeFromCanvas(canvas);
+                const text = result.text.trim();
+                const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+
+                if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
+                    const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
+                               document.querySelector('textarea');
+                    if (box) {
+                        box.value = cleanText;
+                        box.dispatchEvent(new Event('input'));
+                        box.dispatchEvent(new Event('change'));
+                    }
+                    showToast("Address / xpub scanned!");
+                } else {
+                    showToast("Not a Bitcoin address or xpub", true);
+                }
+            } catch (e) {
+                showToast("No QR detected", true);
+            }
+        };
+        img.src = URL.createObjectURL(file);
+    }
+
+    btcInput.onchange = e => scanBTC(e.target.files[0]);
+
+    // === CRITICAL: Fixed RBF restore with proper Gradio sync ===
+    function loadSavedRBF() {
+        const saved = localStorage.getItem('omega_rbf_hex');
+        if (!saved) return;
+        
+        const box = document.querySelector('#rbf-hex-box textarea');
+        if (!box) return;
+        
+        // Only restore if empty (prevents overwrite)
+        if (box.value.trim() === '') {
+            box.value = saved.trim();
+            // These two lines are MAGIC — force Gradio server to see the value
+            box.dispatchEvent(new Event('input', { bubbles: true }));
+            box.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    // Run on load
+    window.addEventListener('load', loadSavedRBF);
+    // Also run after Gradio fully mounts (double safety)
+    document.addEventListener('DOMContentLoaded', () => setTimeout(loadSavedRBF, 500));
+    </script>
     """)
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
