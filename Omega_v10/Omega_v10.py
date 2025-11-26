@@ -421,6 +421,9 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 
 def rbf_bump(raw_hex: str, bump: int = 50):
+    if raw_hex is None or not isinstance(raw_hex, str):
+        return "", "<div style='color:#f7931a; text-align:center;'>No transaction to bump yet — generate one first</div>"
+        
     raw_hex = raw_hex.strip()
     if not raw_hex:
         return "", "<div style='color:#f7931a;'>Paste a raw transaction hex first</div>"
