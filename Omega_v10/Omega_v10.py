@@ -1012,7 +1012,8 @@ with gr.Blocks(
         fn=rbf_bump,
         inputs=rbf_in,
         outputs=[rbf_in, output_log],
-        prevents_concurrent_calls=True,
+        concurrency_limit=1,   # ← This is the correct way in Gradio 6.0.1
+        queue=True,
         js="""
         (hex) => {
             if (hex && hex.trim().length > 100) {
