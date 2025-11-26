@@ -952,7 +952,9 @@ with gr.Blocks(
             rbf_in = gr.Textbox(
                 label="Raw hex (auto-saved from last tx)",
                 lines=6,
-                elem_id="rbf-hex-box"
+                elem_id="rbf-hex-box",
+                persistence=True,          # ← Gradio 6+ = survives refresh forever
+                show_copy_button=True      # ← built-in copy button (replaces your custom JS one)
             )
 
         with gr.Column(scale=4):
@@ -1023,15 +1025,8 @@ with gr.Blocks(
         fn=rbf_bump,
         inputs=rbf_in,
         outputs=[rbf_in, output_log],
-        js="""
-        (hex) => {
-            if (hex && typeof hex === 'string') {
-                try { localStorage.setItem('omega_rbf_hex', hex.trim()); }
-                catch(e) { console.warn('localStorage full'); }
-            }
-        }
-        """,
-        concurrency_limit=None
+        prevents_concurrent_calls=True,   # Guarantees perfect bump ordering
+        stateful=True                     # Auto-saves + auto-restores the raw hex forever
     )
 
     # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
