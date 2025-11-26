@@ -966,8 +966,9 @@ with gr.Blocks(
             rbf_in = gr.Textbox(
                 label="Raw hex (auto-saved from last tx)",
                 lines=6,
-                elem_id="rbf-hex-box",
-                show_copy_button=True
+                elem_id="rbf-hex-box"
+            ).style(
+                show_copy_button=True  # ← Native copy button via .style() — works in Gradio 6.0.1
             )
 
         with gr.Column(scale=4):
