@@ -516,7 +516,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     except:
         fee_rate = 2
 
-    future_rate = max(fee_rate * 6, 100)
+    future_rate = max(fee_rate * future_multiplier, 100)
     future_cost = int((input_vb_global * inputs + output_vb_global) * future_rate)
     miner_fee = max(1000, int(vsize * fee_rate * 1.2))
     savings = future_cost - miner_fee
@@ -707,58 +707,54 @@ with gr.Blocks(
                     "More Savings (50% pruned)"
                 ],
                 value="Recommended (40% pruned)",
-                label="Strategy"
+                label="Strategy",
+                info="How many small UTXOs to sacrifice for eternal fee savings"
             )
 
     with gr.Row():
-        selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
+        selfish_mode = gr.Checkbox(label="Selfish mode – keep 100% to me", value=False)
 
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
-            dust_threshold = gr.Slider(
-                minimum=0,
-                maximum=3000,
-                value=546,
-                step=1,
+            dust_threshold = gr.Slider(0, 3000, value=546, step=1,
                 label="Dust threshold (sats)",
-                info="UTXOs below this value are ignored"
-            )
+                info="Ignore UTXOs smaller than this")
         with gr.Column(scale=1, min_width=300):
-            dao_percent = gr.Slider(
-                minimum=0,
-                maximum=500,
-                value=50,
-                step=10,
-                label="Thank-you to Ω author (basis points)",
-                info="0 bps = keep 100% • 500 bps = 5%"
-            )
+            dao_percent = gr.Slider(0, 500, value=50, step=10,
+                label="Thank-you to Ω author (bps)",
+                info="0–500 bps of future savings only • truly optional")
             live_thankyou = gr.Markdown(
-                "<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>"
+                "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
                 "→ 0.50% of future savings"
                 "</div>"
             )
+        with gr.Column(scale=1, min_width=300):
+            future_multiplier = gr.Slider(3, 20, value=6, step=1,
+                label="Future fee stress test",
+                info="6× = real 2017–2024 peak • 15× = next bull run • 20× = apocalypse"
+            )
 
+    # Live thank-you % updater
     def update_thankyou_label(bps):
         pct = bps / 100
-        return f"<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>→ {pct:.2f}% of future savings</div>"
-
+        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% of future savings</div>"
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
     with gr.Row():
         with gr.Column(scale=4):
             dest_addr = gr.Textbox(
                 label="Destination (optional)",
-                placeholder="Leave blank = same address"
+                placeholder="Leave blank → same address"
             )
         with gr.Column(scale=3):
             dao_addr = gr.Textbox(
                 label="Thank-you address (optional)",
                 value=DEFAULT_DAO_ADDR,
-                placeholder="Leave blank to support the Ω author"
+                placeholder="Leave blank to support Ω"
             )
 
     with gr.Row():
-        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
+        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
 
     output_log = gr.HTML()
 
@@ -780,18 +776,19 @@ with gr.Blocks(
         )
 
 
+
     # ==================================================================
     # Events
     # ==================================================================
     submit_btn.click(
         analysis_pass,
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, future_multiplier],
         [output_log, generate_btn, generate_row]
     )
 
     generate_btn.click(
         fn=build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, future_multiplier],
         outputs=[output_log, generate_btn, generate_row]
     )
 
