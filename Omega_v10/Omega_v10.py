@@ -941,7 +941,7 @@ with gr.Blocks(
 
     output_log = gr.HTML()
 
-    with gr.Row(visible=False) as generate_row:    # ← starts hidden = 0px height
+    with gr.Row(visible=False) as generate_row:
         generate_btn = gr.Button(
             "2. Generate Transaction",
             visible=False,
@@ -950,7 +950,6 @@ with gr.Blocks(
             elem_classes="full-width"
         )
 
-
     with gr.Row():
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
@@ -958,32 +957,32 @@ with gr.Blocks(
             size="lg",
             elem_classes="full-width"
         )
+
     # =================== INFINITE RBF SECTION ===================
     gr.Markdown("### Infinite RBF Bump Zone")
 
-   with gr.Row():
-    with gr.Column(scale=8):
-        rbf_in = gr.Textbox(
-            label="Raw hex (auto-saved from last tx)",
-            lines=6,
-            elem_id="rbf-hex-box",
-            show_copy_button=True,       # ← native copy (beautiful, reliable)
-        )
+    with gr.Row():
+        with gr.Column(scale=8):
+            rbf_in = gr.Textbox(
+                label="Raw hex (auto-saved from last tx)",
+                lines=6,
+                elem_id="rbf-hex-box",
+                show_copy_button=True
+            )
 
-    with gr.Column(scale=4):
-        # Only keep the Clear button — it’s actually useful!
-        clear_rbf_btn = gr.Button(
-            "Clear RBF Hex",
-            variant="secondary",
-            size="lg",
-            elem_classes="bump-with-gap"
-        )
-        rbf_btn = gr.Button(
-            "Bump +50 sat/vB to Miners",
-            variant="primary",
-            size="lg",
-            elem_classes="full-width bump-with-gap"
-        )
+        with gr.Column(scale=4):
+            clear_rbf_btn = gr.Button(
+                "Clear RBF Hex",
+                variant="secondary",
+                size="lg",
+                elem_classes="bump-with-gap"
+            )
+            rbf_btn = gr.Button(
+                "Bump +50 sat/vB to Miners",
+                variant="primary",
+                size="lg",
+                elem_classes="full-width bump-with-gap"
+            )
     # ==================================================================
     # Events
     # ==================================================================
