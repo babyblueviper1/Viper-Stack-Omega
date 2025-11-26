@@ -1,4 +1,4 @@
-# app.py — Omega Pruner v10.0 — Infinite Edition
+# app.py — Omega Pruner v10.0
 import gradio as gr
 import requests, time, base64, io, qrcode
 from dataclasses import dataclass
@@ -32,7 +32,7 @@ input_vb_global = output_vb_global = None
 # CSS
 # ==============================
 css = """
-/* —————————————————————— ΩMEGA PRUNER v10 — INFINITE EDITION CSS —————————————————————— */
+/* —————————————————————— ΩMEGA PRUNER v10 CSS —————————————————————— */
 
 /* 1. SANE, BEAUTIFUL GAPS — GRADIO 6+ FIX */
 .gr-row { gap: 14px !important; }
@@ -80,7 +80,6 @@ css = """
 /* 3. MISC FIXES */
 details summary { list-style: none; cursor: pointer; }
 details summary::-webkit-details-marker { display: none; }
-#rbf-hex-box textarea { font-family: 'Courier New', monospace !important; font-size: 0.95rem !important; }
 
 /* ——— FAB BUTTONS ——— */
 .qr-fab {
@@ -490,25 +489,19 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     if not pruned_utxos_global:
-        return "Run analysis first", gr.update(visible=False), gr.update(visible=False), "", "", ""
+        return "Run analysis first", gr.update(visible=False), gr.update(visible=False)
 
     sample_addr = pruned_utxos_global[0].get('address') or user_input.strip()
     _, info = address_to_script_pubkey(sample_addr)
     detected = info['type']
 
-    strategy_name = {
-        "Privacy First (30% pruned)": "Privacy First",
-        "Recommended (40% pruned)": "Recommended", 
-        "More Savings (50% pruned)": "More Savings"
-    }.get(strategy, strategy.split(" (")[0])
-
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
     outputs = 1 + (1 if not selfish_mode and dao_percent > 0 else 0)
-    weight = 40 + inputs * input_vb_global*4 + outputs * output_vb_global*4 + 4
+    weight = 40 + inputs * input_vb_global * 4 + outputs * output_vb_global * 4 + 4
     if detected in ("SegWit", "Taproot"):
         weight += 2
-    vsize = (weight + 3) // 4   # ceiling division
+    vsize = (weight + 3) // 4
 
     try:
         fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
@@ -523,14 +516,14 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     user_gets = total - miner_fee - dao_cut
 
     if user_gets < 546:
-        return "Not enough after fees", gr.update(visible=False), gr.update(visible=False), "", "", ""
+        return "Not enough after fees", gr.update(visible=False), gr.update(visible=False)
 
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return "Invalid destination", gr.update(visible=False), gr.update(visible=False), "", "", ""
+        return "Invalid destination", gr.update(visible=False), gr.update(visible=False)
 
-    # Build the transaction
+    # Build transaction
     tx = Tx()
     for u in pruned_utxos_global:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
@@ -539,28 +532,9 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         dao_script, _ = address_to_script_pubkey(dao_addr or DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-    # Generate BOTH outputs
     psbt_b64 = make_psbt(tx)
-
-    # Generate clean, unsigned, RBF-ready raw hex — 100% compatible with ALL wallets
-    unsigned_tx = tx.encode(segwit=True)
-
-    raw_hex = unsigned_tx.hex()
-
     qr = make_qr(psbt_b64)
-
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
-
-    details_section = f"""
-<details style="margin-top: 40px;">
-    <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px;">
-        View PSBT (click to expand)
-    </summary>
-    <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
-{psbt_b64}
-    </pre>
-</details>
-"""
 
     html = f"""
     <div style="text-align:center; padding:20px;">
@@ -571,34 +545,27 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             Future savings ≈ <b style="font-size:24px; color:#00ff9d;">{format_btc(savings)}</b> (@ {future_rate} sat/vB)
         </div>
 
-        <div style="margin:40px 0;">
-            <div class="qr-center">
-                <img src="{qr}">
-            </div>
+        <div style="margin:40px 0;" class="qr-center">
+            <img src="{qr}">
         </div>
 
         <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum</small></p>
 
         <details style="margin-top: 32px;">
-            <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center; padding:12px 0;">
+            <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center;">
                 View PSBT (click to expand)
             </summary>
-            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; text-align:left;">
+            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
 {psbt_b64}
             </pre>
         </details>
-
-        <p style="margin:36px 0 20px; color:#f7931a; font-weight:bold; font-size:18px; line-height:1.4;">
-            RBF ready — click "Bump +50 sat/vB" anytime (survives refresh)
-        </p>
     </div>
     """
 
     return (
         html,
-        gr.update(visible=False), # generate_btn
-        gr.update(visible=False), # generate_row
-        raw_hex                     # saved for infinite RBF
+        gr.update(visible=False),  # generate_btn
+        gr.update(visible=False)   # generate_row
     )
 
 # ==============================
@@ -786,17 +753,12 @@ with gr.Blocks(
     generate_btn.click(
         fn=build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-        outputs=[output_log, generate_btn, generate_row, rbf_in],
-        queue=False
+        outputs=[output_log, generate_btn, generate_row]
     )
+
     start_over_btn.click(
-        lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
-                 "", gr.update(visible=False), gr.update(visible=False), "", ""),
-        outputs=[
-            user_input, prune_choice, dust_threshold, dest_addr,
-            selfish_mode, dao_percent, dao_addr,
-            output_log, generate_btn, generate_row, rbf_in
-        ]
+        lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR, "", gr.update(visible=False), gr.update(visible=False)),
+        outputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, output_log, generate_btn, generate_row]
     )
 
 
