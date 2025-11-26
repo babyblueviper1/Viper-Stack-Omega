@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import urllib.parse
 import warnings
+import logging
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
