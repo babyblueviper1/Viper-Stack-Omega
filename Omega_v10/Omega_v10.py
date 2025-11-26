@@ -537,6 +537,28 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     qr = make_qr(psbt_b64)
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
 
+    # ←←← NEW: Copy PSBT Button + Success Toast ←←←
+    copy_button = f"""
+    <button onclick="navigator.clipboard.writeText(`{psbt_b64}`).then(()=>{{
+        const t=document.createElement('div');
+        t.textContent='PSBT copied!';
+        t.style.cssText=`position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+                         z-index:10000;background:#00ff9d;color:#000;padding:16px 36px;
+                         border-radius:50px;font-weight:bold;font-size:18px;
+                         box-shadow:0 12px 40px rgba(0,0,0,0.6);animation:pop 2s forwards;`;
+        document.body.appendChild(t);
+        setTimeout(()=>t.remove(),2000);
+    }})" 
+    style="margin:30px auto;display:block;padding:18px 42px;font-size:1.env19rem;
+           font-weight:800;border-radius:16px;border:none;background:#f7931a;
+           color:white;cursor:pointer;box-shadow:0 8px 30px rgba(247,147,26,0.5);
+           transition:all 0.2s;"
+    onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 40px rgba(247,147,26,0.7)'"
+    onmouseout="this.style.transform='';this.style.boxShadow='0 8px 30px rgba(247,147,26,0.5)'">
+        Copy PSBT to Clipboard
+    </button>
+    """
+
     html = f"""
     <div style="text-align:center; padding:20px;">
         <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
@@ -550,11 +572,13 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
             <img src="{qr}">
         </div>
 
-        <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum</small></p>
+        {copy_button}
+
+        <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum • or paste with the button above</small></p>
 
         <details style="margin-top: 32px;">
             <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center;">
-                View PSBT (click to expand)
+                View raw PSBT (click to expand)
             </summary>
             <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
 {psbt_b64}
@@ -565,8 +589,8 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     return (
         html,
-        gr.update(visible=False),  # generate_btn
-        gr.update(visible=False)   # generate_row
+        gr.update(visible=False),
+        gr.update(visible=False)
     )
 
 # ==============================
