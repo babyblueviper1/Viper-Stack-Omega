@@ -433,7 +433,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 # Core Functions
 # ==============================
-def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, dao_addr, future_multiplier):
+def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     addr = user_input.strip()
@@ -494,7 +494,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, dao_a
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
 # ==============================
-def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, dao_addr, future_multiplier):
+def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     if not pruned_utxos_global:
@@ -575,7 +575,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, dao_a
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
     tx.tx_outs.append(TxOut(user_gets, dest_script))
     if dao_cut > 0:
-        dao_script, _ = address_to_script_pubkey(dao_addr or DEFAULT_DAO_ADDR)
+        dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
     # === GENERATE PSBT & QR ===
@@ -753,8 +753,8 @@ with gr.Blocks(
                 info="Ignore UTXOs smaller than this")
         with gr.Column(scale=1, min_width=300):
             dao_percent = gr.Slider(0, 500, value=50, step=10,
-                label="Thank-you to Ω author (bps)",
-                info="0–500 bps of future savings (capped at 25% of total savings for safety) • optional")
+                label="Thank you (bps)",
+                info="0–500 bps of future savings (capped at 25% of total savings for safety)")
             live_thankyou = gr.Markdown(
                 "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
                 "→ 0.50% of future savings"
@@ -773,17 +773,11 @@ with gr.Blocks(
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
     with gr.Row():
-        with gr.Column(scale=4):
-            dest_addr = gr.Textbox(
-                label="Destination (optional)",
-                placeholder="Leave blank → same address"
-            )
-        with gr.Column(scale=3):
-            dao_addr = gr.Textbox(
-                label="Thank-you address (optional)",
-                value=DEFAULT_DAO_ADDR,
-                placeholder="Leave blank to support Ω"
-            )
+        dest_addr = gr.Textbox(
+            label="Destination (optional)",
+            placeholder="Leave blank → same address",
+            lines=1
+        )
 
     with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
@@ -814,19 +808,19 @@ with gr.Blocks(
     # ==================================================================
     submit_btn.click(
         analysis_pass,
-        [user_input, prune_choice, dust_threshold, dest_addr, dao_percent, dao_addr, future_multiplier],
+        [user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         [output_log, generate_btn, generate_row]
     )
 
     generate_btn.click(
         fn=build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, dao_addr, future_multiplier],
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[output_log, generate_btn, generate_row]
     )
 
     start_over_btn.click(
         lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR, "", gr.update(visible=False), gr.update(visible=False)),
-        outputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, dao_addr, output_log, generate_btn, generate_row]
+        outputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, output_log, generate_btn, generate_row]
     )
 
 
