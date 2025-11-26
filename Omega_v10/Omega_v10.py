@@ -512,11 +512,15 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     vsize = (weight + 3) // 4
 
     try:
-        fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
+        fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=10).json()["fastestFee"]
     except:
-        fee_rate = 2
+        try:
+            fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended").json()["fastestFee"]
+        except:
+            fee_rate = 8  # sane fallback, never 1 or 2
 
     future_rate = max(fee_rate * future_multiplier, 100)
+
     future_cost = int((input_vb_global * inputs + output_vb_global) * future_rate)
     miner_fee = max(1000, int(vsize * fee_rate * 1.2))
     savings = future_cost - miner_fee
