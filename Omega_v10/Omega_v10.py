@@ -1012,13 +1012,24 @@ with gr.Blocks(
         fn=rbf_bump,
         inputs=rbf_in,
         outputs=[rbf_in, output_log],
-        concurrency_limit=1,   # ← This is the correct way in Gradio 6.0.1
+        concurrency_limit=1,
         queue=True,
+        # ← THIS IS THE CRITICAL FIX
         js="""
         (hex) => {
+            // Always force-save before bump
             if (hex && hex.trim().length > 100) {
                 localStorage.setItem('omega_rbf_hex', hex.trim());
             }
+            // If hex is empty or too short, try to recover from localStorage FIRST
+            if (!hex || hex.trim().length < 200) {
+                const saved = localStorage.getItem('omega_rbf_hex');
+                if (saved && saved.trim().length > 200) {
+                    // This is the magic: return the saved value so Python sees it
+                    return saved.trim();
+                }
+            }
+            return hex || '';
         }
         """
     )
@@ -1117,26 +1128,29 @@ with gr.Blocks(
     btcInput.onchange = e => scanBTC(e.target.files[0]);
 
     // === CRITICAL: Fixed RBF restore with proper Gradio sync ===
-    function loadSavedRBF() {
+function loadSavedRBF() {
         const saved = localStorage.getItem('omega_rbf_hex');
-        if (!saved) return;
+        if (!saved || saved.trim().length < 200) return;
         
         const box = document.querySelector('#rbf-hex-box textarea');
         if (!box) return;
         
-        // Only restore if empty (prevents overwrite)
-        if (box.value.trim() === '') {
+        if (box.value.trim() === '' || box.value.trim().length < 200) {
             box.value = saved.trim();
-            // These two lines are MAGIC — force Gradio server to see the value
+            // Force Gradio to acknowledge the value
             box.dispatchEvent(new Event('input', { bubbles: true }));
             box.dispatchEvent(new Event('change', { bubbles: true }));
+            // Also trigger Gradio's internal update
+            if (window.gradio_config) {
+                setTimeout(() => {
+                    box.dispatchEvent(new Event('input', { bubbles: true }));
+                }, 100);
+            }
         }
     }
 
-    // Run on load
     window.addEventListener('load', loadSavedRBF);
-    // Also run after Gradio fully mounts (double safety)
-    document.addEventListener('DOMContentLoaded', () => setTimeout(loadSavedRBF, 500));
+    document.addEventListener('DOMContentLoaded', () => setTimeout(loadSavedRBF, 800));
     </script>
     """)
 
