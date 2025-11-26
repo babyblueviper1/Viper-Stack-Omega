@@ -1029,6 +1029,7 @@ with gr.Blocks(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
         outputs=[output_log, generate_btn, generate_row, rbf_in]
+        queue=False
     )
     start_over_btn.click(
         lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
