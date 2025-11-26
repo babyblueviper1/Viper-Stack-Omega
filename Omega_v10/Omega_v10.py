@@ -145,6 +145,8 @@ textarea:focus-within ~ #omega-bg-container-fixed {
   border: 6px solid #f7931a !important;
   box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
 }
+#omega-footer { margin: 30px 0 20px 0 !important; }
+
 
 """
 # ==============================
