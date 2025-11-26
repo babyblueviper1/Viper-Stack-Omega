@@ -155,6 +155,10 @@ textarea:focus-within ~ #omega-bg-container-fixed {
 .gradio-container footer {
     display: none !important;   /* nukes Gradio's own footer completely */
 }
+@media (max-width: 768px) {
+    .qr-fab { bottom: 80px !important; right: 16px !important; width: 64px !important; height: 64px !important; font-size: 34px !important; }
+    .qr-center img { width: 380px !important; }
+}
 
 """
 # ==============================
@@ -381,20 +385,17 @@ class Tx:
 def _correct_tx_encode(self, segwit=True):
     base = [
         self.version.to_bytes(4, 'little'),
+        b'\x00\x01' if segwit else b'',  # marker + flag
         encode_varint(len(self.tx_ins)),
         b''.join(inp.encode() for inp in self.tx_ins),
         encode_varint(len(self.tx_outs)),
         b''.join(out.encode() for out in self.tx_outs),
         self.locktime.to_bytes(4, 'little')
     ]
-    if segwit:
-        base.insert(1, b'\x00\x01')  # marker + flag after version
     raw = b''.join(base)
     
     if segwit:
-        # Append EMPTY witness data at the VERY END (canonical!)
-        witness = b'\x00'  # 0 witness items for all inputs
-        raw += witness * len(self.tx_ins)
+        raw += b'\x00' * len(self.tx_ins)  # ← ONE \x00 PER INPUT = empty witness stack
     
     return raw
 
@@ -403,8 +404,9 @@ del _correct_tx_encode
 
 def make_psbt(tx: Tx) -> str:
     raw = tx.encode(segwit=True)
-    # DO NOT strip anything — this was the root of the 1 sat/vB bug!
-    psbt = b'psbt\xff' + b'\x00' + encode_varint(len(raw)) + raw + b'\x00'
+    
+    global_tx = b'\x00' + encode_varint(len(raw)) + raw + b'\x00'
+    psbt = b'psbt\xff' + global_tx + b'\xff'
     return base64.b64encode(psbt).decode()
 # =================================================================
 
@@ -459,38 +461,60 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
 
     vb_map = {
-        'P2PKH': (148, 34), 'P2SH': (91, 32), 'SegWit': (68, 31), 'Taproot': (57, 43)
+        'P2PKH': (148, 34),
+        'P2SH': (91, 32),
+        'SegWit': (68, 31),
+        'Taproot': (57, 43)
     }
     input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
 
-    # Apply pruning strategy
-    ratio = {
+    # === STRATEGY MAPPING (must match dropdown EXACTLY) ===
+    NUCLEAR_OPTION = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
+
+    ratio_map = {
         "Privacy First (30% pruned)": 0.3,
         "Recommended (40% pruned)": 0.4,
-        "More Savings (50% pruned)": 0.5
-    }.get(strategy, 0.4)
+        "More Savings (50% pruned)": 0.5,
+        NUCLEAR_OPTION: 0.9,
+    }
+    ratio = ratio_map.get(strategy, 0.4)
 
-    strategy_name = {
+    name_map = {
         "Privacy First (30% pruned)": "Privacy First",
         "Recommended (40% pruned)": "Recommended",
-        "More Savings (50% pruned)": "More Savings"
-    }.get(strategy, strategy.split(" (")[0])
+        "More Savings (50% pruned)": "More Savings",
+        NUCLEAR_OPTION: '<span style="color:#ff1361; font-weight:900; text-shadow: 0 0 10px #ff0066;">NUCLEAR PRUNE</span>',
+    }
+    strategy_name = name_map.get(strategy, strategy.split(" (")[0])
 
-    keep = max(1, int(len(utxos) * (1 - ratio)))
+    # === TRUE NUCLEAR: max 3 inputs (even if 5000 UTXOs) ===
+    if strategy == NUCLEAR_OPTION:
+        keep = min(3, len(utxos)) if len(utxos) > 0 else 0
+        keep = max(1, keep)  # never zero
+    else:
+        keep = max(1, int(len(utxos) * (1 - ratio)))
+
     pruned_utxos_global = utxos[:keep]
+
+    # === Special Nuclear Warning (because yes) ===
+    nuclear_warning = ""
+    if strategy == NUCLEAR_OPTION:
+        nuclear_warning = '<br><span style="color:#ff0066; font-weight:bold; font-size:18px;">⚠️ NUCLEAR MODE ACTIVE ⚠️<br>Only the strongest survive.</span>'
 
     return (
         f"""
         <div style="text-align:center; padding:20px;">
             <b style="font-size:22px; color:#f7931a;">Analysis Complete</b><br><br>
             Found <b>{len(utxos):,}</b> UTXOs • Keeping <b>{keep}</b> largest<br>
-            <b style="color:#f7931a;">Strategy:</b> <b>{strategy_name}</b> • Format: <b>{detected}</b><br><br>
+            <b style="color:#f7931a;">Strategy:</b> <b>{strategy_name}</b> • Format: <b>{detected}</b><br>
+            {nuclear_warning}
+            <br><br>
             Click <b>Generate Transaction</b> to continue
         </div>
         """,
-        gr.update(visible=True), gr.update(visible=True)
+        gr.update(visible=True),
+        gr.update(visible=True)
     )
-
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
 # ==============================
@@ -530,7 +554,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     vsize = (total_weight + 3) // 4
 
     # === MINER FEE (first pass) ===
-    miner_fee = int(vsize * fee_rate * 1.18)
+    miner_fee = int(vsize * fee_rate * 1.06) + 1
     miner_fee = max(miner_fee, vsize * 12)
     miner_fee = min(miner_fee, total // 5)
 
@@ -554,7 +578,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     vsize = (total_weight + 3) // 4
 
     # === FINAL miner fee with accurate vsize ===
-    miner_fee = int(vsize * fee_rate * 1.18)
+    miner_fee = int(vsize * fee_rate * 1.06) + 1
     miner_fee = max(miner_fee, vsize * 12)
     miner_fee = min(miner_fee, total // 5)
 
@@ -739,12 +763,13 @@ with gr.Blocks(
                 choices=[
                     "Privacy First (30% pruned)",
                     "Recommended (40% pruned)",
-                    "More Savings (50% pruned)"
+                    "More Savings (50% pruned)",
+                    "NUCLEAR PRUNE (90% sacrificed — for the brave)",
                 ],
-                value="Recommended (40% pruned)",
-                label="Strategy",
-                info="How many small UTXOs to sacrifice for eternal fee savings"
-            )
+                    value="Recommended (40% pruned)",
+                    label="Strategy",
+                    info="How many small UTXOs to sacrifice for eternal fee savings"
+        )
 
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
