@@ -370,7 +370,7 @@ class Tx:
         self.tx_outs = self.tx_outs or []
     
 def _correct_tx_encode(self, segwit=True):
-    parts = [
+    base = [
         self.version.to_bytes(4, 'little'),
         encode_varint(len(self.tx_ins)),
         b''.join(inp.encode() for inp in self.tx_ins),
@@ -379,9 +379,15 @@ def _correct_tx_encode(self, segwit=True):
         self.locktime.to_bytes(4, 'little')
     ]
     if segwit:
-        parts.insert(1, b'\x00\x01')
-        parts.insert(-1, b'\x00\x00\x00\x00')
-    return b''.join(parts)
+        base.insert(1, b'\x00\x01')  # marker + flag after version
+    raw = b''.join(base)
+    
+    if segwit:
+        # Append EMPTY witness data at the VERY END (canonical!)
+        witness = b'\x00'  # 0 witness items for all inputs
+        raw += witness * len(self.tx_ins)
+    
+    return raw
 
 Tx.encode = _correct_tx_encode
 del _correct_tx_encode
