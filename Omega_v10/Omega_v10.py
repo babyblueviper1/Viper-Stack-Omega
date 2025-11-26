@@ -950,21 +950,16 @@ with gr.Blocks(
         outputs=[rbf_in, output_log],
         concurrency_limit=1,
         queue=True,
-        # ← THIS IS THE CRITICAL FIX
         js="""
         (hex) => {
-            // Always force-save before bump
-            if (hex && hex.trim().length > 100) {
-                localStorage.setItem('omega_rbf_hex', hex.trim());
-            }
-            // If hex is empty or too short, try to recover from localStorage FIRST
+            // ONLY recover from localStorage if the box is actually empty
             if (!hex || hex.trim().length < 200) {
                 const saved = localStorage.getItem('omega_rbf_hex');
-                if (saved && saved.trim().length > 200) {
-                    // This is the magic: return the saved value so Python sees it
+                if (saved && saved.trim().length > 400) {
                     return saved.trim();
                 }
             }
+            // DO NOT overwrite with localStorage if we have fresh hex!
             return hex || '';
         }
         """
@@ -984,116 +979,117 @@ with gr.Blocks(
     # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
     gr.HTML("""
 <!-- Floating BTC Scanner Button -->
-    <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
+<label class="qr-fab btc" title="Scan Address / xpub">B</label>
+<input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
-    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-    <script>
-    // Toast function — beautiful, non-blocking
-    function showToast(message, isError = false) {
-        const toast = document.createElement('div');
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed !important;
-            bottom: 100px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
-            color: ${isError ? '#ff3366' : '#00ff9d'} !important;
-            padding: 16px 36px !important;
-            border-radius: 50px !important;
-            font-weight: bold !important;
-            font-size: 17px !important;
-            z-index: 10000 !important;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
-            backdrop-filter: blur(12px) !important;
-            border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
-            animation: toastPop 2.4s ease forwards !important;
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2400);
-    }
+<script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+<script>
+// Toast system
+function showToast(message, isError = false) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed !important; bottom: 100px !important; left: 50% !important;
+        transform: translateX(-50%) !important; background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
+        color: ${isError ? '#ff3366' : '#00ff9d'} !important; padding: 16px 36px !important;
+        border-radius: 50px !important; font-weight: bold !important; font-size: 17px !important;
+        z-index: 10000 !important; box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
+        backdrop-filter: blur(12px) !important; border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
+        animation: toastPop 2.4s ease forwards !important;
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2400);
+}
+if (!document.querySelector('#toast-style')) {
+    const style = document.createElement('style');
+    style.id = 'toast-style';
+    style.textContent = `@keyframes toastPop {
+        0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
+        12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+        88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
+        100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
+    }`;
+    document.head.appendChild(style);
+}
 
-    // Toast animation
-    if (!document.querySelector('#toast-style')) {
-        const style = document.createElement('style');
-        style.id = 'toast-style';
-        style.textContent = `
-            @keyframes toastPop {
-                0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
-                12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-                88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-                100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
+// QR Scanner
+const btcBtn = document.querySelector('.qr-fab.btc');
+const btcInput = document.getElementById('qr-scanner-btc');
+btcBtn.onclick = () => btcInput.click();
 
-    // BTC Scanner
-    const btcBtn = document.querySelector('.qr-fab btc');
-    const btcInput = document.getElementById('qr-scanner-btc');
-    btcBtn.onclick = () => btcInput.click();
-
-    async function scanBTC(file) {
-        if (!file) return;
-        const img = new Image();
-        img.onload = async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            try {
-                const result = await ZXing.readBarcodeFromCanvas(canvas);
-                const text = result.text.trim();
-                const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-
-                if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
-                    const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
-                               document.querySelector('textarea');
-                    if (box) {
-                        box.value = cleanText;
-                        box.dispatchEvent(new Event('input'));
-                        box.dispatchEvent(new Event('change'));
-                    }
-                    showToast("Address / xpub scanned!");
-                } else {
-                    showToast("Not a Bitcoin address or xpub", true);
+async function scanBTC(file) {
+    if (!file) return;
+    const img = new Image();
+    img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+            const result = await ZXing.readBarcodeFromCanvas(canvas);
+            const text = result.text.trim();
+            const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
+            if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
+                const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
+                           document.querySelector('textarea');
+                if (box) {
+                    box.value = cleanText;
+                    box.dispatchEvent(new Event('input', {bubbles: true}));
+                    box.dispatchEvent(new Event('change', {bubbles: true}));
                 }
-            } catch (e) {
-                showToast("No QR detected", true);
+                showToast("Address / xpub scanned!");
+            } else {
+                showToast("Not a Bitcoin address or xpub", true);
             }
-        };
-        img.src = URL.createObjectURL(file);
-    }
+        } catch (e) {
+            showToast("No QR detected", true);
+        }
+    };
+    img.src = URL.createObjectURL(file);
+}
+btcInput.onchange = e => scanBTC(e.target.files[0]);
 
-    btcInput.onchange = e => scanBTC(e.target.files[0]);
-
-    // === CRITICAL: Fixed RBF restore with proper Gradio sync ===
+// === RBF PERSISTENCE: FIXED & BULLETPROOF ===
+// 1. Restore saved hex on load
 function loadSavedRBF() {
-        const saved = localStorage.getItem('omega_rbf_hex');
-        if (!saved || saved.trim().length < 200) return;
-        
-        const box = document.querySelector('#rbf-hex-box textarea');
-        if (!box) return;
-        
-        if (box.value.trim() === '' || box.value.trim().length < 200) {
-            box.value = saved.trim();
-            // Force Gradio to acknowledge the value
-            box.dispatchEvent(new Event('input', { bubbles: true }));
-            box.dispatchEvent(new Event('change', { bubbles: true }));
-            // Also trigger Gradio's internal update
-            if (window.gradio_config) {
-                setTimeout(() => {
-                    box.dispatchEvent(new Event('input', { bubbles: true }));
-                }, 100);
-            }
+    const saved = localStorage.getItem('omega_rbf_hex');
+    if (!saved || saved.trim().length < 400) return;
+    const box = document.querySelector('#rbf-hex-box textarea');
+    if (!box) return;
+    if (box.value.trim() === '' || box.value.trim().length < 400) {
+        box.value = saved.trim();
+        box.dispatchEvent(new Event('input', {bubbles: true}));
+        box.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+}
+window.addEventListener('load', loadSavedRBF);
+document.addEventListener('DOMContentLoaded', () => setTimeout(loadSavedRBF, 600));
+
+// 2. Save new hex + counter ONLY when bump actually happens
+let isBumping = false;
+document.addEventListener('click', (e) => {
+    if (e.target && e.target.textContent && e.target.textContent.includes('Bump +50')) {
+        isBumping = true;
+    }
+    if (e.target && e.target.textContent && e.target.textContent.includes('Start Over')) {
+        localStorage.removeItem('omega_rbf_hex');
+        localStorage.removeItem('omega_bump_count');
+    }
+});
+
+// Listen for Gradio output and save ONLY on real bump
+document.addEventListener('gradio', (e) => {
+    if (!isBumping) return;
+    if (e.detail && e.detail.output && e.detail.output.data && e.detail.output.data[0]) {
+        const newHex = e.detail.output.data[0];
+        if (typeof newHex === 'string' && newHex.length > 800 && /^[0-9a-fA-F]+$/.test(newHex)) {
+            localStorage.setItem('omega_rbf_hex', newHex);
+            // Counter is already incremented by Python — we just trust it
+            isBumping = false;  // reset flag
         }
     }
-
-    window.addEventListener('load', loadSavedRBF);
-    document.addEventListener('DOMContentLoaded', () => setTimeout(loadSavedRBF, 800));
-    </script>
-    """)
+});
+</script>
+""")
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
     gr.Markdown(
