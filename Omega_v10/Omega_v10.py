@@ -561,31 +561,38 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 
     html = f"""
     <div style="text-align:center; padding:20px;">
-        <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
-        <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}</p>
-        <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">You receive: {format_btc(user_gets)}</b>
-        <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
-            Future savings ≈ <b style="font-size:24px; color:#00ff9d;">{format_btc(savings)}</b> (@ {future_rate} sat/vB)
-        </div>
-
-        <div style="margin:40px 0;" class="qr-center">
-            <img src="{qr}">
-        </div>
-
-        {copy_button}
-
-        <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum • or paste with the button above</small></p>
-
-        <details style="margin-top: 32px;">
-            <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center;">
-                View raw PSBT (click to expand)
-            </summary>
-            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
-{psbt_b64}
-            </pre>
-        </details>
+    <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
+    <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}</p>
+    
+    <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
+        You receive: {format_btc(user_gets)}
+    </b>
+    
+    <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
+        Future savings ≈ <b style="font-size:24px; color:#00ff9d; text-shadow: 0 0 12px black, 0 0 24px black;">
+            {format_btc(savings)}
+        </b> (@ {future_rate} sat/vB)
     </div>
-    """
+
+    <div style="margin:40px 0;" class="qr-center">
+        <img src="{qr}">
+    </div>
+
+    {copy_button}
+
+    <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum • or paste with the button above</small></p>
+
+    <details style="margin-top: 32px;">
+        <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center;">
+            View raw PSBT (click to expand)
+        </summary>
+        <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
+{psbt_b64}
+        </pre>
+    </pre>
+    </details>
+</div>
+"""
 
     return (
         html,
