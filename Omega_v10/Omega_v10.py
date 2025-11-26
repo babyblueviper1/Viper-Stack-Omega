@@ -145,8 +145,7 @@ textarea:focus-within ~ #omega-bg-container-fixed {
   border: 6px solid #f7931a !important;
   box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
 }
-#omega-footer { margin: 30px 0 20px 0 !important; }
-
+#omega-footer { margin-top: 10px !important; margin-bottom: 10px !important; }
 
 """
 # ==============================
@@ -836,15 +835,15 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
     gr.Markdown(
         """
-        <div style="margin: 60px 0 30px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
-            <strong>Ωmega Pruner v10.0</strong><br>
-            <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
-                GitHub • Open Source • Apache 2.0
-            </a><br>
-            <small>Prune today. Win forever. • Ω</small>
-        </div>
-        """,
-        elem_id="omega-footer"
+        <div style="margin: 20px 0 10px 0 !important; padding: 10px 0 !important; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
+        <strong>Ωmega Pruner v10.0</strong><br>
+        <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
+            GitHub • Open Source • Apache 2.0
+        </a><br>
+        <small>Prune today. Win forever. • Ω</small>
+    </div>
+    """,
+    elem_id="omega-footer"
     )
 if __name__ == "__main__":
     import os
