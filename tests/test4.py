@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import urllib.parse
 import warnings
+import logging
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -401,8 +403,7 @@ del _correct_tx_encode
 
 def make_psbt(tx: Tx) -> str:
     raw = tx.encode(segwit=True)
-    if len(raw) >= 8 and raw[-8:-4] == b'\x00\x00\x00\x00':
-        raw = raw[:-4]
+    # DO NOT strip anything — this was the root of the 1 sat/vB bug!
     psbt = b'psbt\xff' + b'\x00' + encode_varint(len(raw)) + raw + b'\x00'
     return base64.b64encode(psbt).decode()
 # =================================================================
@@ -432,7 +433,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 # Core Functions
 # ==============================
-def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
+def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     addr = user_input.strip()
@@ -493,7 +494,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
 # ==============================
-def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
+def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     if not pruned_utxos_global:
@@ -506,45 +507,69 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
     outputs = 1 + (1 if not selfish_mode and dao_percent > 0 else 0)
-    weight = 40 + inputs * input_vb_global * 4 + outputs * output_vb_global * 4 + 4
-    if detected in ("SegWit", "Taproot"):
-        weight += 2
-    vsize = (weight + 3) // 4
 
+    # === ACCURATE WEIGHT / VSIZE CALCULATION ===
+    base_weight = 160                  # 4 * (version + locktime + segwit flag/marker)
+    input_weight = inputs * input_vb_global * 4
+    output_weight = outputs * output_vb_global * 4
+    witness_overhead = 2 if detected in ("SegWit", "Taproot") else 0  # marker + flag
+    total_weight = base_weight + input_weight + output_weight + witness_overhead
+    vsize = (total_weight + 3) // 4
+
+    # === FETCH CURRENT FEE RATE ===
     try:
-        fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
+        fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=10).json()["fastestFee"]
     except:
-        fee_rate = 2
+        try:
+            fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended").json()["fastestFee"]
+        except:
+            fee_rate = 10   # sane modern default
 
-    future_rate = max(fee_rate * 6, 100)
-    future_cost = int((input_vb_global * inputs + output_vb_global) * future_rate)
-    miner_fee = max(1000, int(vsize * fee_rate * 1.2))
+    # === FUTURE RATE — FULLY RESPECTS YOUR SLIDER ===
+    future_rate = int(fee_rate * future_multiplier)
+    future_rate = max(future_rate, fee_rate + 5)   # always meaningfully higher
+
+    # === FUTURE COST ESTIMATE (what this tx would cost at peak) ===
+    future_cost = int((input_vb_global * inputs + output_vb_global * outputs + 10) * future_rate)
+
+    # === MINER FEE — ACCURATE & SAFE ===
+    miner_fee = int(vsize * fee_rate * 1.18)           # +18% buffer for safety
+    miner_fee = max(miner_fee, vsize * 12)             # never below ~12 sat/vB
+    miner_fee = min(miner_fee, total // 5)             # never eat more than 20%
+
     savings = future_cost - miner_fee
-    dao_cut = max(546, int(savings * dao_percent / 10_000)) if not selfish_mode and dao_percent > 0 and savings > 2000 else 0
+
+    # === OPTIONAL THANK-YOU CUT ===
+    dao_cut = 0
+    if not selfish_mode and dao_percent > 0 and savings > 3000:
+        dao_cut = max(546, int(savings * dao_percent / 10_000))
+        dao_cut = min(dao_cut, savings // 4)  # cap at 25% of savings
+
     user_gets = total - miner_fee - dao_cut
-
     if user_gets < 546:
-        return "Not enough after fees", gr.update(visible=False), gr.update(visible=False)
+        return "Not enough for output after fees", gr.update(visible=False), gr.update(visible=False)
 
+    # === DESTINATION ===
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return "Invalid destination", gr.update(visible=False), gr.update(visible=False)
+        return "Invalid destination address", gr.update(visible=False), gr.update(visible=False)
 
-    # Build transaction
+    # === BUILD TX ===
     tx = Tx()
     for u in pruned_utxos_global:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
     tx.tx_outs.append(TxOut(user_gets, dest_script))
-    if dao_cut:
+    if dao_cut > 0:
         dao_script, _ = address_to_script_pubkey(dao_addr or DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-    psbt_b64 = make_psbt(tx)
+    # === CRITICAL: Use clean PSBT (no broken stripping) ===
+    psbt_b64 = make_psbt(tx)   # ← make_psbt must NOT strip locktime zeros!
     qr = make_qr(psbt_b64)
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
 
-    # ←←← NEW: Copy PSBT Button + Success Toast ←←←
+    # === COPY BUTTON ===
     copy_button = f"""
     <button onclick="navigator.clipboard.writeText(`{psbt_b64}`).then(()=>{{
         const t=document.createElement('div');
@@ -556,7 +581,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         document.body.appendChild(t);
         setTimeout(()=>t.remove(),2000);
     }})" 
-    style="margin:30px auto;display:block;padding:18px 42px;font-size:1.env19rem;
+    style="margin:30px auto;display:block;padding:18px 42px;font-size:1.19rem;
            font-weight:800;border-radius:16px;border:none;background:#f7931a;
            color:white;cursor:pointer;box-shadow:0 8px 30px rgba(247,147,26,0.5);
            transition:all 0.2s;"
@@ -569,7 +594,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     html = f"""
     <div style="text-align:center; padding:20px;">
     <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
-    <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}</p>
+    <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: <b>{format_btc(miner_fee)}</b> @ <b>{fee_rate}</b> sat/vB • {thank}</p>
     
     <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
         You receive: {format_btc(user_gets)}
@@ -578,7 +603,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
         Future savings ≈ <b style="font-size:24px; color:#00ff9d; text-shadow: 0 0 12px black, 0 0 24px black;">
             {format_btc(savings)}
-        </b> (@ {future_rate} sat/vB)
+        </b> (@ <b>{future_rate}</b> sat/vB)
     </div>
 
     <div style="margin:40px 0;" class="qr-center">
@@ -596,16 +621,11 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
 {psbt_b64}
         </pre>
-    </pre>
     </details>
-</div>
-"""
+    </div>
+    """
 
-    return (
-        html,
-        gr.update(visible=False),
-        gr.update(visible=False)
-    )
+    return html, gr.update(visible=False), gr.update(visible=False)
 
 # ==============================
 # Gradio UI — Final & Perfect
@@ -707,58 +727,54 @@ with gr.Blocks(
                     "More Savings (50% pruned)"
                 ],
                 value="Recommended (40% pruned)",
-                label="Strategy"
+                label="Strategy",
+                info="How many small UTXOs to sacrifice for eternal fee savings"
             )
 
     with gr.Row():
-        selfish_mode = gr.Checkbox(label="Selfish mode – keep 100%", value=False)
+        selfish_mode = gr.Checkbox(label="Selfish mode – keep 100% to me", value=False)
 
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
-            dust_threshold = gr.Slider(
-                minimum=0,
-                maximum=3000,
-                value=546,
-                step=1,
+            dust_threshold = gr.Slider(0, 3000, value=546, step=1,
                 label="Dust threshold (sats)",
-                info="UTXOs below this value are ignored"
-            )
+                info="Ignore UTXOs smaller than this")
         with gr.Column(scale=1, min_width=300):
-            dao_percent = gr.Slider(
-                minimum=0,
-                maximum=500,
-                value=50,
-                step=10,
-                label="Thank-you to Ω author (basis points)",
-                info="0 bps = keep 100% • 500 bps = 5%"
-            )
+            dao_percent = gr.Slider(0, 500, value=50, step=10,
+                label="Thank-you to Ω author (bps)",
+                info="0–500 bps of future savings only • truly optional")
             live_thankyou = gr.Markdown(
-                "<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>"
+                "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
                 "→ 0.50% of future savings"
                 "</div>"
             )
+        with gr.Column(scale=1, min_width=300):
+            future_multiplier = gr.Slider(3, 20, value=6, step=1,
+                label="Future fee stress test",
+                info="6× = real 2017–2024 peak • 15× = next bull run • 20× = apocalypse"
+            )
 
+    # Live thank-you % updater
     def update_thankyou_label(bps):
         pct = bps / 100
-        return f"<div style='text-align: right; margin-top: 8px; font-size: 20px; color: #f7931a; font-weight: bold;'>→ {pct:.2f}% of future savings</div>"
-
+        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% of future savings</div>"
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
     with gr.Row():
         with gr.Column(scale=4):
             dest_addr = gr.Textbox(
                 label="Destination (optional)",
-                placeholder="Leave blank = same address"
+                placeholder="Leave blank → same address"
             )
         with gr.Column(scale=3):
             dao_addr = gr.Textbox(
                 label="Thank-you address (optional)",
                 value=DEFAULT_DAO_ADDR,
-                placeholder="Leave blank to support the Ω author"
+                placeholder="Leave blank to support Ω"
             )
 
     with gr.Row():
-        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary")
+        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
 
     output_log = gr.HTML()
 
@@ -780,18 +796,19 @@ with gr.Blocks(
         )
 
 
+
     # ==================================================================
     # Events
     # ==================================================================
     submit_btn.click(
         analysis_pass,
-        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        [user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, future_multiplier],
         [output_log, generate_btn, generate_row]
     )
 
     generate_btn.click(
         fn=build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, future_multiplier],
         outputs=[output_log, generate_btn, generate_row]
     )
 
