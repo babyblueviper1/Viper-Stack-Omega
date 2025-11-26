@@ -1026,10 +1026,20 @@ with gr.Blocks(
     )
 
     generate_btn.click(
-        build_real_tx,
+        fn=build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
         outputs=[output_log, generate_btn, generate_row, rbf_in],
-        queue=False
+        queue=False,
+        _js="""
+        (raw_hex) => {
+            // Force the RBF box to update immediately in the browser
+            const rbfBox = document.querySelector('#rbf-hex-box textarea');
+            if (rbfBox && raw_hex) {
+                rbfBox.value = raw_hex;
+                rbfBox.dispatchEvent(new Event('input'));
+            }
+        }
+        """
     )
     start_over_btn.click(
         lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
