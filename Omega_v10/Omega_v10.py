@@ -427,7 +427,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 
 def rbf_bump(raw_hex: str, bump: int = 50):
-    # === Recover from localStorage (keep this) ===
+    # 1. Recover from localStorage if Gradio lost it
     if not raw_hex or not raw_hex.strip():
         try:
             import js
@@ -437,50 +437,48 @@ def rbf_bump(raw_hex: str, bump: int = 50):
         except:
             pass
 
-    if not raw_hex or not raw_hex.strip():
-        return "", "<div style='color:#f7931a; text-align:center; padding:20px;'>No transaction to bump yet — generate one first</div>"
+    if not raw_hex or len(raw_hex.strip()) < 400:
+        return raw_hex or "", "<div style='color:#f7931a;padding:20px;text-align:center;'>Generate a transaction first → then bump forever</div>"
 
     raw_hex = raw_hex.strip()
     try:
         data = bytes.fromhex(raw_hex)
     except:
-        return "", "Invalid hex"
+        return raw_hex, "Invalid hex"
 
     pos = 0
     version = int.from_bytes(data[pos:pos+4], 'little')
     pos += 4
+
     is_segwit = data[pos:pos+2] == b'\x00\x01'
-    if is_segwit: pos += 2
+    if is_segwit:
+        pos += 2
 
-    # === Parse inputs (with correct sequence positions) ===
+    # === Parse inputs (save sequence positions) ===
     vin_len, pos = varint_decode(data, pos)
-    inputs = []
+    seq_positions = []
     for _ in range(vin_len):
-        txid = data[pos:pos+32][::-1].hex()
-        vout = int.from_bytes(data[pos+32:pos+36], 'little')
         pos += 36
-        script_len, pos = varint_decode(data, pos)
-        pos += script_len
-        sequence = int.from_bytes(data[pos:pos+4], 'little')
-        seq_pos = pos  # ← this is the correct position!
+        slen, pos = varint_decode(data, pos)
+        pos += slen
+        seq_positions.append(pos)   # ← exact position of this input's sequence
         pos += 4
-        inputs.append({'sequence': sequence, 'seq_pos': seq_pos})
 
-    # === Parse first output (change) ===
+    # === Parse first output (change output) ===
     vout_len, pos = varint_decode(data, pos)
     if vout_len == 0:
-        return "", "No outputs"
+        return raw_hex, "No outputs"
     amount_pos = pos
     current_amount = int.from_bytes(data[pos:pos+8], 'little')
+
+    # Skip rest of outputs + witness + locktime safely
     pos += 8
-    script_len, pos = varint_decode(data, pos)
-    pos += script_len
+    slen, pos = varint_decode(data, pos)
+    pos += slen
     for _ in range(1, vout_len):
         pos += 8
         slen, pos = varint_decode(data, pos)
         pos += slen
-
-    # Skip witness + locktime safely
     if is_segwit:
         try:
             for _ in range(vin_len):
@@ -489,36 +487,33 @@ def rbf_bump(raw_hex: str, bump: int = 50):
                     ilen, pos = varint_decode(data, pos)
                     pos += ilen
         except: pass
-    if pos + 4 <= len(data):
-        pos += 4
 
-    # === Safety & fee calc ===
+    # === Fee math ===
     vsize = (len(data) + 3) // 4
     extra_fee = vsize * bump
-    if current_amount <= extra_fee + 546:
-        return raw_hex, f"<div style='color:#ff3333; background:#300; padding:16px; border-radius:12px;'>Not enough change left for +{bump} sat/vB<br>Need {(extra_fee + 546 - current_amount):,} more sats</div>"
 
-    # === APPLY BUMP ===
+    if current_amount <= extra_fee + 546:
+        return raw_hex, f"<div style='color:#ff3333;background:#300;padding:16px;border-radius:12px;'>Not enough change for +{bump} sat/vB<br>Need {extra_fee + 546 - current_amount:,} more sats</div>"
+
+    # === Apply bump ===
     tx = bytearray(data)
     new_amount = current_amount - extra_fee
     tx[amount_pos:amount_pos+8] = new_amount.to_bytes(8, 'little')
 
-    # Add RBF signaling ONCE (only if still missing)
-    needs_rbf = all(inp['sequence'] == 0xffffffff for inp in inputs)
-    if needs_rbf:
-        for inp in inputs:
-            tx[inp['seq_pos']:inp['seq_pos']+4] = (0xfffffffd).to_bytes(4, 'little')
+    # === Add RBF signaling only once (first bump) ===
+    if all(int.from_bytes(data[p:p+4], 'little') == 0xffffffff for p in seq_positions):
+        for p in seq_positions:
+            tx[p:p+4] = b'\xfd\xff\xff\xff'   # 0xfffffffd
 
     new_hex = tx.hex()
 
-    # === Correct bump counter ===
-    total_bumps = sum(1 for inp in inputs if inp['sequence'] != 0xffffffff)
-    if needs_rbf:
-        total_bumps += 1  # because we just added it
+    # === Correct bump counter (count how many inputs are no longer 0xffffffff) ===
+    bumped_inputs = sum(1 for p in seq_positions if int.from_bytes(data[p:p+4], 'little') != 0xffffffff)
+    total_bumps = bumped_inputs + 1   # +1 because we just did a bump
 
     info = f"""
-    <div style="background:#00ff9d20; padding:20px; border-radius:14px; border:3px solid #00ff9d; margin:20px 0; text-align:center; font-family: monospace;">
-        <b style="font-size:28px; color:#00ff9d;">BUMP #{total_bumps}</b><br><br>
+    <div style="background:#00ff9d20; padding:24px; border-radius:16px; border:4px solid #00ff9d; margin:20px 0; text-align:center;">
+        <b style="font-size:32px; color:#00ff9d;">BUMP #{total_bumps}</b><br><br>
         +{bump} sat/vB → +{extra_fee:,} sats to miners<br>
         Change reduced: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b>
     </div>
