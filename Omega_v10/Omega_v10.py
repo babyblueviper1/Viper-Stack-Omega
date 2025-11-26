@@ -965,7 +965,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
             opacity: 0.94;
             max-width: 640px;
         ">
-            <strong style="color:#f7931a; font-size:1.02rem;">Ωmega Pruner v10.0</strong><br>
+            <strong style="color:#f7931a; font-size:1.02rem;">Ωmega Pruner v10.0 — NUCLEAR EDITION</strong><br>
             <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" 
                target="_blank" rel="noopener" 
                style="color: #f7931a; text-decoration: none; font-weight:600;">
