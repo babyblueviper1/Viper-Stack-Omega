@@ -432,7 +432,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 # Core Functions
 # ==============================
-def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
+def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     addr = user_input.strip()
@@ -493,7 +493,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
 # ==============================
-def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr):
+def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_percent, dao_addr, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     if not pruned_utxos_global:
