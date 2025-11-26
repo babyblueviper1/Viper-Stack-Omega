@@ -560,7 +560,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         document.body.appendChild(t);
         setTimeout(()=>t.remove(),2000);
     }})" 
-    style="margin:30px auto;display:block;padding:18px 42px;font-size:1.env19rem;
+    style="margin:30px auto;display:block;padding:18px 42px;font-size:1.19rem;
            font-weight:800;border-radius:16px;border:none;background:#f7931a;
            color:white;cursor:pointer;box-shadow:0 8px 30px rgba(247,147,26,0.5);
            transition:all 0.2s;"
@@ -600,7 +600,6 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
 {psbt_b64}
         </pre>
-    </pre>
     </details>
 </div>
 """
