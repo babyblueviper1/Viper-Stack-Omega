@@ -967,9 +967,9 @@ with gr.Blocks(
                 label="Raw hex (auto-saved from last tx)",
                 lines=6,
                 elem_id="rbf-hex-box"
-            ).style(
-                show_copy_button=True  # ← Native copy button via .style() — works in Gradio 6.0.1
+                show_copy_button=True  # ← Direct parameter — works in Gradio 6.0.1
             )
+        
 
         with gr.Column(scale=4):
             clear_rbf_btn = gr.Button(
