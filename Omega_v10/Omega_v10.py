@@ -427,7 +427,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 
 def rbf_bump(raw_hex: str, bump: int = 50):
-    # Recover from localStorage
+    # === 1. Recover from localStorage (frontend already does this, but we double-check) ===
     if not raw_hex or not raw_hex.strip():
         try:
             import js
@@ -438,13 +438,13 @@ def rbf_bump(raw_hex: str, bump: int = 50):
             pass
 
     if not raw_hex or len(raw_hex.strip()) < 400:
-        return "", "<div style='color:#f7931a;padding:20px;text-align:center;'>Generate a transaction first → then bump forever</div>"
+        return "", "<div style='color:#f7931a;padding:20px;text-align:center;font-size:18px;'>Generate a transaction first → then bump forever</div>"
 
     raw_hex = raw_hex.strip()
     try:
         data = bytes.fromhex(raw_hex)
     except:
-        return raw_hex, "Invalid hex"
+        return raw_hex, "<div style='color:#ff3333;padding:16px;border-radius:12px;background:#300;'>Invalid hex</div>"
 
     pos = 0
     pos += 4  # version
@@ -461,14 +461,14 @@ def rbf_bump(raw_hex: str, bump: int = 50):
         seq_positions.append(pos)
         pos += 4
 
-    # Parse first output (change)
+    # Parse change output (assumed to be first output)
     vout_len, pos = varint_decode(data, pos)
     if vout_len == 0:
         return raw_hex, "No outputs"
     amount_pos = pos
     current_amount = int.from_bytes(data[pos:pos+8], 'little')
 
-    # Skip rest safely
+    # Skip to end safely
     pos += 8
     slen, pos = varint_decode(data, pos)
     pos += slen
@@ -491,30 +491,53 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     if current_amount <= extra_fee + 546:
         return raw_hex, f"<div style='color:#ff3333;background:#300;padding:16px;border-radius:12px;'>Not enough change for +{bump} sat/vB bump</div>"
 
-    # APPLY BUMP
+    # === APPLY BUMP ===
     tx = bytearray(data)
     new_amount = current_amount - extra_fee
     tx[amount_pos:amount_pos+8] = new_amount.to_bytes(8, 'little')
 
-    # Add RBF signaling only once — on the first bump
+    # Enable RBF only once (first bump)
     needs_rbf_signal = all(int.from_bytes(data[p:p+4], 'little') == 0xffffffff for p in seq_positions)
     if needs_rbf_signal:
         for p in seq_positions:
-            tx[p:p+4] = b'\xfd\xff\xff\xff'   # 0xfffffffd
+            tx[p:p+4] = b'\xfd\xff\xff\xff'   # sequence = 0xfffffffd
 
     new_hex = tx.hex()
 
-    # CORRECT BUMP COUNTER — count how many inputs we have already bumped (i.e. not 0xffffffff anymore)
-    already_bumped = sum(1 for p in seq_positions if int.from_bytes(tx[p:p+4], 'little') != 0xffffffff)
-    bump_number = already_bumped + 1   # +1 because this bump just happened
+    # === FIXED: Persistent & Accurate Bump Counter via localStorage ===
+    try:
+        import js
+        saved_count = js.localStorage.getItem("omega_bump_count")
+        if saved_count is not None and saved_count.isdigit():
+            bump_number = int(saved_count) + 1
+        else:
+            bump_number = 1
+        js.localStorage.setItem("omega_bump_count", str(bump_number))
+    except:
+        bump_number = 1  # fallback
+
+    # Optional: Auto-clear counter if RBF signaling is still disabled (means fresh tx)
+    if needs_rbf_signal:
+        try:
+            import js
+            js.localStorage.setItem("omega_bump_count", "0")  # will become 1 on this bump
+        except:
+            pass
 
     info = f"""
-    <div style="background:#00ff9d20; padding:26px; border-radius:16px; border:5px solid #00ff9d; margin:20px 0; text-align:center;">
-        <b style="font-size:34px; color:#00ff9d;">BUMP #{bump_number}</b><br><br>
-        +{bump} sat/vB → +{extra_fee:,} sats to miners<br>
-        Change: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b>
+    <div style="background:#00ff9d20; padding:28px; border-radius:16px; border:5px solid #00ff9d; margin:20px 0; text-align:center;">
+        <b style="font-size:38px; color:#00ff9d; text-shadow: 0 0 20px #00ff9d;">BUMP #{bump_number}</b><br><br>
+        <span style="font-size:20px;">+{bump} sat/vB → +{extra_fee:,} sats to miners</span><br><br>
+        Change: {format_btc(current_amount)} → <b style="color:#00ff9d;font-size:22px;">{format_btc(new_amount)}</b>
     </div>
     """
+
+    # Save new hex for next bump
+    try:
+        import js
+        js.localStorage.setItem("omega_rbf_hex", new_hex)
+    except:
+        pass
 
     return new_hex, info
 # ==============================
@@ -950,7 +973,12 @@ with gr.Blocks(
     clear_rbf_btn.click(
         lambda: ("", ""),
         outputs=[rbf_in, output_log],
-        js="() => localStorage.removeItem('omega_rbf_hex')"
+        js="""
+        () => {
+        localStorage.removeItem('omega_rbf_hex');
+        localStorage.removeItem('omega_bump_count');
+        }
+        """
     )
 
     # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
