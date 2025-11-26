@@ -833,18 +833,18 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
 """)
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
-    gr.Markdown(
-        """
-        <div style="margin: 20px 0 10px 0 !important; padding: 10px 0 !important; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
+    gr.HTML(
+    """
+    <div style="margin: 20px 0 10px 0; padding: 10px 0; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9;">
         <strong>Ωmega Pruner v10.0</strong><br>
-        <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
+        <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none;">
             GitHub • Open Source • Apache 2.0
         </a><br>
         <small>Prune today. Win forever. • Ω</small>
     </div>
     """,
     elem_id="omega-footer"
-    )
+)
 if __name__ == "__main__":
     import os
     import warnings
