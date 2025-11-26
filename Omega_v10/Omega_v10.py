@@ -801,8 +801,6 @@ with gr.Blocks(
             elem_classes="full-width"
         )
 
-
-
     # ==================================================================
     # Events
     # ==================================================================
@@ -819,8 +817,26 @@ with gr.Blocks(
     )
 
     start_over_btn.click(
-        lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR, "", gr.update(visible=False), gr.update(visible=False)),
-        outputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, output_log, generate_btn, generate_row]
+        lambda: (
+            "", 
+            "Recommended (40% pruned)", 
+            546, 
+            "", 
+            50,  # dao_percent reset to 50 bps
+            "",  # output_log
+            gr.update(visible=False), 
+            gr.update(visible=False)
+        ),
+        outputs=[
+            user_input, 
+            prune_choice, 
+            dust_threshold, 
+            dest_addr, 
+            dao_percent, 
+            output_log, 
+            generate_btn, 
+            generate_row
+        ]
     )
 
 
