@@ -670,8 +670,27 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Omega v10",
+    title="Ωmega Pruner v10.0 — NUCLEAR EDITION: Prune UTXOs Forever",
 ) as demo:
+     # ——— BULLETPROOF OG TAGS — FORCES THUMBNAIL + DESCRIPTION EVERYWHERE ———
+    gr.HTML("""
+    <head>
+        <meta property="og:title" content="Ωmega Pruner v10.0 — NUCLEAR EDITION: Prune UTXOs Forever">
+        <meta property="og:description" content="The last UTXO consolidator alive in 2025. NUCLEAR PRUNE mode: max 3 inputs, burn the rest. Save thousands in future fees. Only the strongest survive.">
+        <meta property="og:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:image:alt" content="Glowing orange Ωmega Pruner symbol on black background">
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://omega-v10.onrender.com">
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" content="Ωmega Pruner v10.0 — NUCLEAR EDITION: Prune UTXOs Forever">
+        <meta name="twitter:description" content="The last UTXO consolidator alive in 2025. NUCLEAR PRUNE: max 3 inputs. Save thousands in fees. Prune today. Win forever.">
+        <meta name="twitter:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
+        <title>Ωmega Pruner v10.0 — NUCLEAR EDITION</title>
+    </head>
+    """, visible=False)
+    
     gr.Markdown(
         """
         <div style="text-align: center; padding: 20px 0 10px;">
@@ -959,17 +978,6 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
         elem_id="omega-footer"
     )
 
-   # ——— OFFICIAL OMEGA THUMBNAIL — LIVE EVERYWHERE ———
-    gr.HTML("""
-    <meta property="og:title" content="Ωmega Pruner v10.0 — NUCLEAR EDITION">
-    <meta property="og:description" content="The last UTXO consolidator alive in 2025. NUCLEAR PRUNE — max 3 inputs. Only the strongest survive.">
-    <meta property="og:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Glowing Ωmega Pruner Symbol">
-    <meta property="og:type" content="website">
-    <meta name="twitter:card" content="summary_large_image">
-    """, visible=False)
     
 if __name__ == "__main__":
     import os
