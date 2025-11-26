@@ -1,4 +1,4 @@
-# app.py — Omega Pruner v10.0 — Infinite Edition
+# app.py — Omega Pruner v10.0
 import gradio as gr
 import requests, time, base64, io, qrcode
 from dataclasses import dataclass
@@ -32,7 +32,7 @@ input_vb_global = output_vb_global = None
 # CSS
 # ==============================
 css = """
-/* —————————————————————— ΩMEGA PRUNER v10 — INFINITE EDITION CSS —————————————————————— */
+/* —————————————————————— ΩMEGA PRUNER v10 CSS —————————————————————— */
 
 /* 1. SANE, BEAUTIFUL GAPS — GRADIO 6+ FIX */
 .gr-row { gap: 14px !important; }
@@ -80,7 +80,6 @@ css = """
 /* 3. MISC FIXES */
 details summary { list-style: none; cursor: pointer; }
 details summary::-webkit-details-marker { display: none; }
-#rbf-hex-box textarea { font-family: 'Courier New', monospace !important; font-size: 0.95rem !important; }
 
 /* ——— FAB BUTTONS ——— */
 .qr-fab {
@@ -146,6 +145,7 @@ textarea:focus-within ~ #omega-bg-container-fixed {
   border: 6px solid #f7931a !important;
   box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
 }
+#omega-footer { margin-top: 3px !important; margin-bottom: 10px !important; }
 
 """
 # ==============================
@@ -370,7 +370,7 @@ class Tx:
         self.tx_outs = self.tx_outs or []
     
 def _correct_tx_encode(self, segwit=True):
-    parts = [
+    base = [
         self.version.to_bytes(4, 'little'),
         encode_varint(len(self.tx_ins)),
         b''.join(inp.encode() for inp in self.tx_ins),
@@ -379,9 +379,15 @@ def _correct_tx_encode(self, segwit=True):
         self.locktime.to_bytes(4, 'little')
     ]
     if segwit:
-        parts.insert(1, b'\x00\x01')
-        parts.insert(-1, b'\x00\x00\x00\x00')
-    return b''.join(parts)
+        base.insert(1, b'\x00\x01')  # marker + flag after version
+    raw = b''.join(base)
+    
+    if segwit:
+        # Append EMPTY witness data at the VERY END (canonical!)
+        witness = b'\x00'  # 0 witness items for all inputs
+        raw += witness * len(self.tx_ins)
+    
+    return raw
 
 Tx.encode = _correct_tx_encode
 del _correct_tx_encode
@@ -416,176 +422,6 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
     else:
         return int.from_bytes(data[pos:pos+8], 'little'), pos + 8
 
-# ==============================
-# RBF BUMP — FINAL, BULLETPROOF VERSION (put it right here!)
-# ==============================
-
-def rbf_bump(raw_hex: str, bump: int = 50):
-    # Critical guard — Gradio sometimes passes None or empty
-    if not raw_hex or not isinstance(raw_hex, str):
-        return "", "<div style='color:#f7931a; text-align:center; padding:20px;'>No transaction to bump yet — generate one first</div>"
-
-    raw_hex = raw_hex.strip()
-    if not raw_hex:
-        return "", "<div style='color:#f7931a; text-align:center; padding:20px;'>Paste a raw transaction hex first</div>"
-
-    try:
-        data = bytes.fromhex(raw_hex)
-    except Exception:
-        return "Invalid hex", raw_hex
-
-    if len(data) < 100:
-        return "Too short — not a valid transaction", raw_hex
-
-    pos = 0
-
-    # Parse version
-    version = int.from_bytes(data[pos:pos + 4], 'little')
-    if version not in (1, 2):
-        return "Unsupported transaction version (only v1/v2 allowed)", raw_hex
-    pos += 4
-
-    # Detect SegWit
-    is_segwit = data[pos:pos + 2] == b'\x00\x01'
-    if is_segwit:
-        pos += 2
-
-    # Parse inputs
-    vin_len, pos = varint_decode(data, pos)
-    if vin_len == 0:
-        return "Transaction has no inputs", raw_hex
-
-    inputs = []
-    for _ in range(vin_len):
-        txid = data[pos:pos + 32][::-1].hex()
-        vout = int.from_bytes(data[pos + 32:pos + 36], 'little')
-        pos += 36
-        script_len, pos = varint_decode(data, pos)
-        pos += script_len
-        sequence = int.from_bytes(data[pos:pos + 4], 'little')
-        pos += 4
-        inputs.append({
-            'txid': txid,
-            'vout': vout,
-            'sequence': sequence,
-            'sequence_pos': pos - 4,
-        })
-
-    # Parse outputs
-    vout_len, pos = varint_decode(data, pos)
-    if vout_len == 0:
-        return "Transaction has no outputs — nothing to bump", raw_hex
-
-    first_output_pos = pos
-    output_amount_pos = pos
-    pos += 8
-    script_len, pos = varint_decode(data, pos)
-    pos += script_len
-
-    # Skip remaining outputs
-    for _ in range(1, vout_len):
-        pos += 8
-        slen, pos = varint_decode(data, pos)
-        pos += slen
-
-    # Skip witness data (if SegWit)
-    if is_segwit:
-        for _ in range(vin_len):
-            witness_items, pos = varint_decode(data, pos)
-            for _ in range(witness_items):
-                item_len, pos = varint_decode(data, pos)
-                pos += item_len
-
-    # Locktime
-    if pos + 4 > len(data):
-        return "Truncated transaction — failed to parse locktime", raw_hex
-    int.from_bytes(data[pos:pos + 4], 'little')
-    pos += 4
-
-    # Safety checks
-    current_amount = int.from_bytes(data[output_amount_pos:output_amount_pos + 8], 'little')
-    if current_amount == 0:
-        return "First output is 0 — this is an anyone-can-spend output, cannot reduce", raw_hex
-
-    vsize = (len(data) + 3) // 4
-    extra_fee = int(vsize * bump)
-
-    if current_amount <= extra_fee + 546:
-        needed = extra_fee + 546 - current_amount + 1
-        return (
-            f"<div style='color:#ff3333; background:#300; padding:16px; border-radius:12px;'>"
-            f"<b>Cannot bump +{bump} sat/vB</b><br>"
-            f"Would reduce change output to dust (≤546 sats)<br>"
-            f"Need at least <b>+{needed:,}</b> more sats in change output"
-            f"</div>"
-        ), raw_hex
-
-    # Detect Taproot
-    is_taproot = (
-        is_segwit and
-        vout_len >= 1 and
-        data[first_output_pos + 8:first_output_pos + 10] == b'\x51\x20'
-    )
-
-    # RBF signaling
-    sequences = [inp['sequence'] for inp in inputs]
-    rbf_signaled = any(seq < 0xfffffffe for seq in sequences)
-    all_max = all(seq == 0xffffffff for seq in sequences)
-
-    # User feedback
-    if is_taproot:
-        warning = (
-            "<div style='color:#ff9900; background:#332200; padding:14px; border-radius:10px; margin:12px 0; border:2px solid #ff9900;'>"
-            "<b>Taproot Key-Path Spend Detected</b><br>"
-            "Sequence-based RBF is ignored.<br>"
-            "Use anyone-can-spend output or Sparrow for reliable RBF."
-            "</div>"
-        )
-        rbf_action = "fee bump only"
-    elif not rbf_signaled and all_max:
-        warning = "<div style='color:#00ff9d; background:#003300; padding:14px; border-radius:10px; border:2px solid #00ff9d; margin:12px 0;'>"
-        warning += "<b>RBF signaling added</b> — now replaceable!</div>"
-        rbf_action = "signaling + fee bump"
-    elif rbf_signaled:
-        warning = "<div style='color:#f7931a; background:#332200; padding:14px; border-radius:10px; margin:12px 0;'>"
-        warning += "<b>Already RBF-enabled</b> — increasing fee only</div>"
-        rbf_action = "fee bump only"
-    else:
-        warning = ""
-        rbf_action = "fee bump"
-
-    # Apply bump
-    tx = bytearray(data)
-    new_amount = current_amount - extra_fee
-    tx[output_amount_pos:output_amount_pos + 8] = new_amount.to_bytes(8, 'little')
-
-    # Add RBF signaling if needed
-    if not is_taproot and all_max:
-        for inp in inputs:
-            if inp['sequence'] == 0xffffffff:
-                tx[inp['sequence_pos']:inp['sequence_pos'] + 4] = (0xfffffffd).to_bytes(4, 'little')
-
-    bumped_hex = tx.hex()
-
-    # Stats
-    try:
-        fee_rate_api = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=6).json()["fastestFee"]
-    except:
-        fee_rate_api = "unknown"
-
-    bump_count = sum(1 for s in sequences if s == 0xffffffff) + (1 if all_max else 0)
-
-    info = f"""
-    {warning}
-    <div style="background:#00ff9d20; padding:18px; border-radius:14px; border:3px solid #00ff9d; margin:20px 0; text-align:center; font-family: monospace;">
-        <b style="font-size:24px; color:#00ff9d;">Bump #{bump_count}</b><br><br>
-        +{bump} sat/vB → +{extra_fee:,} sats to miners<br>
-        Change reduced: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b><br><br>
-        <small>Current fastest: ~{fee_rate_api} sat/vB • {rbf_action}</small>
-    </div>
-    """
-
-    return bumped_hex, info
 # ==============================
 # Core Functions
 # ==============================
@@ -654,25 +490,19 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     if not pruned_utxos_global:
-        return "Run analysis first", gr.update(visible=False), gr.update(visible=False), "", "", ""
+        return "Run analysis first", gr.update(visible=False), gr.update(visible=False)
 
     sample_addr = pruned_utxos_global[0].get('address') or user_input.strip()
     _, info = address_to_script_pubkey(sample_addr)
     detected = info['type']
 
-    strategy_name = {
-        "Privacy First (30% pruned)": "Privacy First",
-        "Recommended (40% pruned)": "Recommended", 
-        "More Savings (50% pruned)": "More Savings"
-    }.get(strategy, strategy.split(" (")[0])
-
     total = sum(u['value'] for u in pruned_utxos_global)
     inputs = len(pruned_utxos_global)
     outputs = 1 + (1 if not selfish_mode and dao_percent > 0 else 0)
-    weight = 40 + inputs * input_vb_global*4 + outputs * output_vb_global*4 + 4
+    weight = 40 + inputs * input_vb_global * 4 + outputs * output_vb_global * 4 + 4
     if detected in ("SegWit", "Taproot"):
         weight += 2
-    vsize = (weight + 3) // 4   # ceiling division
+    vsize = (weight + 3) // 4
 
     try:
         fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=8).json()["fastestFee"]
@@ -687,14 +517,14 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     user_gets = total - miner_fee - dao_cut
 
     if user_gets < 546:
-        return "Not enough after fees", gr.update(visible=False), gr.update(visible=False), "", "", ""
+        return "Not enough after fees", gr.update(visible=False), gr.update(visible=False)
 
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return "Invalid destination", gr.update(visible=False), gr.update(visible=False), "", "", ""
+        return "Invalid destination", gr.update(visible=False), gr.update(visible=False)
 
-    # Build the transaction
+    # Build transaction
     tx = Tx()
     for u in pruned_utxos_global:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
@@ -703,77 +533,78 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
         dao_script, _ = address_to_script_pubkey(dao_addr or DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-    # Generate BOTH outputs
     psbt_b64 = make_psbt(tx)
-
-    # Generate clean, unsigned, RBF-ready raw hex — 100% compatible with ALL wallets
-    unsigned_tx = tx.encode(segwit=True)
-
-    # CRITICAL: Strip the empty witness placeholder (4 zero bytes) when unsigned
-    if unsigned_tx.endswith(b'\x00\x00\x00\x00'):
-        unsigned_tx = unsigned_tx[:-4]
-
-    raw_hex = unsigned_tx.hex()
-
     qr = make_qr(psbt_b64)
-
     thank = "No thank-you" if dao_cut == 0 else f"Thank-you: {format_btc(dao_cut)}"
 
-    details_section = f"""
-<details style="margin-top: 40px;">
-    <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px;">
-        View PSBT (click to expand)
-    </summary>
-    <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
-{psbt_b64}
-    </pre>
-</details>
-"""
+    # ←←← NEW: Copy PSBT Button + Success Toast ←←←
+    copy_button = f"""
+    <button onclick="navigator.clipboard.writeText(`{psbt_b64}`).then(()=>{{
+        const t=document.createElement('div');
+        t.textContent='PSBT copied!';
+        t.style.cssText=`position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+                         z-index:10000;background:#00ff9d;color:#000;padding:16px 36px;
+                         border-radius:50px;font-weight:bold;font-size:18px;
+                         box-shadow:0 12px 40px rgba(0,0,0,0.6);animation:pop 2s forwards;`;
+        document.body.appendChild(t);
+        setTimeout(()=>t.remove(),2000);
+    }})" 
+    style="margin:30px auto;display:block;padding:18px 42px;font-size:1.env19rem;
+           font-weight:800;border-radius:16px;border:none;background:#f7931a;
+           color:white;cursor:pointer;box-shadow:0 8px 30px rgba(247,147,26,0.5);
+           transition:all 0.2s;"
+    onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 40px rgba(247,147,26,0.7)'"
+    onmouseout="this.style.transform='';this.style.boxShadow='0 8px 30px rgba(247,147,26,0.5)'">
+        Copy PSBT to Clipboard
+    </button>
+    """
 
     html = f"""
     <div style="text-align:center; padding:20px;">
-        <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
-        <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}</p>
-        <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">You receive: {format_btc(user_gets)}</b>
-        <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
-            Future savings ≈ <b style="font-size:24px; color:#00ff9d;">{format_btc(savings)}</b> (@ {future_rate} sat/vB)
-        </div>
-
-        <div style="margin:40px 0;">
-            <div class="qr-center">
-                <img src="{qr}">
-            </div>
-        </div>
-
-        <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum</small></p>
-
-        <details style="margin-top: 32px;">
-            <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center; padding:12px 0;">
-                View PSBT (click to expand)
-            </summary>
-            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px; text-align:left;">
-{psbt_b64}
-            </pre>
-        </details>
-
-        <p style="margin:36px 0 20px; color:#f7931a; font-weight:bold; font-size:18px; line-height:1.4;">
-            RBF ready — click "Bump +50 sat/vB" anytime (survives refresh)
-        </p>
+    <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
+    <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: {format_btc(miner_fee)} @ {fee_rate} sat/vB • {thank}</p>
+    
+    <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
+        You receive: {format_btc(user_gets)}
+    </b>
+    
+    <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
+        Future savings ≈ <b style="font-size:24px; color:#00ff9d; text-shadow: 0 0 12px black, 0 0 24px black;">
+            {format_btc(savings)}
+        </b> (@ {future_rate} sat/vB)
     </div>
-    """
+
+    <div style="margin:40px 0;" class="qr-center">
+        <img src="{qr}">
+    </div>
+
+    {copy_button}
+
+    <p><small>Scan with Sparrow • Nunchuk • BlueWallet • Electrum • or paste with the button above</small></p>
+
+    <details style="margin-top: 32px;">
+        <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center;">
+            View raw PSBT (click to expand)
+        </summary>
+        <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
+{psbt_b64}
+        </pre>
+    </pre>
+    </details>
+</div>
+"""
 
     return (
         html,
-        gr.update(visible=False), # generate_btn
-        gr.update(visible=False), # generate_row
-        raw_hex                     # saved for infinite RBF
+        gr.update(visible=False),
+        gr.update(visible=False)
     )
 
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Omega v10 — Infinite Edition",
+    title="Omega v10",
 ) as demo:
     gr.Markdown(
         """
@@ -781,9 +612,6 @@ with gr.Blocks(
             <h1 style="font-size: 3.2rem; margin: 0; background: linear-gradient(135deg, #f7931a, #ff9900); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 30px rgba(247,147,26,0.4);">
                 Ωmega Pruner v10
             </h1>
-            <h2 style="font-size: 1.7rem; color: #f7931a; margin: 8px 0 30px; font-weight: 600;">
-                Infinite Edition — RBF Forever • Privacy First
-            </h2>
         </div>
         """,
         elem_id="omega-title"
@@ -927,7 +755,7 @@ with gr.Blocks(
 
     output_log = gr.HTML()
 
-    with gr.Row(visible=False) as generate_row:    # ← starts hidden = 0px height
+    with gr.Row(visible=False) as generate_row:
         generate_btn = gr.Button(
             "2. Generate Transaction",
             visible=False,
@@ -936,7 +764,6 @@ with gr.Blocks(
             elem_classes="full-width"
         )
 
-
     with gr.Row():
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
@@ -944,59 +771,8 @@ with gr.Blocks(
             size="lg",
             elem_classes="full-width"
         )
-    # =================== INFINITE RBF SECTION ===================
-    gr.Markdown("### Infinite RBF Bump Zone")
 
-    with gr.Row():
-        with gr.Column(scale=8):
-            rbf_in = gr.Textbox(
-                label="Raw hex (auto-saved from last tx)",
-                lines=6,
-                elem_id="rbf-hex-box",
-                persistence=True,          # ← Gradio 6+ = survives refresh forever
-                show_copy_button=True      # ← built-in copy button (replaces your custom JS one)
-            )
 
-        with gr.Column(scale=4):
-            # Copy + Clear — perfectly spaced
-            with gr.Row():
-                gr.Button("Copy raw hex", size="sm").click(
-                    None, None, None,
-                   js="""
-                    () => {
-                    const box = document.querySelector('#rbf-hex-box textarea') || 
-                           document.querySelector('textarea[data-testid*="textbox"]');
-                    if (box && box.value.trim()) {
-                        navigator.clipboard.writeText(box.value.trim());
-                        const toast = document.createElement('div');
-                        toast.textContent = "Copied!";
-                        toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,255,157,0.95);color:#000;padding:12px 32px;border-radius:50px;font-weight:bold;z-index:10000;box-shadow:0 8px 32px rgba(0,0,0,0.5);animation:toastPop 1.8s ease forwards;';
-                        document.body.appendChild(toast);
-                        setTimeout(() => toast.remove(), 1800);
-                        }
-                            }
-                    """
-                )
-
-                gr.Button("Clear saved", size="sm").click(
-                    None, None, None,
-                    js="""
-                    () => {
-                        localStorage.removeItem('omega_rbf_hex');
-                        const box = document.querySelector('#rbf-hex-box textarea');
-                        if (box) box.value = '';
-                        showToast("Cleared & ready for new tx");
-                    }
-                    """
-                )
-
-            # Bump button with CSS gap
-            rbf_btn = gr.Button(
-                "Bump +50 sat/vB to Miners",
-                variant="primary",
-                size="lg",
-                elem_classes="full-width bump-with-gap"
-           )
     # ==================================================================
     # Events
     # ==================================================================
@@ -1009,137 +785,97 @@ with gr.Blocks(
     generate_btn.click(
         fn=build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
-        outputs=[output_log, generate_btn, generate_row, rbf_in],
-        queue=False
+        outputs=[output_log, generate_btn, generate_row]
     )
+
     start_over_btn.click(
-        lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
-                 "", gr.update(visible=False), gr.update(visible=False), "", ""),
-        outputs=[
-            user_input, prune_choice, dust_threshold, dest_addr,
-            selfish_mode, dao_percent, dao_addr,
-            output_log, generate_btn, generate_row, rbf_in
-        ]
+        lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR, "", gr.update(visible=False), gr.update(visible=False)),
+        outputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr, output_log, generate_btn, generate_row]
     )
-    rbf_btn.click(
-        fn=rbf_bump,
-        inputs=rbf_in,
-        outputs=[rbf_in, output_log],
-        prevents_concurrent_calls=True,   # Guarantees perfect bump ordering
-        stateful=True                     # Auto-saves + auto-restores the raw hex forever
-    )
+
 
     # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
     gr.HTML("""
-    <!-- Floating BTC Scanner Button -->
-    <label class="qr-fab btc" title="Scan Address / xpub">B</label>
-    <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
+<!-- Floating BTC Scanner Button -->
+<label class="qr-fab btc" title="Scan Address / xpub">B</label>
+<input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
-    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-    <script>
-    // Toast function — beautiful, non-blocking
-    function showToast(message, isError = false) {
-        const toast = document.createElement('div');
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed !important;
-            bottom: 100px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
-            color: ${isError ? '#ff3366' : '#00ff9d'} !important;
-            padding: 16px 36px !important;
-            border-radius: 50px !important;
-            font-weight: bold !important;
-            font-size: 17px !important;
-            z-index: 10000 !important;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
-            backdrop-filter: blur(12px) !important;
-            border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
-            animation: toastPop 2.4s ease forwards !important;
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2400);
-    }
+<script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+<script>
+// Toast — beautiful feedback
+function showToast(msg, err = false) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = `position:fixed !important; bottom:100px !important; left:50% !important;
+        transform:translateX(-50%) !important; z-index:10000 !important;
+        background:${err?'#300':'rgba(0,0,0,0.92)'} !important;
+        color:${err?'#ff3366':'#00ff9d'} !important;
+        padding:16px 36px !important; border-radius:50px !important;
+        font-weight:bold !important; font-size:17px !important;
+        border:3px solid ${err?'#ff3366':'#00ff9d'} !important;
+        box-shadow:0 12px 40px rgba(0,0,0,0.7) !important;
+        backdrop-filter:blur(12px) !important;
+        animation:pop 2.4s forwards !important;`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2400);
+}
+if (!document.getElementById('toast-style')) {
+    const s = document.createElement('style');
+    s.id = 'toast-style';
+    s.textContent = `@keyframes pop{
+        0%{transform:translateX(-50%) translateY(30px);opacity:0}
+        12%,88%{transform:translateX(-50%) translateY(0);opacity:1}
+        100%{transform:translateX(-50%) translateY(-30px);opacity:0}
+    }`;
+    document.head.appendChild(s);
+}
 
-    // Toast animation
-    if (!document.querySelector('#toast-style')) {
-        const style = document.createElement('style');
-        style.id = 'toast-style';
-        style.textContent = `
-            @keyframes toastPop {
-                0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
-                12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-                88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-                100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
+// QR Scanner — perfect and untouched
+document.querySelector('.qr-fab.btc')?.addEventListener('click', () => 
+    document.getElementById('qr-scanner-btc').click()
+);
 
-    // BTC Scanner
-    const btcBtn = document.querySelector('.qr-fab.btc');
-    const btcInput = document.getElementById('qr-scanner-btc');
-    btcBtn.onclick = () => btcInput.click();
-
-    async function scanBTC(file) {
-        if (!file) return;
-        const img = new Image();
-        img.onload = async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            try {
-                const result = await ZXing.readBarcodeFromCanvas(canvas);
-                const text = result.text.trim();
-                const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-
-                if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
-                    const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
-                               document.querySelector('textarea');
-                    if (box) {
-                        box.value = cleanText;
-                        box.dispatchEvent(new Event('input'));
-                        box.dispatchEvent(new Event('change'));
-                    }
-                    showToast("Address / xpub scanned!");
-                } else {
-                    showToast("Not a Bitcoin address or xpub", true);
+document.getElementById('qr-scanner-btc').onchange = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        try {
+            const res = await ZXing.readBarcodeFromCanvas(canvas);
+            const txt = res.text.trim().split('?')[0].replace(/^bitcoin:/i, '');
+            if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(txt)) {
+                const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
+                           document.querySelector('textarea');
+                if (box) {
+                    box.value = txt;
+                    box.dispatchEvent(new Event('input', {bubbles:true}));
+                    box.dispatchEvent(new Event('change', {bubbles:true}));
                 }
-            } catch (e) {
-                showToast("No QR detected", true);
-            }
-        };
-        img.src = URL.createObjectURL(file);
-    }
-
-    btcInput.onchange = e => scanBTC(e.target.files[0]);
-
-    // Restore saved RBF hex
-    function loadSavedRBF() {
-        const saved = localStorage.getItem('omega_rbf_hex');
-        if (!saved) return;
-        const box = document.querySelector('textarea[label*="Raw hex"]');
-        if (box) box.value = saved;
-    }
-    loadSavedRBF();
-    </script>
-    """)
+                showToast("Scanned!");
+            } else showToast("Not a BTC address/xpub", true);
+        } catch { showToast("No QR detected", true); }
+    };
+    img.src = URL.createObjectURL(file);
+};
+</script>
+""")
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
-    gr.Markdown(
-        """
-        <div style="margin: 60px 0 30px; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9; pointer-events: none;">
-            <strong>Ωmega Pruner v10.0 — Infinite Edition</strong><br>
-            <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none; pointer-events: auto;">
-                GitHub • Open Source • Apache 2.0
-            </a><br>
-            <small>Prune today. Win forever. • Ω</small>
-        </div>
-        """,
-        elem_id="omega-footer"
-    )
+    gr.HTML(
+    """
+    <div style="margin: 20px 0 10px 0; padding: 10px 0; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9;">
+        <strong>Ωmega Pruner v10.0</strong><br>
+        <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none;">
+            GitHub • Open Source • Apache 2.0
+        </a><br>
+        <small>Prune today. Win forever. • Ω</small>
+    </div>
+    """,
+    elem_id="omega-footer"
+)
 if __name__ == "__main__":
     import os
     import warnings
