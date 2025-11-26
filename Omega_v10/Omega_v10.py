@@ -1027,7 +1027,6 @@ with gr.Blocks(
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, selfish_mode, dao_percent, dao_addr],
         outputs=[output_log, generate_btn, generate_row, rbf_in]
     )
-
     start_over_btn.click(
         lambda: ("", "Recommended (40% pruned)", 546, "", False, 50, DEFAULT_DAO_ADDR,
                  "", gr.update(visible=False), gr.update(visible=False), "", ""),
@@ -1037,7 +1036,6 @@ with gr.Blocks(
             output_log, generate_btn, generate_row, rbf_in
         ]
     )
-
     rbf_btn.click(
         fn=rbf_bump,
         inputs=rbf_in,
