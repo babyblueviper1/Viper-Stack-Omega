@@ -427,7 +427,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 
 def rbf_bump(raw_hex: str, bump: int = 50):
-    # 1. Recover from localStorage if Gradio lost it
+    # Recover from localStorage
     if not raw_hex or not raw_hex.strip():
         try:
             import js
@@ -438,7 +438,7 @@ def rbf_bump(raw_hex: str, bump: int = 50):
             pass
 
     if not raw_hex or len(raw_hex.strip()) < 400:
-        return raw_hex or "", "<div style='color:#f7931a;padding:20px;text-align:center;'>Generate a transaction first → then bump forever</div>"
+        return "", "<div style='color:#f7931a;padding:20px;text-align:center;'>Generate a transaction first → then bump forever</div>"
 
     raw_hex = raw_hex.strip()
     try:
@@ -447,31 +447,28 @@ def rbf_bump(raw_hex: str, bump: int = 50):
         return raw_hex, "Invalid hex"
 
     pos = 0
-    version = int.from_bytes(data[pos:pos+4], 'little')
-    pos += 4
-
+    pos += 4  # version
     is_segwit = data[pos:pos+2] == b'\x00\x01'
-    if is_segwit:
-        pos += 2
+    if is_segwit: pos += 2
 
-    # === Parse inputs (save sequence positions) ===
+    # Parse inputs and save sequence positions
     vin_len, pos = varint_decode(data, pos)
     seq_positions = []
     for _ in range(vin_len):
         pos += 36
         slen, pos = varint_decode(data, pos)
         pos += slen
-        seq_positions.append(pos)   # ← exact position of this input's sequence
+        seq_positions.append(pos)
         pos += 4
 
-    # === Parse first output (change output) ===
+    # Parse first output (change)
     vout_len, pos = varint_decode(data, pos)
     if vout_len == 0:
         return raw_hex, "No outputs"
     amount_pos = pos
     current_amount = int.from_bytes(data[pos:pos+8], 'little')
 
-    # Skip rest of outputs + witness + locktime safely
+    # Skip rest safely
     pos += 8
     slen, pos = varint_decode(data, pos)
     pos += slen
@@ -488,34 +485,34 @@ def rbf_bump(raw_hex: str, bump: int = 50):
                     pos += ilen
         except: pass
 
-    # === Fee math ===
     vsize = (len(data) + 3) // 4
     extra_fee = vsize * bump
 
     if current_amount <= extra_fee + 546:
-        return raw_hex, f"<div style='color:#ff3333;background:#300;padding:16px;border-radius:12px;'>Not enough change for +{bump} sat/vB<br>Need {extra_fee + 546 - current_amount:,} more sats</div>"
+        return raw_hex, f"<div style='color:#ff3333;background:#300;padding:16px;border-radius:12px;'>Not enough change for +{bump} sat/vB bump</div>"
 
-    # === Apply bump ===
+    # APPLY BUMP
     tx = bytearray(data)
     new_amount = current_amount - extra_fee
     tx[amount_pos:amount_pos+8] = new_amount.to_bytes(8, 'little')
 
-    # === Add RBF signaling only once (first bump) ===
-    if all(int.from_bytes(data[p:p+4], 'little') == 0xffffffff for p in seq_positions):
+    # Add RBF signaling only once — on the first bump
+    needs_rbf_signal = all(int.from_bytes(data[p:p+4], 'little') == 0xffffffff for p in seq_positions)
+    if needs_rbf_signal:
         for p in seq_positions:
             tx[p:p+4] = b'\xfd\xff\xff\xff'   # 0xfffffffd
 
     new_hex = tx.hex()
 
-    # === Correct bump counter (count how many inputs are no longer 0xffffffff) ===
-    bumped_inputs = sum(1 for p in seq_positions if int.from_bytes(data[p:p+4], 'little') != 0xffffffff)
-    total_bumps = bumped_inputs + 1   # +1 because we just did a bump
+    # CORRECT BUMP COUNTER — count how many inputs we have already bumped (i.e. not 0xffffffff anymore)
+    already_bumped = sum(1 for p in seq_positions if int.from_bytes(tx[p:p+4], 'little') != 0xffffffff)
+    bump_number = already_bumped + 1   # +1 because this bump just happened
 
     info = f"""
-    <div style="background:#00ff9d20; padding:24px; border-radius:16px; border:4px solid #00ff9d; margin:20px 0; text-align:center;">
-        <b style="font-size:32px; color:#00ff9d;">BUMP #{total_bumps}</b><br><br>
+    <div style="background:#00ff9d20; padding:26px; border-radius:16px; border:5px solid #00ff9d; margin:20px 0; text-align:center;">
+        <b style="font-size:34px; color:#00ff9d;">BUMP #{bump_number}</b><br><br>
         +{bump} sat/vB → +{extra_fee:,} sats to miners<br>
-        Change reduced: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b>
+        Change: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b>
     </div>
     """
 
