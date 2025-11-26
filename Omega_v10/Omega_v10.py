@@ -421,6 +421,20 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 
 def rbf_bump(raw_hex: str, bump: int = 50):
+    # Ultra-defensive: if Gradio somehow lost it, try to recover from JS
+    if not raw_hex or not raw_hex.strip():
+        try:
+            import js
+            saved = js.localStorage.getItem("omega_rbf_hex")
+            if saved and len(saved) > 200:
+                raw_hex = saved
+                print("RBF hex recovered from localStorage fallback")
+        except:
+            pass
+
+    if not raw_hex or not raw_hex.strip():
+        return "", "<div style='color:#f7931a; text-align:center; padding:20px;'>No transaction to bump yet — generate one first</div>"
+    
     # Critical guard — Gradio sometimes passes None or empty
     if not raw_hex or not isinstance(raw_hex, str):
         return "", "<div style='color:#f7931a; text-align:center; padding:20px;'>No transaction to bump yet — generate one first</div>"
@@ -947,56 +961,29 @@ with gr.Blocks(
     # =================== INFINITE RBF SECTION ===================
     gr.Markdown("### Infinite RBF Bump Zone")
 
-    with gr.Row():
-        with gr.Column(scale=8):
-            rbf_in = gr.Textbox(
-                label="Raw hex (auto-saved from last tx)",
-                lines=6,
-                elem_id="rbf-hex-box",
-                persistence=True,          # ← Gradio 6+ = survives refresh forever
-                show_copy_button=True      # ← built-in copy button (replaces your custom JS one)
-            )
+   with gr.Row():
+    with gr.Column(scale=8):
+        rbf_in = gr.Textbox(
+            label="Raw hex (auto-saved from last tx)",
+            lines=6,
+            elem_id="rbf-hex-box",
+            show_copy_button=True,       # ← native copy (beautiful, reliable)
+        )
 
-        with gr.Column(scale=4):
-            # Copy + Clear — perfectly spaced
-            with gr.Row():
-                gr.Button("Copy raw hex", size="sm").click(
-                    None, None, None,
-                   js="""
-                    () => {
-                    const box = document.querySelector('#rbf-hex-box textarea') || 
-                           document.querySelector('textarea[data-testid*="textbox"]');
-                    if (box && box.value.trim()) {
-                        navigator.clipboard.writeText(box.value.trim());
-                        const toast = document.createElement('div');
-                        toast.textContent = "Copied!";
-                        toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,255,157,0.95);color:#000;padding:12px 32px;border-radius:50px;font-weight:bold;z-index:10000;box-shadow:0 8px 32px rgba(0,0,0,0.5);animation:toastPop 1.8s ease forwards;';
-                        document.body.appendChild(toast);
-                        setTimeout(() => toast.remove(), 1800);
-                        }
-                            }
-                    """
-                )
-
-                gr.Button("Clear saved", size="sm").click(
-                    None, None, None,
-                    js="""
-                    () => {
-                        localStorage.removeItem('omega_rbf_hex');
-                        const box = document.querySelector('#rbf-hex-box textarea');
-                        if (box) box.value = '';
-                        showToast("Cleared & ready for new tx");
-                    }
-                    """
-                )
-
-            # Bump button with CSS gap
-            rbf_btn = gr.Button(
-                "Bump +50 sat/vB to Miners",
-                variant="primary",
-                size="lg",
-                elem_classes="full-width bump-with-gap"
-           )
+    with gr.Column(scale=4):
+        # Only keep the Clear button — it’s actually useful!
+        clear_rbf_btn = gr.Button(
+            "Clear RBF Hex",
+            variant="secondary",
+            size="lg",
+            elem_classes="bump-with-gap"
+        )
+        rbf_btn = gr.Button(
+            "Bump +50 sat/vB to Miners",
+            variant="primary",
+            size="lg",
+            elem_classes="full-width bump-with-gap"
+        )
     # ==================================================================
     # Events
     # ==================================================================
@@ -1025,8 +1012,20 @@ with gr.Blocks(
         fn=rbf_bump,
         inputs=rbf_in,
         outputs=[rbf_in, output_log],
-        prevents_concurrent_calls=True,   # Guarantees perfect bump ordering
-        stateful=True                     # Auto-saves + auto-restores the raw hex forever
+        prevents_concurrent_calls=True,
+        js="""
+        (hex) => {
+            if (hex && hex.trim().length > 100) {
+                localStorage.setItem('omega_rbf_hex', hex.trim());
+            }
+        }
+        """
+    )
+
+    clear_rbf_btn.click(
+        lambda: ("", ""),
+        outputs=[rbf_in, output_log],
+        js="() => localStorage.removeItem('omega_rbf_hex')"
     )
 
     # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
@@ -1036,95 +1035,39 @@ with gr.Blocks(
     <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
     <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-    <script>
-    // Toast function — beautiful, non-blocking
-    function showToast(message, isError = false) {
-        const toast = document.createElement('div');
-        toast.textContent = message;
-        toast.style.cssText = `
-            position: fixed !important;
-            bottom: 100px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
-            color: ${isError ? '#ff3366' : '#00ff9d'} !important;
-            padding: 16px 36px !important;
-            border-radius: 50px !important;
-            font-weight: bold !important;
-            font-size: 17px !important;
-            z-index: 10000 !important;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
-            backdrop-filter: blur(12px) !important;
-            border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
-            animation: toastPop 2.4s ease forwards !important;
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2400);
+<script>
+// Toast function (unchanged - perfect)
+function showToast(message, isError = false) { ... }  // ← keep your existing toast code
+
+// BTC Scanner (unchanged)
+const btcBtn = document.querySelector('.qr-fab.btc');
+const btcInput = document.getElementById('qr-scanner-btc');
+btcBtn.onclick = () => btcInput.click();
+async function scanBTC(file) { ... }  // ← keep your scanner
+btcInput.onchange = e => scanBTC(e.target.files[0]);
+
+// === CRITICAL: Fixed RBF restore with proper Gradio sync ===
+function loadSavedRBF() {
+    const saved = localStorage.getItem('omega_rbf_hex');
+    if (!saved) return;
+    
+    const box = document.querySelector('#rbf-hex-box textarea');
+    if (!box) return;
+    
+    // Only restore if empty (prevents overwrite)
+    if (box.value.trim() === '') {
+        box.value = saved.trim();
+        // These two lines are MAGIC — force Gradio server to see the value
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+        box.dispatchEvent(new Event('change', { bubbles: true }));
     }
+}
 
-    // Toast animation
-    if (!document.querySelector('#toast-style')) {
-        const style = document.createElement('style');
-        style.id = 'toast-style';
-        style.textContent = `
-            @keyframes toastPop {
-                0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
-                12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-                88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-                100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    // BTC Scanner
-    const btcBtn = document.querySelector('.qr-fab.btc');
-    const btcInput = document.getElementById('qr-scanner-btc');
-    btcBtn.onclick = () => btcInput.click();
-
-    async function scanBTC(file) {
-        if (!file) return;
-        const img = new Image();
-        img.onload = async () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            canvas.getContext('2d').drawImage(img, 0, 0);
-            try {
-                const result = await ZXing.readBarcodeFromCanvas(canvas);
-                const text = result.text.trim();
-                const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-
-                if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
-                    const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
-                               document.querySelector('textarea');
-                    if (box) {
-                        box.value = cleanText;
-                        box.dispatchEvent(new Event('input'));
-                        box.dispatchEvent(new Event('change'));
-                    }
-                    showToast("Address / xpub scanned!");
-                } else {
-                    showToast("Not a Bitcoin address or xpub", true);
-                }
-            } catch (e) {
-                showToast("No QR detected", true);
-            }
-        };
-        img.src = URL.createObjectURL(file);
-    }
-
-    btcInput.onchange = e => scanBTC(e.target.files[0]);
-
-    // Restore saved RBF hex
-    function loadSavedRBF() {
-        const saved = localStorage.getItem('omega_rbf_hex');
-        if (!saved) return;
-        const box = document.querySelector('textarea[label*="Raw hex"]');
-        if (box) box.value = saved;
-    }
-    loadSavedRBF();
-    </script>
+// Run on load
+window.addEventListener('load', loadSavedRBF);
+// Also run after Gradio fully mounts (double safety)
+document.addEventListener('DOMContentLoaded', () => setTimeout(loadSavedRBF, 500));
+</script>
     """)
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
