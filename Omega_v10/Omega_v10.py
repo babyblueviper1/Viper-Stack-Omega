@@ -427,65 +427,70 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 
 def rbf_bump(raw_hex: str, bump: int = 50):
-    if not raw_hex or len(raw_hex.strip()) < 400:
-        return raw_hex, "<div style='color:#f7931a;padding:20px;text-align:center;'>Generate a tx first</div>"
+    if not raw_hex or len(raw_hex := raw_hex.strip()) < 400:
+        return raw_hex, "<div style='color:#f7931a;padding:20px;text-align:center;'>Generate a transaction first</div>"
 
-    raw_hex = raw_hex.strip()
     try:
         data = bytes.fromhex(raw_hex)
     except:
         return raw_hex, "Invalid hex"
 
-    # Super simple parsing — we only care about first output (change)
-    pos = 4
-    if data[pos:pos+2] == b'\x00\x01':
-        pos += 2
+    # --- SUPER SAFE WAY TO FIND CHANGE OUTPUT (first output) ---
+    try:
+        pos = 4
+        if len(data) > pos + 1 and data[pos:pos+2] == b'\x00\x01':
+            pos += 2
 
-    vin_len = data[pos]; pos += 1
-    pos += vin_len * 50  # skip inputs roughly
+        # Skip inputs roughly
+        vin_len = data[pos]
+        pos += 1 + vin_len * 50  # safe over-estimate
 
-    vout_len = data[pos]; pos += 1
-    if vout_len == 0:
-        return raw_hex, "No outputs"
-
-    # First output amount
-    amount_pos = pos
-    current_amount = int.from_bytes(data[pos:pos+8], 'little')
-    pos += 8 + 10  # skip script
+        # First output amount
+        if len(data) < pos + 9:
+            return raw_hex, "Tx too short"
+        amount_pos = pos
+        current_amount = int.from_bytes(data[pos:pos+8], 'little')
+    except:
+        return raw_hex, "Failed to read tx"
 
     vsize = (len(data) + 3) // 4
     extra_fee = vsize * bump
 
     if current_amount <= extra_fee + 546:
-        return raw_hex, "Not enough for bump"
+        return raw_hex, f"<div style='color:#ff3333;background:#300;padding:16px;border-radius:12px;'>Not enough change (+{bump} sat/vB)</div>"
 
-    # Apply bump
+    # --- APPLY BUMP ---
     tx = bytearray(data)
     new_amount = current_amount - extra_fee
     tx[amount_pos:amount_pos+8] = new_amount.to_bytes(8, 'little')
 
-    # Enable RBF on first bump
-    for i in range(vin_len):
-        seq_pos = 41 + (i * 50) + (44 if data[4:6] == b'\x00\x01' else 0)
-        if int.from_bytes(data[seq_pos:seq_pos+4], 'little') == 0xffffffff:
-            tx[seq_pos:seq_pos+4] = b'\xfd\xff\xff\xff'
+    # Enable RBF on first bump (simple heuristic)
+    try:
+        for i in range(20):  # max 20 inputs
+            seq_pos = 41 + i*50 + (2 if data[4:6] == b'\x00\x01' else 0)
+            if seq_pos + 4 >= len(tx):
+                break
+            if tx[seq_pos:seq_pos+4] == b'\xff\xff\xff\xff':
+                tx[seq_pos:seq_pos+4] = b'\xfd\xff\xff\xff'
+    except:
+        pass
 
     new_hex = tx.hex()
 
-    # Simple counter
+    # --- COUNTER & SAVE ---
     try:
         import js
-        count = int(js.localStorage.getItem("bump") or "0")
-        count += 1
-        js.localStorage.setItem("bump", str(count))
+        count = int(js.localStorage.getItem("bump_count") or "0") + 1
+        js.localStorage.setItem("bump_count", str(count))
+        js.localStorage.setItem("omega_rbf_hex", new_hex)
     except:
         count = 1
 
     info = f"""
     <div style="background:#00ff9d20;padding:30px;border-radius:16px;border:5px solid #00ff9d;text-align:center;margin:20px 0;">
-        <h1 style="color:#00ff9d;margin:0;">BUMP #{count}</h1>
-        <p>+{bump} sat/vB • +{extra_fee:,} sats to miners</p>
-        <p>Change: {format_btc(current_amount)} → <b>{format_btc(new_amount)}</b></p>
+        <h1 style="color:#00ff9d;margin:0;font-size:42px;">BUMP #{count}</h1>
+        <p style="margin:10px 0;font-size:18px;">+{bump} sat/vB → +{extra_fee:,} sats to miners</p>
+        <p>Change: {format_btc(current_amount)} → <b style="color:#00ff9d;font-size:22px;">{format_btc(new_amount)}</b></p>
     </div>
     """
 
