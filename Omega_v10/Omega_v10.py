@@ -427,12 +427,14 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 
 def rbf_bump(raw_hex: str, bump: int = 50):
-    # === 1. Recover from localStorage (frontend already does this, but we double-check) ===
+    # -------------------------------------------------
+    # 1. If no hex → try to recover from localStorage
+    # -------------------------------------------------
     if not raw_hex or not raw_hex.strip():
         try:
             import js
             saved = js.localStorage.getItem("omega_rbf_hex")
-            if saved and len(saved) > 400:
+            if saved and len(saved) > 800:
                 raw_hex = saved
         except:
             pass
@@ -451,7 +453,7 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     is_segwit = data[pos:pos+2] == b'\x00\x01'
     if is_segwit: pos += 2
 
-    # Parse inputs and save sequence positions
+    # Parse inputs → remember sequence positions
     vin_len, pos = varint_decode(data, pos)
     seq_positions = []
     for _ in range(vin_len):
@@ -461,14 +463,14 @@ def rbf_bump(raw_hex: str, bump: int = 50):
         seq_positions.append(pos)
         pos += 4
 
-    # Parse change output (assumed to be first output)
+    # First output = change output
     vout_len, pos = varint_decode(data, pos)
     if vout_len == 0:
         return raw_hex, "No outputs"
     amount_pos = pos
     current_amount = int.from_bytes(data[pos:pos+8], 'little')
 
-    # Skip to end safely
+    # Skip rest of tx
     pos += 8
     slen, pos = varint_decode(data, pos)
     pos += slen
@@ -491,53 +493,51 @@ def rbf_bump(raw_hex: str, bump: int = 50):
     if current_amount <= extra_fee + 546:
         return raw_hex, f"<div style='color:#ff3333;background:#300;padding:16px;border-radius:12px;'>Not enough change for +{bump} sat/vB bump</div>"
 
-    # === APPLY BUMP ===
+    # -------------------------------------------------
+    # 2. APPLY THE BUMP
+    # -------------------------------------------------
     tx = bytearray(data)
     new_amount = current_amount - extra_fee
     tx[amount_pos:amount_pos+8] = new_amount.to_bytes(8, 'little')
 
-    # Enable RBF only once (first bump)
+    # Enable RBF only on first bump
     needs_rbf_signal = all(int.from_bytes(data[p:p+4], 'little') == 0xffffffff for p in seq_positions)
     if needs_rbf_signal:
         for p in seq_positions:
-            tx[p:p+4] = b'\xfd\xff\xff\xff'   # sequence = 0xfffffffd
+            tx[p:p+4] = b'\xfd\xff\xff\xff'   # 0xfffffffd
 
     new_hex = tx.hex()
 
-    # === FIXED: Persistent & Accurate Bump Counter via localStorage ===
+    # -------------------------------------------------
+    # 3. BUMP COUNTER — SIMPLE AND BULLETPROOF
+    # -------------------------------------------------
     try:
         import js
-        saved_count = js.localStorage.getItem("omega_bump_count")
-        if saved_count is not None and saved_count.isdigit():
-            bump_number = int(saved_count) + 1
-        else:
-            bump_number = 1
+        count = js.localStorage.getItem("omega_bump_count")
+        bump_number = (int(count) + 1) if count and count.isdigit() else 1
         js.localStorage.setItem("omega_bump_count", str(bump_number))
     except:
-        bump_number = 1  # fallback
+        bump_number = 1
 
-    # Optional: Auto-clear counter if RBF signaling is still disabled (means fresh tx)
-    if needs_rbf_signal:
-        try:
-            import js
-            js.localStorage.setItem("omega_bump_count", "0")  # will become 1 on this bump
-        except:
-            pass
-
-    info = f"""
-    <div style="background:#00ff9d20; padding:28px; border-radius:16px; border:5px solid #00ff9d; margin:20px 0; text-align:center;">
-        <b style="font-size:38px; color:#00ff9d; text-shadow: 0 0 20px #00ff9d;">BUMP #{bump_number}</b><br><br>
-        <span style="font-size:20px;">+{bump} sat/vB → +{extra_fee:,} sats to miners</span><br><br>
-        Change: {format_btc(current_amount)} → <b style="color:#00ff9d;font-size:22px;">{format_btc(new_amount)}</b>
-    </div>
-    """
-
-    # Save new hex for next bump
+    # -------------------------------------------------
+    # 4. SAVE NEW HEX SO NEXT BUMP WORKS
+    # -------------------------------------------------
     try:
         import js
         js.localStorage.setItem("omega_rbf_hex", new_hex)
     except:
         pass
+
+    # -------------------------------------------------
+    # 5. RESULT
+    # -------------------------------------------------
+    info = f"""
+    <div style="background:#00ff9d20; padding:28px; border-radius:16px; border:5px solid #00ff9d; margin:20px 0; text-align:center;">
+        <b style="font-size:42px; color:#00ff9d; text-shadow: 0 0 20px #00ff9d;">BUMP #{bump_number}</b><br><br>
+        +{bump} sat/vB → +{extra_fee:,} sats to miners<br><br>
+        Change: {format_btc(current_amount)} → <b style="color:#00ff9d; font-size:24px;">{format_btc(new_amount)}</b>
+    </div>
+    """
 
     return new_hex, info
 # ==============================
@@ -949,21 +949,8 @@ with gr.Blocks(
         inputs=rbf_in,
         outputs=[rbf_in, output_log],
         concurrency_limit=1,
-        queue=True,
-        # ← THIS JS IS NOW 100% CORRECT
-        js="""
-        (hex) => {
-            // ONLY recover from localStorage if box is truly empty
-            if (!hex || hex.trim() === "" || hex.trim().length < 400) {
-                const saved = localStorage.getItem("omega_rbf_hex");
-                if (saved && saved.length > 800) {
-                    return saved;
-                }
-            }
-            // DO NOT TOUCH hex if it's already fresh from Python!
-            return hex;
-        }
-        """
+        queue=True
+
     )
     clear_rbf_btn.click(
         lambda: ("", ""),
@@ -984,47 +971,43 @@ with gr.Blocks(
 
 <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
 <script>
-// ──────────────────────────────────────────────
-// Toast (beautiful non-blocking feedback)
-// ──────────────────────────────────────────────
-function showToast(message, isError = false) {
-    const toast = document.createElement('div');
-    toast.textContent = message;
-    toast.style.cssText = `
-        position: fixed !important; bottom: 100px !important; left: 50% !important;
-        transform: translateX(-50%) !important;
-        background: ${isError ? '#300' : 'rgba(0,0,0,0.92)'} !important;
-        color: ${isError ? '#ff3366' : '#00ff9d'} !important;
-        padding: 16px 36px !important; border-radius: 50px !important;
-        font-weight: bold !important; font-size: 17px !important;
-        z-index: 10000 !important; box-shadow: 0 12px 40px rgba(0,0,0,0.7) !important;
-        backdrop-filter: blur(12px) !important;
-        border: 3px solid ${isError ? '#ff3366' : '#00ff9d'} !important;
-        animation: toastPop 2.4s ease forwards !important;
+// Toast — beautiful feedback
+function showToast(msg, err = false) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = `
+        position:fixed !important; bottom:100px !important; left:50% !important;
+        transform:translateX(-50%) !important; z-index:10000 !important;
+        background:${err?'#300':'rgba(0,0,0,0.92)'} !important;
+        color:${err?'#ff3366':'#00ff9d'} !important;
+        padding:16px 36px !important; border-radius:50px !important;
+        font-weight:bold !important; font-size:17px !important;
+        border:3px solid ${err?'#ff3366':'#00ff9d'} !important;
+        box-shadow:0 12px 40px rgba(0,0,0,0.7) !important;
+        backdrop-filter:blur(12px) !important;
+        animation:pop 2.4s forwards !important;
     `;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2400);
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2400);
 }
-if (!document.querySelector('#toast-style')) {
+if (!document.getElementById('toast-style')) {
     const s = document.createElement('style');
     s.id = 'toast-style';
-    s.textContent = `@keyframes toastPop {
-        0%   { transform: translateX(-50%) translateY(30px); opacity: 0; }
-        12%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-        88%  { transform: translateX(-50%) translateY(0); opacity: 1; }
-        100% { transform: translateX(-50%) translateY(-30px); opacity: 0; }
+    s.textContent = `@keyframes pop{
+        0%{transform:translateX(-50%) translateY(30px);opacity:0}
+        12%,88%{transform:translateX(-50%) translateY(0);opacity:1}
+        100%{transform:translateX(-50%) translateY(-30px);opacity:0}
     }`;
     document.head.appendChild(s);
 }
 
-// ──────────────────────────────────────────────
-// QR Scanner (works perfectly)
-// ──────────────────────────────────────────────
-const btcBtn = document.querySelector('.qr-fab.btc');
-const btcInput = document.getElementById('qr-scanner-btc');
-btcBtn.onclick = () => btcInput.click();
+// QR Scanner — works perfectly
+document.querySelector('.qr-fab.btc')?.addEventListener('click', () => 
+    document.getElementById('qr-scanner-btc').click()
+);
 
-async function scanBTC(file) {
+document.getElementById('qr-scanner-btc').onchange = async e => {
+    const file = e.target.files[0];
     if (!file) return;
     const img = new Image();
     img.onload = async () => {
@@ -1032,71 +1015,57 @@ async function scanBTC(file) {
         canvas.width = img.width; canvas.height = img.height;
         canvas.getContext('2d').drawImage(img, 0, 0);
         try {
-            const result = await ZXing.readBarcodeFromCanvas(canvas);
-            const text = result.text.trim();
-            const cleanText = text.split('?')[0].replace(/^bitcoin:/i, '').trim();
-            if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(cleanText)) {
+            const res = await ZXing.readBarcodeFromCanvas(canvas);
+            const txt = res.text.trim().split('?')[0].replace(/^bitcoin:/i, '');
+            if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(txt)) {
                 const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
                            document.querySelector('textarea');
                 if (box) {
-                    box.value = cleanText;
-                    box.dispatchEvent(new Event('input', {bubbles: true}));
-                    box.dispatchEvent(new Event('change', {bubbles: true}));
+                    box.value = txt;
+                    box.dispatchEvent(new Event('input', {bubbles:true}));
+                    box.dispatchEvent(new Event('change', {bubbles:true}));
                 }
-                showToast("Address / xpub scanned!");
-            } else {
-                showToast("Not a Bitcoin address", true);
-            }
-        } catch (e) {
-            showToast("No QR detected", true);
-        }
+                showToast("Scanned!");
+            } else showToast("Not a BTC address/xpub", true);
+        } catch { showToast("No QR found", true); }
     };
     img.src = URL.createObjectURL(file);
-}
-btcInput.onchange = e => scanBTC(e.target.files[0]);
+};
 
-// ──────────────────────────────────────────────
-// INFINITE RBF — FINAL FIXED VERSION (NO MORE #1 STUCK)
-// ──────────────────────────────────────────────
-let bumpInProgress = false;
+// ————————————————————————————————————————
+// INFINITE RBF — FINAL WORKING VERSION
+// ————————————————————————————————————————
 
-// Detect bump button click
-document.addEventListener('click', (e) => {
-    if (e.target && e.target.textContent && e.target.textContent.includes('Bump +50')) {
-        bumpInProgress = true;
-    }
-    if (e.target && e.target.textContent && e.target.textContent.includes('Start Over')) {
-        localStorage.removeItem('omega_rbf_hex');
-        localStorage.removeItem('omega_bump_count');
-        bumpInProgress = false;
-    }
-});
-
-// Save new hex ONLY when a real bump finishes
-document.addEventListener('gradio', (e) => {
-    if (!bumpInProgress) return;
+// Save new hex immediately when Python returns it
+document.addEventListener('gradio', e => {
     if (e.detail?.output?.data?.[0]) {
-        const newHex = e.detail.output.data[0];
-        if (typeof newHex === 'string' && newHex.length > 800 && /^[0-9a-fA-F]+$/.test(newHex)) {
-            localStorage.setItem('omega_rbf_hex', newHex);
-            bumpInProgress = false;
+        const hex = e.detail.output.data[0];
+        if (typeof hex === 'string' && hex.length > 800 && /^[0-9a-fA-F]+$/.test(hex)) {
+            localStorage.setItem('omega_rbf_hex', hex);
         }
     }
 });
 
-// Restore saved RBF hex on page load (only if textbox is empty)
-function restoreRBF() {
-    const saved = localStorage.getItem('omega_rbf_hex');
-    if (!saved || saved.length < 800) return;
-    const box = document.querySelector('#rbf-hex-box textarea');
-    if (!box) return;
-    if (!box.value || box.value.trim().length < 800) {
-        box.value = saved;
-        box.dispatchEvent(new Event('input', {bubbles: true}));
-        box.dispatchEvent(new Event('change', {bubbles: true}));
+// Restore saved hex on page load (only if box is empty)
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const saved = localStorage.getItem('omega_rbf_hex');
+        const box = document.querySelector('#rbf-hex-box textarea');
+        if (saved && box && (!box.value || box.value.length < 800)) {
+            box.value = saved;
+            box.dispatchEvent(new Event('input', {bubbles:true}));
+            box.dispatchEvent(new Event('change', {bubbles:true}));
+        }
+    }, 800);
+});
+
+// Clear everything on Start Over
+document.addEventListener('click', e => {
+    if (e.target?.textContent?.includes('Start Over')) {
+        localStorage.removeItem('omega_rbf_hex');
+        localStorage.removeItem('omega_bump_count');
     }
-}
-window.addEventListener('load', () => setTimeout(restoreRBF, 600));
+});
 </script>
 """)
 
