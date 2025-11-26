@@ -145,7 +145,14 @@ textarea:focus-within ~ #omega-bg-container-fixed {
   border: 6px solid #f7931a !important;
   box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
 }
-#omega-footer { margin-top: 3px !important; margin-bottom: 10px !important; }
+#omega-footer {
+    margin-bottom: -10px !important;
+    padding-bottom: 4px !important;
+}
+.gradio-container .gradio-footer,
+.gradio-container footer {
+    display: none !important;   /* nukes Gradio's own footer completely */
+}
 
 """
 # ==============================
@@ -866,16 +873,27 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
     gr.HTML(
     """
-    <div style="margin: 20px 0 10px 0; padding: 10px 0; text-align: center; font-size: 0.9rem; color: #888; opacity: 0.9;">
-        <strong>Ωmega Pruner v10.0</strong><br>
-        <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" target="_blank" rel="noopener" style="color: #f7931a; text-decoration: none;">
-            GitHub • Open Source • Apache 2.0
-        </a><br>
-        <small>Prune today. Win forever. • Ω</small>
-    </div>
-    """,
-    elem_id="omega-footer"
-)
+    <div style="
+            margin: 30px auto 6px auto !important; 
+            padding: 12px 0 8px 0 !important; 
+            text-align: center; 
+            font-size: 0.92rem; 
+            color: #888; 
+            opacity: 0.94;
+            max-width: 640px;
+        ">
+            <strong style="color:#f7931a; font-size:1.02rem;">Ωmega Pruner v10.0</strong><br>
+            <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" 
+               target="_blank" rel="noopener" 
+               style="color: #f7931a; text-decoration: none; font-weight:600;">
+                GitHub • Open Source • Apache 2.0
+            </a><br><br>
+            <small style="color:#aaa;">Prune today. Win forever. • Ω</small>
+        </div>
+        </div>
+        """,
+        elem_id="omega-footer"
+    )
 if __name__ == "__main__":
     import os
     import warnings
