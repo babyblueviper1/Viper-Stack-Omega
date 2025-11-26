@@ -723,10 +723,6 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, selfish_mode, dao_
     # Generate clean, unsigned, RBF-ready raw hex — 100% compatible with ALL wallets
     unsigned_tx = tx.encode(segwit=True)
 
-    # CRITICAL: Strip the empty witness placeholder (4 zero bytes) when unsigned
-    if unsigned_tx.endswith(b'\x00\x00\x00\x00'):
-        unsigned_tx = unsigned_tx[:-4]
-
     raw_hex = unsigned_tx.hex()
 
     qr = make_qr(psbt_b64)
