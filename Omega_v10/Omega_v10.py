@@ -977,7 +977,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
             <a href="https://www.babyblueviper.com/p/mega-pruner-lifetime-license-0042" style="color:#ff9900; text-decoration:underline;">details</a>
             </span><br><br>
 
-            <small style="color:#aaa;">Prune today. Win forever. • Ω</small>
+            <span style="color:#aaa; font-size:0.85rem;">Prune today. Win forever. • Ω</span>
     
         </div>
         """,
