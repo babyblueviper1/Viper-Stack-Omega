@@ -56,3 +56,5 @@ Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trez
 **Prune today. Win forever. • Ω**
 
 **babyblueviper & the swarm** • November 26, 2025
+
+**Contact:** omegapruner@proton.me
