@@ -1025,7 +1025,6 @@ with gr.Blocks(
         </div>
         """
     )
-demo.root_path = "/es"   # Matches the mount path exactly (no trailing /)
 
 # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 
