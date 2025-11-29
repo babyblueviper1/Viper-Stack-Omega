@@ -699,6 +699,16 @@ with gr.Blocks(
         """,
         elem_id="omega-title"
     )
+    gr.HTML("""
+    <div style="text-align:center; margin:0 0 40px; font-size:1rem; color:#ccc; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
+        <strong>Idioma:</strong> 
+        <a href="/" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">English</a> • 
+        <a href="/es.html" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Español</a> • 
+        <span style="color:#666; margin:0 10px;">Português (soon)</span> • 
+        <span style="color:#666; margin:0 10px;">Français (soon)</span> • 
+        <span style="color:#666; margin:0 10px;">Deutsch (soon)</span>
+    </div>
+    """)
     
     gr.HTML(
         """
