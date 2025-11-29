@@ -1,29 +1,16 @@
 from fastapi import FastAPI
 import uvicorn
 import os
-from gradio import mount_gradio_app  # Standard import for 6.0.1
+from gradio.mount_gradio_app import mount_gradio_app
 
 app = FastAPI()
 
-# Import language versions
 from Omega_v10_en import demo as demo_en
 from Omega_v10_es import demo as demo_es
 
-# Mount English at root (empty root_path to avoid //)
-app = mount_gradio_app(
-    app, 
-    demo_en, 
-    path="/",
-    app_kwargs={"root_path": ""}  # Empty for root
-)
-
-# Mount Spanish at subpath
-app = mount_gradio_app(
-    app, 
-    demo_es, 
-    path="/es",
-    app_kwargs={"root_path": "/es"}  # Exact match to path (no trailing /)
-)
+# Just these two lines — that's it!
+app = mount_gradio_app(app, demo_en, path="/")
+app = mount_gradio_app(app, demo_es, path="/es")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
