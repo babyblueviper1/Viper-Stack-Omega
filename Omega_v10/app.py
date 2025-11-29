@@ -9,12 +9,12 @@ app = FastAPI()
 from Omega_v10_en import demo as demo_en
 from Omega_v10_es import demo as demo_es
 
-# Mount English at root (empty root_path)
+# Mount English at root (empty root_path to avoid //)
 app = mount_gradio_app(
     app, 
     demo_en, 
     path="/",
-    app_kwargs={"root_path": ""}  # Empty for root (prevents //)
+    app_kwargs={"root_path": ""}  # Empty for root
 )
 
 # Mount Spanish at subpath
@@ -22,7 +22,7 @@ app = mount_gradio_app(
     app, 
     demo_es, 
     path="/es",
-    app_kwargs={"root_path": "/es"}  # Matches path exactly (fixes frontend fetches)
+    app_kwargs={"root_path": "/es"}  # Exact match to path (no trailing /)
 )
 
 if __name__ == "__main__":
