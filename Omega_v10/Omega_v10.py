@@ -702,7 +702,7 @@ with gr.Blocks(
         elem_id="omega-title"
     )
     gr.HTML("""
-    <div style="text-align:center; margin:10px 0 40px; font-size:1rem; color:#ccc;text-shadow: 0 0 8px rgba(247,147,26,0.4);">
+    <div style="text-align:center; margin:0px 0 40px; font-size:1rem; color:#ccc;text-shadow: 0 0 8px rgba(247,147,26,0.4);">
         <strong>Language:</strong> 
         <a href="/" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">English</a> • 
         <a href="/es.html" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Español</a> • 
