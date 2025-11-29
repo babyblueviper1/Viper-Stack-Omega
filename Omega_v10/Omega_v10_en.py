@@ -1,4 +1,4 @@
-# app.py — Omega Pruner v10.0
+#Omega Pruner v10.0 -- English Version
 import gradio as gr
 import requests, time, base64, io, qrcode
 from dataclasses import dataclass
@@ -701,6 +701,16 @@ with gr.Blocks(
         """,
         elem_id="omega-title"
     )
+    gr.HTML("""
+    <div style="text-align:center; margin:0 0 40px; font-size:1rem; color:#ccc; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
+        <strong>Language:</strong> 
+        <a href="/" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">English</a> • 
+        <a href="/es.html" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Español</a> • 
+        <span style="color:#666; margin:0 10px;">Português (próximamente)</span> • 
+        <span style="color:#666; margin:0 10px;">Français (bientôt)</span> • 
+        <span style="color:#666; margin:0 10px;">Deutsch (bald)</span>
+    </div>
+    """)
     
     gr.HTML(
         """
@@ -884,7 +894,7 @@ with gr.Blocks(
     )
 
 
-    # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
+    # Floating BTC QR Scanner + Beautiful Toast
     gr.HTML("""
 <!-- Floating BTC Scanner Button -->
 <label class="qr-fab btc" title="Scan Address / xpub">B</label>
