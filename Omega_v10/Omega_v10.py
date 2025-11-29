@@ -954,46 +954,17 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
 """)
 
     # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
-    gr.HTML(
-    """
-    <div style="
-            margin: 30px auto 6px auto !important; 
-            padding: 12px 0 8px 0 !important; 
-            text-align: center; 
-            font-size: 0.92rem; 
-            color: #888; 
-            opacity: 0.94;
-            max-width: 640px;
-        ">
-            <strong style="color:#f7931a; font-size:1.02rem;">Ωmega Pruner v10.0 — NUCLEAR EDITION</strong><br>
-            <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" 
-               target="_blank" rel="noopener" 
-               style="color: #f7931a; text-decoration: none; font-weight:600;">
-                GitHub • Open Source • Apache 2.0
-            </a>
-                &nbsp;&nbsp;•&nbsp;&nbsp;
-                <a href="#verified-prunes" style="color:#f7931a; text-decoration:none; font-weight:600;">
-                    Verified NUCLEAR Prunes
-                </a><br><br>
-            
-            <span style="font-size:0.92rem; color:#ff9900; font-weight:600;">
-            Lifetime License — 0.042 BTC (first 21 only) → 
-            <a href="https://www.babyblueviper.com/p/mega-pruner-lifetime-license-0042" style="color:#ff9900; text-decoration:underline;">details</a>
-            </span><br><br>
-
-            <span style="color:#aaa; font-size:0.85rem;">Prune today. Win forever. • Ω</span>
-    
-        </div>
-        """,
-        elem_id="omega-footer"
-    )
-
-    gr.HTML("""
-    <div id="verified-prunes" style="margin:80px auto 40px; max-width:900px; padding:0 20px;">
+<div id="verified-prunes" style="margin:80px auto 40px; max-width:900px; padding:0 20px;">
         <h1 style="text-align:center; color:#f7931a; font-size:2.5rem; margin-bottom:20px;">
             Verified NUCLEAR Prunes
         </h1>
-        <p style="text-align:center; color:#cccccc; font-size:1.1rem; margin-bottom:60px;">
+        <p style="
+            text-align:center; 
+            color:#e0e0e0; 
+            font-size:1.1rem; 
+            margin-bottom:60px;
+            text-shadow: 0 0 8px rgba(247,147,26,0.4);
+        ">
             The wall starts empty.<br>
             The first name etched on-chain will be remembered forever.
         </p>
