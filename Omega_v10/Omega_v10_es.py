@@ -806,10 +806,10 @@ with gr.Blocks(
         with gr.Column(scale=1, min_width=300):
             dao_percent = gr.Slider(0, 500, value=50, step=10,
                 label="Agradecimiento (bps)",
-                info="0–500 bps del futuro ahorro (máximo 25% por seguridad)")
+                info="0–500 bps de su futuro ahorro (máximo 25% por seguridad)")
             live_thankyou = gr.Markdown(
                 "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
-                "→ 0,50% del futuro ahorro"
+                "→ 0,50% de su futuro ahorro"
                 "</div>"
             )
         with gr.Column(scale=1, min_width=300):
@@ -821,7 +821,7 @@ with gr.Blocks(
     # Live thank-you % updater
     def update_thankyou_label(bps):
         pct = bps / 100
-        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% del ahorro futuro</div>"
+        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% de su futuro ahorro</div>"
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
     with gr.Row():
