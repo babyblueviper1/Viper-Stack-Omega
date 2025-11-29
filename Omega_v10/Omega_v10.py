@@ -997,7 +997,8 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
             </h1>
             <p style="text-align:center; color:#868686; font-size:1.1rem; margin-bottom:60px; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
                 The wall starts empty.<br>
-                The first name etched on-chain will be remembered forever.
+                Every verified prune is proven on-chain forever via TXID.<br>
+                The first ones will be remembered as legends.
             </p>
 
             <div style="text-align:center; padding:50px 20px; background:#111; border:2px dashed #f7931a; border-radius:16px;">
@@ -1008,7 +1009,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
             </div>
 
             <p style="text-align:center; color:#f7931a; margin-top:60px; font-size:1rem;">
-                Reply on X with your TXID → your name goes here forever.<br><br>
+                Reply on X with your TXID → your prune goes here forever.<br><br>
                 <a href="https://twitter.com/intent/tweet?text=I%20just%20ran%20NUCLEAR%20prune%20with%20%40babyblueviper1%20%E2%98%A2%EF%B8%8F%20TXID%3A" 
                    target="_blank" 
                    style="color:#ff9900; text-decoration:underline; font-weight:bold;">
