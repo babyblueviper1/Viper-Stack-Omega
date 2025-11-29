@@ -704,9 +704,9 @@ with gr.Blocks(
         <strong>Idioma:</strong> 
         <a href="/" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">English</a> • 
         <a href="/es.html" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Español</a> • 
-        <span style="color:#666; margin:0 10px;">Português (soon)</span> • 
-        <span style="color:#666; margin:0 10px;">Français (soon)</span> • 
-        <span style="color:#666; margin:0 10px;">Deutsch (soon)</span>
+        <span style="color:#666; margin:0 10px;">Português (próximamente)</span> • 
+        <span style="color:#666; margin:0 10px;">Français (bientôt)</span> • 
+        <span style="color:#666; margin:0 10px;">Deutsch (bald)</span>
     </div>
     """)
     
