@@ -1,6 +1,6 @@
 # Ωmega Pruner v10.0
 
-**The last UTXO consolidator alive in 2025.  
+**The last UTXO consolidator . . .  
 
 **LIVE:** https://omega-v10.onrender.com  
 **Launched:** November 26, 2025  
