@@ -1030,6 +1030,9 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
         """
     )
 
+demo.root_path = "/"
+
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
     
 if __name__ == "__main__":
     import os
