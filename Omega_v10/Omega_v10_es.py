@@ -1,4 +1,4 @@
-# app.py — Omega Pruner v10.0
+# omega_v10_es.py — Versión en español
 import gradio as gr
 import requests, time, base64, io, qrcode
 from dataclasses import dataclass
@@ -444,13 +444,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return msg or "Failed to scan xpub", gr.update(visible=False)
+            return msg or "Error al escanear xpub", gr.update(visible=False)
     else:
         if not addr:
-            return "Enter address or xpub", gr.update(visible=False)
+            return "Ingresa dirección o xpub", gr.update(visible=False)
         utxos = get_utxos(addr, threshold)
         if not utxos:
-            return "No UTXOs above dust threshold", gr.update(visible=False)
+            return "No hay UTXOs por encima del umbral de polvo", gr.update(visible=False)
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
@@ -469,20 +469,20 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
 
     # === STRATEGY MAPPING (must match dropdown EXACTLY) ===
-    NUCLEAR_OPTION = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
+    NUCLEAR_OPTION = "NUCLEAR PRUNE (90% sacrificado — para los valientes)"
 
     ratio_map = {
-        "Privacy First (30% pruned)": 0.3,
-        "Recommended (40% pruned)": 0.4,
-        "More Savings (50% pruned)": 0.5,
+        "Privacidad Primero (30% podado)": 0.3,
+        "Recomendado (40% podado)": 0.4,
+        "Más Ahorro (50% podado)": 0.5,
         NUCLEAR_OPTION: 0.9,
     }
     ratio = ratio_map.get(strategy, 0.4)
 
     name_map = {
-        "Privacy First (30% pruned)": "Privacy First",
-        "Recommended (40% pruned)": "Recommended",
-        "More Savings (50% pruned)": "More Savings",
+        "Privacidad Primero (30% podado)": "Privacidad Primero",
+        "Recomendado (40% podado)": "Recomendado",
+        "Más Ahorro (50% podado)": "Más Ahorro",
         NUCLEAR_OPTION: '<span style="color:#ff1361; font-weight:900; text-shadow: 0 0 10px #ff0066;">NUCLEAR PRUNE</span>',
     }
     strategy_name = name_map.get(strategy, strategy.split(" (")[0])
@@ -499,17 +499,17 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     # === Special Nuclear Warning (because yes) ===
     nuclear_warning = ""
     if strategy == NUCLEAR_OPTION:
-        nuclear_warning = '<br><span style="color:#ff0066; font-weight:bold; font-size:18px;">⚠️ NUCLEAR MODE ACTIVE ⚠️<br>Only the strongest survive.</span>'
+        nuclear_warning = '<br><span style="color:#ff0066; font-weight:bold; font-size:18px;">⚠️ MODO NUCLEAR ACTIVADO ⚠️<br>Solo los más fuertes sobreviven.</span>'
 
     return (
         f"""
         <div style="text-align:center; padding:20px;">
-            <b style="font-size:22px; color:#f7931a;">Analysis Complete</b><br><br>
-            Found <b>{len(utxos):,}</b> UTXOs • Keeping <b>{keep}</b> largest<br>
-            <b style="color:#f7931a;">Strategy:</b> <b>{strategy_name}</b> • Format: <b>{detected}</b><br>
+            <b style="font-size:22px; color:#f7931a;">Análisis completado</b><br><br>
+            Encontrados <b>{len(utxos):,}</b> UTXOs • Conservando <b>{keep}</b> más grandes<br>
+            <b style="color:#f7931a;">Estrategia:</b> <b>{strategy_name}</b> • Formato: <b>{detected}</b><br>
             {nuclear_warning}
             <br><br>
-            Click <b>Generate Transaction</b> to continue
+            Haz clic en <b>Generar Transacción</b> para continuar
         </div>
         """,
         gr.update(visible=True),
@@ -522,7 +522,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     if not pruned_utxos_global:
-        return "Run analysis first", gr.update(visible=False), gr.update(visible=False)
+        return "Primero ejecuta el análisis", gr.update(visible=False), gr.update(visible=False)
 
     sample_addr = pruned_utxos_global[0].get('address') or user_input.strip()
     _, info = address_to_script_pubkey(sample_addr)
@@ -585,13 +585,13 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     # === FINAL user amount ===
     user_gets = total - miner_fee - dao_cut
     if user_gets < 546:
-        return "Not enough for output after fees", gr.update(visible=False), gr.update(visible=False)
+        return "No alcanza para crear salida después de comisiones", gr.update(visible=False), gr.update(visible=False)
 
     # === DESTINATION ===
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return "Invalid destination address", gr.update(visible=False), gr.update(visible=False)
+        return "Dirección de destino inválida", gr.update(visible=False), gr.update(visible=False)
 
     # === BUILD TRANSACTION ===
     tx = Tx()
@@ -605,13 +605,13 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     # === GENERATE PSBT & QR ===
     psbt_b64 = make_psbt(tx)
     qr = make_qr(psbt_b64)
-    thank = "No thank you given" if dao_cut == 0 else f"Thank you given: {format_btc(dao_cut)}"
+    thank = "Ningun agradecimiento dado" if dao_cut == 0 else f"Agradecimiento dado: {format_btc(dao_cut)}"
 
     # === COPY BUTTON ===
     copy_button = f"""
     <button onclick="navigator.clipboard.writeText(`{psbt_b64}`).then(()=>{{
         const t=document.createElement('div');
-        t.textContent='PSBT copied!';
+        t.textContent='¡PSBT copiado!';
         t.style.cssText=`position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
                          z-index:10000;background:#00ff9d;color:#000;padding:16px 36px;
                          border-radius:50px;font-weight:bold;font-size:18px;
@@ -625,22 +625,22 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
            transition:all 0.2s;"
     onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 40px rgba(247,147,26,0.7)'"
     onmouseout="this.style.transform='';this.style.boxShadow='0 8px 30px rgba(247,147,26,0.5)'">
-        Copy PSBT to Clipboard
+        Copiar PSBT al portapapeles
     </button>
     """
 
     html = f"""
     <div style="text-align:center; padding:20px;">
-    <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
-    <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: <b>{format_btc(miner_fee)}</b> @ <b>{fee_rate}</b> sat/vB<br>
+    <h3 style="color:#f7931a;">Transacción lista — PSBT generado</h3>
+    <p><b>{inputs}</b> entradas → {format_btc(total)} • Comisión: <b>{format_btc(miner_fee)}</b> @ <b>{fee_rate}</b> sat/vB<br>
        <span style="font-size:18px; color:#f7931a; font-weight:700;">{thank}</span></p>
     
     <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
-        You receive: {format_btc(user_gets)}
+        Recibirás: {format_btc(user_gets)}
     </b>
     
     <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
-        Future savings ≈ <b style="font-size:24px; color:#00ff9d; text-shadow: 0 0 12px black, 0 0 24px black;">
+        Ahorro futuro ≈ <b style="font-size:24px; color:#00ff9d; text-shadow: 0 0 12px black, 0 0 24px black;">
             {format_btc(savings)}
         </b> (@ <b>{future_rate}</b> sat/vB)
     </div>
@@ -651,11 +651,11 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     {copy_button}
 
-    <p><small>Scan with wallet • or copy and paste </small></p>
+    <p><small>Escanear con tu wallet • o copiar y pegar</small></p>
 
     <details style="margin-top: 32px;">
         <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center;">
-            View raw PSBT (click to expand)
+            Ver PSBT crudo (clic para expandir)
         </summary>
         <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
 {psbt_b64}
@@ -670,24 +670,22 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
 # Gradio UI — Final & Perfect
 # ==============================
 with gr.Blocks(
-    title="Ωmega Pruner v10.0 — NUCLEAR EDITION: Prune UTXOs Forever",
+    title="Ωmega Pruner v10.0 — EDICIÓN NUCLEAR: Podar UTXOs para siempre",
 ) as demo:
      # ——— BULLETPROOF OG TAGS — FORCES THUMBNAIL + DESCRIPTION EVERYWHERE ———
     gr.HTML("""
     <head>
-        <meta property="og:title" content="Ωmega Pruner v10.0 — NUCLEAR EDITION: Prune UTXOs Forever">
-        <meta property="og:description" content="The last UTXO consolidator . . . NUCLEAR PRUNE mode: max 3 inputs, burn the rest. Save thousands in future fees. Only the strongest survive.">
+        <meta property="og:title" content="Ωmega Pruner v10.0 — EDICIÓN NUCLEAR: Podar UTXOs para siempre">
+        <meta property="og:description" content="El último consolidator vivo en 2025. MODO NUCLEAR: máximo 3 inputs, quema el resto para siempre. Ahorra miles en comisiones futuras. Solo los más fuertes sobreviven.">
         <meta property="og:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
         <meta property="og:image:width" content="1200">
         <meta property="og:image:height" content="630">
-        <meta property="og:image:alt" content="Glowing orange Ωmega Pruner symbol on black background">
         <meta property="og:type" content="website">
-        <meta property="og:url" content="https://omega-v10.onrender.com">
+        <meta property="og:url" content="https://omega-v10.onrender.com/es">
         <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="Ωmega Pruner v10.0 — NUCLEAR EDITION: Prune UTXOs Forever">
-        <meta name="twitter:description" content="The last UTXO consolidator . . . NUCLEAR PRUNE: max 3 inputs. Save thousands in fees. Prune today. Win forever.">
-        <meta name="twitter:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
-        <title>Ωmega Pruner v10.0 — NUCLEAR EDITION</title>
+        <meta name="twitter:title" content="Ωmega Pruner v10.0 — EDICIÓN NUCLEAR">
+        <meta name="twitter:description" content="MODO NUCLEAR: máximo 3 inputs. Quema el resto para siempre. Desde Chile al mundo.">
+        <title>Ωmega Pruner v10.0 — EDICIÓN NUCLEAR</title>
     </head>
     """, visible=False)
     
@@ -772,7 +770,7 @@ with gr.Blocks(
     with gr.Row():
         with gr.Column(scale=4):
             user_input = gr.Textbox(
-                label="Address or xpub",
+                label="Dirección o xpub",
                 placeholder="bc1q… or xpub…",
                 lines=2,
                 autofocus=True
@@ -780,57 +778,57 @@ with gr.Blocks(
         with gr.Column(scale=3):
             prune_choice = gr.Dropdown(
                 choices=[
-                    "Privacy First (30% pruned)",
-                    "Recommended (40% pruned)",
-                    "More Savings (50% pruned)",
-                    "NUCLEAR PRUNE (90% sacrificed — for the brave)",
+                    "Privacidad Primero (30% podado)",
+                    "Recomendado (40% podado)",
+                    "Más Ahorro (50% podado)",
+                    "NUCLEAR PRUNE (90% sacrificado — para los valientes)",
                 ],
-                    value="Recommended (40% pruned)",
-                    label="Strategy",
-                    info="How many small UTXOs to sacrifice for eternal fee savings"
+                    value="Recomendado (40% podado)",
+                    label="Estrategia",
+                    info="Cuántos UTXOs pequeños hay que sacrificar para ahorrar tarifas eternamente"
         )
 
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
             dust_threshold = gr.Slider(0, 3000, value=546, step=1,
-                label="Dust threshold (sats)",
-                info="Ignore UTXOs smaller than this")
+                label="Umbral de polvo (sats)",
+                info="Ignorar UTXOs menores a este valor")
         with gr.Column(scale=1, min_width=300):
             dao_percent = gr.Slider(0, 500, value=50, step=10,
-                label="Thank you (bps)",
-                info="0–500 bps of future savings (capped at 25% of total savings for safety)")
+                label="Agradecimiento (bps)",
+                info="0–500 bps del ahorro futuro (máximo 25% por seguridad)")
             live_thankyou = gr.Markdown(
                 "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
-                "→ 0.50% of future savings"
+                "→ 0,50% del ahorro futuro"
                 "</div>"
             )
         with gr.Column(scale=1, min_width=300):
             future_multiplier = gr.Slider(3, 20, value=6, step=1,
-                label="Future fee stress test",
-                info="6× = real 2017–2024 peak • 15× = next bull run • 20× = apocalypse"
+                label="Test de estrés futuro",
+                info="6× = pico real 2017–2024 • 15× = próximo bull run • 20× = apocalipsis"
             )
 
     # Live thank-you % updater
     def update_thankyou_label(bps):
         pct = bps / 100
-        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% of future savings</div>"
+        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% del ahorro futuro</div>"
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
     with gr.Row():
         dest_addr = gr.Textbox(
-            label="Destination (optional)",
-            placeholder="Leave blank → same address",
+            label="Destino (opcional)",
+            placeholder="Dejar vacío → misma dirección",
             lines=1
         )
 
     with gr.Row():
-        submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
+        submit_btn = gr.Button("1. Analizar UTXOs", variant="secondary", size="lg")
 
     output_log = gr.HTML()
 
     with gr.Row(visible=False) as generate_row:
         generate_btn = gr.Button(
-            "2. Generate Transaction",
+            "2. Generar Transacción",
             visible=False,
             variant="primary",
             size="lg",
@@ -839,7 +837,7 @@ with gr.Blocks(
 
     with gr.Row():
         start_over_btn = gr.Button(
-            "Start Over — Clear Everything",
+            "Reiniciar — Borrar todo",
             variant="secondary",
             size="lg",
             elem_classes="full-width"
@@ -863,11 +861,11 @@ with gr.Blocks(
     start_over_btn.click(
         lambda: (
             "", 
-            "Recommended (40% pruned)", 
+            "Recomendado (40% podado)",  # ← español
             546, 
             "", 
-            50,  # dao_percent reset to 50 bps
-            "",  # output_log
+            50,
+            "",  
             gr.update(visible=False), 
             gr.update(visible=False)
         ),
@@ -884,76 +882,74 @@ with gr.Blocks(
     )
 
 
-    # Floating BTC QR Scanner + Beautiful Toast (Lightning removed forever)
+    # ——— ESCÁNER QR + TOAST EN ESPAÑOL ———
     gr.HTML("""
 <!-- Floating BTC Scanner Button -->
-<label class="qr-fab btc" title="Scan Address / xpub">B</label>
-<input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
+    <label class="qr-fab btc" title="Escanear dirección / xpub">B</label>
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
-<script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-<script>
-// Toast — beautiful feedback
-function showToast(msg, err = false) {
-    const t = document.createElement('div');
-    t.textContent = msg;
-    t.style.cssText = `position:fixed !important; bottom:100px !important; left:50% !important;
-        transform:translateX(-50%) !important; z-index:10000 !important;
-        background:${err?'#300':'rgba(0,0,0,0.92)'} !important;
-        color:${err?'#ff3366':'#00ff9d'} !important;
-        padding:16px 36px !important; border-radius:50px !important;
-        font-weight:bold !important; font-size:17px !important;
-        border:3px solid ${err?'#ff3366':'#00ff9d'} !important;
-        box-shadow:0 12px 40px rgba(0,0,0,0.7) !important;
-        backdrop-filter:blur(12px) !important;
-        animation:pop 2.4s forwards !important;`;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2400);
-}
-if (!document.getElementById('toast-style')) {
-    const s = document.createElement('style');
-    s.id = 'toast-style';
-    s.textContent = `@keyframes pop{
-        0%{transform:translateX(-50%) translateY(30px);opacity:0}
-        12%,88%{transform:translateX(-50%) translateY(0);opacity:1}
-        100%{transform:translateX(-50%) translateY(-30px);opacity:0}
-    }`;
-    document.head.appendChild(s);
-}
+    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+    <script>
+    function showToast(msg, err = false) {
+        const t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = `position:fixed !important; bottom:100px !important; left:50% !important;
+            transform:translateX(-50%) !important; z-index:10000 !important;
+            background:${err?'#300':'rgba(0,0,0,0.92)'} !important;
+            color:${err?'#ff3366':'#00ff9d'} !important;
+            padding:16px 36px !important; border-radius:50px !important;
+            font-weight:bold !important; font-size:17px !important;
+            border:3px solid ${err?'#ff3366':'#00ff9d'} !important;
+            box-shadow:0 12px 40px rgba(0,0,0,0.7) !important;
+            backdrop-filter:blur(12px) !important;
+            animation:pop 2.4s forwards !important;`;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2400);
+    }
+    if (!document.getElementById('toast-style')) {
+        const s = document.createElement('style');
+        s.id = 'toast-style';
+        s.textContent = `@keyframes pop{
+            0%{transform:translateX(-50%) translateY(30px);opacity:0}
+            12%,88%{transform:translateX(-50%) translateY(0);opacity:1}
+            100%{transform:translateX(-50%) translateY(-30px);opacity:0}
+        }`;
+        document.head.appendChild(s);
+    }
 
-// QR Scanner — perfect and untouched
-document.querySelector('.qr-fab.btc')?.addEventListener('click', () => 
-    document.getElementById('qr-scanner-btc').click()
-);
+    document.querySelector('.qr-fab.btc')?.addEventListener('click', () => 
+        document.getElementById('qr-scanner-btc').click()
+    );
 
-document.getElementById('qr-scanner-btc').onchange = async e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width; canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        try {
-            const res = await ZXing.readBarcodeFromCanvas(canvas);
-            const txt = res.text.trim().split('?')[0].replace(/^bitcoin:/i, '');
-            if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(txt)) {
-                const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
-                           document.querySelector('textarea');
-                if (box) {
-                    box.value = txt;
-                    box.dispatchEvent(new Event('input', {bubbles:true}));
-                    box.dispatchEvent(new Event('change', {bubbles:true}));
-                }
-                showToast("Scanned!");
-            } else showToast("Not a BTC address/xpub", true);
-        } catch { showToast("No QR detected", true); }
+    document.getElementById('qr-scanner-btc').onchange = async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const img = new Image();
+        img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            try {
+                const res = await ZXing.readBarcodeFromCanvas(canvas);
+                const txt = res.text.trim().split('?')[0].replace(/^bitcoin:/i, '');
+                if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(txt)) {
+                    const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
+                               document.querySelector('textarea');
+                    if (box) {
+                        box.value = txt;
+                        box.dispatchEvent(new Event('input', {bubbles:true}));
+                        box.dispatchEvent(new Event('change', {bubbles:true}));
+                    }
+                    showToast("¡Escaneado!");
+                } else showToast("No es dirección/xpub BTC", true);
+            } catch { showToast("QR no detectado", true); }
+        };
+        img.src = URL.createObjectURL(file);
     };
-    img.src = URL.createObjectURL(file);
-};
-</script>
-""")
+    </script>
+    """)
 
-    # ——— FOOTER — NOW 100% SAFE (will never interfere with output_log) ———
+    # ——— FOOTER EN ESPAÑOL ———
     gr.HTML(
         """
         <div style="
@@ -965,61 +961,60 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
                 opacity: 0.94;
                 max-width: 640px;
             ">
-                <strong style="color:#f7931a; font-size:1.02rem;">Ωmega Pruner v10.0 — NUCLEAR EDITION</strong><br>
+                <strong style="color:#f7931a; font-size:1.02rem;">Ωmega Pruner v10.0 — EDICIÓN NUCLEAR</strong><br>
                 <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" 
                    target="_blank" rel="noopener" 
                    style="color: #f7931a; text-decoration: none; font-weight:600;">
-                    GitHub • Open Source • Apache 2.0
+                    GitHub • Código Abierto • Apache 2.0
                 </a>
                 &nbsp;&nbsp;•&nbsp;&nbsp;
                 <a href="#verified-prunes" style="color:#f7931a; text-decoration:none; font-weight:600;">
-                    Verified NUCLEAR Prunes
+                    Prunes NUCLEARES verificados
                 </a><br><br>
                 
                 <span style="font-size:0.92rem; color:#ff9900; font-weight:600;">
-                Lifetime License — 0.042 BTC (first 21 only) → 
+                Licencia de por vida — 0.042 BTC (solo primeros 21) → 
                 <a href="https://www.babyblueviper.com/p/mega-pruner-lifetime-license-0042" 
-                   style="color:#ff9900; text-decoration:underline;">details</a>
+                   style="color:#ff9900; text-decoration:underline;">detalles</a>
                 </span><br><br>
 
-                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Prune today. Win forever. • Ω</span>
+                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Podar hoy. Ganar para siempre. • Ω</span>
         </div>
         """,
         elem_id="omega-footer"
     )
-    
-    
+
+    # ——— SECCIÓN VERIFIED PRUNES EN ESPAÑOL ———
     gr.HTML(
         """
         <div id="verified-prunes" style="margin:80px auto 40px; max-width:900px; padding:0 20px;">
             <h1 style="text-align:center; color:#f7931a; font-size:2.5rem; margin-bottom:20px;">
-                Verified NUCLEAR Prunes
+                Prunes NUCLEARES verificados
             </h1>
             <p style="text-align:center; color:#868686; font-size:1.1rem; margin-bottom:60px; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
-                The wall starts empty.<br>
-                Every verified prune is proven on-chain forever via TXID.<br>
-                The first ones will be remembered as legends.
+                El muro comienza vacío.<br>
+                Cada prune verificado queda grabado en la cadena para siempre mediante TXID.<br>
+                Los primeros serán recordados como leyendas.
             </p>
 
             <div style="text-align:center; padding:50px 20px; background:#111; border:2px dashed #f7931a; border-radius:16px;">
-                <p style="color:#f7931a; font-size:1.5rem; margin:0;">No verified prunes yet.</p>
+                <p style="color:#f7931a; font-size:1.5rem; margin:0;">Aún no hay prunes verificados.</p>
                 <p style="color:#aaa; margin:20px 0 0; font-size:1rem;">
-                    Be the first. Run NUCLEAR. Send your TXID.
+                    Sé el primero. Ejecuta NUCLEAR. Envía tu TXID.
                 </p>
             </div>
 
             <p style="text-align:center; color:#f7931a; margin-top:60px; font-size:1rem;">
-                Reply on X with your TXID → your prune goes here forever.<br><br>
-                <a href="https://twitter.com/intent/tweet?text=I%20just%20ran%20NUCLEAR%20prune%20with%20%40babyblueviper1%20%E2%98%A2%EF%B8%8F%20TXID%3A" 
+                Responde en X con tu TXID → tu prune entra aquí para siempre.<br><br>
+                <a href="https://twitter.com/intent/tweet?text=Acabo%20de%20ejecutar%20un%20prune%20NUCLEAR%20con%20%40babyblueviper1%20%E2%98%A2%EF%B8%8F%20TXID%3A" 
                    target="_blank" 
                    style="color:#ff9900; text-decoration:underline; font-weight:bold;">
-                    → Tweet your prune
+                    → Tuitea tu prune
                 </a>
             </p>
         </div>
         """
     )
-
     
 if __name__ == "__main__":
     import os
