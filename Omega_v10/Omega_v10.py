@@ -970,7 +970,11 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
                target="_blank" rel="noopener" 
                style="color: #f7931a; text-decoration: none; font-weight:600;">
                 GitHub • Open Source • Apache 2.0
-            </a><br><br>
+            </a>
+                &nbsp;&nbsp;•&nbsp;&nbsp;
+                <a href="#verified-prunes" style="color:#f7931a; text-decoration:none; font-weight:600;">
+                    Verified NUCLEAR Prunes
+                </a><br><br>
             
             <span style="font-size:0.92rem; color:#ff9900; font-weight:600;">
             Lifetime License — 0.042 BTC (first 21 only) → 
@@ -983,6 +987,34 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
         """,
         elem_id="omega-footer"
     )
+
+    gr.HTML("""
+    <div id="verified-prunes" style="margin:80px auto 40px; max-width:900px; padding:0 20px;">
+        <h1 style="text-align:center; color:#f7931a; font-size:2.5rem; margin-bottom:20px;">
+            Verified NUCLEAR Prunes
+        </h1>
+        <p style="text-align:center; color:#fff; font-size:1.1rem; margin-bottom:60px;">
+            The wall starts empty.<br>
+            The first name etched on-chain will be remembered forever.
+        </p>
+
+        <div style="text-align:center; padding:50px 20px; background:#111; border:2px dashed #f7931a; border-radius:16px;">
+            <p style="color:#f7931a; font-size:1.5rem; margin:0;">No verified prunes yet.</p>
+            <p style="color:#aaa; margin:20px 0 0; font-size:1rem;">
+                Be the first. Run NUCLEAR. Send your TXID.
+            </p>
+        </div>
+
+        <p style="text-align:center; color:#f7931a; margin-top:60px; font-size:1rem;">
+            Reply on X with your TXID → your name goes here forever.<br><br>
+            <a href="https://twitter.com/intent/tweet?text=I%20just%20ran%20NUCLEAR%20prune%20with%20%40babyblueviper1%20%E2%98%A2%EF%B8%8F%20TXID%3A" 
+               target="_blank" 
+               style="color:#ff9900; text-decoration:underline; font-weight:bold;">
+                → Tweet your prune
+            </a>
+        </p>
+    </div>
+    """)
 
     
 if __name__ == "__main__":
