@@ -1025,7 +1025,10 @@ with gr.Blocks(
         </div>
         """
     )
-    
+demo.root_path = "/es/"   # ← THIS LINE FIXES the 404 on Render
+
+# ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+
 if __name__ == "__main__":
     import os
     import warnings
