@@ -10,31 +10,31 @@ app = FastAPI()
 from Omega_v10_en import demo as demo_en
 from Omega_v10_es import demo as demo_es
 
-# Mount English at root
+# Mount English at root (no subpath issues here)
 app = mount_gradio_app(
     app,
     demo_en,
     path="/",
-    app_kwargs={"root_path": ""}  # Gradio 6 needs this explicit for root on proxies
+    root_path=""  # Empty for root; tells Gradio assets are at base /
 )
 
-# Mount Spanish at /es
+# Mount Spanish at /es (fixes 404s on /es, /es/info, /es/theme.css, etc.)
 app = mount_gradio_app(
     app,
     demo_es,
     path="/es",
-    app_kwargs={"root_path": "/es"}  # No trailing slash; critical for 6.x asset loading
+    root_path="/es"  # Exact subpath; no trailing slash—Gradio 6 enforces strict matching
 )
 
-# Fix Gradio 6's .html share links (still generates them, but 404s on subpaths)
+# Handle Gradio's .html share links (redirects preserve query params)
 @app.get("/es.html")
 async def fix_es_html():
-    return RedirectResponse("/es", status_code=307)  # Use 307 for query param preservation
+    return RedirectResponse("/es", status_code=307)
 
-# Quick health check (optional, but useful for Render logs)
+# Optional health check (hit /_health to verify both mounts)
 @app.get("/_health")
 async def health():
-    return {"status": "ok", "gradio_version": "6.0", "languages": ["en", "es"]}
+    return {"status": "ok", "languages": {"en": "/", "es": "/es"}, "gradio": "6.0"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
