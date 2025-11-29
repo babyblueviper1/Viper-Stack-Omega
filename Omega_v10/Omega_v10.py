@@ -982,7 +982,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
                    style="color:#ff9900; text-decoration:underline;">details</a>
                 </span><br><br>
 
-                <span style="color:#868686; font-size:0.85rem;">Prune today. Win forever. • Ω</span>
+                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Prune today. Win forever. • Ω</span>
         </div>
         """,
         elem_id="omega-footer"
