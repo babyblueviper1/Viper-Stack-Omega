@@ -14,7 +14,7 @@ from Omega_v10_es import demo as demo_es
 
 # Mount them
 app = mount_gradio_app(app, demo_en, path="/")
-app = mount_gradio_app(app, demo_es, path="/es")
+app = mount_gradio_app(app, demo_es, path="/es/")
 # app = mount_gradio_app(app, demo_pt, path="/pt")
 # app = mount_gradio_app(app, demo_fr, path="/fr")
 
