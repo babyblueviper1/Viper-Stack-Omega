@@ -1030,6 +1030,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
         """
     )
 
+demo.root_path = ""   # Empty for root (avoids // issues)
 
 # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
     
