@@ -640,7 +640,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </b>
     
     <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
-        Ahorro futuro ≈ <b style="font-size:24px; color:#00ff9d; text-shadow: 0 0 12px black, 0 0 24px black;">
+         Futuro Ahorro ≈ <b style="font-size:24px; color:#00ff9d; text-shadow: 0 0 12px black, 0 0 24px black;">
             {format_btc(savings)}
         </b> (@ <b>{future_rate}</b> sat/vB)
     </div>
@@ -806,16 +806,16 @@ with gr.Blocks(
         with gr.Column(scale=1, min_width=300):
             dao_percent = gr.Slider(0, 500, value=50, step=10,
                 label="Agradecimiento (bps)",
-                info="0–500 bps del ahorro futuro (máximo 25% por seguridad)")
+                info="0–500 bps del futuro ahorro (máximo 25% por seguridad)")
             live_thankyou = gr.Markdown(
                 "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
-                "→ 0,50% del ahorro futuro"
+                "→ 0,50% del futuro ahorro"
                 "</div>"
             )
         with gr.Column(scale=1, min_width=300):
             future_multiplier = gr.Slider(3, 20, value=6, step=1,
                 label="Test de estrés futuro",
-                info="6× = pico real 2017–2024 • 15× = próximo bull run • 20× = apocalipsis"
+                info="6× = real 2017–2024 pico • 15× = próximo bull run • 20× = apocalipsis"
             )
 
     # Live thank-you % updater
@@ -983,7 +983,7 @@ with gr.Blocks(
                 </a><br><br>
                 
                 <span style="font-size:0.92rem; color:#ff9900; font-weight:600;">
-                Licencia de por vida — 0.042 BTC (solo primeros 21) → 
+                Licencia de por vida — 0.042 BTC (solo los primeros 21) → 
                 <a href="https://www.babyblueviper.com/p/mega-pruner-lifetime-license-0042" 
                    style="color:#ff9900; text-decoration:underline;">detalles</a>
                 </span><br><br>
