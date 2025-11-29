@@ -1,6 +1,7 @@
 # app.py
 from fastapi import FastAPI
 import uvicorn
+import os
 from gradio import mount_gradio_app
 
 app = FastAPI()
