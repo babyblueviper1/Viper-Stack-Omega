@@ -1030,7 +1030,6 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
         """
     )
 
-demo.config = demo.get_config_file()   # ← ADD THIS LINE
 
 # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
     
