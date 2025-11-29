@@ -676,7 +676,7 @@ with gr.Blocks(
     gr.HTML("""
     <head>
         <meta property="og:title" content="Ωmega Pruner v10.0 — NUCLEAR EDITION: Prune UTXOs Forever">
-        <meta property="og:description" content="The last UTXO consolidator alive in 2025. NUCLEAR PRUNE mode: max 3 inputs, burn the rest. Save thousands in future fees. Only the strongest survive.">
+        <meta property="og:description" content="The last UTXO consolidator . . . NUCLEAR PRUNE mode: max 3 inputs, burn the rest. Save thousands in future fees. Only the strongest survive.">
         <meta property="og:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
         <meta property="og:image:width" content="1200">
         <meta property="og:image:height" content="630">
@@ -685,7 +685,7 @@ with gr.Blocks(
         <meta property="og:url" content="https://omega-v10.onrender.com">
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title" content="Ωmega Pruner v10.0 — NUCLEAR EDITION: Prune UTXOs Forever">
-        <meta name="twitter:description" content="The last UTXO consolidator alive in 2025. NUCLEAR PRUNE: max 3 inputs. Save thousands in fees. Prune today. Win forever.">
+        <meta name="twitter:description" content="The last UTXO consolidator . . . NUCLEAR PRUNE: max 3 inputs. Save thousands in fees. Prune today. Win forever.">
         <meta name="twitter:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
         <title>Ωmega Pruner v10.0 — NUCLEAR EDITION</title>
     </head>
@@ -701,6 +701,15 @@ with gr.Blocks(
         """,
         elem_id="omega-title"
     )
+    gr.HTML("""
+    <div style="text-align:center; margin:20px 0 40px; font-size:1rem; color:#868686;text-shadow: 0 0 8px rgba(247,147,26,0.4);">
+        <strong>Language:</strong> 
+        <a href="/" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">English</a> • 
+        <a href="/es.html" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Español</a> • 
+        <a href="/pt.html" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Português</a> • 
+        <a href="/fr.html" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Français</a>
+    </div>
+    """)
     
     gr.HTML(
         """
