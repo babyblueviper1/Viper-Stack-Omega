@@ -1,18 +1,18 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI
 import uvicorn
 import os
+from gradio import mount_gradio_app  # Standard import (no sub-module)
 
 app = FastAPI()
 
-# Import your demos
+# Import language versions
 from Omega_v10_en import demo as demo_en
 from Omega_v10_es import demo as demo_es
 
-# Mount with the new 2025 helper that fixes the subpath bug
-from gradio.routes import mount_gradio_app   # ← this is the correct import now
-
-app = mount_gradio_app(app, demo_en, path="/")
-app = mount_gradio_app(app, demo_es, path="/es")   # ← NO trailing slash on /es
+# Mount: No trailing slashes to avoid // redirects
+app = mount_gradio_app(app, demo_en, path="/")     # English at root
+app = mount_gradio_app(app, demo_es, path="/es")   # Spanish subpath
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
