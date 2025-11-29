@@ -993,7 +993,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
         <h1 style="text-align:center; color:#f7931a; font-size:2.5rem; margin-bottom:20px;">
             Verified NUCLEAR Prunes
         </h1>
-        <p style="text-align:center; color:#fff; font-size:1.1rem; margin-bottom:60px;">
+        <p style="text-align:center; color:#cccccc; font-size:1.1rem; margin-bottom:60px;">
             The wall starts empty.<br>
             The first name etched on-chain will be remembered forever.
         </p>
