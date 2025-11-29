@@ -1,14 +1,14 @@
 from fastapi import FastAPI
 import uvicorn
 import os
-from gradio.mount_gradio_app import mount_gradio_app
+from gradio import mount_gradio_app  # Correct import — from the main gradio module
 
 app = FastAPI()
 
 from Omega_v10_en import demo as demo_en
 from Omega_v10_es import demo as demo_es
 
-# Just these two lines — that's it!
+# These two lines — now with the fixed import
 app = mount_gradio_app(app, demo_en, path="/")
 app = mount_gradio_app(app, demo_es, path="/es")
 
