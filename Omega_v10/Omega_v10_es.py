@@ -1026,8 +1026,6 @@ with gr.Blocks(
         """
     )
 
-demo.config = demo.get_config_file()   # ← ADD THIS LINE
-
 # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 
 if __name__ == "__main__":
