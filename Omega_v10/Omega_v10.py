@@ -982,7 +982,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
                    style="color:#ff9900; text-decoration:underline;">details</a>
                 </span><br><br>
 
-                <span style="color:#aaa; font-size:0.85rem;">Prune today. Win forever. • Ω</span>
+                <span style="color:#868686; font-size:0.85rem;">Prune today. Win forever. • Ω</span>
         </div>
         """,
         elem_id="omega-footer"
@@ -995,7 +995,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
             <h1 style="text-align:center; color:#f7931a; font-size:2.5rem; margin-bottom:20px;">
                 Verified NUCLEAR Prunes
             </h1>
-            <p style="text-align:center; color:#e0e0e0; font-size:1.1rem; margin-bottom:60px; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
+            <p style="text-align:center; color:#868686; font-size:1.1rem; margin-bottom:60px; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
                 The wall starts empty.<br>
                 The first name etched on-chain will be remembered forever.
             </p>
