@@ -901,7 +901,7 @@ with gr.Blocks(
 # ——— ESCÂNER QR + TOAST EM PORTUGUÊS ———
 gr.HTML("""
 <!-- Botão Flutuante BTC Scanner -->
-<label class="qr-fab btc" title="Escanear carteira / xpub">₿</label>
+<label class="qr-fab btc" title="Escanear carteira / xpub">B</label>
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
 <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
