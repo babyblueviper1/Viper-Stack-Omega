@@ -549,12 +549,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         txid_short = u['txid'][:12] + "…" + u['txid'][-8:]
         confirmed = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
         html_rows += f'''
-        <tr>
-            <td style="text-align:center;"><input type="checkbox" {checked} onchange="updateSelection()" data-idx="{idx}"></td>
-            <td style="font-family:monospace;">{value}</td>
-            <td style="font-family:monospace;">{txid_short}</td>
+        <tr style="height:56px;">
+            <td style="text-align:center;">
+                <input type="checkbox" {checked} data-idx="{idx}" style="width:20px; height:20px; cursor:pointer;">
+            </td>
+            <td style="font-family:monospace; font-size:15px;">{value}</td>
+            <td style="font-family:monospace; font-size:13px; color:#aaa;">{txid_short}</td>
             <td style="text-align:center;">{u['vout']}</td>
-            <td style="text-align:center;">{confirmed}</td>
+            <td style="text-align:center; color:#0f0;">{confirmed}</td>
         </tr>'''
 
     table_html = textwrap.dedent(f'''
@@ -574,17 +576,43 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         </div>
         <script>
         const utxos = {json.dumps(pruned_utxos_global)};
-        function updateSelection() {{
-            const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked'))
-                            .map(cb => parseInt(cb.dataset.idx));
-            const selected = checked.map(i => utxos[i]);
-            const total = selected.reduce((a,b) => a + b.value, 0);
+
+        // Find the gr.State component reliably
+        let stateComponent = null;
+        const states = document.querySelectorAll('gradio-state, [data-testid="state"], component');
+        for (let el of states) {
+            if (el.__gradio_internal__ || el.value !== undefined) {
+                stateComponent = el;
+                break;
+            }
+        }
+
+        function updateSelection() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"][data-idx]:checked');
+            const checkedIndices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.idx));
+            const selected = checkedIndices.map(i => utxos[i]);
+            const total = selected.reduce((a, b) => a + b.value, 0);
+
+            // THIS LINE WAS BROKEN — fixed with double braces
             document.getElementById('selected-summary').innerHTML = 
-                `<b>Selected:</b> ${checked.length} UTXOs • <b>Total:</b> ${total.toLocaleString()} sats`;
-            const s = document.querySelector('[data-testid="state"]');
-            if (s?.__gradio_internal__) s.__gradio_internal__.setValue(selected);
-        }}
+                `<b style="color:#f7931a;">Selected:</b> ${checkedIndices.length} UTXOs • <b style="color:#00ff9d;">Total:</b> ${total.toLocaleString()} sats`;
+
+            // Update the hidden gr.State
+            if (stateComponent) {
+                if (stateComponent.__gradio_internal__) {
+                    stateComponent.__gradio_internal__.setValue(selected);
+                } else {
+                    stateComponent.value = selected;
+                    stateComponent.dispatchEvent(new Event('change'));
+                }
+            }
+        }
+
+        // Run on load and on every change
         updateSelection();
+        document.addEventListener('change', e => {
+            if (e.target.matches('input[type="checkbox"][data-idx]')) updateSelection();
+        });
         </script>
         <div id="selected-summary" style="margin-top:12px; font-size:18px; color:#f7931a;"></div>
     ''').strip()
