@@ -927,17 +927,17 @@ with gr.Blocks(
 
     # Live coin control summary
     def update_coin_control(table_data):
-    if table_data is None or table_data.empty:
-        return "Selected: 0 • Total: 0 sats", []
+        if table_data is None or table_data.empty:
+            return "Selected: 0 • Total: 0 sats", []
 
-    rows = table_data.to_dict("records")
-    selected = [row["_raw"] for row in rows if row.get("Include", False)]
-    total_sats = sum(u['value'] for u in selected)
+        rows = table_data.to_dict("records")
+        selected = [row["_raw"] for row in rows if row.get("Include", False)]
+        total_sats = sum(u['value'] for u in selected)
 
-    return (
-        f"**Selected:** {len(selected):,} UTXOs • **Total:** {format_btc(total_sats)}",
-        selected
-    )
+        return (
+            f"**Selected:** {len(selected):,} UTXOs • **Total:** {format_btc(total_sats)}",
+            selected
+        )
 
     coin_table.change(
         update_coin_control,
