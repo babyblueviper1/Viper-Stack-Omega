@@ -555,79 +555,127 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     # ── Build table rows ───────────────────────────────────────────────
     html_rows = ""
-    for idx, u in enumerate(pruned_utxos_global):
+        for idx, u in enumerate(pruned_utxos_global):
         value = format_btc(u['value'])
-        txid_short = u['txid'][:12] + "…" + u['txid'][-8:]
+        txid_short = u['txid'][:10] + "..." + u['txid'][-8:]
         confirmed = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
 
         html_rows += f'''
-        <tr style="height:58px;">
+        <tr style="height:62px; transition:background 0.2s;">
             <td style="text-align:center;">
-                <input type="checkbox" checked data-idx="{idx}" style="width:22px;height:22px;cursor:pointer;">
+                <input type="checkbox" checked data-idx="{idx}" style="width:24px;height:24px;cursor:pointer;">
             </td>
-            <td style="text-align:right;padding:0 16px;font-family:monospace;">{value}</td>
-            <td style="font-family:monospace;font-size:0.88rem;color:#bbb;word-break:break-all;">{txid_short}</td>
-            <td style="text-align:center;">{u['vout']}</td>
-            <td style="text-align:center;color:#0f0;">{confirmed}</td>
+            <td style="text-align:right; font-weight:800; color:#f7931a; font-size:18px;">{value}</td>
+            <td style="color:#aaa; font-size:0.9rem; word-break:break-all;">{txid_short}</td>
+            <td style="text-align:center; font-weight:bold; color:white;">{u['vout']}</td>
+            <td style="text-align:center; color:#0f0; font-weight:bold;">{confirmed}</td>
         </tr>'''
-
-    # ── Full table + coin-control script ─────────────────────────────────
+    # ── FINAL UPGRADED TABLE + FULLY WORKING COIN CONTROL ─────────────────────
     table_html = f"""
-    <div style="max-height:520px;overflow-y:auto;border:2px solid #f7931a;border-radius:12px;margin:20px 0;">
-    <table style="width:100%;border-collapse:collapse;background:#111;color:white;font-size:15px;">
-        <thead style="position:sticky;top:0;background:#f7931a;color:black;font-weight:bold;">
-            <tr>
-                <th style="padding:14px;">Include</th>
-                <th style="padding:14px;">Value</th>
-                <th style="padding:14px;">TXID</th>
-                <th style="padding:14px;">vout</th>
-                <th style="padding:14px;">Confirmed</th>
-            </tr>
-        </thead>
-        <tbody>{html_rows}</tbody>
-    </table>
-    </div>
-
-    <script>
-    const allUtxos = {json.dumps(pruned_utxos_global)};
-
-    // Find the hidden gr.State component
-    let stateComp = null;
-    for (let el of document.querySelectorAll('gradio-state, [data-testid="state"], component')) {{
-        if (el.value !== undefined || el.__gradio_internal__) {{
-            stateComp = el;
-            break;
-        }}
+    <style>
+    /* Make text crisp and bright */
+    #omega-coin-table {{ color: white !important; }}
+    #omega-coin-table td, #omega-coin-table th {{ padding: 14px !important; }}
+    #omega-coin-table input[type="checkbox"] {{ 
+        width: 24px; height: 24px; cursor: pointer; accent-color: #f7931a;
     }}
+    </style>
 
-    function updateSelection() {{
-        const checked = document.querySelectorAll('input[data-idx]:checked');
-        const indices = Array.from(checked).map(cb => parseInt(cb.dataset.idx));
-        const selected = indices.map(i => allUtxos[i]);
-        const total = selected.reduce((s, u) => s + u.value, 0);
+    <div style="margin:20px 0;">
+        <div style="text-align:center; margin-bottom:12px;">
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=true);updateSelection();"
+                    style="padding:10px 20px; margin:0 8px; background:#f7931a; color:black; border:none; border-radius:8px; font-weight:bold;">
+                Select All
+            </button>
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false);updateSelection();"
+                    style="padding:10px 20px; margin:0 8px; background:#333; color:white; border:1px solid #f7931a; border-radius:8px; font-weight:bold;">
+                None
+            </button>
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{
+                const val = parseInt(c.closest('tr').querySelector('td:nth-child(2)').textContent.replace(/[^0-9]/g,''));
+                c.checked = val >= 100000;
+            }}); updateSelection();"
+                    style="padding:10px 20px; margin:0 8px; background:#0f0; color:black; border:none; border-radius:8px; font-weight:bold;">
+                Only ≥ 0.001 BTC
+            </button>
+        </div>
 
-        document.getElementById('selected-summary').innerHTML =
-            `<b style="color:#f7931a;">Selected:</b> ${{indices.length}} UTXOs • <b style="color:#00ff9d;">Total:</b> ${{total.toLocaleString()}} sats`;
+        <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:14px;" id="omega-coin-table">
+        <table style="width:100%; border-collapse:collapse; background:#0d0d0d; color:white; font-size:16px;">
+            <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
+                <tr>
+                    <th style="padding:16px; width:80px;">Include</th>
+                    <th style="padding:16px; text-align:right;">Value</th>
+                    <th style="padding:16px;">TXID</th>
+                    <th style="padding:16px; width:80px;">vout</th>
+                    <th style="padding:16px; width:100px;">Confirmed</th>
+                </tr>
+            </thead>
+            <tbody style="font-family: 'Courier New', monospace;">
+                {html_rows}
+            </tbody>
+        </table>
+        </div>
 
-        if (stateComp) {{
-            if (stateComp.__gradio_internal__) {{
-                stateComp.__gradio_internal__.setValue(selected);
-            }} else {{
-                stateComp.value = selected;
-                stateComp.dispatchEvent(new Event('change'));
+        <script>
+        const allUtxos = {json.dumps(pruned_utxos_global)};
+
+        // Find gr.State — bulletproof
+        let stateComp = null;
+        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"], component, div')) {{
+            if (el.value !== undefined || el.__gradio_internal__) {{
+                stateComp = el;
+                break;
             }}
         }}
-    }}
 
-    updateSelection();
-    document.addEventListener('change', e => {{
-        if (e.target.matches('input[data-idx]')) updateSelection();
-    }});
-    </script>
+        function updateSelection() {{
+            const checked = document.querySelectorAll('input[data-idx]:checked');
+            const indices = Array.from(checked).map(cb => parseInt(cb.dataset.idx));
+            const selected = indices.map(i => allUtxos[i]).filter(Boolean);
+            const total = selected.reduce((s, u) => s + u.value, 0);
 
-    <div id="selected-summary" style="text-align:center;padding:16px;background:rgba(247,147,26,0.15);
-         border:2px solid #f7931a;border-radius:12px;font-size:20px;font-weight:bold;margin-top:12px;">
-        Calculating...
+            const summary = document.getElementById('selected-summary');
+            if (summary) {{
+                summary.innerHTML = `
+                    <span style="color:#f7931a; font-size:24px; font-weight:900;">${indices.length}</span> UTXOs selected • 
+                    <span style="color:#00ff9d; font-size:28px; font-weight:900;">${formatBtc(total)}</span>
+                    <br><small style="color:#888;">Click Generate Transaction when ready</small>
+                `;
+            }}
+
+            if (stateComp) {{
+                if (stateComp.__gradio_internal__) {{
+                    stateComp.__gradio_internal__.setValue(selected);
+                }} else {{
+                    stateComp.value = selected;
+                    stateComp.dispatchEvent(new Event('change'));
+                }}
+            }}
+        }}
+
+        // Super pretty BTC formatter
+        function formatBtc(sats) {{
+            if (sats >= 100000000) return (sats/100000000).toFixed(8).replace(/0+$/,'').replace(/\\.$/,'') + ' BTC';
+            if (sats >= 1000000) return (sats/100000000).toFixed(4) + ' BTC';
+            return sats.toLocaleString() + ' sats';
+        }}
+
+        // Initial run
+        updateSelection();
+
+        // Listen to all checkbox changes
+        document.addEventListener('change', e => {{
+            if (e.target.matches('input[data-idx]')) updateSelection();
+        }});
+        </script>
+
+        <div id="selected-summary" style="
+            text-align:center; padding:20px; margin-top:16px; background:linear-gradient(135deg,#1a1a1a,#0f0f0f);
+            border:3px solid #f7931a; border-radius:16px; font-size:22px; font-weight:bold;
+            box-shadow:0 8px 30px rgba(247,147,26,0.4);">
+            Calculating...
+        </div>
     </div>
     """.strip()
 
@@ -931,7 +979,7 @@ with gr.Blocks(
                     border:2px solid #f7931a; border-radius:12px; font-size:0.95rem; color:#f7931a;
                     font-weight:600; text-align:center; box-shadow:0 4px 20px rgba(247,147,26,0.25);">
             No private keys ever entered • 100% non-custodial<br>
-            <span style="font-weight:800; color:#00ff9d;">Nothing is sent to any server</span> • Runs entirely in your browser
+            <span style="font-weight:800; color:#00ff9d;text-shadow: 0 0 12px black, 0 0 24px black;">Nothing is sent to any server</span> • Runs entirely in your browser
             </div>
             """)
             
@@ -1017,11 +1065,11 @@ with gr.Blocks(
         analysis_pass,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[
-            output_log,
-            generate_row,
-            coin_control_row,
-            coin_table_html,        # ← THIS MUST BE THE 4TH ITEM (index 3)
-            selected_utxos_state    # ← THIS MUST BE THE 5TH ITEM (index 4)
+            output_log,          # ← Analysis Complete message
+            generate_row,         # ← makes "Generate Transaction" button appear
+            coin_control_row,     # ← the coin control section
+            coin_table_html,      # ← the actual table
+            selected_utxos_state  # ← hidden state
         ]
     )
 
