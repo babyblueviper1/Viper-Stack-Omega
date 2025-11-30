@@ -676,7 +676,7 @@ with gr.Blocks(
     gr.HTML("""
     <head>
         <meta property="og:title" content="Ωmega Pruner v10.0 — EDICIÓN NUCLEAR: Podar UTXOs para siempre">
-        <meta property="og:description" content="El último consolidator vivo en 2025. MODO NUCLEAR: máximo 3 inputs, quema el resto para siempre. Ahorra miles en comisiones futuras. Solo los más fuertes sobreviven.">
+        <meta property="og:description" content="El último consolidator . . . MODO NUCLEAR. Para cada Bitcoiner. Del primero al último.">
         <meta property="og:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
         <meta property="og:image:width" content="1200">
         <meta property="og:image:height" content="630">
@@ -684,7 +684,7 @@ with gr.Blocks(
         <meta property="og:url" content="https://omega-v10.onrender.com/es">
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title" content="Ωmega Pruner v10.0 — EDICIÓN NUCLEAR">
-        <meta name="twitter:description" content="MODO NUCLEAR: máximo 3 inputs. Quema el resto para siempre. Desde Chile al mundo.">
+        <meta name="twitter:description" content="MODO NUCLEAR. Para cada Bitcoiner. Del primero al último.">
         <title>Ωmega Pruner v10.0 — EDICIÓN NUCLEAR</title>
     </head>
     """, visible=False)
@@ -988,7 +988,7 @@ with gr.Blocks(
                    style="color:#ff9900; text-decoration:underline;">detalles</a>
                 </span><br><br>
 
-                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Podar hoy. Ganar para siempre. • Ω</span>
+                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Podar hoy. Ganar siempre. Para cada Bitcoiner — del primero al último. • Ω</span>
         </div>
         """,
         elem_id="omega-footer"
