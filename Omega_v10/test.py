@@ -6,6 +6,8 @@ from typing import List, Tuple, Optional
 import urllib.parse
 import warnings
 import logging
+import pandas as pd
+
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 warnings.filterwarnings("ignore", category=UserWarning)
