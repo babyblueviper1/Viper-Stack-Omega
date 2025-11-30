@@ -987,7 +987,7 @@ gr.HTML(
                style="color:#ff9900; text-decoration:underline;">detalhes</a>
             </span><br><br>
 
-            <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Podar hoje. Vencer pra sempre. • Para cada Bitcoiner — do primeiro ao último. • Ω</span>
+            <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Poda hoje. Vencer pra sempre. • Ω</span>
     </div>
     """,
     elem_id="omega-footer"
