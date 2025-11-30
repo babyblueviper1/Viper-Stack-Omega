@@ -546,15 +546,16 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
   # Prepare table data for coin control
     table_data = []
-    for u in pruned_utxos_global:
+    for idx, u in enumerate(pruned_utxos_global):
         table_data.append({
             "Include": True,
-            "Value": format_btc(u['value']),
+            "Value (sats)": format_btc(u['value']),
             "TXID": u['txid'][:12] + "…" + u['txid'][-8:],
             "vout": u['vout'],
             "Confirmed": "Yes" if u.get('status', {}).get('confirmed', True) else "No",
-            "_raw": u
+            "idx": idx  # ← only store index
         })
+
     
     df = pd.DataFrame(table_data)
 
@@ -918,9 +919,9 @@ with gr.Blocks(
         with gr.Column():
             gr.Markdown("### Coin Control — Uncheck UTXOs you want to KEEP")
             coin_table = gr.Dataframe(
-                headers=["Include", "Value", "TXID", "vout", "Confirmed"],
+                headers=["Include", "Value (sats)", "TXID", "vout", "Confirmed"],
                 datatype=["bool", "str", "str", "number", "str"],
-                value=pd.DataFrame(),  # ← start empty
+                value=pd.DataFrame(),
                 interactive=True,
                 row_count=(15, "dynamic"),
                 column_widths=[80, 160, 180, 80, 110],
@@ -970,19 +971,17 @@ with gr.Blocks(
         if table_df is None or table_df.empty:
             return "Selected: 0 • Total: 0 sats", []
 
-    # table_df is already a DataFrame
-        selected = []
-        for _, row in table_df.iterrows():
-            if row["Include"]:
-                selected.append(row["_raw"])
-
-        total_sats = sum(u['value'] for u in selected)
+        # Get selected indices
+        selected_indices = table_df[table_df["Include"] == True]["idx"].tolist()
+    
+        # Reconstruct selected UTXOs from global list
+        selected_utxos = [pruned_utxos_global[i] for i in selected_indices]
+        total_sats = sum(u['value'] for u in selected_utxos)
 
         return (
-            f"**Selected:** {len(selected):,} UTXOs • **Total:** {format_btc(total_sats)}",
-            selected
+            f"**Selected:** {len(selected_utxos):,} UTXOs • **Total:** {format_btc(total_sats)}",
+            selected_utxos
         )
-
     coin_table.change(
         update_coin_control,
         coin_table,
