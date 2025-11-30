@@ -849,7 +849,7 @@ with gr.Blocks(
     with gr.Row(visible=False) as coin_control_row:
         with gr.Column():
             gr.Markdown("### Coin Control — Uncheck UTXOs you want to KEEP")
-            coin_table_html = gr.HTML("")  # ← We control it manually
+            coin_table_html = gr.HTML()  # ← We control it manually
         
     # START OVER BUTTON
     with gr.Row():
