@@ -555,7 +555,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     # ── Build table rows ───────────────────────────────────────────────
     html_rows = ""
-        for idx, u in enumerate(pruned_utxos_global):
+    for idx, u in enumerate(pruned_utxos_global):
         value = format_btc(u['value'])
         txid_short = u['txid'][:10] + "..." + u['txid'][-8:]
         confirmed = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
