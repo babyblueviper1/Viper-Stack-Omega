@@ -897,7 +897,7 @@ with gr.Blocks(
     # Floating BTC QR Scanner + Beautiful Toast
     gr.HTML("""
 <!-- Floating BTC Scanner Button -->
-<label class="qr-fab btc" title="Scan Address / xpub">B</label>
+<label class="qr-fab btc" title="Scan Address / xpub">₿</label>
 <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
 <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
