@@ -473,24 +473,27 @@ selected_utxos_state = gr.State()
 def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
     global pruned_utxos_global
 
-    # Fake some data so it always works
-    pruned_utxos_global = [{"value": 12345678, "txid": "abc123def456", "vout": 0}] * 5
+    # Fake data so it always runs
+    pruned_utxos_global = [{"value": 50000000, "txid": "deadbeef" * 8, "vout": 0}] * 4
 
-    # RED TEST BOX — THIS WILL APPEAR NO MATTER WHAT
+    # RED BOX — 100% SAFE CHARACTERS ONLY
     table_html = textwrap.dedent("""\
-        <div style="border:6px solid red; padding:40px; background:#300; margin:30px 0; border-radius:20px; text-align:center;">
-            <h1 style="color:#f7931a; font-size:40px; margin:0;">RED BOX = SUCCESS</h1>
-            <h2 style="color:white; margin:10px 0 20px;">If you see this → EVERYTHING WORKS</h2>
-            <p style="color:#0f0; font-size:24px;">Coin control is now 100% wired and ready.</p>
+        <div style="border:8px solid red; padding:50px; background:#300; margin:30px 0; border-radius:20px; text-align:center; font-family: sans-serif;">
+            <h1 style="color:#f7931a; font-size:44px; margin:0;">RED BOX = VICTORY</h1>
+            <h2 style="color:white; font-size:28px; margin:20px 0;">EVERYTHING IS NOW WORKING</h2>
+            <p style="color:#00ff00; font-size:24px; margin:20px 0;">Coin control wiring = FIXED</p>
+            <p style="color:#ff0; font-size:20px;">You can now safely activate the real table</p>
         </div>""")
 
     return (
-        "<div style='text-align:center; color:#f7931a; font-size:24px; padding:20px;'>Analysis Complete — Red box should appear below</div>",
-        gr.update(visible=True),
-        gr.update(visible=True),
-        table_html,
-        pruned_utxos_global
+        "<div style='text-align:center; color:#f7931a; font-size:26px; padding:30px;'>Analysis Complete - Look below for red box</div>",
+        gr.update(visible=True),   # generate_row
+        gr.update(visible=True),   # coin_control_row
+        table_html,                # coin_table_html
+        pruned_utxos_global        # selected_utxos_state
     )
+
+
 
 
 
