@@ -478,17 +478,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", []
+            return msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False)
     else:
         if not addr:
-            return "Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", []
+            return "Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False)
         utxos = get_utxos(addr, threshold)
         if not utxos:
-            return (
-                "<div style='text-align:center;padding:40px;color:#f7931a;font-size:1.5rem;'>"
-                "No UTXOs found above dust threshold</div>",
-                gr.update(visible=False), gr.update(visible=False), "", []
-            )
+            return "No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False)
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
@@ -497,20 +493,17 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
     from collections import Counter
     detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
-
-    vb_map = {'P2PKH': (148,34), 'P2SH': (91,32), 'SegWit': (68,31), 'Taproot': (57,43)}
-    input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68,31))
+    input_vb_global, output_vb_global = {'P2PKH':(148,34),'P2SH':(91,32),'SegWit':(68,31),'Taproot':(57,43)}.get(detected.split()[0], (68,31))
 
     # Strategy
     NUCLEAR = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
-    ratio = {"Privacy First (30% pruned)": 0.3, "Recommended (40% pruned)": 0.4,
-             "More Savings (50% pruned)": 0.5, NUCLEAR: 0.9}.get(strategy, 0.4)
+    ratio = {"Privacy First (30% pruned)":0.3, "Recommended (40% pruned)":0.4,
+             "More Savings (50% pruned)":0.5, NUCLEAR:0.9}.get(strategy, 0.4)
+    name = {"Privacy First (30% pruned)":"Privacy First", "Recommended (40% pruned)":"Recommended",
+            "More Savings (50% pruned)":"More Savings",
+            NUCLEAR:'<span style="color:#ff0066;font-weight:900;">NUCLEAR PRUNE</span>'}.get(strategy, strategy)
 
-    name = {"Privacy First (30% pruned)": "Privacy First", "Recommended (40% pruned)": "Recommended",
-            "More Savings (50% pruned)": "More Savings",
-            NUCLEAR: '<span style="color:#ff3366;font-weight:900;text-shadow:0 0 12px #ff0066;">NUCLEAR PRUNE</span>'}.get(strategy, strategy)
-
-    keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos) * (1 - ratio)))
+    keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos)*(1-ratio)))
     pruned_utxos_global = utxos[:keep]
 
     # Build rows
@@ -518,40 +511,60 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     for idx, u in enumerate(pruned_utxos_global):
         val = format_btc(u['value'])
         txid = u['txid'][:10] + "..." + u['txid'][-8:]
-        conf = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
+        conf = "Yes" if u.get('status', {}).get('confirmed', True) else "warning"
         html_rows += f'''
-        <tr style="height:64px;">
+        <tr style="height:66px;">
             <td style="text-align:center;">
                 <input type="checkbox" checked data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
             </td>
-            <td style="text-align:right;padding-right:24px;font-weight:800;color:#f7931a;font-size:19px;">{val}</td>
-            <td style="color:#bbb;font-size:0.9rem;word-break:break-all;">{txid}</td>
-            <td style="text-align:center;color:white;font-weight:bold;font-size:18px;">{u['vout']}</td>
-            <td style="text-align:center;color:#0f0;font-weight:bold;">{conf}</td>
+            <td style="text-align:right;padding-right:30px;font-weight:800;color:#f7931a;font-size:20px;">{val}</td>
+            <td style="color:#ccc;font-size:0.92rem;word-break:break-all;">{txid}</td>
+            <td style="text-align:center;color:white;font-weight:bold;font-size:19px;">{u['vout']}</td>
+            <td style="text-align:center;color:#0f0;font-weight:bold;">{conf or "Yes"}</td>
         </tr>'''
 
-    # FINAL WORKING TABLE — NO MORE CRASHES
     table_html = f"""
-    <div style="margin:20px 0;">
-        <div style="text-align:center;margin-bottom:16px;">
+    <div style="margin:30px 0; font-family: system-ui, sans-serif;">
+
+        <!-- FILTER BUTTONS -->
+        <div style="text-align:center; margin-bottom:20px; padding:12px; background:#111; border-radius:12px;">
             <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=true);updateSelection()"
-                    style="padding:12px 24px;margin:6px;background:#f7931a;color:black;border:none;border-radius:10px;font-weight:bold;">Select All</button>
+                    style="padding:12px 28px; margin:6px; background:#f7931a; color:black; border:none; border-radius:10px; font-weight:bold 16px system-ui; cursor:pointer;">
+                Select All
+            </button>
             <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false);updateSelection()"
-                    style="padding:12px 24px;margin:6px;background:#333;color:white;border:1px solid #f7931a;border-radius:10px;font-weight:bold;">Select None</button>
+                    style="padding:12px 28px; margin:6px; background:#333; color:white; border:2px solid #f7931a; border-radius:10px; font-weight:bold; cursor:pointer;">
+                Select None
+            </button>
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{
+                let sats = parseInt(c.closest('tr').children[1].textContent.replace(/[^0-9]/g,''));
+                c.checked = sats >= 100000;
+            }}); updateSelection()"
+                    style="padding:12px 28px; margin:6px; background:#00ff9d; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
+                ≥ 0.001 BTC
+            </button>
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{
+                let sats = parseInt(c.closest('tr').children[1].textContent.replace(/[^0-9]/g,''));
+                c.checked = sats >= 1000000;
+            }}); updateSelection()"
+                    style="padding:12px 28px; margin:6px; background:#ff9900; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
+                ≥ 0.01 BTC
+            </button>
         </div>
 
-        <div style="max-height:520px;overflow-y:auto;border:3px solid #f7931a;border-radius:16px;background:#0a0a0a;">
-            <table style="width:100%;border-collapse:collapse;font-size:16px;">
-                <thead style="position:sticky;top:0;background:#f7931a;color:black;font-weight:900;">
+        <!-- TABLE -->
+        <div style="max-height:540px; overflow-y:auto; border:4px solid #f7931a; border-radius:16px; background:#0a0a0a;">
+            <table style="width:100%; border-collapse:collapse;">
+                <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
                     <tr>
-                        <th style="padding:16px;">Include</th>
-                        <th style="padding:16px;text-align:right;">Value</th>
-                        <th style="padding:16px;">TXID</th>
-                        <th style="padding:16px;">vout</th>
-                        <th style="padding:16px;">Confirmed</th>
+                        <th style="padding:18px 12px;">Include</th>
+                        <th style="padding:18px 12px; text-align:right;">Value</th>
+                        <th style="padding:18px 12px;">TXID</th>
+                        <th style="padding:18px 12px;">vout</th>
+                        <th style="padding:18px 12px;">Confirmed</th>
                     </tr>
                 </thead>
-                <tbody style="font-family:monospace;">
+                <tbody style="font-family: 'Courier New', monospace;">
                     {html_rows}
                 </tbody>
             </table>
@@ -560,9 +573,10 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         <script>
         const allUtxos = {json.dumps(pruned_utxos_global)};
 
+        // Find gr.State component
         let stateComp = null;
-        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"], component')) {{
-            if (el.value !== undefined || el.__gradio_internal__) {{
+        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
+            if (el.__gradio_internal__ || el.value !== undefined) {{
                 stateComp = el;
                 break;
             }}
@@ -572,12 +586,12 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             const checked = document.querySelectorAll('input[data-idx]:checked');
             const indices = Array.from(checked).map(c => parseInt(c.dataset.idx));
             const selected = indices.map(i => allUtxos[i]);
-            const total = selected.reduce((a, b) => a + b.value, 0);
+            const total = selected.reduce((a,b) => a + b.value, 0);
 
             document.getElementById('selected-summary').innerHTML = `
-                <div style="font-size:28px;font-weight:900;color:#f7931a;">${{indices.length}}</div> UTXOs selected • 
-                <div style="font-size:34px;font-weight:900;color:#00ff9d;margin:8px 0;">${{total.toLocaleString()}} sats</div>
-                <div style="color:#888;font-size:14px;">Ready — click Generate Transaction</div>
+                <div style="font-size:32px; color:#f7931a; font-weight:900;">${{indices.length}} UTXOs selected</div>
+                <div style="font-size:44px; color:#00ff9d; font-weight:900; margin:10px 0;">${{total.toLocaleString()}} sats</div>
+                <div style="color:#aaa;">Ready to prune — click the button below</div>
             `;
 
             if (stateComp) {{
@@ -592,20 +606,20 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         }});
         </script>
 
-        <div id="selected-summary" style="text-align:center;padding:24px;margin-top:20px;background:linear-gradient(135deg,#1a0d00,#0a0500);
-             border:3px solid #f7931a;border-radius:16px;font-weight:bold;box-shadow:0 10px 40px rgba(247,147,26,0.6);">
+        <div id="selected-summary" style="text-align:center; padding:30px; margin-top:24px; background:linear-gradient(135deg,#1a0d00,#0f0500);
+             border:4px solid #f7931a; border-radius:20px; font-weight:bold; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
             Calculating...
         </div>
     </div>
     """.strip()
 
     return (
-        f"<div style='text-align:center;padding:30px;font-size:20px;color:#f7931a;'><b>Analysis Complete</b><br>"
-        f"Keeping <b>{keep}</b> largest UTXOs • Strategy: {name} • Type: {detected}</div>",
-        gr.update(visible=True),     # generate_row → button appears
-        gr.update(visible=True),     # coin_control_row
-        table_html,
-        pruned_utxos_global
+        "",
+        gr.update(visible=True),      # generate_row → "Generate Transaction" button
+        gr.update(visible=True),      # coin_control_row
+        table_html,                   # the full table + filters + live total
+        pruned_utxos_global,          # state
+        gr.update(visible=True)       # ← THIS LINE WAS MISSING! Makes Generate button appear!
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
@@ -950,7 +964,15 @@ with gr.Blocks(
     # COIN CONTROL SECTION — MUST BE DEFINED HERE
     with gr.Row(visible=False) as coin_control_row:
         with gr.Column():
-            gr.Markdown("### Coin Control — Uncheck UTXOs you want to KEEP")
+            gr.Markdown(
+            "<div style='text-align:center; padding:20px 0 10px; font-size:22px; color:#f7931a; font-weight:bold;'>"
+                "Coin Control<br>"
+                "<span style='font-size:18px; color:#ccc; font-weight:normal;'>"
+                "Uncheck any UTXO you want to <u>exclude from pruning</u> (i.e. keep forever)"
+                "</span>"
+                "</div>"
+                elem_classes="coin-control-header"
+            )
             coin_table_html
         
     # START OVER BUTTON
@@ -974,11 +996,12 @@ with gr.Blocks(
         analysis_pass,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[
-            output_log,          # ← Analysis Complete message
-            generate_row,         # ← makes "Generate Transaction" button appear
-            coin_control_row,     # ← the coin control section
-            coin_table_html,      # ← the actual table
-            selected_utxos_state  # ← hidden state
+            output_log,           # ← can stay, we just send empty string
+            generate_row,
+            coin_control_row,
+            coin_table_html,
+            selected_utxos_state,
+            generate_row  
         ]
     )
 
