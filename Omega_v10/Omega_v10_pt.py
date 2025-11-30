@@ -963,74 +963,76 @@ with gr.Blocks(
     </script>
     """)
     
-
-
 # ——— FOOTER EM PORTUGUÊS ———
-gr.HTML(
-    """
-    <div style="
-            margin: 30px auto 6px auto !important; 
-            padding: 12px 0 8px 0 !important; 
-            text-align: center; 
-            font-size: 0.92rem; 
-            color: #888; 
-            opacity: 0.94;
-            max-width: 640px;
-        ">
-            <strong style="color:#f7931a; font-size:1.02rem;">Ωmega Pruner v10.0 — MODO NUCLEAR</strong><br>
-            <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" 
-               target="_blank" rel="noopener" 
-               style="color: #f7931a; text-decoration: none; font-weight:600;">
-                GitHub • Código Aberto • Apache 2.0
-            </a>
-            &nbsp;&nbsp;•&nbsp;&nbsp;
-            <a href="#verified-prunes" style="color:#f7931a; text-decoration:none; font-weight:600;">
+    gr.HTML(
+        """
+        <div style="
+                margin: 30px auto 6px auto !important; 
+                padding: 12px 0 8px 0 !important; 
+                text-align: center; 
+                font-size: 0.92rem; 
+                color: #888; 
+                opacity: 0.94;
+                max-width: 640px;
+            ">
+                <strong style="color:#f7931a; font-size:1.02rem;">Ωmega Pruner v10.0 — MODO NUCLEAR</strong><br>
+                <a href="https://github.com/babyblueviper1/Viper-Stack-Omega/tree/main/Omega_v10" 
+                   target="_blank" rel="noopener" 
+                   style="color: #f7931a; text-decoration: none; font-weight:600;">
+                    GitHub • Código Aberto • Apache 2.0
+                </a>
+                &nbsp;&nbsp;•&nbsp;&nbsp;
+                <a href="#verified-prunes" style="color:#f7931a; text-decoration:none; font-weight:600;">
+                    Prunes NUCLEARES verificados
+                </a><br><br>
+                
+                <span style="font-size:0.92rem; color:#ff9900; font-weight:600;">
+                    Licença+ vitalícia — 0.042 BTC (só os primeiros 21) → 
+                    <a href="https://www.babyblueviper.com/p/mega-pruner-lifetime-license-0042" 
+                       style="color:#ff9900; text-decoration:underline;">detalhes</a>
+                </span><br><br>
+
+                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
+                    Poda hoje. Vencer pra sempre. • Ω
+                </span>
+        </div>
+        """,
+        elem_id="omega-footer"
+    )
+
+    # ——— SEÇÃO VERIFIED PRUNES EM PORTUGUÊS ———
+    gr.HTML(
+        """
+        <div id="verified-prunes" style="margin:80px auto 40px; max-width:900px; padding:0 20px;">
+            <h1 style="text-align:center; color:#f7931a; font-size:2.5rem; margin-bottom:20px;">
                 Prunes NUCLEARES verificados
-            </a><br><br>
-            
-            <span style="font-size:0.92rem; color:#ff9900; font-weight:600;">
-            Licença+ vitalícia — 0.042 BTC (só os primeiros 21) → 
-            <a href="https://www.babyblueviper.com/p/mega-pruner-lifetime-license-0042" 
-               style="color:#ff9900; text-decoration:underline;">detalhes</a>
-            </span><br><br>
+            </h1>
+            <p style="text-align:center; color:#868686; font-size:1.1rem; margin-bottom:60px; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
+                O muro começa vazio.<br>
+                Cada prune verificado fica gravado na blockchain pra sempre via TXID.<br>
+                Os primeiros serão lembrados como lendas.
+            </p>
 
-            <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Poda hoje. Vencer pra sempre. • Ω</span>
-    </div>
-    """,
-    elem_id="omega-footer"
-)
+            <div style="text-align:center; padding:50px 20px; background:#111; border:2px dashed #f7931a; border-radius:16px;">
+                <p style="color:#f7931a; font-size:1.5rem; margin:0;">Ainda não há prunes verificados.</p>
+                <p style="color:#aaa; margin:20px 0 0; font-size:1rem;">
+                    Seja o primeiro. Execute NUCLEAR. Envie seu TXID.
+                </p>
+            </div>
 
-# ——— SEÇÃO VERIFIED PRUNES EM PORTUGUÊS ———
-gr.HTML(
-    """
-    <div id="verified-prunes" style="margin:80px auto 40px; max-width:900px; padding:0 20px;">
-        <h1 style="text-align:center; color:#f7931a; font-size:2.5rem; margin-bottom:20px;">
-            Prunes NUCLEARES verificados
-        </h1>
-        <p style="text-align:center; color:#868686; font-size:1.1rem; margin-bottom:60px; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
-            O muro começa vazio.<br>
-            Cada prune verificado fica gravado na blockchain pra sempre via TXID.<br>
-            Os primeiros serão lembrados como lendas.
-        </p>
-
-        <div style="text-align:center; padding:50px 20px; background:#111; border:2px dashed #f7931a; border-radius:16px;">
-            <p style="color:#f7931a; font-size:1.5rem; margin:0;">Ainda não há prunes verificados.</p>
-            <p style="color:#aaa; margin:20px 0 0; font-size:1rem;">
-                Seja o primeiro. Execute NUCLEAR. Envie seu TXID.
+            <p style="text-align:center; color:#f7931a; margin-top:60px; font-size:1rem;">
+                Responda no X com seu TXID → seu prune entra aqui pra sempre.<br><br>
+                <a href="https://twitter.com/intent/tweet?text=Acabei%20de%20executar%20um%20prune%20NUCLEAR%20com%20%40babyblueviper1%20%E2%98%A2%EF%B8%8F%20TXID%3A" 
+                   target="_blank" 
+                   style="color:#ff9900; text-decoration:underline; font-weight:bold;">
+                    → Tuitar seu prune
+                </a>
             </p>
         </div>
+        """
+    )
 
-        <p style="text-align:center; color:#f7931a; margin-top:60px; font-size:1rem;">
-            Responda no X com seu TXID → seu prune entra aqui pra sempre.<br><br>
-            <a href="https://twitter.com/intent/tweet?text=Acabei%20de%20executar%20um%20prune%20NUCLEAR%20com%20%40babyblueviper1%20%E2%98%A2%EF%B8%8F%20TXID%3A" 
-               target="_blank" 
-               style="color:#ff9900; text-decoration:underline; font-weight:bold;">
-                → Tuitar seu prune
-            </a>
-        </p>
-    </div>
-    """
-)
+
 # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
 
 if __name__ == "__main__":
