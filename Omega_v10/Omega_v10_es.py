@@ -816,10 +816,10 @@ with gr.Blocks(
         with gr.Column(scale=1, min_width=300):
             dao_percent = gr.Slider(0, 500, value=50, step=10,
                 label="Agradecimiento (bps)",
-                info="0–500 bps de su futuro ahorro (máximo 25% por seguridad)")
+                info="0–500 bps de tu futuro ahorro (máximo 25% por seguridad)")
             live_thankyou = gr.Markdown(
                 "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
-                "→ 0,50% de su futuro ahorro"
+                "→ 0,50% de tu futuro ahorro"
                 "</div>"
             )
         with gr.Column(scale=1, min_width=300):
@@ -998,7 +998,7 @@ with gr.Blocks(
                    style="color:#ff9900; text-decoration:underline;">detalles</a>
                 </span><br><br>
 
-                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Poda hoy. Ganar para siempre. • Ω</span>
+                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Podar hoy. Ganar para siempre. • Ω</span>
         </div>
         """,
         elem_id="omega-footer"
