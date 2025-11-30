@@ -779,118 +779,125 @@ with gr.Blocks(
       
     # ====================== LAYOUT STARTS HERE ======================
     with gr.Row():
-    with gr.Column(scale=4):
-        user_input = gr.Textbox(
-            label="Carteira ou xpub",
-            placeholder="bc1q… ou xpub…",
-            lines=2,
-            autofocus=True
+        with gr.Column(scale=4):
+            user_input = gr.Textbox(
+                label="Carteira ou xpub",
+                placeholder="bc1q… ou xpub…",
+                lines=2,
+                autofocus=True
+            )
+        with gr.Column(scale=3):
+            prune_choice = gr.Dropdown(
+                choices=[
+                    "Privacidade Primeiro (30% podado)",
+                    "Recomendado (40% podado)",
+                    "Mais Economia (50% podado)",
+                    "NUCLEAR PRUNE (90% sacrificado — só pra quem tem culhão)",
+                ],
+                value="Recomendado (40% podado)",
+                label="Estratégia",
+                info="Quantos UTXOs pequenos vamos queimar pra economizar taxas pra sempre"
+            )
+
+    with gr.Row(equal_height=False):
+        with gr.Column(scale=1, min_width=300):
+            dust_threshold = gr.Slider(
+                0, 3000, value=546, step=1,
+                label="Limite de pó (sats)",
+                info="Ignorar UTXOs menores que esse valor"
+            )
+        with gr.Column(scale=1, min_width=300):
+            dao_percent = gr.Slider(
+                0, 500, value=50, step=10,
+                label="Agradecimento (bps)",
+                info="0–500 bps do seu futuro ganho (máximo 25% por segurança)"
+            )
+            live_thankyou = gr.Markdown(
+                "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
+                "→ 0,50% do seu futuro ganho"
+                "</div>"
+            )
+        with gr.Column(scale=1, min_width=300):
+            future_multiplier = gr.Slider(
+                3, 20, value=6, step=1,
+                label="Teste de estresse futuro",
+                info="6× = pico histórico 2017–2024 • 15× = próximo bull run • 20× = apocalipse total"
+            )
+
+    # Atualiza % do agradecimento em tempo real
+    def update_thankyou_label(bps):
+        pct = bps / 100
+        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% do seu futuro ganho</div>"
+    dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
+
+    with gr.Row():
+        dest_addr = gr.Textbox(
+            label="Destino (opcional)",
+            placeholder="Deixe vazio → mesma carteira",
+            lines=1
         )
-    with gr.Column(scale=3):
-        prune_choice = gr.Dropdown(
-            choices=[
-                "Privacidade Primeiro (30% podado)",
-                "Recomendado (40% podado)",
-                "Mais Economia (50% podado)",
-                "NUCLEAR PRUNE (90% sacrificado — só pra quem tem culhão)",
-            ],
-            value="Recomendado (40% podado)",
-            label="Estratégia",
-            info="Quantos UTXOs pequenos vamos queimar pra economizar taxas pra sempre"
+
+    with gr.Row():
+        submit_btn = gr.Button("1. Analisar UTXOs", variant="secondary", size="lg")
+
+    output_log = gr.HTML()
+
+    with gr.Row(visible=False) as generate_row:
+        generate_btn = gr.Button(
+            "2. Gerar Transação",
+            visible=False,
+            variant="primary",
+            size="lg",
+            elem_classes="full-width"
         )
 
-with gr.Row(equal_height=False):
-    with gr.Column(scale=1, min_width=300):
-        dust_threshold = gr.Slider(0, 3000, value=546, step=1,
-            label="Limite de pó (sats)",
-            info="Ignorar UTXOs menores que esse valor")
-    with gr.Column(scale=1, min_width=300):
-        dao_percent = gr.Slider(0, 500, value=50, step=10,
-            label="Agradecimento (bps)",
-            info="0–500 bps do seu futuro ganho (máximo 25% por segurança)")
-        live_thankyou = gr.Markdown(
-            "<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>"
-            "→ 0,50% do seu futuro ganho"
-            "</div>"
-        )
-    with gr.Column(scale=1, min_width=300):
-        future_multiplier = gr.Slider(3, 20, value=6, step=1,
-            label="Teste de estresse futuro",
-            info="6× = pico histórico 2017–2024 • 15× = próximo bull run • 20× = apocalipse total"
+    with gr.Row():
+        start_over_btn = gr.Button(
+            "Reiniciar — Apagar tudo",
+            variant="secondary",
+            size="lg",
+            elem_classes="full-width"
         )
 
-# Atualiza % do agradecimento em tempo real
-def update_thankyou_label(bps):
-    pct = bps / 100
-    return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% do seu futuro ganho</div>"
-dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
-
-with gr.Row():
-    dest_addr = gr.Textbox(
-        label="Destino (opcional)",
-        placeholder="Deixe vazio → mesma carteira",
-        lines=1
-    )
-
-with gr.Row():
-    submit_btn = gr.Button("1. Analisar UTXOs", variant="secondary", size="lg")
-
-output_log = gr.HTML()
-
-with gr.Row(visible=False) as generate_row:
-    generate_btn = gr.Button(
-        "2. Gerar Transação",
-        visible=False,
-        variant="primary",
-        size="lg",
-        elem_classes="full-width"
-    )
-
-with gr.Row():
-    start_over_btn = gr.Button(
-        "Reiniciar — Apagar tudo",
-        variant="secondary",
-        size="lg",
-        elem_classes="full-width"
-    )
     # ==================================================================
     # Events
     # ==================================================================
     submit_btn.click(
-    analysis_pass,
-    [user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
-    [output_log, generate_btn, generate_row]
-)
+        analysis_pass,
+        [user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
+        [output_log, generate_btn, generate_row]
+    )
 
-generate_btn.click(
-    fn=build_real_tx,
-    inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
-    outputs=[output_log, generate_btn, generate_row]
-)
+    generate_btn.click(
+        fn=build_real_tx,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
+        outputs=[output_log, generate_btn, generate_row]
+    )
 
-start_over_btn.click(
-    lambda: (
-        "", 
-        "Recomendado (40% podado)",  # ← português agora
-        546, 
-        "", 
-        50,
-        "",  
-        gr.update(visible=False), 
-        gr.update(visible=False)
-    ),
-    outputs=[
-        user_input, 
-        prune_choice, 
-        dust_threshold, 
-        dest_addr, 
-        dao_percent, 
-        output_log, 
-        generate_btn, 
-        generate_row
-    ]
-)
+    start_over_btn.click(
+        lambda: (
+            "",                                          # user_input
+            "Recomendado (40% podado)",                  # prune_choice
+            546,                                         # dust_threshold
+            "",                                          # dest_addr
+            50,                                          # dao_percent
+            "",                                          # output_log (texto)
+            gr.update(visible=False),                    # generate_btn
+            gr.update(visible=False)                     # generate_row
+        ),
+        outputs=[
+            user_input,
+            prune_choice,
+            dust_threshold,
+            dest_addr,
+            dao_percent,
+            output_log,
+            generate_btn,
+            generate_row
+        ]
+    )
 
+    
 # ——— ESCÂNER QR + TOAST EM PORTUGUÊS ———
 gr.HTML("""
 <!-- Botão Flutuante BTC Scanner -->
