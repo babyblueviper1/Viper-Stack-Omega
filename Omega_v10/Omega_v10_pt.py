@@ -786,6 +786,15 @@ with gr.Blocks(
                 lines=2,
                 autofocus=True
             )
+
+            gr.Markdown("""
+            <div style="margin-top:8px; padding:14px 16px; background:linear-gradient(135deg,rgba(247,147,26,0.15),rgba(247,147,26,0.08));
+                border:2px solid #f7931a; border-radius:12px; font-size:0.95rem; color:#f7931a;
+                font-weight:600; text-align:center; box-shadow:0 4px 20px rgba(247,147,26,0.25);">
+            Nenhuma chave privada é inserida • 100% sem custódia<br>
+            <span style="font-weight:800; color:#00ff9d;">Nada é enviado a nenhum servidor</span> • Tudo roda no seu navegador
+            </div>
+            """)
         with gr.Column(scale=3):
             prune_choice = gr.Dropdown(
                 choices=[
