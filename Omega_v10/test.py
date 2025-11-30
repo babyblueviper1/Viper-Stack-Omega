@@ -553,6 +553,9 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             "Confirmed": "Yes" if u.get('status', {}).get('confirmed', True) else "No",
             "_raw": u
         })
+    
+    df = pd.DataFrame(table_data)
+
 
     return (
         f"""
@@ -567,7 +570,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         """,
         gr.update(visible=True),
         gr.update(visible=True),
-        table_data,                # → coin control table
+        df,                # → coin control table
         pruned_utxos_global        # fallback if they skip coin control
     )
 # ==============================
@@ -915,10 +918,10 @@ with gr.Blocks(
             coin_table = gr.Dataframe(
                 headers=["Include", "Value", "TXID", "vout", "Confirmed"],
                 datatype=["bool", "str", "str", "number", "str"],
-                value=[],
+                value=pd.DataFrame(),  # ← start empty
                 interactive=True,
                 row_count=(15, "dynamic"),
-                column_widths=[80, 140, 180, 80, 100],
+                column_widths=[80, 160, 180, 80, 110],
                 wrap=True
             )
             selected_summary = gr.Markdown("Selected: 0 UTXOs • Total: 0 sats")
@@ -961,12 +964,16 @@ with gr.Blocks(
     )
 
     # Live coin control summary
-    def update_coin_control(table_data):
-        if table_data is None or table_data.empty:
+    def update_coin_control(table_df):
+        if table_df is None or table_df.empty:
             return "Selected: 0 • Total: 0 sats", []
 
-        rows = table_data.to_dict("records")
-        selected = [row["_raw"] for row in rows if row.get("Include", False)]
+    # table_df is already a DataFrame
+        selected = []
+        for _, row in table_df.iterrows():
+            if row["Include"]:
+                selected.append(row["_raw"])
+
         total_sats = sum(u['value'] for u in selected)
 
         return (
