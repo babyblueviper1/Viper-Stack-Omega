@@ -871,15 +871,23 @@ with gr.Blocks(
 
     output_log = gr.HTML()
 
-    with gr.Row(visible=False) as generate_row:
-        generate_btn = gr.Button(
-            "2. Generate Transaction",
-            visible=False,
-            variant="primary",
-            size="lg",
-            elem_classes="full-width"
-        )
+    # COIN CONTROL SECTION — MUST BE DEFINED HERE
+    with gr.Row(visible=False) as coin_control_row:
+        with gr.Column():
+            gr.Markdown("### Coin Control — Uncheck UTXOs you want to KEEP")
+            coin_table = gr.Dataframe(
+                headers=["Include", "Value", "TXID", "vout", "Confirmed"],
+                datatype=["bool", "str", "str", "number", "str"],
+                value=[],
+                interactive=True,
+                row_count=(10, "dynamic"),
+                column_widths=[80, 140, 180, 80, 100],
+                height=520,
+                wrap=True
+            )
+            selected_summary = gr.Markdown("Selected: 0 UTXOs • Total: 0 sats")
 
+    # START OVER BUTTON
     with gr.Row():
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
@@ -914,6 +922,23 @@ with gr.Blocks(
             selected_utxos_state
         ],
         outputs=[output_log, generate_btn, generate_row]
+    )
+
+    # Live coin control summary
+    def update_coin_control(table_data):
+        if not table_data or not isinstance(table_data, list):
+            return "Selected: 0 • Total: 0 sats", []
+        selected = [row["_raw"] for row in table_data if row["Include"]]
+        total_sats = sum(u['value'] for u in selected)
+        return (
+            f"**Selected:** {len(selected):,} UTXOs • **Total:** {format_btc(total_sats)}",
+            selected
+        )
+
+    coin_table.change(
+        update_coin_control,
+        coin_table,
+        [selected_summary, selected_utxos_state]
     )
 
     start_over_btn.click(
