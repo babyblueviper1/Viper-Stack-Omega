@@ -474,11 +474,6 @@ selected_utxos_state = gr.State()
 def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
-    print("\n" + "="*60)
-    print("analysis_pass() CALLED")
-    print(f"Returning table_html length: {len(table_html)}")
-    print("="*60 + "\n")
-    
     addr = user_input.strip()
     is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub'))
 
@@ -498,9 +493,10 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                 "</div>",
                 gr.update(visible=False),
                 gr.update(visible=False),
-                [],
+                "",
                 []
             )
+
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
     # Detect script type
@@ -517,9 +513,8 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     }
     input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
 
-    # === STRATEGY MAPPING (must match dropdown EXACTLY) ===
+    # === STRATEGY MAPPING ===
     NUCLEAR_OPTION = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
-
     ratio_map = {
         "Privacy First (30% pruned)": 0.3,
         "Recommended (40% pruned)": 0.4,
@@ -536,118 +531,109 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     }
     strategy_name = name_map.get(strategy, strategy.split(" (")[0])
 
-    # === TRUE NUCLEAR: max 3 inputs (even if 5000 UTXOs) ===
+    # === NUCLEAR MODE ===
     if strategy == NUCLEAR_OPTION:
         keep = min(3, len(utxos)) if len(utxos) > 0 else 0
-        keep = max(1, keep)  # never zero
+        keep = max(1, keep)
     else:
         keep = max(1, int(len(utxos) * (1 - ratio)))
 
     pruned_utxos_global = utxos[:keep]
 
-    # === Special Nuclear Warning (because yes) ===
     nuclear_warning = ""
     if strategy == NUCLEAR_OPTION:
-        nuclear_warning = '<br><span style="color:#ff0066; font-weight:bold; font-size:18px;">⚠️ NUCLEAR MODE ACTIVE ⚠️<br>Only the strongest survive.</span>'
+        nuclear_warning = '<br><span style="color:#ff0066; font-weight:bold; font-size:18px;">NUCLEAR MODE ACTIVE<br>Only the strongest survive.</span>'
 
+    # ==================================================================
+    # TEMPORARY RED TEST TABLE — REMOVE THIS WHEN YOU SEE IT WORKING
+    # ==================================================================
+    table_html = textwrap.dedent("""\
+        <div style="border:4px solid red; padding:30px; background:#200; margin:20px 0; border-radius:16px; text-align:center;">
+            <h3 style="color:#f7931a; font-size:28px; margin:0 0 20px 0;">
+                TEST TABLE — IF YOU SEE THIS RED BOX, EVERYTHING IS WORKING
+            </h3>
+            <p style="color:white; font-size:22px;">Wiring = Fixed<br>Indentation = Fixed<br>Coin Control = Ready</p>
+            <div style="background:#000; color:#f7931a; padding:20px; border-radius:12px; margin-top:20px; font-family:monospace;">
+                Found: {total_utxos} UTXOs → Keeping: {keep} largest<br>
+                Strategy: {strategy_name}
+            </div>
+        </div>""".format(total_utxos=len(utxos), keep=keep, strategy_name=strategy_name))
 
-  # Prepare table data for coin control
-    table_data = []
-    for idx, u in enumerate(pruned_utxos_global):
-        table_data.append({
-            "Include": True,
-            "Value (sats)": format_btc(u['value']),
-            "TXID": u['txid'][:12] + "…" + u['txid'][-8:],
-            "vout": u['vout'],
-            "Confirmed": "Yes" if u.get('status', {}).get('confirmed', True) else "No",
-            "idx": idx  # ← only store index
-        })
-
+    # ==================================================================
+    # WHEN THE RED BOX APPEARS → UNCOMMENT THE REAL TABLE BELOW
+    # ==================================================================
+    """
+    # REAL COIN CONTROL TABLE (uncomment when test passes)
     html_rows = ""
     for idx, u in enumerate(pruned_utxos_global):
         checked = "checked"
         value = format_btc(u['value'])
         txid_short = u['txid'][:12] + "…" + u['txid'][-8:]
         confirmed = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
-        
-        html_rows += f"""
+        html_rows += f'''
         <tr>
             <td style="text-align:center;"><input type="checkbox" {checked} onchange="updateSelection()" data-idx="{idx}"></td>
             <td style="font-family:monospace;">{value}</td>
             <td style="font-family:monospace;">{txid_short}</td>
             <td style="text-align:center;">{u['vout']}</td>
             <td style="text-align:center;">{confirmed}</td>
-        </tr>
-        """
+        </tr>'''
 
-
-table_html = textwrap.dedent(f"""
-    <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:12px;">
-    <table style="width:100%; border-collapse:collapse; background:#111; color:white;">
-        <thead style="position:sticky; top:0; background:#f7931a; color:black;">
-            <tr>
-                <th style="padding:12px;">Include</th>
-                <th style="padding:12px;">Value (sats)</th>
-                <th style="padding:12px;">TXID</th>
-                <th style="padding:12px;">vout</th>
-                <th style="padding:12px;">Confirmed</th>
-            </tr>
-        </thead>
-        <tbody>{html_rows}</tbody>
-    </table>
-    </div>
-    <script>
-    const utxos = {json.dumps([u._asdict() if hasattr(u, '_asdict') else u for u in pruned_utxos_global])};
-
-    function updateSelection() {{
-        const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked'))
-                        .map(cb => parseInt(cb.dataset.idx));
-        const selected = checked.map(i => utxos[i]);
-        const total = selected.reduce((a,b) => a + b.value, 0);
-
-        document.getElementById('selected-summary').innerHTML = 
-            `<b>Selected:</b> ${{checked.length}} UTXOs • <b>Total:</b> ${{total.toLocaleString()}} sats`;
-
-        const stateEl = document.querySelector('[data-testid="state"]');
-        if (stateEl?.__gradio_internal__) stateEl.__gradio_internal__.setValue(selected);
-    }}
-    updateSelection();
-    </script>
-    <div id="selected-summary" style="margin-top:12px; font-size:18px; color:#f7931a;"></div>
-    """).strip()
-
-
-# TESTE RÁPIDO (deixa exatamente assim até ver a tabela vermelha)
-table_html = textwrap.dedent("""\
-    <div style="border:4px solid red; padding:30px; background:#200; margin:20px 0; border-radius:16px;">
-        <h3 style="color:#f7931a; font-size:28px; margin:0 0 20px 0;">
-            TEST TABLE — IF YOU SEE THIS RED BOX, EVERYTHING IS WORKING
-        </h3>
-        <p style="color:white; font-size:20px;">Wiring is perfect. Indentation is perfect. You won.</p>
-        <table style="background:#000; color:#f7931a; width:100%; border-collapse:collapse;">
-            <tr><td style="padding:12px; border:1px solid #f7931a;">Row 1 – everything OK</td></tr>
-            <tr><td style="padding:12px; border:1px solid #f7931a;">Row 2 – coin control ready</td></tr>
+    table_html = textwrap.dedent(f'''
+        <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:12px;">
+        <table style="width:100%; border-collapse:collapse; background:#111; color:white;">
+            <thead style="position:sticky; top:0; background:#f7931a; color:black;">
+                <tr>
+                    <th style="padding:12px;">Include</th>
+                    <th style="padding:12px;">Value (sats)</th>
+                    <th style="padding:12px;">TXID</th>
+                    <th style="padding:12px;">vout</th>
+                    <th style="padding:12px;">Confirmed</th>
+                </tr>
+            </thead>
+            <tbody>{html_rows}</tbody>
         </table>
-    </div>""")
+        </div>
+        <script>
+        const utxos = {json.dumps(pruned_utxos_global)};
+        function updateSelection() {{
+            const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked'))
+                            .map(cb => parseInt(cb.dataset.idx));
+            const selected = checked.map(i => utxos[i]);
+            const total = selected.reduce((a,b) => a + b.value, 0);
+            document.getElementById('selected-summary').innerHTML = 
+                `<b>Selected:</b> ${checked.length} UTXOs • <b>Total:</b> ${total.toLocaleString()} sats`;
+            const s = document.querySelector('[data-testid="state"]');
+            if (s?.__gradio_internal__) s.__gradio_internal__.setValue(selected);
+        }}
+        updateSelection();
+        </script>
+        <div id="selected-summary" style="margin-top:12px; font-size:18px; color:#f7931a;"></div>
+    ''').strip()
+    """
 
-print(f"RETURNING: type(table_html)={type(table_html)}, len={len(table_html) if table_html else 0}")
-print(f"pruned_utxos_global len={len(pruned_utxos_global) if pruned_utxos_global else 0}")
+    # Final debug print
+    print(f"RETURNING table_html length: {len(table_html)}")
+    print(f"pruned_utxos_global length: {len(pruned_utxos_global)}")
+
     return (
         f"""
         <div style="text-align:center; padding:20px;">
             <b style="font-size:22px; color:#f7931a;">Analysis Complete</b><br><br>
             Found <b>{len(utxos):,}</b> UTXOs • Keeping <b>{keep}</b> largest<br>
-            <b style="color:#f7931a;">Strategy:</b> <b>{strategy_name}</b> • Format: <b>{detected}</b><br>
+            <b style="color:#f7931a;">Strategy:</b> {strategy_name} • Format: <b>{detected}</b><br>
             {nuclear_warning}
             <br><br>
             Click <b>Generate Transaction</b> to continue
         </div>
         """,
-        gr.update(visible=True),          # For generate_row
-        gr.update(visible=True),          # For coin_control_row
-        table_html,                       # ← The full table (div + script + summary) — goes to coin_table_html
-        pruned_utxos_global               # ← Raw list — goes to selected_utxos_state (NO gr.update()!)
-)
+        gr.update(visible=True),     # generate_row
+        gr.update(visible=True),     # coin_control_row
+        table_html,                  # coin_table_html (gr.HTML)
+        pruned_utxos_global          # selected_utxos_state (raw list)
+    )
+
+
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
 # ==============================
