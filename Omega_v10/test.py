@@ -7,6 +7,7 @@ import urllib.parse
 import warnings
 import logging
 import json
+import textwrap
 import pandas as pd
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -579,7 +580,6 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         </tr>
         """
 
-    import textwrap
 
 table_html = textwrap.dedent(f"""
     <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:12px;">
@@ -617,12 +617,15 @@ table_html = textwrap.dedent(f"""
     """).strip()
 
 
-    table_html = """
+    table_html = textwrap.dedent("""\
     <div style="border:2px solid red; padding:20px;">
         <h3>TEST TABLE — IF YOU SEE THIS, WIRING WORKS</h3>
-        <table><tr><td>Row 1</td></tr></table>
+        <table border="1" style="background:#000;color:#fff;">
+            <tr><td>Row 1</td></tr>
+            <tr><td>Row 2</td></tr>
+        </table>
     </div>
-    """
+""")
 
     print(f"RETURNING: type(table_html)={type(table_html)}, len={len(table_html) if table_html else 0}")
     print(f"pruned_utxos_global len={len(pruned_utxos_global) if pruned_utxos_global else 0}")
