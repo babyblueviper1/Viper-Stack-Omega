@@ -574,7 +574,9 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         </tr>
         """
 
-    table_html = f"""
+    import textwrap
+
+table_html = textwrap.dedent(f"""
     <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:12px;">
     <table style="width:100%; border-collapse:collapse; background:#111; color:white;">
         <thead style="position:sticky; top:0; background:#f7931a; color:black;">
@@ -590,19 +592,24 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </table>
     </div>
     <script>
-    const utxos = {json.dumps(pruned_utxos_global)};
+    const utxos = {json.dumps([u._asdict() if hasattr(u, '_asdict') else u for u in pruned_utxos_global])};
+
     function updateSelection() {{
-        const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(cb => parseInt(cb.dataset.idx));
+        const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked'))
+                        .map(cb => parseInt(cb.dataset.idx));
         const selected = checked.map(i => utxos[i]);
         const total = selected.reduce((a,b) => a + b.value, 0);
-        document.getElementById('selected-summary').innerHTML = 
-            `<b>Selected:</b> ${{checked.length}} UTXOs • <b>Total:</b> ${{format_btc(total)}}`;
-        window.__gradio_selected = selected;
-    }}
-    </script>
-    <div id="selected-summary"></div>
-    """
 
+        document.getElementById('selected-summary').innerHTML = 
+            `<b>Selected:</b> ${{checked.length}} UTXOs • <b>Total:</b> ${{total.toLocaleString()}} sats`;
+
+        const stateEl = document.querySelector('[data-testid="state"]');
+        if (stateEl?.__gradio_internal__) stateEl.__gradio_internal__.setValue(selected);
+    }}
+    updateSelection();
+    </script>
+    <div id="selected-summary" style="margin-top:12px; font-size:18px; color:#f7931a;"></div>
+    """).strip()
 
 
     return (
@@ -619,7 +626,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         gr.update(visible=True),
         gr.update(visible=True),
         table_html,
-        gr.update(value=pruned_utxos_global)        # fallback if they skip coin control
+        pruned_utxos_global        
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
