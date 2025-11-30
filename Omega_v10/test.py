@@ -959,20 +959,21 @@ with gr.Blocks(
     with gr.Row(visible=False) as generate_row:
         generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary", size="lg", elem_classes="full-width")
 
-    coin_table_html = gr.HTML()  # ← We control it manually
+    # COIN CONTROL SECTION — FINAL & PERFECT
+    coin_table_html = gr.HTML()  # ← Define it first, outside the row
 
-    # COIN CONTROL SECTION — MUST BE DEFINED HERE
     with gr.Row(visible=False) as coin_control_row:
         with gr.Column():
+            # Header — always on top
             gr.Markdown(
-            "<div style='text-align:center; padding:20px 0 10px; font-size:22px; color:#f7931a; font-weight:bold;'>"
-                "Coin Control<br>"
-                "<span style='font-size:18px; color:#ccc; font-weight:normal;'>"
-                "Uncheck any UTXO you want to <u>exclude from pruning</u> (i.e. keep forever)"
-                "</span>"
+                "<div style='text-align:center; padding:30px 0 10px; line-height:1.5;'>"
+                "<h2 style='margin:0; color:#f7931a; font-size:30px; font-weight:900;'>Coin Control</h2>"
+                "<p style='margin:10px auto 0; color:#ccc; font-size:18px; max-width:720px;'>"
+                "Uncheck any UTXO you want to <u>exclude from pruning</u> → it will be kept forever"
+                "</p>"
                 "</div>"
-                elem_classes="coin-control-header"
             )
+            # The actual interactive table goes here
             coin_table_html
         
     # START OVER BUTTON
