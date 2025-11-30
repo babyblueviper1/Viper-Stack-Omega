@@ -880,10 +880,9 @@ with gr.Blocks(
                 datatype=["bool", "str", "str", "number", "str"],
                 value=[],
                 interactive=True,
-                row_count=(10, "dynamic"),
+                row_count=(15, "dynamic"),   # ← controls visible rows + scroll
                 column_widths=[80, 140, 180, 80, 100],
-                height=520,
-                wrap=True
+                wrap=True,
             )
             selected_summary = gr.Markdown("Selected: 0 UTXOs • Total: 0 sats")
 
