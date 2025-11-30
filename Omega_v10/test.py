@@ -475,142 +475,86 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     addr = user_input.strip()
     is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub', 'vpub', 'upub'))
 
-    # ── Fetch UTXOs ─────────────────────────────────────────────────────
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return (
-                msg or "Failed to scan xpub",
-                gr.update(visible=False),
-                gr.update(visible=False),
-                "",
-                []
-            )
+            return msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", []
     else:
         if not addr:
-            return (
-                "Enter address or xpub",
-                gr.update(visible=False),
-                gr.update(visible=False),
-                "",
-                []
-            )
+            return "Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", []
         utxos = get_utxos(addr, threshold)
         if not utxos:
             return (
-                "<div style='text-align:center;padding:30px;color:#f7931a;font-size:1.4rem;'>"
-                "No UTXOs found above dust threshold<br><br>"
-                "Try a different address or lower the dust limit"
-                "</div>",
-                gr.update(visible=False),
-                gr.update(visible=False),
-                "",
-                []
+                "<div style='text-align:center;padding:40px;color:#f7931a;font-size:1.5rem;'>"
+                "No UTXOs found above dust threshold</div>",
+                gr.update(visible=False), gr.update(visible=False), "", []
             )
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
-    # ── Detect address type → vB weights ─────────────────────────────────
-    sample_addrs = [u.get('address') or addr for u in utxos[:10]]
-    types = [address_to_script_pubkey(a)[1]['type'] for a in sample_addrs]
+    # Detect type
+    sample = [u.get('address') or addr for u in utxos[:10]]
+    types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
     from collections import Counter
     detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
 
-    vb_map = {
-        'P2PKH':  (148, 34),
-        'P2SH':   (91,  32),
-        'SegWit': (68,  31),
-        'Taproot':(57,  43)
-    }
-    input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
+    vb_map = {'P2PKH': (148,34), 'P2SH': (91,32), 'SegWit': (68,31), 'Taproot': (57,43)}
+    input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68,31))
 
-    # ── Strategy → how many UTXOs to keep ───────────────────────────────
-    NUCLEAR_OPTION = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
-    ratio_map = {
-        "Privacy First (30% pruned)": 0.3,
-        "Recommended (40% pruned)": 0.4,
-        "More Savings (50% pruned)": 0.5,
-        NUCLEAR_OPTION: 0.9,
-    }
-    ratio = ratio_map.get(strategy, 0.4)          # ← fixed typo
+    # Strategy
+    NUCLEAR = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
+    ratio = {"Privacy First (30% pruned)": 0.3, "Recommended (40% pruned)": 0.4,
+             "More Savings (50% pruned)": 0.5, NUCLEAR: 0.9}.get(strategy, 0.4)
 
-    name_map = {
-        "Privacy First (30% pruned)": "Privacy First",
-        "Recommended (40% pruned)": "Recommended",
-        "More Savings (50% pruned)": "More Savings",
-        NUCLEAR_OPTION: '<span style="color:#ff1361;font-weight:900;text-shadow:0 0 10px #ff0066;">NUCLEAR PRUNE</span>',
-    }
-    strategy_name = name_map.get(strategy, strategy.split(" (")[0])
+    name = {"Privacy First (30% pruned)": "Privacy First", "Recommended (40% pruned)": "Recommended",
+            "More Savings (50% pruned)": "More Savings",
+            NUCLEAR: '<span style="color:#ff3366;font-weight:900;text-shadow:0 0 12px #ff0066;">NUCLEAR PRUNE</span>'}.get(strategy, strategy)
 
-    if strategy == NUCLEAR_OPTION:
-        keep = max(1, min(3, len(utxos)))
-    else:
-        keep = max(1, int(len(utxos) * (1 - ratio)))
-
+    keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos) * (1 - ratio)))
     pruned_utxos_global = utxos[:keep]
 
-    nuclear_warning = ""
-    if strategy == NUCLEAR_OPTION:
-        nuclear_warning = '<br><span style="color:#ff0066;font-weight:bold;font-size:18px;">NUCLEAR MODE ACTIVE<br>Only the strongest survive.</span>'
-
-    # ── Build table rows ───────────────────────────────────────────────
+    # Build rows
     html_rows = ""
     for idx, u in enumerate(pruned_utxos_global):
-        value = format_btc(u['value'])
-        txid_short = u['txid'][:10] + "..." + u['txid'][-8:]
-        confirmed = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
-
+        val = format_btc(u['value'])
+        txid = u['txid'][:10] + "..." + u['txid'][-8:]
+        conf = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
         html_rows += f'''
-        <tr style="height:62px; transition:background 0.2s;">
+        <tr style="height:64px;">
             <td style="text-align:center;">
-                <input type="checkbox" checked data-idx="{idx}" style="width:24px;height:24px;cursor:pointer;">
+                <input type="checkbox" checked data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
             </td>
-            <td style="text-align:right; font-weight:800; color:#f7931a; font-size:19px; padding-right:20px;">{value}</td>
-            <td style="color:#aaa; font-size:0.9rem; word-break:break-all;">{txid_short}</td>
-            <td style="text-align:center; font-weight:bold; color:white; font-size:17px;">{u['vout']}</td>
-            <td style="text-align:center; color:#0f0; font-weight:bold;">{confirmed}</td>
+            <td style="text-align:right;padding-right:24px;font-weight:800;color:#f7931a;font-size:19px;">{val}</td>
+            <td style="color:#bbb;font-size:0.9rem;word-break:break-all;">{txid}</td>
+            <td style="text-align:center;color:white;font-weight:bold;font-size:18px;">{u['vout']}</td>
+            <td style="text-align:center;color:#0f0;font-weight:bold;">{conf}</td>
         </tr>'''
-    # ── FINAL UPGRADED TABLE + FULLY WORKING COIN CONTROL ─────────────────────
-    table_html = f"""
-    <style>
-    #omega-coin-table {{ color: white !important; }}
-    #omega-coin-table input[type="checkbox"] {{ width:24px; height:24px; accent-color:#f7931a; cursor:pointer; }}
-    </style>
 
+    # FINAL WORKING TABLE — NO MORE CRASHES
+    table_html = f"""
     <div style="margin:20px 0;">
-        <div style="text-align:center; margin-bottom:14px;">
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=true);updateSelection();"
-                    style="padding:10px 20px; margin:4px; background:#f7931a; color:black; border:none; border-radius:8px; font-weight:bold;">
-                Select All
-            </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false);updateSelection();"
-                    style="padding:10px 20px; margin:4px; background:#333; color:white; border:1px solid #f7931a; border-radius:8px; font-weight:bold;">
-                Select None
-            </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{ 
-                const val = parseInt(c.closest('tr').querySelector('td:nth-child(2)').innerText.replace(/[^0-9]/g,'')); 
-                c.checked = val >= 100000; 
-            }}); updateSelection();"
-                    style="padding:10px 20px; margin:4px; background:#00ff9d; color:black; border:none; border-radius:8px; font-weight:bold;">
-                Only Greater Than or Equal to 0.001 BTC
-            </button>
+        <div style="text-align:center;margin-bottom:16px;">
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=true);updateSelection()"
+                    style="padding:12px 24px;margin:6px;background:#f7931a;color:black;border:none;border-radius:10px;font-weight:bold;">Select All</button>
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false);updateSelection()"
+                    style="padding:12px 24px;margin:6px;background:#333;color:white;border:1px solid #f7931a;border-radius:10px;font-weight:bold;">Select None</button>
         </div>
 
-        <div style="max-height:520px; overflow-y:auto; border:3px solid #f7931a; border-radius:14px; background:#0a0a0a;" id="omega-coin-table">
-        <table style="width:100%; border-collapse:collapse; font-size:16px;">
-            <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
-                <tr>
-                    <th style="padding:16px;">Include</th>
-                    <th style="padding:16px; text-align:right;">Value</th>
-                    <th style="padding:16px;">TXID</th>
-                    <th style="padding:16px;">vout</th>
-                    <th style="padding:16px;">Confirmed</th>
-                </tr>
-            </thead>
-            <tbody style="font-family: 'Courier New', monospace;">
-                {html_rows}
-            </tbody>
-        </table>
+        <div style="max-height:520px;overflow-y:auto;border:3px solid #f7931a;border-radius:16px;background:#0a0a0a;">
+            <table style="width:100%;border-collapse:collapse;font-size:16px;">
+                <thead style="position:sticky;top:0;background:#f7931a;color:black;font-weight:900;">
+                    <tr>
+                        <th style="padding:16px;">Include</th>
+                        <th style="padding:16px;text-align:right;">Value</th>
+                        <th style="padding:16px;">TXID</th>
+                        <th style="padding:16px;">vout</th>
+                        <th style="padding:16px;">Confirmed</th>
+                    </tr>
+                </thead>
+                <tbody style="font-family:monospace;">
+                    {html_rows}
+                </tbody>
+            </table>
         </div>
 
         <script>
@@ -626,23 +570,19 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
         function updateSelection() {{
             const checked = document.querySelectorAll('input[data-idx]:checked');
-            const indices = Array.from(checked).map(cb => parseInt(cb.dataset.idx));
-            const selected = indices.map(i => allUtxos[i]).filter(Boolean);
-            const total = selected.reduce((s, u) => s + u.value, 0);
+            const indices = Array.from(checked).map(c => parseInt(c.dataset.idx));
+            const selected = indices.map(i => allUtxos[i]);
+            const total = selected.reduce((a, b) => a + b.value, 0);
 
             document.getElementById('selected-summary').innerHTML = `
-                <span style="color:#f7931a; font-size:26px; font-weight:900;">${indices.length}</span> UTXOs selected • 
-                <span style="color:#00ff9d; font-size:32px; font-weight:900;">${total.toLocaleString()} sats</span>
-                <br><small style="color:#888;">Ready — click Generate Transaction below</small>
+                <div style="font-size:28px;font-weight:900;color:#f7931a;">${{indices.length}}</div> UTXOs selected • 
+                <div style="font-size:34px;font-weight:900;color:#00ff9d;margin:8px 0;">${{total.toLocaleString()}} sats</div>
+                <div style="color:#888;font-size:14px;">Ready — click Generate Transaction</div>
             `;
 
             if (stateComp) {{
-                if (stateComp.__gradio_internal__) {{
-                    stateComp.__gradio_internal__.setValue(selected);
-                }} else {{
-                    stateComp.value = selected;
-                    stateComp.dispatchEvent(new Event('change'));
-                }}
+                if (stateComp.__gradio_internal__) stateComp.__gradio_internal__.setValue(selected);
+                else {{ stateComp.value = selected; stateComp.dispatchEvent(new Event('change')); }}
             }}
         }}
 
@@ -652,32 +592,21 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         }});
         </script>
 
-        <div id="selected-summary" style="text-align:center; padding:22px; margin-top:18px; background:linear-gradient(135deg,#1a0d00,#0f0a00);
-             border:3px solid #f7931a; border-radius:16px; font-weight:bold; box-shadow:0 10px 40px rgba(247,147,26,0.5);">
+        <div id="selected-summary" style="text-align:center;padding:24px;margin-top:20px;background:linear-gradient(135deg,#1a0d00,#0a0500);
+             border:3px solid #f7931a;border-radius:16px;font-weight:bold;box-shadow:0 10px 40px rgba(247,147,26,0.6);">
             Calculating...
         </div>
     </div>
     """.strip()
 
-    # ── Return everything in correct order ───────────────────────────────
     return (
-        f"""
-        <div style="text-align:center;padding:20px;">
-            <b style="font-size:22px;color:#f7931a;">Analysis Complete</b><br><br>
-            Found <b>{len(utxos):,}</b> UTXOs • Keeping <b>{keep}</b> largest<br>
-            <b style="color:#f7931a;">Strategy:</b> {strategy_name} • Format: <b>{detected}</b><br>
-            {nuclear_warning}
-            <br><br>
-            Uncheck any UTXOs you want to <u>exclude</u> → then click <b>Generate Transaction</b>
-        </div>
-        """,
-        gr.update(visible=True),     # generate_row
+        f"<div style='text-align:center;padding:30px;font-size:20px;color:#f7931a;'><b>Analysis Complete</b><br>"
+        f"Keeping <b>{keep}</b> largest UTXOs • Strategy: {name} • Type: {detected}</div>",
+        gr.update(visible=True),     # generate_row → button appears
         gr.update(visible=True),     # coin_control_row
-        table_html,                  # coin_table_html
-        pruned_utxos_global          # selected_utxos_state
+        table_html,
+        pruned_utxos_global
     )
-
-
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
 # ==============================
