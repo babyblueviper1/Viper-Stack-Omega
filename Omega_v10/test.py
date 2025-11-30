@@ -614,12 +614,12 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     """.strip()
 
     return (
-        "",
-        gr.update(visible=True),      # generate_row → "Generate Transaction" button
-        gr.update(visible=True),      # coin_control_row
-        table_html,                   # the full table + filters + live total
-        pruned_utxos_global,          # state
-        gr.update(visible=True)       # ← THIS LINE WAS MISSING! Makes Generate button appear!
+        "",                                      # output_log (empty now)
+        gr.update(visible=True),                 # generate_row → shows the Generate button
+        gr.update(visible=True),                 # coin_control_row → shows the whole coin control section
+        table_html,                              # your full beautiful table + filters + live total
+        pruned_utxos_global,                     # selected UTXOs → gr.State
+        gr.update(visible=True)                  # generate_row again → forces Generate button to appear
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
