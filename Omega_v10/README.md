@@ -38,23 +38,21 @@ Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trez
 | Works with every wallet in 2025+          | LIVE     | Verified on hardware & software                          |
 | Zero custody • Zero lies • Zero regrets | FOREVER  | Apache 2.0                                              |
 
-### Ωmega Pruner Lifetime License — 0.042 BTC (one-time)
+### Ωmega Pruner Lifetime License — 0.042 BTC (one-time payment)
+
+Price locked at 0.042 BTC for the next 48 hours only.  
+After Monday 1 Dec 23:59 UTC → price doubles to 0.084 BTC forever.
+
+First 21 people only. Then the door closes.
+
 You get forever:
+- Name etched on-chain via OP_RETURN (immortal)
+- Priority support + direct line to Federico
+- Every future feature the day it drops (Lightning sweep, mobile PWA, collaborative pruning, IPFS version, NUCLEAR+ modes, etc.)
+- Permanent spot on the Founders wall
 
-- Name permanently etched on the on-chain founder wall (OP_RETURN — immortal)  
-- Priority support + direct line to Federico (Telegram/Email)  
-- Early access to every future feature the day it ships:  
-  → Mobile PWA (installable app)  
-  → Lightning sweep (dust → instant channel liquidity)  
-  → Collaborative consolidations (prune with friends, outputs unrelated)  
-  → Fully static + IPFS version (works offline, unkillable)  
-  → Custom pruning strategies & history export  
-  → Exclusive NUCLEAR+ modes (1-input mode, etc.)  
-- Lifetime spot on the “Founders” page of the site  
-- First dibs on enterprise / on-premise version when ready  
-
-**First 21 people only** → then price goes up.  
-**bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj**
+Founders secured so far: 0 / 21  
+bc1qhtq6avlzyzrh3hxmcjtch6578mvarh9lu28ej8
 
 ### Quick start
 1. Paste or scan address / xpub  
@@ -67,7 +65,7 @@ You get forever:
 **Future fees → obliterated.**  
 **Peace of mind → eternal.**
 
-**No custody. No lies. No mercy.**
+**No custody. No mercy.**
 
 **Prune today. Win forever. • Ω**
 
