@@ -473,19 +473,19 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     global pruned_utxos_global, input_vb_global, output_vb_global
 
     addr = user_input.strip()
-    is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub'))
+    is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub', 'vpub', 'upub'))
 
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return msg or "Failed to scan xpub", gr.update(visible=False)
+            return msg or "Failed to scan xpub", gr.update(visible=False), gr.update(visible=False), "", []
     else:
         if not addr:
-            return "Enter address or xpub", gr.update(visible=False)
+            return "Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", []
         utxos = get_utxos(addr, threshold)
         if not utxos:
             return (
-                "<div style='text-align:center;padding:30px;color:#f7931a;font-size:1.4rem;'>"
+                "<div style='text-align:center;padding:center;padding:30px;color:#f7931a;font-size:1.4rem;'>"
                 "No UTXOs found above dust threshold<br><br>"
                 "Try a different address or lower the dust limit"
                 "</div>",
@@ -503,36 +503,26 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     from collections import Counter
     detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
 
-    vb_map = {
-        'P2PKH': (148, 34),
-        'P2SH': (91, 32),
-        'SegWit': (68, 31),
-        'Taproot': (57, 43)
-    }
+    vb_map = {'P2PKH': (148, 34), 'P2SH': (91, 32), 'SegWit': (68, 31), 'Taproot': (57, 43)}
     input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
 
-    # === STRATEGY MAPPING ===
+    # Strategy mapping
     NUCLEAR_OPTION = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
-    ratio_map = {
-        "Privacy First (30% pruned)": 0.3,
-        "Recommended (40% pruned)": 0.4,
-        "More Savings (50% pruned)": 0.5,
-        NUCLEAR_OPTION: 0.9,
-    }
-    ratio = ratio_map.get(strategy, 0.4)
+    ratio_map = {"Privacy First (30% pruned)": 0.3, "Recommended (40% pruned)": 0.4,
+                 "More Savings (50% pruned)": 0.5, NUCLEAR_OPTION: 0.9}
+    ratio = ratio_map.get(strategy, 0.Concurrent)
 
     name_map = {
         "Privacy First (30% pruned)": "Privacy First",
         "Recommended (40% pruned)": "Recommended",
         "More Savings (50% pruned)": "More Savings",
-        NUCLEAR_OPTION: '<span style="color:#ff1361; font-weight:900; text-shadow: 0 0 10px #ff0066;">NUCLEAR PRUNE</span>',
+        NUCLEAR_OPTION: '<span style="color:#ff1361; font-weight:bold; text-shadow: 0 0 10px #ff0066;">NUCLEAR PRUNE</span>',
     }
     strategy_name = name_map.get(strategy, strategy.split(" (")[0])
 
-    # === NUCLEAR MODE ===
+    # How many to keep
     if strategy == NUCLEAR_OPTION:
-        keep = min(3, len(utxos)) if len(utxos) > 0 else 0
-        keep = max(1, keep)
+        keep = max(1, min(3, len(utxos)))
     else:
         keep = max(1, int(len(utxos) * (1 - ratio)))
 
@@ -542,80 +532,84 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     if strategy == NUCLEAR_OPTION:
         nuclear_warning = '<br><span style="color:#ff0066; font-weight:bold; font-size:18px;">NUCLEAR MODE ACTIVE<br>Only the strongest survive.</span>'
 
+    # === BUILD TABLE ROWS ===
     html_rows = ""
     for idx, u in enumerate(pruned_utxos_global):
-        checked = "checked"
         value = format_btc(u['value'])
         txid_short = u['txid'][:12] + "…" + u['txid'][-8:]
         confirmed = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
         html_rows += f'''
-        <tr style="height:56px;">
+        <tr style="height:58px;">
             <td style="text-align:center;">
-                <input type="checkbox" {checked} data-idx="{idx}" style="width:20px; height:20px; cursor:pointer;">
+                <input type="checkbox" checked data-idx="{idx}" style="width:22px;height:22px;cursor:pointer;">
             </td>
-            <td style="font-family:monospace; font-size:15px;">{value}</td>
-            <td style="font-family:monospace; font-size:13px; color:#aaa;">{txid_short}</td>
+            <td style="text-align:right; font-family:monospace;padding:0 16px;">{value}</td>
+            <td style="font-family:monospace; font-size:0.88rem; color:#bbb; word-break:break-all;">{txid_short}</td>
             <td style="text-align:center;">{u['vout']}</td>
             <td style="text-align:center; color:#0f0;">{confirmed}</td>
         </tr>'''
 
-    table_html = textwrap.dedent(f'''
-        <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:12px;">
-        <table style="width:100%; border-collapse:collapse; background:#111; color:white;">
-            <thead style="position:sticky; top:0; background:#f7931a; color:black;">
-                <tr>
-                    <th style="padding:12px;">Include</th>
-                    <th style="padding:12px;">Value (sats)</th>
-                    <th style="padding:12px;">TXID</th>
-                    <th style="padding:12px;">vout</th>
-                    <th style="padding:12px;">Confirmed</th>
-                </tr>
-            </thead>
-            <tbody>{html_rows}</tbody>
-        </table>
-        </div>
-        <script>
-        const utxos = {json.dumps(pruned_utxos_global)};
+    # TABLE_HTML IS NOW OUTSIDE THE LOOP — FIXED!
+    table_html = f"""
+    <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:12px; margin:20px 0;">
+    <table style="width:100%; border-collapse:collapse; background:#111; color:white; font-size:15px;">
+        <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:bold;">
+            <tr>
+                <th style="padding:14px;">Include</th>
+                <th style="padding:14px;">Value</th>
+                <th style="padding:14px;">TXID</th>
+                <th style="padding:14px;">vout</th>
+                <th style="padding:14px;">Confirmed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {html_rows}
+        </tbody>
+    </table>
+    </div>
 
-        // Find the gr.State component reliably
-        let stateComponent = null;
-        const states = document.querySelectorAll('gradio-state, [data-testid="state"], component');
-        for (let el of states) {
-            if (el.__gradio_internal__ || el.value !== undefined) {
-                stateComponent = el;
-                break;
-            }
-        }
+    <script>
+    const allUtxos = {json.dumps(pruned_utxos_global)};
 
-        function updateSelection() {
-            const checkboxes = document.querySelectorAll('input[type="checkbox"][data-idx]:checked');
-            const checkedIndices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.idx));
-            const selected = checkedIndices.map(i => utxos[i]);
-            const total = selected.reduce((a, b) => a + b.value, 0);
+    let stateComponent = null;
+    const candidates = document.querySelectorAll('gradio-state, [data-testid="state"], component');
+    for (let el of candidates) {{
+        if (el.value !== undefined || el.__gradio_internal__) {{
+            stateComponent = el;
+            break;
+        }}
+    }}
 
-            // THIS LINE WAS BROKEN — fixed with double braces
-            document.getElementById('selected-summary').innerHTML = 
-                `<b style="color:#f7931a;">Selected:</b> ${checkedIndices.length} UTXOs • <b style="color:#00ff9d;">Total:</b> ${total.toLocaleString()} sats`;
+    function updateSelection() {{
+        const checkedBoxes = document.querySelectorAll('input[data-idx]:checked');
+        const indices = Array.from(checkedBoxes).map(cb => parseInt(cb.dataset.idx));
+        const selected = indices.map(i => allUtxos[i]);
+        const totalSats = selected.reduce((a = 0, u) => a + u.value, 0);
 
-            // Update the hidden gr.State
-            if (stateComponent) {
-                if (stateComponent.__gradio_internal__) {
-                    stateComponent.__gradio_internal__.setValue(selected);
-                } else {
-                    stateComponent.value = selected;
-                    stateComponent.dispatchEvent(new Event('change'));
-                }
-            }
-        }
+        document.getElementById('selected-summary').innerHTML = 
+            `<b style="color:#f7931a;">Selected:</b> ${{indices.length}} UTXOs • <b style="color:#00ff9d;">Total:</b> ${{totalSats.toLocaleString()}} sats`;
 
-        // Run on load and on every change
-        updateSelection();
-        document.addEventListener('change', e => {
-            if (e.target.matches('input[type="checkbox"][data-idx]')) updateSelection();
-        });
-        </script>
-        <div id="selected-summary" style="margin-top:12px; font-size:18px; color:#f7931a;"></div>
-    ''').strip()
+        if (stateComponent) {{
+            if (stateComponent.__gradio_internal__) {{
+                stateComponent.__gradio_internal__.setValue(selected);
+            }} else {{
+                stateComponent.value = selected;
+                stateComponent.dispatchEvent(new Event('change'));
+            }}
+        }}
+    }}
+
+    updateSelection();
+    document.addEventListener('change', e => {{
+        if (e.target.matches('input[data-idx]')) updateSelection();
+    }});
+    </script>
+
+    <div id="selected-summary" style="text-align:center; padding:16px; background:rgba(247,147,26,0.15); 
+         border:2px solid #f7931a; border-radius:12px; font-size:20px; font-weight:bold; margin-top:12px;">
+        Calculating...
+    </div>
+    """.strip()
 
     return (
         f"""
@@ -625,13 +619,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             <b style="color:#f7931a;">Strategy:</b> {strategy_name} • Format: <b>{detected}</b><br>
             {nuclear_warning}
             <br><br>
-            Click <b>Generate Transaction</b> to continue
+            Uncheck any UTXOs you want to <u>exclude</u> • Then click <b>Generate Transaction</b>
         </div>
         """,
-        gr.update(visible=True),     # generate_row
-        gr.update(visible=True),     # coin_control_row
-        table_html,                  # coin_table_html (gr.HTML)
-        pruned_utxos_global          # selected_utxos_state (raw list)
+        gr.update(visible=True),      # generate_row
+        gr.update(visible=True),      # coin_control_row
+        table_html,                  # coin_table_html
+        pruned_utxos_global          # selected_utxos_state
     )
 
 
