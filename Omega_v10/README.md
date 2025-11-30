@@ -38,7 +38,7 @@ Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trez
 | Works with every wallet in 2025+          | LIVE     | Verified on hardware & software                          |
 | Zero custody • Zero lies • Zero regrets | FOREVER  | Apache 2.0                                              |
 
-### Ωmega Pruner Lifetime License — 0.042 BTC (one-time payment)
+### Ωmega Pruner+ Lifetime License — 0.042 BTC (one-time payment)
 
 Price locked at 0.042 BTC for the next 48 hours only.  
 After Monday 1 Dec 23:59 UTC → price doubles to 0.084 BTC forever.
