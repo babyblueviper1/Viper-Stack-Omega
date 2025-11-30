@@ -998,7 +998,7 @@ with gr.Blocks(
                    style="color:#ff9900; text-decoration:underline;">detalles</a>
                 </span><br><br>
 
-                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Podar hoy. Ganar para siempre. • Ω</span>
+                <span style="color:#868686; font-size:0.85rem; text-shadow: 0 0 8px rgba(247,147,26,0.4);">Podar hoy. Ganar siempre. • Ω</span>
         </div>
         """,
         elem_id="omega-footer"
