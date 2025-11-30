@@ -511,12 +511,12 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     table_data = []
     for u in pruned_utxos_global:
         table_data.append({
-            "Incluir": True,
-            "Valor": format_btc(u['value']),
+            "Include": True,
+            "Value": format_btc(u['value']),
             "TXID": u['txid'][:12] + "…" + u['txid'][-8:],
             "vout": u['vout'],
-            "Confirmado": "Sim" if u.get('status', {}).get('confirmed', True) else "Não",
-            "_raw": u  # hidden raw data
+            "Confirmed": "Yes" if u.get('status', {}).get('confirmed', True) else "No",
+            "_raw": u
         })
 
     return (
@@ -882,9 +882,9 @@ with gr.Blocks(
                 datatype=["bool", "str", "str", "number", "str"],
                 value=[],
                 interactive=True,
-                row_count=(15, "dynamic"),   # ← controls visible rows + scroll
+                row_count=(15, "dynamic"),
                 column_widths=[80, 140, 180, 80, 100],
-                wrap=True,
+                wrap=True
             )
             selected_summary = gr.Markdown("Selected: 0 UTXOs • Total: 0 sats")
 
@@ -927,14 +927,17 @@ with gr.Blocks(
 
     # Live coin control summary
     def update_coin_control(table_data):
-        if not table_data or not isinstance(table_data, list):
-            return "Selected: 0 • Total: 0 sats", []
-        selected = [row["_raw"] for row in table_data if row["Include"]]
-        total_sats = sum(u['value'] for u in selected)
-        return (
-            f"**Selected:** {len(selected):,} UTXOs • **Total:** {format_btc(total_sats)}",
-            selected
-        )
+    if table_data is None or table_data.empty:
+        return "Selected: 0 • Total: 0 sats", []
+
+    rows = table_data.to_dict("records")
+    selected = [row["_raw"] for row in rows if row.get("Include", False)]
+    total_sats = sum(u['value'] for u in selected)
+
+    return (
+        f"**Selected:** {len(selected):,} UTXOs • **Total:** {format_btc(total_sats)}",
+        selected
+    )
 
     coin_table.change(
         update_coin_control,
