@@ -466,9 +466,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # ==============================
 # Core Functions
 # ==============================
-# === NEW: Global state for selected UTXOs ===
 
-selected_utxos_state = gr.State()
 
 def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
     global pruned_utxos_global
@@ -859,6 +857,8 @@ with gr.Blocks(
             size="lg",
             elem_classes="full-width"
         )
+    
+    selected_utxos_state = gr.State()
 
     # ==================================================================
     # Events
