@@ -676,7 +676,7 @@ with gr.Blocks(
     gr.HTML("""
     <head>
         <meta property="og:title" content="Ωmega Pruner v10.0 — EDICIÓN NUCLEAR: Podar UTXOs para siempre">
-        <meta property="og:description" content="El último consolidator . . . MODO NUCLEAR. Para cada Bitcoiner. Del primero al último.">
+        <meta property="og:description" content="El último consolidator . . . MODO NUCLEAR. Para cada Bitcoiner — del primero al último.">
         <meta property="og:image" content="https://raw.githubusercontent.com/babyblueviper1/Viper-Stack-Omega/main/Omega_v10/omega_thumbnail.png">
         <meta property="og:image:width" content="1200">
         <meta property="og:image:height" content="630">
@@ -684,7 +684,7 @@ with gr.Blocks(
         <meta property="og:url" content="https://omega-v10.onrender.com/es">
         <meta name="twitter:card" content="summary_large_image">
         <meta name="twitter:title" content="Ωmega Pruner v10.0 — EDICIÓN NUCLEAR">
-        <meta name="twitter:description" content="MODO NUCLEAR. Para cada Bitcoiner. Del primero al último.">
+        <meta name="twitter:description" content="MODO NUCLEAR. Para cada Bitcoiner — del primero al último.">
         <title>Ωmega Pruner v10.0 — EDICIÓN NUCLEAR</title>
     </head>
     """, visible=False)
@@ -871,7 +871,7 @@ with gr.Blocks(
     start_over_btn.click(
         lambda: (
             "", 
-            "Recomendado (40% podado)",  # ← español
+            "Recomendado (40% podado)",  #
             546, 
             "", 
             50,
