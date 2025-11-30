@@ -49,9 +49,10 @@ You get forever:
 - Name etched on-chain via OP_RETURN (immortal)
 - Priority support + direct line to Federico
 - Every future feature the day it drops (Lightning sweep, mobile PWA, collaborative pruning, IPFS version, NUCLEAR+ modes, etc.)
-- Permanent spot on the Founders wall
+- Custom builds & private integrations (your node, your vault, your rules)
+- Permanent spot on the Ωmega Pruner+ Founders wall
 
-Founders secured so far: 0 / 21  
+Founders secured so far: 0 / 21 
 bc1qhtq6avlzyzrh3hxmcjtch6578mvarh9lu28ej8
 
 ### Quick start
