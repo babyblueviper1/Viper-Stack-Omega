@@ -831,7 +831,7 @@ with gr.Blocks(
     # Live thank-you % updater
     def update_thankyou_label(bps):
         pct = bps / 100
-        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% de su futuro ahorro</div>"
+        return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% de tu futuro ahorro</div>"
     dao_percent.change(update_thankyou_label, dao_percent, live_thankyou)
 
     with gr.Row():
