@@ -6,6 +6,7 @@ from typing import List, Tuple, Optional
 import urllib.parse
 import warnings
 import logging
+import json
 import pandas as pd
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
