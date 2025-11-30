@@ -987,7 +987,7 @@ document.getElementById('qr-scanner-btc').onchange = async e => {
                 </a><br><br>
                 
                 <span style="font-size:0.92rem; color:#ff9900; font-weight:600;">
-                Lifetime License — 0.042 BTC (first 21 only) → 
+                Lifetime License+ — 0.042 BTC (first 21 only) → 
                 <a href="https://www.babyblueviper.com/p/mega-pruner-lifetime-license-0042" 
                    style="color:#ff9900; text-decoration:underline;">details</a>
                 </span><br><br>
