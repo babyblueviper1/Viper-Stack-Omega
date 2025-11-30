@@ -703,11 +703,11 @@ with gr.Blocks(
     <div style="text-align:center; margin:0 0 40px; font-size:1rem; color:#ccc; text-shadow: 0 0 8px rgba(247,147,26,0.4);">
         <strong>Idioma:</strong> 
         <a href="https://omega-v10.onrender.com/" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">English</a> • 
-        <span style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Español</a> • 
-        <span style="color:#666; margin:0 10px;">Português (próximamente)</span> • 
+        <span style="color:#f7931a; margin:0 15px; font-weight:700;">Español</span> • 
+        <a href="https://omega-v10-pt.onrender.com/" style="color:#f7931a; margin:0 15px; text-decoration:none; font-weight:600;">Português</a> • 
         <span style="color:#666; margin:0 10px;">Français (bientôt)</span> • 
         <span style="color:#666; margin:0 10px;">Deutsch (bald)</span>
-    </div>
+</div>
     """)
     
     gr.HTML(
@@ -815,7 +815,7 @@ with gr.Blocks(
         with gr.Column(scale=1, min_width=300):
             future_multiplier = gr.Slider(3, 20, value=6, step=1,
                 label="Test de estrés futuro",
-                info="6× = real 2017–2024 pico • 15× = próximo bull run • 20× = apocalipsis"
+                info="6× = máximo histórico 2017–2024 • 15× = próximo bull run • 20× = apocalipsis"
             )
 
     # Live thank-you % updater
