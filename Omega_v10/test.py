@@ -473,6 +473,11 @@ selected_utxos_state = gr.State()
 def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
+    print("\n" + "="*60)
+    print("analysis_pass() CALLED")
+    print(f"Returning table_html length: {len(table_html)}")
+    print("="*60 + "\n")
+    
     addr = user_input.strip()
     is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub'))
 
@@ -612,6 +617,15 @@ table_html = textwrap.dedent(f"""
     """).strip()
 
 
+    table_html = """
+    <div style="border:2px solid red; padding:20px;">
+        <h3>TEST TABLE — IF YOU SEE THIS, WIRING WORKS</h3>
+        <table><tr><td>Row 1</td></tr></table>
+    </div>
+    """
+
+    print(f"RETURNING: type(table_html)={type(table_html)}, len={len(table_html) if table_html else 0}")
+    print(f"pruned_utxos_global len={len(pruned_utxos_global) if pruned_utxos_global else 0}")
     return (
         f"""
         <div style="text-align:center; padding:20px;">
@@ -623,11 +637,11 @@ table_html = textwrap.dedent(f"""
             Click <b>Generate Transaction</b> to continue
         </div>
         """,
-        gr.update(visible=True),
-        gr.update(visible=True),
-        table_html,
-        pruned_utxos_global        
-    )
+        gr.update(visible=True),          # For generate_row
+        gr.update(visible=True),          # For coin_control_row
+        table_html,                       # ← The full table (div + script + summary) — goes to coin_table_html
+        pruned_utxos_global               # ← Raw list — goes to selected_utxos_state (NO gr.update()!)
+)
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
 # ==============================
@@ -991,11 +1005,11 @@ with gr.Blocks(
         analysis_pass,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[
-            output_log,           # 0: analysis HTML
-            generate_row,         # 1: show generate button
-            coin_control_row,     # 2: show coin control section
-            coin_table_html,      # ← CHANGED: now gr.HTML, not gr.Dataframe
-            selected_utxos_state  # 4: fallback list
+            output_log,
+            generate_row,
+            coin_control_row,
+            coin_table_html,        # ← THIS MUST BE THE 4TH ITEM (index 3)
+            selected_utxos_state    # ← THIS MUST BE THE 5TH ITEM (index 4)
         ]
     )
 
