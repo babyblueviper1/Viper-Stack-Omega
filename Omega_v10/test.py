@@ -565,50 +565,46 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             <td style="text-align:center;">
                 <input type="checkbox" checked data-idx="{idx}" style="width:24px;height:24px;cursor:pointer;">
             </td>
-            <td style="text-align:right; font-weight:800; color:#f7931a; font-size:18px;">{value}</td>
+            <td style="text-align:right; font-weight:800; color:#f7931a; font-size:19px; padding-right:20px;">{value}</td>
             <td style="color:#aaa; font-size:0.9rem; word-break:break-all;">{txid_short}</td>
-            <td style="text-align:center; font-weight:bold; color:white;">{u['vout']}</td>
+            <td style="text-align:center; font-weight:bold; color:white; font-size:17px;">{u['vout']}</td>
             <td style="text-align:center; color:#0f0; font-weight:bold;">{confirmed}</td>
         </tr>'''
     # ── FINAL UPGRADED TABLE + FULLY WORKING COIN CONTROL ─────────────────────
     table_html = f"""
     <style>
-    /* Make text crisp and bright */
     #omega-coin-table {{ color: white !important; }}
-    #omega-coin-table td, #omega-coin-table th {{ padding: 14px !important; }}
-    #omega-coin-table input[type="checkbox"] {{ 
-        width: 24px; height: 24px; cursor: pointer; accent-color: #f7931a;
-    }}
+    #omega-coin-table input[type="checkbox"] {{ width:24px; height:24px; accent-color:#f7931a; cursor:pointer; }}
     </style>
 
     <div style="margin:20px 0;">
-        <div style="text-align:center; margin-bottom:12px;">
+        <div style="text-align:center; margin-bottom:14px;">
             <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=true);updateSelection();"
-                    style="padding:10px 20px; margin:0 8px; background:#f7931a; color:black; border:none; border-radius:8px; font-weight:bold;">
+                    style="padding:10px 20px; margin:4px; background:#f7931a; color:black; border:none; border-radius:8px; font-weight:bold;">
                 Select All
             </button>
             <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false);updateSelection();"
-                    style="padding:10px 20px; margin:0 8px; background:#333; color:white; border:1px solid #f7931a; border-radius:8px; font-weight:bold;">
-                None
+                    style="padding:10px 20px; margin:4px; background:#333; color:white; border:1px solid #f7931a; border-radius:8px; font-weight:bold;">
+                Select None
             </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{
-                const val = parseInt(c.closest('tr').querySelector('td:nth-child(2)').textContent.replace(/[^0-9]/g,''));
-                c.checked = val >= 100000;
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{ 
+                const val = parseInt(c.closest('tr').querySelector('td:nth-child(2)').innerText.replace(/[^0-9]/g,'')); 
+                c.checked = val >= 100000; 
             }}); updateSelection();"
-                    style="padding:10px 20px; margin:0 8px; background:#0f0; color:black; border:none; border-radius:8px; font-weight:bold;">
-                Only ≥ 0.001 BTC
+                    style="padding:10px 20px; margin:4px; background:#00ff9d; color:black; border:none; border-radius:8px; font-weight:bold;">
+                Only Greater Than or Equal to 0.001 BTC
             </button>
         </div>
 
-        <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:14px;" id="omega-coin-table">
-        <table style="width:100%; border-collapse:collapse; background:#0d0d0d; color:white; font-size:16px;">
+        <div style="max-height:520px; overflow-y:auto; border:3px solid #f7931a; border-radius:14px; background:#0a0a0a;" id="omega-coin-table">
+        <table style="width:100%; border-collapse:collapse; font-size:16px;">
             <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
                 <tr>
-                    <th style="padding:16px; width:80px;">Include</th>
+                    <th style="padding:16px;">Include</th>
                     <th style="padding:16px; text-align:right;">Value</th>
                     <th style="padding:16px;">TXID</th>
-                    <th style="padding:16px; width:80px;">vout</th>
-                    <th style="padding:16px; width:100px;">Confirmed</th>
+                    <th style="padding:16px;">vout</th>
+                    <th style="padding:16px;">Confirmed</th>
                 </tr>
             </thead>
             <tbody style="font-family: 'Courier New', monospace;">
@@ -620,9 +616,8 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         <script>
         const allUtxos = {json.dumps(pruned_utxos_global)};
 
-        // Find gr.State — bulletproof
         let stateComp = null;
-        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"], component, div')) {{
+        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"], component')) {{
             if (el.value !== undefined || el.__gradio_internal__) {{
                 stateComp = el;
                 break;
@@ -635,14 +630,11 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             const selected = indices.map(i => allUtxos[i]).filter(Boolean);
             const total = selected.reduce((s, u) => s + u.value, 0);
 
-            const summary = document.getElementById('selected-summary');
-            if (summary) {{
-                summary.innerHTML = `
-                    <span style="color:#f7931a; font-size:24px; font-weight:900;">${indices.length}</span> UTXOs selected • 
-                    <span style="color:#00ff9d; font-size:28px; font-weight:900;">${formatBtc(total)}</span>
-                    <br><small style="color:#888;">Click Generate Transaction when ready</small>
-                `;
-            }}
+            document.getElementById('selected-summary').innerHTML = `
+                <span style="color:#f7931a; font-size:26px; font-weight:900;">${indices.length}</span> UTXOs selected • 
+                <span style="color:#00ff9d; font-size:32px; font-weight:900;">${total.toLocaleString()} sats</span>
+                <br><small style="color:#888;">Ready — click Generate Transaction below</small>
+            `;
 
             if (stateComp) {{
                 if (stateComp.__gradio_internal__) {{
@@ -654,26 +646,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
-        // Super pretty BTC formatter
-        function formatBtc(sats) {{
-            if (sats >= 100000000) return (sats/100000000).toFixed(8).replace(/0+$/,'').replace(/\\.$/,'') + ' BTC';
-            if (sats >= 1000000) return (sats/100000000).toFixed(4) + ' BTC';
-            return sats.toLocaleString() + ' sats';
-        }}
-
-        // Initial run
         updateSelection();
-
-        // Listen to all checkbox changes
         document.addEventListener('change', e => {{
             if (e.target.matches('input[data-idx]')) updateSelection();
         }});
         </script>
 
-        <div id="selected-summary" style="
-            text-align:center; padding:20px; margin-top:16px; background:linear-gradient(135deg,#1a1a1a,#0f0f0f);
-            border:3px solid #f7931a; border-radius:16px; font-size:22px; font-weight:bold;
-            box-shadow:0 8px 30px rgba(247,147,26,0.4);">
+        <div id="selected-summary" style="text-align:center; padding:22px; margin-top:18px; background:linear-gradient(135deg,#1a0d00,#0f0a00);
+             border:3px solid #f7931a; border-radius:16px; font-weight:bold; box-shadow:0 10px 40px rgba(247,147,26,0.5);">
             Calculating...
         </div>
     </div>
