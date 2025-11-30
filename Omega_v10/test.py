@@ -843,11 +843,13 @@ with gr.Blocks(
     with gr.Row(visible=False) as generate_row:
         generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary", size="lg", elem_classes="full-width")
 
+    coin_table_html = gr.HTML()  # ← We control it manually
+
     # COIN CONTROL SECTION — MUST BE DEFINED HERE
     with gr.Row(visible=False) as coin_control_row:
         with gr.Column():
             gr.Markdown("### Coin Control — Uncheck UTXOs you want to KEEP")
-            coin_table_html = gr.HTML()  # ← We control it manually
+            coin_table_html
         
     # START OVER BUTTON
     with gr.Row():
