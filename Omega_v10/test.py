@@ -870,6 +870,8 @@ with gr.Blocks(
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
 
     output_log = gr.HTML()
+    with gr.Row(visible=False) as generate_row:
+        generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary", size="lg", elem_classes="full-width")
 
     # COIN CONTROL SECTION — MUST BE DEFINED HERE
     with gr.Row(visible=False) as coin_control_row:
