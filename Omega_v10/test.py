@@ -467,43 +467,145 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 # Core Functions
 # ==============================
 
+# === Modified analysis_pass — now returns UTXOs for coin control ===
 
 def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
-    global pruned_utxos_global
+    global pruned_utxos_global, input_vb_global, output_vb_global
 
-    # Fake data so it always runs
-    pruned_utxos_global = [{"value": 50000000, "txid": "deadbeef" * 8, "vout": 0}] * 4
+    addr = user_input.strip()
+    is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub'))
 
-    # RED BOX — 100% SAFE CHARACTERS ONLY
-    table_html = textwrap.dedent("""\
-        <div style="border:8px solid red; padding:50px; background:#300; margin:30px 0; border-radius:20px; text-align:center; font-family: sans-serif;">
-            <h1 style="color:#f7931a; font-size:44px; margin:0;">RED BOX = VICTORY</h1>
-            <h2 style="color:white; font-size:28px; margin:20px 0;">EVERYTHING IS NOW WORKING</h2>
-            <p style="color:#00ff00; font-size:24px; margin:20px 0;">Coin control wiring = FIXED</p>
-            <p style="color:#ff0; font-size:20px;">You can now safely activate the real table</p>
-        </div>""")
+    if is_xpub:
+        utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
+        if not utxos:
+            return msg or "Failed to scan xpub", gr.update(visible=False)
+    else:
+        if not addr:
+            return "Enter address or xpub", gr.update(visible=False)
+        utxos = get_utxos(addr, threshold)
+        if not utxos:
+            return (
+                "<div style='text-align:center;padding:30px;color:#f7931a;font-size:1.4rem;'>"
+                "No UTXOs found above dust threshold<br><br>"
+                "Try a different address or lower the dust limit"
+                "</div>",
+                gr.update(visible=False),
+                gr.update(visible=False),
+                "",
+                []
+            )
+
+    utxos.sort(key=lambda x: x['value'], reverse=True)
+
+    # Detect script type
+    sample = [u.get('address') or addr for u in utxos[:10]]
+    types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
+    from collections import Counter
+    detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
+
+    vb_map = {
+        'P2PKH': (148, 34),
+        'P2SH': (91, 32),
+        'SegWit': (68, 31),
+        'Taproot': (57, 43)
+    }
+    input_vb_global, output_vb_global = vb_map.get(detected.split()[0], (68, 31))
+
+    # === STRATEGY MAPPING ===
+    NUCLEAR_OPTION = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
+    ratio_map = {
+        "Privacy First (30% pruned)": 0.3,
+        "Recommended (40% pruned)": 0.4,
+        "More Savings (50% pruned)": 0.5,
+        NUCLEAR_OPTION: 0.9,
+    }
+    ratio = ratio_map.get(strategy, 0.4)
+
+    name_map = {
+        "Privacy First (30% pruned)": "Privacy First",
+        "Recommended (40% pruned)": "Recommended",
+        "More Savings (50% pruned)": "More Savings",
+        NUCLEAR_OPTION: '<span style="color:#ff1361; font-weight:900; text-shadow: 0 0 10px #ff0066;">NUCLEAR PRUNE</span>',
+    }
+    strategy_name = name_map.get(strategy, strategy.split(" (")[0])
+
+    # === NUCLEAR MODE ===
+    if strategy == NUCLEAR_OPTION:
+        keep = min(3, len(utxos)) if len(utxos) > 0 else 0
+        keep = max(1, keep)
+    else:
+        keep = max(1, int(len(utxos) * (1 - ratio)))
+
+    pruned_utxos_global = utxos[:keep]
+
+    nuclear_warning = ""
+    if strategy == NUCLEAR_OPTION:
+        nuclear_warning = '<br><span style="color:#ff0066; font-weight:bold; font-size:18px;">NUCLEAR MODE ACTIVE<br>Only the strongest survive.</span>'
+
+    html_rows = ""
+    for idx, u in enumerate(pruned_utxos_global):
+        checked = "checked"
+        value = format_btc(u['value'])
+        txid_short = u['txid'][:12] + "…" + u['txid'][-8:]
+        confirmed = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
+        html_rows += f'''
+        <tr>
+            <td style="text-align:center;"><input type="checkbox" {checked} onchange="updateSelection()" data-idx="{idx}"></td>
+            <td style="font-family:monospace;">{value}</td>
+            <td style="font-family:monospace;">{txid_short}</td>
+            <td style="text-align:center;">{u['vout']}</td>
+            <td style="text-align:center;">{confirmed}</td>
+        </tr>'''
+
+    table_html = textwrap.dedent(f'''
+        <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:12px;">
+        <table style="width:100%; border-collapse:collapse; background:#111; color:white;">
+            <thead style="position:sticky; top:0; background:#f7931a; color:black;">
+                <tr>
+                    <th style="padding:12px;">Include</th>
+                    <th style="padding:12px;">Value (sats)</th>
+                    <th style="padding:12px;">TXID</th>
+                    <th style="padding:12px;">vout</th>
+                    <th style="padding:12px;">Confirmed</th>
+                </tr>
+            </thead>
+            <tbody>{html_rows}</tbody>
+        </table>
+        </div>
+        <script>
+        const utxos = {json.dumps(pruned_utxos_global)};
+        function updateSelection() {{
+            const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked'))
+                            .map(cb => parseInt(cb.dataset.idx));
+            const selected = checked.map(i => utxos[i]);
+            const total = selected.reduce((a,b) => a + b.value, 0);
+            document.getElementById('selected-summary').innerHTML = 
+                `<b>Selected:</b> ${checked.length} UTXOs • <b>Total:</b> ${total.toLocaleString()} sats`;
+            const s = document.querySelector('[data-testid="state"]');
+            if (s?.__gradio_internal__) s.__gradio_internal__.setValue(selected);
+        }}
+        updateSelection();
+        </script>
+        <div id="selected-summary" style="margin-top:12px; font-size:18px; color:#f7931a;"></div>
+    ''').strip()
 
     return (
-        "<div style='text-align:center; color:#f7931a; font-size:26px; padding:30px;'>Analysis Complete - Look below for red box</div>",
-        gr.update(visible=True),   # generate_row
-        gr.update(visible=True),   # coin_control_row
-        table_html,                # coin_table_html
-        pruned_utxos_global        # selected_utxos_state
+        f"""
+        <div style="text-align:center; padding:20px;">
+            <b style="font-size:22px; color:#f7931a;">Analysis Complete</b><br><br>
+            Found <b>{len(utxos):,}</b> UTXOs • Keeping <b>{keep}</b> largest<br>
+            <b style="color:#f7931a;">Strategy:</b> {strategy_name} • Format: <b>{detected}</b><br>
+            {nuclear_warning}
+            <br><br>
+            Click <b>Generate Transaction</b> to continue
+        </div>
+        """,
+        gr.update(visible=True),     # generate_row
+        gr.update(visible=True),     # coin_control_row
+        table_html,                  # coin_table_html (gr.HTML)
+        pruned_utxos_global          # selected_utxos_state (raw list)
     )
 
-
-
-
-
-
-
-
-
-
-
-
-
-# === Modified analysis_pass — now returns UTXOs for coin control ===
 
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
