@@ -4,7 +4,9 @@
 
 **LIVE (English):** https://omega-v10.onrender.com  
 **LIVE (Español):** https://omega-v10-es.onrender.com  
-**Launched:** November 26, 2025  
+**LIVE (Português):** https://omega-v10-pt.onrender.com  
+
+**Launched:** November 26, 2025
 
 | Property                                 | Ωmega Pruner v10.0                                          | Everyone Else in 2025 |
 |------------------------------------------|------------------------------------------------------------|-----------------------|
