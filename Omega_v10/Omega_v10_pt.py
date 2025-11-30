@@ -896,74 +896,74 @@ with gr.Blocks(
             generate_row
         ]
     )
+    #Floating BTC QR Scanner + Toast (Portuguese version)
+    gr.HTML("""
+    <!-- Floating BTC Scanner Button -->
+    <label class="qr-fab btc" title="Escanear carteira / xpub">B</label>
+    <input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
 
-    
-# ——— ESCÂNER QR + TOAST EM PORTUGUÊS ———
-gr.HTML("""
-<!-- Botão Flutuante BTC Scanner -->
-<label class="qr-fab btc" title="Escanear carteira / xpub">B</label>
-<input type="file" accept="image/*" capture="environment" id="qr-scanner-btc" style="display:none">
+    <script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
+    <script>
+    function showToast(msg, err = false) {
+        const t = document.createElement('div');
+        t.textContent = msg;
+        t.style.cssText = `position:fixed !important; bottom:100px !important; left:50% !important;
+            transform:translateX(-50%) !important; z-index:10000 !important;
+            background:${err?'#300':'rgba(0,0,0,0.92)'} !important;
+            color:${err?'#ff3366':'#00ff9d'} !important;
+            padding:16px 36px !important; border-radius:50px !important;
+            font-weight:bold !important; font-size:17px !important;
+            border:3px solid ${err?'#ff3366':'#00ff9d'} !important;
+            box-shadow:0 12px 40px rgba(0,0,0,0.7) !important;
+            backdrop-filter:blur(12px) !important;
+            animation:pop 2.4s forwards !important;`;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2400);
+    }
+    if (!document.getElementById('toast-style')) {
+        const s = document.createElement('style');
+        s.id = 'toast-style';
+        s.textContent = `@keyframes pop{
+            0%{transform:translateX(-50%) translateY(30px);opacity:0}
+            12%,88%{transform:translateX(-50%) translateY(0);opacity:1}
+            100%{transform:translateX(-50%) translateY(-30px);opacity:0}
+        }`;
+        document.head.appendChild(s);
+    }
 
-<script src="https://unpkg.com/@zxing/library@0.21.0/dist/index.min.js"></script>
-<script>
-function showToast(msg, err = false) {
-    const t = document.createElement('div');
-    t.textContent = msg;
-    t.style.cssText = `position:fixed !important; bottom:100px !important; left:50% !important;
-        transform:translateX(-50%) !important; z-index:10000 !important;
-        background:${err?'#300':'rgba(0,0,0,0.92)'} !important;
-        color:${err?'#ff3366':'#00ff9d'} !important;
-        padding:16px 36px !important; border-radius:50px !important;
-        font-weight:bold !important; font-size:17px !important;
-        border:3px solid ${err?'#ff3366':'#00ff9d'} !important;
-        box-shadow:0 12px 40px rgba(0,0,0,0.7) !important;
-        backdrop-filter:blur(12px) !important;
-        animation:pop 2.4s forwards !important;`;
-    document.body.appendChild(t);
-    setTimeout(() => t.remove(), 2400);
-}
-if (!document.getElementById('toast-style')) {
-    const s = document.createElement('style');
-    s.id = 'toast-style';
-    s.textContent = `@keyframes pop{
-        0%{transform:translateX(-50%) translateY(30px);opacity:0}
-        12%,88%{transform:translateX(-50%) translateY(0);opacity:1}
-        100%{transform:translateX(-50%) translateY(-30px);opacity:0}
-    }`;
-    document.head.appendChild(s);
-}
+    document.querySelector('.qr-fab.btc')?.addEventListener('click', () => 
+        document.getElementById('qr-scanner-btc').click()
+    );
 
-document.querySelector('.qr-fab.btc')?.addEventListener('click', () => 
-    document.getElementById('qr-scanner-btc').click()
-);
-
-document.getElementById('qr-scanner-btc').onchange = async e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width; canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        try {
-            const res = await ZXing.readBarcodeFromCanvas(canvas);
-            const txt = res.text.trim().split('?')[0].replace(/^bitcoin:/i, '');
-            if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(txt)) {
-                const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
-                           document.querySelector('textarea');
-                if (box) {
-                    box.value = txt;
-                    box.dispatchEvent(new Event('input', {bubbles:true}));
-                    box.dispatchEvent(new Event('change', {bubbles:true}));
-                }
-                showToast("Escaneado com sucesso!");
-            } else showToast("Não é carteira/xpub BTC", true);
-        } catch { showToast("QR não detectado", true); }
+    document.getElementById('qr-scanner-btc').onchange = async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const img = new Image();
+        img.onload = async () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width; canvas.height = img.height;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            try {
+                const res = await ZXing.readBarcodeFromCanvas(canvas);
+                const txt = res.text.trim().split('?')[0].replace(/^bitcoin:/i, '');
+                if (/^(bc1|[13]|xpub|ypub|zpub|tpub)/i.test(txt)) {
+                    const box = document.querySelector('textarea[placeholder*="bc1q"], textarea[placeholder*="xpub"]') || 
+                               document.querySelector('textarea');
+                    if (box) {
+                        box.value = txt;
+                        box.dispatchEvent(new Event('input', {bubbles:true}));
+                        box.dispatchEvent(new Event('change', {bubbles:true}));
+                    }
+                    showToast("Escaneado com sucesso!");
+                } else showToast("Não é carteira/xpub BTC", true);
+            } catch { showToast("QR não detectado", true); }
+        };
+        img.src = URL.createObjectURL(file);
     };
-    img.src = URL.createObjectURL(file);
-};
-</script>
-""")
+    </script>
+    """)
+    
+
 
 # ——— FOOTER EM PORTUGUÊS ———
 gr.HTML(
