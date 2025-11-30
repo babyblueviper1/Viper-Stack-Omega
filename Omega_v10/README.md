@@ -67,7 +67,7 @@ You get forever:
 **Future fees → obliterated.**  
 **Peace of mind → eternal.**
 
-**No custody. No mercy.**
+**No custody. No lies. No mercy.**
 
 **Prune today. Win forever. • Ω**
 
