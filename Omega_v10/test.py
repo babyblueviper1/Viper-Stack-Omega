@@ -630,8 +630,8 @@ table_html = textwrap.dedent("""\
         </table>
     </div>""")
 
-    print(f"RETURNING: type(table_html)={type(table_html)}, len={len(table_html) if table_html else 0}")
-    print(f"pruned_utxos_global len={len(pruned_utxos_global) if pruned_utxos_global else 0}")
+print(f"RETURNING: type(table_html)={type(table_html)}, len={len(table_html) if table_html else 0}")
+print(f"pruned_utxos_global len={len(pruned_utxos_global) if pruned_utxos_global else 0}")
     return (
         f"""
         <div style="text-align:center; padding:20px;">
