@@ -964,8 +964,6 @@ with gr.Blocks(
             gr.Markdown("### Coin Control — Uncheck UTXOs you want to KEEP")
             coin_table_html = gr.HTML("")  # ← We control it manually
         
-            selected_summary = gr.Markdown("Selected: 0 UTXOs • Total: 0 sats")
-
     # START OVER BUTTON
     with gr.Row():
         start_over_btn = gr.Button(
