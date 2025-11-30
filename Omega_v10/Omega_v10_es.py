@@ -983,7 +983,7 @@ with gr.Blocks(
                 </a><br><br>
                 
                 <span style="font-size:0.92rem; color:#ff9900; font-weight:600;">
-                Licencia de por vida — 0.042 BTC (solo los primeros 21) → 
+                Licencia+ de por vida — 0.042 BTC (solo los primeros 21) → 
                 <a href="https://www.babyblueviper.com/p/mega-pruner-lifetime-license-0042" 
                    style="color:#ff9900; text-decoration:underline;">detalles</a>
                 </span><br><br>
