@@ -556,8 +556,52 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             "idx": idx  # ← only store index
         })
 
-    
-    df = pd.DataFrame(table_data)
+    html_rows = ""
+    for idx, u in enumerate(pruned_utxos_global):
+        checked = "checked"
+        value = format_btc(u['value'])
+        txid_short = u['txid'][:12] + "…" + u['txid'][-8:]
+        confirmed = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
+        
+        html_rows += f"""
+        <tr>
+            <td style="text-align:center;"><input type="checkbox" {checked} onchange="updateSelection()" data-idx="{idx}"></td>
+            <td style="font-family:monospace;">{value}</td>
+            <td style="font-family:monospace;">{txid_short}</td>
+            <td style="text-align:center;">{u['vout']}</td>
+            <td style="text-align:center;">{confirmed}</td>
+        </tr>
+        """
+
+    table_html = f"""
+    <div style="max-height:520px; overflow-y:auto; border:2px solid #f7931a; border-radius:12px;">
+    <table style="width:100%; border-collapse:collapse; background:#111; color:white;">
+        <thead style="position:sticky; top:0; background:#f7931a; color:black;">
+            <tr>
+                <th style="padding:12px;">Include</th>
+                <th style="padding:12px;">Value (sats)</th>
+                <th style="padding:12px;">TXID</th>
+                <th style="padding:12px;">vout</th>
+                <th style="padding:12px;">Confirmed</th>
+            </tr>
+        </thead>
+        <tbody>{html_rows}</tbody>
+    </table>
+    </div>
+    <script>
+    const utxos = {json.dumps(pruned_utxos_global)};
+    function updateSelection() {{
+        const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(cb => parseInt(cb.dataset.idx));
+        const selected = checked.map(i => utxos[i]);
+        const total = selected.reduce((a,b) => a + b.value, 0);
+        document.getElementById('selected-summary').innerHTML = 
+            `<b>Selected:</b> ${{checked.length}} UTXOs • <b>Total:</b> ${{format_btc(total)}}`;
+        window.__gradio_selected = selected;
+    }}
+    </script>
+    <div id="selected-summary"></div>
+    """
+
 
 
     return (
@@ -573,7 +617,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         """,
         gr.update(visible=True),
         gr.update(visible=True),
-        df,                # → coin control table
+        table_html,
         gr.update(value=pruned_utxos_global)        # fallback if they skip coin control
     )
 # ==============================
@@ -918,15 +962,8 @@ with gr.Blocks(
     with gr.Row(visible=False) as coin_control_row:
         with gr.Column():
             gr.Markdown("### Coin Control — Uncheck UTXOs you want to KEEP")
-            coin_table = gr.Dataframe(
-                headers=["Include", "Value (sats)", "TXID", "vout", "Confirmed"],
-                datatype=["bool", "str", "str", "number", "str"],
-                value=pd.DataFrame(),
-                interactive=True,
-                row_count=(15, "dynamic"),
-                column_widths=[80, 160, 180, 80, 110],
-                wrap=True
-            )
+            coin_table_html = gr.HTML("")  # ← We control it manually
+        
             selected_summary = gr.Markdown("Selected: 0 UTXOs • Total: 0 sats")
 
     # START OVER BUTTON
@@ -949,69 +986,31 @@ with gr.Blocks(
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[
             output_log,           # 0: analysis HTML
-            generate_row,         # 1: visibility of "Generate Transaction" row
-            coin_control_row,     # 2: visibility of coin control section
-            coin_table,           # 3: dataframe with UTXOs
-            selected_utxos_state  # 4: fallback/full UTXO list
+            generate_row,         # 1: show generate button
+            coin_control_row,     # 2: show coin control section
+            coin_table_html,      # ← CHANGED: now gr.HTML, not gr.Dataframe
+            selected_utxos_state  # 4: fallback list
         ]
     )
 
     generate_btn.click(
         build_real_tx,
-        inputs=[
-            user_input, prune_choice, dust_threshold,
-            dest_addr, dao_percent, future_multiplier,
-            selected_utxos_state
-        ],
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],
         outputs=[output_log, generate_btn, generate_row]
     )
 
-    # Live coin control summary
-    def update_coin_control(table_df):
-        if table_df is None or table_df.empty:
-            return "Selected: 0 • Total: 0 sats", []
-
-        # Get selected indices
-        selected_indices = table_df[table_df["Include"] == True]["idx"].tolist()
-    
-        # Reconstruct selected UTXOs from global list
-        selected_utxos = [pruned_utxos_global[i] for i in selected_indices]
-        total_sats = sum(u['value'] for u in selected_utxos)
-
-        return (
-            f"**Selected:** {len(selected_utxos):,} UTXOs • **Total:** {format_btc(total_sats)}",
-            selected_utxos
-        )
-    coin_table.change(
-        update_coin_control,
-        coin_table,
-        [selected_summary, selected_utxos_state]
-    )
-
+   
     start_over_btn.click(
         lambda: (
-            "",                                           # user_input
-            "Recommended (40% pruned)",                   # prune_choice
-            546,                                          # dust_threshold
-            "",                                           # dest_addr
-            50,                                           # dao_percent
-            "",                                           # output_log
-            gr.update(visible=False),                     # generate_row
-            gr.update(visible=False),                     # coin_control_row
-            [],                                           # coin_table → cleared
-            []                                            # selected_utxos_state → cleared
+            "", "Recommended (40% pruned)", 546, "", 50, "",
+            gr.update(visible=False),   # generate_row
+            gr.update(visible=False),   # coin_control_row
+            "",                         # coin_table_html → clear
+            []                          # selected_utxos_state → clear
         ),
         outputs=[
-            user_input,
-            prune_choice,
-            dust_threshold,
-            dest_addr,
-            dao_percent,
-            output_log,
-            generate_row,
-            coin_control_row,
-            coin_table,
-            selected_utxos_state
+            user_input, prune_choice, dust_threshold, dest_addr, dao_percent, output_log,
+            generate_row, coin_control_row, coin_table_html, selected_utxos_state
         ]
     )
 
