@@ -792,7 +792,7 @@ with gr.Blocks(
                 border:2px solid #f7931a; border-radius:12px; font-size:0.95rem; color:#f7931a;
                 font-weight:600; text-align:center; box-shadow:0 4px 20px rgba(247,147,26,0.25);">
             Nenhuma chave privada é inserida • 100% sem custódia<br>
-            <span style="font-weight:800; color:#00ff9d;">Nada é enviado a nenhum servidor</span> • Tudo roda no seu navegador
+            <span style="font-weight:800; color:#00ff9d;text-shadow: 0 0 12px black, 0 0 24px black;">Nada é enviado a nenhum servidor</span> • Tudo roda no seu navegador
             </div>
             """)
         with gr.Column(scale=3):
