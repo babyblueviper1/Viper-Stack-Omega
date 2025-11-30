@@ -573,7 +573,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         gr.update(visible=True),
         gr.update(visible=True),
         df,                # → coin control table
-        pruned_utxos_global        # fallback if they skip coin control
+        gr.update(value=pruned_utxos_global)        # fallback if they skip coin control
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
