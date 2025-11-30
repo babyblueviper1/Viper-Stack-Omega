@@ -617,15 +617,18 @@ table_html = textwrap.dedent(f"""
     """).strip()
 
 
-    table_html = textwrap.dedent("""\
-    <div style="border:2px solid red; padding:20px;">
-        <h3>TEST TABLE — IF YOU SEE THIS, WIRING WORKS</h3>
-        <table border="1" style="background:#000;color:#fff;">
-            <tr><td>Row 1</td></tr>
-            <tr><td>Row 2</td></tr>
+# TESTE RÁPIDO (deixa exatamente assim até ver a tabela vermelha)
+table_html = textwrap.dedent("""\
+    <div style="border:4px solid red; padding:30px; background:#200; margin:20px 0; border-radius:16px;">
+        <h3 style="color:#f7931a; font-size:28px; margin:0 0 20px 0;">
+            TEST TABLE — IF YOU SEE THIS RED BOX, EVERYTHING IS WORKING
+        </h3>
+        <p style="color:white; font-size:20px;">Wiring is perfect. Indentation is perfect. You won.</p>
+        <table style="background:#000; color:#f7931a; width:100%; border-collapse:collapse;">
+            <tr><td style="padding:12px; border:1px solid #f7931a;">Row 1 – everything OK</td></tr>
+            <tr><td style="padding:12px; border:1px solid #f7931a;">Row 2 – coin control ready</td></tr>
         </table>
-    </div>
-""")
+    </div>""")
 
     print(f"RETURNING: type(table_html)={type(table_html)}, len={len(table_html) if table_html else 0}")
     print(f"pruned_utxos_global len={len(pruned_utxos_global) if pruned_utxos_global else 0}")
