@@ -566,11 +566,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                    style="color:#00ff9d !important; font-family:monospace; font-size:0.95rem; font-weight:600; text-decoration:none;"
                    onmouseover="this.style.color='#f7931a'; this.querySelector('span').style.background='rgba(247,147,26,0.25)';"
                    onmouseout="this.style.color='#00ff9d'; this.querySelector('span').style.background='transparent';"
-                   onclick="event.preventDefault(); navigator.clipboard.writeText('{txid_full}');
+                   onclick="event.preventDefault(); navigator.clipboard.writeText('{txid_full}'); 
                             let s=this.querySelector('span'); let old=s.innerText; s.innerText='COPIED!'; 
-                            setTimeout(()=>{s.innerText=old}, 1000);"
+                            setTimeout(function(){{ s.innerText=old; }}, 1000);"
                    title="Click to copy full TXID">
-                    <span style="cursor:pointer; padding:6px 10px; border-radius:8px; transition:all 0.2s;">{txid_short}</span>
+                    <span style="cursor:pointer; padding:6px 10px; border-radius:8px; transition:all 0.2s; display:inline-block;">
+                        {txid_short}
+                    </span>
                 </a>
             </td>
             <td style="text-align:center;color:white;font-weight:bold;font-size:19px;">{u['vout']}</td>
@@ -581,7 +583,8 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     <div style="margin:30px 0; font-family:system-ui,sans-serif;">
 
         <!-- FILTERS & SORT -->
-        <div style="text-align:center; margin-bottom:20px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a; display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:center;">
+        <div style="text-align:center; margin-bottom:20px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a; 
+             display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:center;">
             <input type="text" id="txid-search" placeholder="Search TXID..." 
                    style="padding:14px 20px; width:300px; font-size:17px; border-radius:12px; border:3px solid #f7931a; background:#000; color:#f7931a; font-weight:bold;">
 
@@ -589,8 +592,8 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                 <option value="">Sort by...</option>
                 <option value="value-desc">Size (Largest first)</option>
                 <option value="value-asc">Size (Smallest first)</option>
-                <option value="vout-desc">vout</option>
-                <option value="vout-asc">vout</option>
+                <option value="vout-desc">vout (descending)</option>
+                <option value="vout-asc">vout (ascending)</option>
             </select>
 
             <select id="conf-filter" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
@@ -599,7 +602,10 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                 <option value="unconfirmed">Unconfirmed only</option>
             </select>
 
-            <button onclick="document.getElementById('txid-search').value=''; document.getElementById('sort-select').value=''; document.getElementById('conf-filter').value=''; applyFilters();" 
+            <button onclick="document.getElementById('txid-search').value=''; 
+                             document.getElementById('sort-select').value=''; 
+                             document.getElementById('conf-filter').value=''; 
+                             applyFilters();" 
                     style="padding:14px 24px; background:#333; color:white; border:2px solid #f7931a; border-radius:12px; font-weight:bold;">Reset</button>
         </div>
 
@@ -611,7 +617,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                         <th style="padding:18px;">Include</th>
                         <th style="padding:18px; text-align:right;">Value</th>
                         <th style="padding:18px;">TXID</th>
-                        <th style="padding:18px;">vout <small style="font-weight:normal;color:#333;">(output index)</small></th>
+                        <th style="padding:18px;">vout <small style="font-weight:normal;color:#333;">(index)</small></th>
                         <th style="padding:18px;">Confirmed</th>
                     </tr>
                 </thead>
@@ -683,6 +689,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
         applyFilters();
         updateSelection();
+
+        // Force Generate button to appear
+        setTimeout(() => {{
+            const row = document.querySelector('.gr-row:has(button:contains("Generate Transaction"))') ||
+                        document.querySelector('#generate_row') ||
+                        document.querySelector('gradio-row');
+            if (row) row.style.display = 'flex';
+        }}, 500);
         </script>
 
         <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
