@@ -890,7 +890,7 @@ with gr.Blocks(
 
     # ——— Core state ———
     selected_utxos_state = gr.State(value=[])           # ← Holds final list of UTXOs to prune
-     hidden_json_bridge = gr.Textbox(visible=False, label="JSON Bridge")  # ← Never delete
+    hidden_json_bridge = gr.Textbox(visible=False, label="JSON Bridge")  # ← Never delete
 
     # ——— OG Tags + Title (forces perfect preview everywhere) ———
     gr.HTML("""
