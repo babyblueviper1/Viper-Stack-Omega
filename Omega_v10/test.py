@@ -511,69 +511,52 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
-    addr = user_input.strip()
+    addr = user_input გეო.strip()
     is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub', 'vpub', 'upub'))
 
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return (msg or "xpub scan failed",
-                    gr.update(visible=False),
-                    gr.update(visible=False),
-                    "",
-                    [],
-                    gr.update(visible=False))
+            return (msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False))
     else:
         if not addr:
-            return ("Enter address or xpub",
-                    gr.update(visible=False),
-                    gr.update(visible=False),
-                    "",
-                    [],
-                    gr.update(visible=False))
+            return ("Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False))
         utxos = get_utxos(addr, threshold)
         if not utxos:
-            return ("No UTXOs above dust",
-                    gr.update(visible=False),
-                    gr.update(visible=False),
-                    "",
-                    [],
-                    gr.update(visible=False))
+            return ("No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False))
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
-    # Detect address type
+    # Detect type
     sample = [u.get('address') or addr for u in utxos[:10]]
     types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
     from collections import Counter
     detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
     input_vb_global, output_vb_global = {
-        'P2PKH': (148, 34), 'P2SH': (91, 32), 'SegWit': (68, 31), 'Taproot': (57, 43)
-    }.get(detected.split()[0], (68, 31))
+        'P2PKH': (148,34), 'P2SH': (91,32), 'SegWit': (68,31), 'Taproot': (57,43)
+    }.get(detected.split()[0], (68,31))
 
     # Strategy
     NUCLEAR = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
-    ratio = {
-        "Privacy First (30% pruned)": 0.3,
-        "Recommended (40% pruned)": 0.4,
-        "More Savings (50% pruned)": 0.5,
-        NUCLEAR: 0.9
-    }.get(strategy, 0.4)
+    ratio = {"Privacy First (30% pruned)":0.3, "Recommended (40% pruned)":0.4,
+             "More Savings (50% pruned)":0.5, NUCLEAR:0.9}.get(strategy, 0.4)
 
-    keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos) * (1 - ratio)))
+    keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos)*(1-ratio)))
     pruned_utxos_global = utxos[:keep]
 
-    # Build beautiful, bright, functional TXID rows
+    # Build rows
     html_rows = ""
     for idx, u in enumerate(pruned_utxos_global):
         val = format_btc(u['value'])
         txid_full = u['txid']
         txid_short = txid_full[:12] + "…" + txid_full[-10:]
         explorer_url = f"https://mempool.space/tx/{txid_full}"
-        conf = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
+        confirmed = u.get('status', {}).get('confirmed', True)
+        conf_text = "Yes" if confirmed else '<span style="color:#ff3366;">No</span>'
+        conf_val = "confirmed" if confirmed else "unconfirmed"
 
         html_rows += f'''
-        <tr style="height:66px;">
+        <tr style="height:66px;" data-value="{u['value']}" data-vout="{u['vout']}" data-confirmed="{conf_val}">
             <td style="text-align:center;">
                 <input type="checkbox" checked data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
             </td>
@@ -581,31 +564,43 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             <td style="padding:8px 12px;">
                 <a href="{explorer_url}" target="_blank"
                    style="color:#00ff9d !important; font-family:monospace; font-size:0.95rem; font-weight:600; text-decoration:none;"
-                   onmouseover="this.style.color='#f7931a'; this.querySelector('span').style.background='rgba(247,147,26,0.25)'; this.querySelector('span').style.borderRadius='8px';"
+                   onmouseover="this.style.color='#f7931a'; this.querySelector('span').style.background='rgba(247,147,26,0.25)';"
                    onmouseout="this.style.color='#00ff9d'; this.querySelector('span').style.background='transparent';"
                    onclick="event.preventDefault(); navigator.clipboard.writeText('{txid_full}');
-                            let s = this.querySelector('span'); let old = s.innerText; s.innerText = 'COPIED!'; s.style.color='# Orange'; 
-                            setTimeout(() => {{ s.innerText = old; s.style.color='#00ff9d'; }}, 1000);"
-                   title="Click to copy • Opens in mempool.space">
-                    <span style="cursor:pointer; padding:6px 10px; border-radius:8px; transition:all 0.2s; display:inline-block;">
-                        {txid_short}
-                    </span>
+                            let s=this.querySelector('span'); let old=s.innerText; s.innerText='COPIED!'; 
+                            setTimeout(()=>{s.innerText=old}, 1000);"
+                   title="Click to copy full TXID">
+                    <span style="cursor:pointer; padding:6px 10px; border-radius:8px; transition:all 0.2s;">{txid_short}</span>
                 </a>
             </td>
             <td style="text-align:center;color:white;font-weight:bold;font-size:19px;">{u['vout']}</td>
-            <td style="text-align:center;color:#0f0;font-weight:bold;">{conf}</td>
+            <td style="text-align:center;font-weight:bold;color:#0f0;">{conf_text}</td>
         </tr>'''
 
     table_html = f"""
     <div style="margin:30px 0; font-family:system-ui,sans-serif;">
 
-        <!-- LIVE SEARCH — NO BUTTON NEEDED -->
-        <div style="text-align:center; margin-bottom:24px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a;">
-            <input type="text" id="txid-search" placeholder="Live search TXID..." 
-                   style="padding:16px 24px; width:420px; font-size:18px; font-weight:bold; text-align:center;
-                          border-radius:14px; border:3px solid #f7931a; background:#000; color:#f7931a;"
-                   oninput="filterTable()">
-            <div style="margin-top:12px; color:#888; font-size:15px;">Type to filter instantly</div>
+        <!-- FILTERS & SORT -->
+        <div style="text-align:center; margin-bottom:20px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a; display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:center;">
+            <input type="text" id="txid-search" placeholder="Search TXID..." 
+                   style="padding:14px 20px; width:300px; font-size:17px; border-radius:12px; border:3px solid #f7931a; background:#000; color:#f7931a; font-weight:bold;">
+
+            <select id="sort-select" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
+                <option value="">Sort by...</option>
+                <option value="value-desc">Size ↓ (Largest first)</option>
+                <option value="value-asc">Size ↑ (Smallest first)</option>
+                <option value="vout-desc">vout ↓</option>
+                <option value="vout-asc">vout ↑</option>
+            </select>
+
+            <select id="conf-filter" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
+                <option value="">All confirmations</option>
+                <option value="confirmed">Confirmed only</option>
+                <option value="unconfirmed">Unconfirmed only</option>
+            </select>
+
+            <button onclick="document.getElementById('txid-search').value=''; document.getElementById('sort-select').value=''; document.getElementById('conf-filter').value=''; applyFilters();" 
+                    style="padding:14px 24px; background:#333; color:white; border:2px solid #f7931a; border-radius:12px; font-weight:bold;">Reset All</button>
         </div>
 
         <!-- TABLE -->
@@ -616,7 +611,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                         <th style="padding:18px;">Include</th>
                         <th style="padding:18px; text-align:right;">Value</th>
                         <th style="padding:18px;">TXID</th>
-                        <th style="padding:18px;">vout</th>
+                        <th style="padding:18px;">vout <span style="font-weight:normal;font-size:12px;color:#000;">(output index)</span></th>
                         <th style="padding:18px;">Confirmed</th>
                     </tr>
                 </thead>
@@ -627,31 +622,61 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         </div>
 
         <script>
+        const allRows = document.querySelectorAll('#utxo-table tbody tr');
         const allUtxos = {json.dumps(pruned_utxos_global)};
-        const tableRows = document.querySelectorAll('#utxo-table tbody tr');
+
         let stateComp = null;
         for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
             if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
         }}
 
-        function filterTable() {{
+        function applyFilters() {{
             const query = document.getElementById('txid-search').value.toLowerCase();
-            tableRows.forEach(row => {{
-                const txid = row.children[2].textContent.toLowerCase();
-                row.style.display = txid.includes(query) ? '' : 'none';
-            }});
+            const sort = document.getElementById('sort-select').value;
+            const confFilter = document.getElementById('conf-filter').value;
+
+            let rows = Array.from(allRows);
+
+            // Filter confirmed
+            if (confFilter) {{
+                rows = rows.filter(r => r.dataset.confirmed === confFilter);
+            }}
+
+            // Search
+            if (query) {{
+                rows = rows.filter(r => r.children[2].textContent.toLowerCase().includes(query));
+            }}
+
+            // Sort
+            if (sort) {{
+                rows.sort((a, b) => {{
+                    if (sort.includes('value')) {{
+                        const av = parseInt(a.dataset.value);
+                        const bv = parseInt(b.dataset.value);
+                        return sort === 'value-desc' ? bv - av : av - bv;
+                    }} else {{
+                        const av = parseInt(a.dataset.vout);
+                        const bv = parseInt(b.dataset.vout);
+                        return sort === 'vout-desc' ? bv - av : av - bv;
+                    }}
+                }});
+            }}
+
+            // Apply
+            const tbody = document.querySelector('#utxo-table tbody');
+            rows.forEach(r => tbody.appendChild(r));
         }}
 
         function updateSelection() {{
             const checked = document.querySelectorAll('input[data-idx]:checked');
             const indices = Array.from(checked).map(c => parseInt(c.dataset.idx));
             const selected = indices.map(i => allUtxos[i]).filter(Boolean);
-            const total = selected.reduce((a, b) => a + b.value, 0);
+            const total = selected.reduce((a,b) => a + b.value, 0);
 
             document.getElementById('selected-summary').innerHTML = `
                 <div style="font-size:34px; color:#f7931a; font-weight:900;">${{indices.length}} UTXOs selected</div>
-                <div style="font-size:50px; color:#00ff9d; font-weight:900; margin:14px 0;">${{total.toLocaleString()}} sats</div>
-                <div style="color:#aaa; font-size:16px;">Ready — click Generate Transaction below</div>
+                <div style="font-size:50px; color:#00ff9d; font-weight:900;">${{total.toLocaleString()}} sats</div>
+                <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
             `;
 
             if (stateComp) {{
@@ -660,26 +685,23 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
-        // Live search + checkbox updates
-        document.getElementById('txid-search').addEventListener('input', filterTable);
+        // Listeners
+        document.getElementById('txid-search').addEventListener('input', applyFilters);
+        document.getElementById('sort-select').addEventListener('change', applyFilters);
+        document.getElementById('conf-filter').addEventListener('change', applyFilters);
         document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
 
-        // Initial update
+        // Initial
+        applyFilters();
         updateSelection();
 
-        // FINAL KICK — FORCE GENERATE BUTTON TO APPEAR (Gradio sometimes needs this)
+        // FINAL NUCLEAR FIX: Force Generate button to appear
         setTimeout(() => {{
-            const row = document.querySelector('[data-testid="generate_row"]') || 
+            const row = document.querySelector('gradio-row:contains("Generate Transaction")')?.closest('.gr-row') ||
                         document.querySelector('#generate-and-startover-row') ||
-                        document.querySelector('.gr-button:contains("Generate")')?.closest('.gr-row');
+                        document.querySelector('.gr-button')?.closest('.gr-row');
             if (row) row.style.display = 'flex';
-            const btn = document.querySelector('button:contains("Generate Transaction")');
-            if (btn) {{
-                btn.style.display = 'block';
-                btn.style.visibility = 'visible';
-                btn.style.opacity = '1';
-            }}
-        }}, 400);
+        }}, 500);
         </script>
 
         <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
@@ -690,14 +712,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </div>
     """.strip()
 
-    # FINAL RETURN — 6 outputs, bulletproof
     return (
         "",                              # output_log
-        gr.update(visible=True),         # generate_row → shows the row
-        gr.update(visible=True),         # coin_control_row → shows table
-        table_html,                      # coin_table_html
-        pruned_utxos_global,             # selected_utxos_state
-        gr.update(visible=False)         # dummy update — required for 6 outputs
+        gr.update(visible=True),         # generate_row
+        gr.update(visible=True),         # coin_control_row
+        table_html,
+        pruned_utxos_global,
+        gr.update(visible=False)         # dummy — required for 6 outputs
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
@@ -1035,13 +1056,13 @@ with gr.Blocks(
 
     output_log = gr.HTML()
     with gr.Row(visible=False) as generate_row:
-        generate_btn = gr.Button(
-        "2. Generate Transaction",
-        variant="primary",
-        size="lg",
-        elem_classes="full-width bump-with-gap"
-        # ← NO visible=False HERE!
-    )
+       generate_btn = gr.Button(
+           "2. Generate Transaction",
+            variant="primary",
+            size="lg",
+            elem_classes="full-width bump-with-gap"
+            # ← NO visible=False HERE
+        )
 
     # COIN CONTROL SECTION — FINAL & PERFECT
     coin_table_html = gr.HTML()  # ← Define it first, outside the row
