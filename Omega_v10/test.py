@@ -718,7 +718,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         gr.update(visible=True),         # coin_control_row
         table_html,
         pruned_utxos_global,
-        gr.update(visible=True) dummy
+        gr.update(visible=True)
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
