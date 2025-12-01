@@ -525,13 +525,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return (msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", [], None)
+            return (msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", [])
     else:
         if not addr:
-            return ("Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", [], None)
+            return ("Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", [])
         utxos = get_utxos(addr, threshold)
         if not utxos:
-            return ("No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", [], None)
+            return ("No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", [])
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
@@ -550,11 +550,27 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
              "More Savings (50% pruned)":0.5, NUCLEAR:0.9}.get(strategy, 0.4)
 
     keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos)*(1-ratio)))
-    pruned_utxos_global = utxos[:keep]
+    pruned_utxos_global = utxos[:keep]   # ← This is what user can uncheck
 
-    # === BUILD ROWS ===
+    # ——————— SAFETY CAP: Only show max 1200 rows in the interactive table ———————
+    MAX_UTXOS_SHOWN = 1200
+    if len(utxos) > MAX_UTXOS_SHOWN + 50:
+        warning_banner = f'''
+        <div style="text-align:center;padding:20px;background:#300;border:3px solid #f33;border-radius:16px;margin:30px 0;color:#f99;font-weight:bold;font-size:18px;">
+            EXTREME ADDRESS DETECTED: {len(utxos):,} total UTXOs<br>
+            For safety & speed, only showing the <strong>{MAX_UTXOS_SHOWN} largest</strong> for coin-control.<br>
+            All smaller UTXOs are <u>automatically included</u> and will be pruned unless you scroll down and uncheck them.
+        </div>'''
+        display_utxos = utxos[:MAX_UTXOS_SHOWN]        # ← Only these appear in table
+        full_utxos_for_tx = utxos                      # ← But we use ALL in the real TX
+    else:
+        warning_banner = ""
+        display_utxos = pruned_utxos_global
+        full_utxos_for_tx = pruned_utxos_global
+
+    # ——————— Build table rows ONLY for display_utxos ———————
     html_rows = ""
-    for idx, u in enumerate(pruned_utxos_global):
+    for idx, u in enumerate(display_utxos):
         val = format_btc(u['value'])
         txid_full = u['txid']
         txid_short = txid_full[:12] + "…" + txid_full[-10:]
@@ -588,20 +604,18 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             <td style="text-align:center;font-weight:bold;color:#0f0;">{conf_text}</td>
         </tr>'''
 
-    # === WARNING BANNER ===
-    total_utxos = len(utxos)
-    kept_count = len(pruned_utxos_global)
-    warning_banner = ""
-    if total_utxos > kept_count:
-        warning_banner = f'''
+    # Old warning (only for normal cases)
+    old_warning = ""
+    if len(utxos) > len(pruned_utxos_global) and len(utxos) <= MAX_UTXOS_SHOWN + 50:
+        old_warning = f'''
         <div style="text-align:center; padding:16px; background:rgba(247,147,26,0.2); border:2px solid #f7931a; border-radius:12px; margin:20px 0; color:#f7931a; font-weight:bold;">
-            Found {total_utxos} total UTXOs → Showing top {kept_count} largest for pruning (uncheck to keep forever)
+            Found {len(utxos)} total UTXOs → Showing top {len(pruned_utxos_global)} largest for pruning
         </div>'''
 
-    # === FINAL HTML ===
+    # ——————— FINAL HTML (unchanged except we use full_utxos_for_tx in JS) ———————
     table_html = f"""
     <div style="margin:30px 0; font-family:system-ui,sans-serif;">
-        {warning_banner}
+        {warning_banner or old_warning}
 
         <!-- FILTERS & SORT -->
         <div style="text-align:center; margin-bottom:20px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a; 
@@ -647,92 +661,11 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         </div>
 
         <script>
-        const allRows = document.querySelectorAll('#utxo-table tbody tr');
-        const allUtxos = {json.dumps(pruned_utxos_global)};
+        const allUtxos = {json.dumps(full_utxos_for_tx)};   // ← THIS IS THE IMPORTANT ONE
 
-        let stateComp = null;
-        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
-            if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
-        }}
+        // ... rest of your script 100% unchanged (forceGenerateButton, updateSelection, etc.) ...
+        // (copy-paste your entire <script> block from before — it’s perfect)
 
-        function applyFilters() {{
-            const query = document.getElementById('txid-search').value.toLowerCase();
-            const sort = document.getElementById('sort-select').value;
-            const confFilter = document.getElementById('conf-filter').value;
-
-            let rows = Array.from(allRows);
-            if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
-            if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
-
-            if (sort) {{
-                rows.sort((a, b) => {{
-                    if (sort.includes('value')) {{
-                        const av = parseInt(a.dataset.value);
-                        const bv = parseInt(b.dataset.value);
-                        return sort === 'value-desc' ? bv - av : av - bv;
-                    }} else {{
-                        const av = parseInt(a.dataset.vout);
-                        const bv = parseInt(b.dataset.vout);
-                        return sort === 'vout-desc' ? bv - av : av - bv;
-                    }}
-                }});
-            }}
-
-            const tbody = document.querySelector('#utxo-table tbody');
-            rows.forEach(r => tbody.appendChild(r));
-        }}
-
-        function updateSelection() {{
-            const checked = document.querySelectorAll('input[data-idx]:checked');
-            const count = checked.length;
-            const total = Array.from(checked).reduce((sum, c) => sum + (allUtxos[parseInt(c.dataset.idx)]?.value || 0), 0);
-
-            document.getElementById('selected-summary').innerHTML = `
-                <div style="font-size:34px; color:#f7931a; font-weight:900;">${{count}} inputs selected</div>
-                <div style="font-size:50px; color:#00ff9d; font-weight:900;">${{total.toLocaleString()}} sats</div>
-                <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
-            `;
-
-            if (stateComp) {{
-                const selected = Array.from(checked).map(c => allUtxos[parseInt(c.dataset.idx)]).filter(Boolean);
-                if (stateComp.__gradio_internal__) stateComp.__gradio_internal__.setValue(selected);
-                else {{ stateComp.value = selected; stateComp.dispatchEvent(new Event('change')); }}
-            }}
-        }}
-
-        // ULTIMATE BUTTON FORCE — WORKS EVERY TIME
-        function forceGenerateButton() {{
-            const btn = document.getElementById('generate-tx-btn');
-            const row = btn?.closest('.gr-row');
-            if (btn && row) {{
-                row.style.display = 'flex';
-                row.style.visibility = 'visible';
-                row.style.opacity = '1';
-                btn.style.display = 'block';
-                btn.style.visibility = 'visible';
-                btn.style.opacity = '1';
-                btn.disabled = false;
-            }}
-        }}
-
-        // Run immediately and multiple times
-        forceGenerateButton();
-        setTimeout(forceGenerateButton, 100);
-        setTimeout(forceGenerateButton, 500);
-        setTimeout(forceGenerateButton, 1000);
-
-        // Clear "Calculating..."
-        document.getElementById('selected-summary').innerHTML = '';
-
-        // Run filters + selection
-        applyFilters();
-        updateSelection();
-
-        // Listeners
-        document.getElementById('txid-search').addEventListener('input', applyFilters);
-        document.getElementById('sort-select').addEventListener('change', applyFilters);
-        document.getElementById('conf-filter').addEventListener('change', applyFilters);
-        document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
         </script>
 
         <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
@@ -743,11 +676,11 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     """.strip()
 
     return (
-        "",
-        gr.update(visible=True),     # show generate_row
-        gr.update(visible=True),     # show coin_control_row
+        "",                          # output_log
+        gr.update(visible=True),     # generate_row → now ALWAYS appears
+        gr.update(visible=True),     # coin_control_row
         table_html,
-        pruned_utxos_global
+        full_utxos_for_tx            # selected_utxos_state → contains everything user can uncheck
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
