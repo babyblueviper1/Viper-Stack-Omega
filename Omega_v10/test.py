@@ -874,7 +874,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     dao_cut = 0
     if dao_percent > 0 and savings > 4000:
         raw_cut = int(savings * dao_percent / 10_000)
-        dao_cut = max(546, min(raw_cut, savings // 4))  never more than 25%
+        dao_cut = max(546, min(raw_cut, savings // 4))  #never more than 25%
 
     user_receives = total_sats - miner_fee - dao_cut
     if user_receives < 546:
