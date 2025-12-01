@@ -701,30 +701,34 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
+        // Run on load
+        applyFilters();
+        updateSelection();
+
+        // KILL "Calculating..." FOREVER
+        document.getElementById('selected-summary').innerHTML = '';
+
+        // Listeners
         document.getElementById('txid-search').addEventListener('input', applyFilters);
         document.getElementById('sort-select').addEventListener('change', applyFilters);
         document.getElementById('conf-filter').addEventListener('change', applyFilters);
         document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
 
-        applyFilters();
-        updateSelection();
-
+        // FINAL BUTTON FORCE
         setTimeout(() => {{
             const btn = document.getElementById('generate-tx-btn');
             if (btn) {{
                 btn.style.display = 'block';
                 btn.style.visibility = 'visible';
                 btn.style.opacity = '1';
-                const row = btn.closest('.gr-row');
-                if (row) row.style.display = 'flex';
+                btn.closest('.gr-row').style.display = 'flex';
             }}
-        }}, 400);
+        }}, 500);
         </script>
 
         <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
              background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
              font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
-            Calculating...
         </div>
     </div>
     """.strip()
