@@ -707,28 +707,33 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
 <script>
 const fullUtxos = {json.dumps(full_utxos_for_tx)};
-let selectedMap = new Map(fullUtxos.map(u => [`${u.txid}-${u.vout}`, u]));
+const displayedUtxos = {json.dumps(display_utxos)};
 
-/* Pre-check all visible checkboxes */
+/* Build fast lookup map using proper dict access */
+const selectedMap = new Map();
+fullUtxos.forEach(u => {
+    const key = `${u.txid}-${u.vout}`;
+    selectedMap.set(key, u);
+});
+
+/* Pre-check all visible boxes */
 document.querySelectorAll('input[data-idx]').forEach(cb => cb.checked = true);
 
-function updateSelection() {{
-    /* Start with EVERY UTXO — this is the real fix */
-    const selected = [...fullUtxos];
+function updateSelection() {
+    /* Start with EVERY UTXO */
+    let selected = [...fullUtxos];
 
-    /* Remove only the ones the user explicitly unchecked */
-    document.querySelectorAll('input[data-idx]:not(:checked)').forEach(cb => {{
+    /* Remove only the ones user unchecked (only displayed ones can be unchecked) */
+    document.querySelectorAll('input[data-idx]:not(:checked)').forEach(cb => {
         const idx = parseInt(cb.dataset.idx);
-        const displayed = {json.dumps(display_utxos)};
-        if (displayed[idx]) {{
-            const key = `${displayed[idx].txid}-${displayed[idx].vout}`;
-            const utxoToRemove = selectedMap.get(key);
-            if (utxoToRemove) {{
-                const index = selected.findIndex(u => u === utxoToRemove);
-                if (index > -1) selected.splice(index, 1);
-            }}
-        }}
-    }});
+        const utxo = displayedUtxos[idx];
+        if (utxo) {
+            const key = `${utxo.txid}-${utxo.vout}`;
+            selected = selected.filter(u => 
+                !(u.txid === utxo.txid && u.vout === utxo.vout)
+            );
+        }
+    });
 
     const count = selected.length;
     const total = selected.reduce((sum, u) => sum + u.value, 0);
@@ -739,57 +744,57 @@ function updateSelection() {{
         <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
     `;
 
-    const stateComp = document.querySelector('gradio-state') || 
-                     Array.from(document.querySelectorAll('*')).find(el => 
-                         el.__gradio_internal__ || (el.tagName.toLowerCase() === 'input' && el.type === 'hidden')
-                     );
+    /* Update Gradio state — bulletproof */
+    const stateEl = document.querySelector('gradio-state') || 
+                   document.querySelector('input[type="hidden"]');
+    if (stateEl) {
+        if (stateEl.__gradio_internal__) {
+            stateEl.__gradio_internal__.setValue(selected);
+        } else {
+            stateEl.value = JSON.stringify(selected);
+            stateEl.dispatchEvent(new Event('change'));
+        }
+    }
+}
 
-    if (stateComp) {{
-        if (stateComp.__gradio_internal__) {{
-            stateComp.__gradio_internal__.setValue(selected);
-        }} else {{
-            stateComp.value = selected;
-            stateComp.dispatchEvent(new Event('change'));
-        }}
-    }}
-}}
-
+/* Run now and on every checkbox change */
 updateSelection();
-document.addEventListener('change', e => {{
+document.addEventListener('change', e => {
     if (e.target.matches('input[data-idx]')) updateSelection();
-}});
+});
 
-/* ——— FILTERS (unchanged) ——— */
-function applyFilters() {{
-    const query = document.getElementById('txid-search').value.toLowerCase();
+/* ——— FILTERS & SORT (unchanged) ——— */
+function applyFilters() {
+    const query = (document.getElementById('txid-search').value || '').toLowerCase();
     const sort = document.getElementById('sort-select').value;
-    const confFilter = document.getElementById('conf-filter').value;
+    const conf = document.getElementById('conf-filter').value;
 
     let rows = Array.from(document.querySelectorAll('#utxo-table tbody tr'));
-    if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
+
+    if (conf) rows = rows.filter(r => r.dataset.confirmed === conf);
     if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
 
-    if (sort) {{
-        rows.sort((a, b) => {{
-            if (sort.includes('value')) {{
-                const av = parseInt(a.dataset.value);
-                const bv = parseInt(b.dataset.value);
-                return sort === 'value-desc' ? bv - av : av - bv;
-            }} else {{
-                const av = parseInt(a.dataset.vout);
-                const bv = parseInt(b.dataset.vout);
-                return sort === 'vout-desc' ? bv - av : av - bv;
-            }}
-        }});
-    }}
+    if (sort) {
+        rows.sort((a, b) => {
+            if (sort.includes('value')) {
+                return sort === 'value-desc' 
+                    ? parseInt(b.dataset.value) - parseInt(a.dataset.value)
+                    : parseInt(a.dataset.value) - parseInt(b.dataset.value);
+            } else {
+                return sort === 'vout-desc'
+                    ? parseInt(b.dataset.vout) - parseInt(a.dataset.vout)
+                    : parseInt(a.dataset.vout) - parseInt(b.dataset.vout);
+            }
+        });
+    }
 
     const tbody = document.querySelector('#utxo-table tbody');
     rows.forEach(r => tbody.appendChild(r));
-}}
+}
 
-document.getElementById('txid-search').addEventListener('input', applyFilters);
-document.getElementById('sort-select').addEventListener('change', applyFilters);
-document.getElementById('conf-filter').addEventListener('change', applyFilters);
+document.getElementById('txid-search')?.addEventListener('input', applyFilters);
+document.getElementById('sort-select')?.addEventListener('change', applyFilters);
+document.getElementById('conf-filter')?.addEventListener('change', applyFilters);
 applyFilters();
 </script>
 
