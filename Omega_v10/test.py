@@ -840,57 +840,56 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </button>
     """
 
-result_html = f"""
-<div style="text-align:center; padding:30px 0; width:100%; max-width:100vw; box-sizing:border-box;">
-    <h2 style="color:#f7931a; margin:40px 0; font-size:2.8rem; font-weight:900;">
-        PSBT READY — BROADCAST TO PRUNE
-    </h2>
+    result_html = f"""
+    <div style="text-align:center; padding:30px 0; width:100%; max-width:100vw; box-sizing:border-box;">
+        <h2 style="color:#f7931a; margin:40px 0; font-size:2.8rem; font-weight:900;">
+            PSBT READY — BROADCAST TO PRUNE
+        </h2>
 
-    <div style="font-size:20px; line-height:1.9; margin:20px 0; color:#ddd;">
-        <strong>{inputs:,}</strong> inputs → {format_btc(total_sats)} total<br>
-        Miner fee: <strong>{format_btc(miner_fee)}</strong> @ {fee_rate} sat/vB<br>
-        <span style="color:#f7931a; font-weight:800;">{donation_text}</span>
-    </div>
-
-    <div style="font-size:48px; font-weight:900; color:#00ff9d; margin:40px 0; text-shadow:0 0 30px #0f0;">
-        You receive: {format_btc(user_receives)}
-    </div>
-
-    <div style="margin:30px 0; padding:24px; background:rgba(247,147,26,0.15); border:3px solid #f7931a; border-radius:16px; font-size:19px;">
-        Future fee savings ≈ <strong style="font-size:36px; color:#00ff9d;">{format_btc(savings)}</strong><br>
-        <small>at {future_rate} sat/vB peak</small>
-    </div>
-
-    <!-- QR — NOW 100% BULLETPROOF CENTERED -->
-    <div style="display:flex; justify-content:center; align-items:center; margin:60px 0; width:100%;">
-        <div class="qr-center">
-            <img src="{qr_image}" style="width:460px; max-width:96vw; border:6px solid #f7931a; border-radius:20px; box-shadow:0 15px 60px rgba(247,147,26,0.7);">
+        <div style="font-size:20px; line-height:1.9; margin:20px 0; color:#ddd;">
+            <strong>{inputs:,}</strong> inputs → {format_btc(total_sats)} total<br>
+            Miner fee: <strong>{format_btc(miner_fee)}</strong> @ {fee_rate} sat/vB<br>
+            <span style="color:#f7931a; font-weight:800;">{donation_text}</span>
         </div>
-    </div>
 
-    {copy_button}
+        <div style="font-size:48px; font-weight:900; color:#00ff9d; margin:40px 0; text-shadow:0 0 30px #0f0;">
+            You receive: {format_btc(user_receives)}
+        </div>
 
-    <p style="color:#aaa; margin:40px 0; font-size:18px;">
-        Scan with Sparrow • Electrum • BlueWallet • or paste PSBT
-    </p>
+        <div style="margin:30px 0; padding:24px; background:rgba(247,147,26,0.15); border:3px solid #f7931a; border-radius:16px; font-size:19px;">
+            Future fee savings ≈ <strong style="font-size:36px; color:#00ff9d;">{format_btc(savings)}</strong><br>
+            <small>at {future_rate} sat/vB peak</small>
+        </div>
 
-    <details style="margin:60px auto 20px; max-width:900px;">
-        <summary style="cursor:pointer; color:#f7931a; font-weight:bold; font-size:20px; padding:10px;">
-            View raw PSBT (base64)
-        </summary>
-        <pre style="background:#000; color:#0f0; padding:20px; border-radius:12px; margin-top:15px; overflow-x:auto; font-size:11px; text-align:left; word-wrap:break-word;">
+        <div style="display:flex; justify-content:center; align-items:center; margin:60px 0; width:100%;">
+            <div class="qr-center">
+                <img src="{qr_image}" style="width:460px; max-width:96vw; border:6px solid #f7931a; border-radius:20px; box-shadow:0 15px 60px rgba(247,147,26,0.7);">
+            </div>
+        </div>
+
+        {copy_button}
+
+        <p style="color:#aaa; margin:40px 0; font-size:18px;">
+            Scan with Sparrow • Electrum • BlueWallet • or paste PSBT
+        </p>
+
+        <details style="margin:60px auto 20px; max-width:900px;">
+            <summary style="cursor:pointer; color:#f7931a; font-weight:bold; font-size:20px; padding:10px;">
+                View raw PSBT (base64)
+            </summary>
+            <pre style="background:#000; color:#0f0; padding:20px; border-radius:12px; margin-top:15px; overflow-x:auto; font-size:11px; text-align:left; word-wrap:break-word;">
 {psbt_b64}
-        </pre>
-    </details>
-</div>
-"""
+            </pre>
+        </details>
+    </div>
+    """
 
     return (
         result_html,
         "<div id='generate-section' style='display:none;'></div>",
         "<div id='coin-control-section' style='display:none;'></div>",
         ""
-    )
+    )  
     
 # ==============================
 # Gradio UI — Final & Perfect
