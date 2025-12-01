@@ -835,11 +835,11 @@ applyFilters();
     table_html = table_part1 + script_part2
 
     return (
-        "",                                              # output_log
-        gr.Row(visible=True),                            # show generate_row
-        gr.Row(visible=True),                            # show coin_control_row
-        table_html,                                      # coin_table_html value
-        json.dumps(full_utxos_for_tx)                    # selected_utxos_state
+        "",                                           # output_log
+        gr.Box(visible=True),                         # show generate_section
+        gr.Box(visible=True),                         # show coin_control_section
+        table_html,                                   # coin_table_html
+        json.dumps(full_utxos_for_tx)                 # selected_utxos_state
     )
 # ==============================
 
@@ -1027,10 +1027,9 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     return (
         result_html,
-        generate_btn.update(visible=False),
-        generate_row.update(visible=False),
-        coin_control_row.update(visible=False),
-        coin_table_html.update(value="")
+        gr.Box(visible=False),     # hide generate_section
+        gr.Box(visible=False),     # hide coin_control_section
+        ""                         # clear table
     )
     
 # ==============================
@@ -1213,26 +1212,26 @@ with gr.Blocks(
             lines=1
         )
 
-    with gr.Row():
+       with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
 
     output_log = gr.HTML()
-    generate_row = gr.Row(visible=False)
-    with generate_row:
-       generate_btn = gr.Button(
+
+    # ────── GENERATE BUTTON SECTION (replaces gr.Row) ──────
+    with gr.Box(visible=False, elem_id="generate-section") as generate_section:
+        generate_btn = gr.Button(
             "2. Generate Transaction",
             variant="primary",
             size="lg",
             elem_classes="full-width bump-with-gap",
-            elem_id="generate-tx-btn"   # ← THIS IS THE KEY
+            elem_id="generate-tx-btn"
         )
 
-    # COIN CONTROL SECTION — FINAL & PERFECT
-    coin_table_html = gr.HTML()  # ← Define it first, outside the row
+    # ────── COIN CONTROL SECTION (replaces gr.Row) ──────
+    coin_table_html = gr.HTML()
 
-    with gr.Row(visible=False) as coin_control_row:
+    with gr.Box(visible=False, elem_id="coin-control-section") as coin_control_section:
         with gr.Column():
-            # Header — always on top
             gr.Markdown(
                 "<div style='text-align:center; padding:40px 0 20px;'>"
                 "<h2 style='margin:0; color:#f7931a; font-size:34px; font-weight:900;'>Coin Control</h2>"
@@ -1245,8 +1244,8 @@ with gr.Blocks(
                 "</div>"
             )
             coin_table_html
-        
-    # START OVER BUTTON
+
+    # ────── START OVER BUTTON ──────
     with gr.Row():
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
@@ -1254,9 +1253,9 @@ with gr.Blocks(
             size="lg",
             elem_classes="full-width"
         )
-    
+
     # ==================================================================
-    # Events
+    # Events — FULLY COMPATIBLE WITH GRADIO 6.0+
     # ==================================================================
 
     submit_btn.click(
@@ -1270,11 +1269,11 @@ with gr.Blocks(
             future_multiplier
         ],
         outputs=[
-            output_log,           # HTML log / warnings
-            generate_row,         # Row containing the "Generate" button
-            coin_control_row,     # Coin-control table row
-            coin_table_html,      # The big UTXO table
-            selected_utxos_state  # Hidden JSON state
+            output_log,
+            generate_section,      # ← Now a Box → valid output
+            coin_control_section,  # ← Box → valid output
+            coin_table_html,
+            selected_utxos_state
         ]
     )
 
@@ -1290,27 +1289,26 @@ with gr.Blocks(
             selected_utxos_state
         ],
         outputs=[
-            output_log,       # Final PSBT + QR result
-            generate_btn,     # Hide the generate button
-            generate_row,     # Hide the whole generate row
-            coin_control_row, # Hide coin-control section
-            coin_table_html   # Clear the table
+            output_log,            # Final PSBT + QR
+            generate_section,      # Hide generate section
+            coin_control_section,  # Hide coin control
+            coin_table_html        # Clear table
         ]
     )
 
     start_over_btn.click(
         lambda: (
-            "",                                  # user_input
-            "Recommended (40% pruned)",          # prune_choice
-            546,                                 # dust_threshold
-            "",                                  # dest_addr
-            50,                                  # dao_percent
-            6,                                   # future_multiplier
-            "",                                  # output_log (clear)
-            generate_row.update(visible=False),
-            coin_control_row.update(visible=False),
-            coin_table_html.update(value=""),
-            selected_utxos_state.update(value="[]")
+            "",                               # user_input
+            "Recommended (40% pruned)",       # prune_choice
+            546,                              # dust_threshold
+            "",                               # dest_addr
+            50,                               # dao_percent
+            6,                                # future_multiplier
+            "",                               # output_log
+            gr.Box(visible=False),            # hide generate_section
+            gr.Box(visible=False),            # hide coin_control_section
+            "",                               # clear coin_table_html
+            "[]"                              # clear selected_utxos_state
         ),
         outputs=[
             user_input,
@@ -1320,8 +1318,8 @@ with gr.Blocks(
             dao_percent,
             future_multiplier,
             output_log,
-            generate_row,
-            coin_control_row,
+            generate_section,
+            coin_control_section,
             coin_table_html,
             selected_utxos_state
         ]
