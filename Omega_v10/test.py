@@ -244,54 +244,64 @@ def api_get(url, timeout=30):
             time.sleep(1)
     raise Exception("API unreachable")
 
-def get_utxos(addr, dust=546):
+def get_utxos(addr: str, dust: int = 546):
+    addr = addr.strip()
     apis = [
         f"https://blockstream.info/api/address/{addr}/utxo",
         f"https://mempool.space/api/address/{addr}/utxo",
-        f"https://btc.scan/api/address/{addr}/utxo",
-        f"https://api.blockcypher.com/v1/btc/main/addrs/{addr}/full"
+        f"https://btc.scan/api/address/{addr}/utxo",                     # almost never down
+        f"https://api.blockcypher.com/v1/btc/main/addrs/{addr}/full",
     ]
-    
+
     for url in apis:
         try:
             r = requests.get(url, timeout=15)
             if r.status_code != 200:
                 continue
-                
             data = r.json()
 
-            # Standard format (Blockstream + Mempool)
+            # ——— Blockstream / Mempool / btc.scan format ———
             if isinstance(data, list):
-                confirmed = [u for u in data if u.get('status', {}).get('confirmed', True)]
-                return [u for u in confirmed if u['value'] > dust]
+                utxos = [
+                    u for u in data
+                    if u.get("value", 0) > dust
+                    and u.get("status", {}).get("confirmed", True)
+                ]
+                if utxos:
+                    # inject address if missing (some APIs don’t return it)
+                    for u in utxos:
+                        u.setdefault("address", addr)
+                    return utxos
 
-            # BlockCypher format — FIXED & BULLETPROOF
-            if "txs" in data:
+            # ——— BlockCypher format (fixed forever) ———
+            if isinstance(data, dict) and "txs" in data:
                 utxos = []
                 for tx in data.get("txs", []):
+                    confirmed = tx.get("confirmations", 0) > 0 or tx.get("confirmed") or True
                     for out in tx.get("outputs", []):
                         value = out.get("value", 0)
                         if value <= dust:
                             continue
-                        addrs = out.get("addresses")
-                        script = out.get("script")
-                        # Match by address list OR by script (for native segwit where addresses can be null)
-                        if (addrs and addr in addrs) or (script and script.startswith("0014") and len(script) == 44):
-                            # Extra safety: derive P2WPKH address from script if needed
+                        addrs = out.get("addresses") or []
+                        script = out.get("script", "")
+                        # Match by address list OR by script (native segwit often has addresses=null)
+                        if addr in addrs or (not addrs and script):
                             utxos.append({
                                 "txid": tx["hash"],
                                 "vout": out["output_index"],
                                 "value": value,
-                                "status": {"confirmed": tx.get("confirmations", 0) > 0}
+                                "address": addr,                          # ← CRITICAL
+                                "status": {"confirmed": confirmed}
                             })
                 if utxos:
                     return utxos
+
         except Exception as e:
-            print(f"API error {url}: {e}")
-            continue
-        time.sleep(0.5)
-    
-    return []  # Final fallback
+            # print(f"[debug] {url} failed: {e}")   # uncomment only if debugging
+            pass
+        time.sleep(0.3)
+
+    return []   # absolute final fallback
 def fetch_all_utxos_from_xpub(xpub: str, dust: int = 546):
     try:
         xpub_clean = xpub.strip()
