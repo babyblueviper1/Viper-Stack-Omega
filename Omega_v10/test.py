@@ -710,7 +710,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     # ——————— PART 2: Script + Summary (separate f-string) ———————
     script_part2 = f"""
 <script>
-/* === COIN CONTROL — BULLETPROOF 2025 === */
+/* === COIN CONTROL — BULLETPROOF 2025 WITH HIDDEN INPUT === */
 const fullUtxos = {safe_full_json};
 const displayedUtxos = {safe_display_json};
 
@@ -743,10 +743,12 @@ function updateSelection() {{
         <div style="color:#aaa;font-size:16px;margin-top:8px">Ready — click Generate Transaction below</div>
     `;
 
-    // Update Gradio state
-    const state = document.querySelector("gradio-state");
-    if (state && state.__gradio_internal__) {{
-        state.__gradio_internal__.setValue(selected);
+    // FIXED: Update via hidden input (works 100% with gr.Json)
+    const hiddenInput = document.querySelector('#selected-utxos-input');
+    if (hiddenInput) {{
+        hiddenInput.value = JSON.stringify(selected);
+        hiddenInput.dispatchEvent(new Event('input', {{bubbles: true}}));
+        hiddenInput.dispatchEvent(new Event('change', {{bubbles: true}}));
     }}
 }}
 
@@ -757,7 +759,7 @@ document.querySelectorAll("input[data-idx]").forEach(cb => {{
 }});
 updateSelection();
 
-// Filters & sorting
+// Filters & sorting (unchanged)
 function applyFilters() {{
     const query = (document.getElementById("txid-search")?.value || "").toLowerCase();
     const sort = document.getElementById("sort-select")?.value || "";
@@ -792,6 +794,9 @@ function applyFilters() {{
 applyFilters();
 </script>
 
+<!-- FIXED: Hidden input for Gradio state (must be here for JS to find it) -->
+<input type="hidden" id="selected-utxos-input" value='{json.dumps(full_utxos_for_tx)}'>
+
 <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
      background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
      font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
@@ -813,13 +818,21 @@ applyFilters();
 
 
 def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier, selected_utxos):
-    global input_vb_global, output_vb_global
+    global input_vb_global, output_vb_global, pruned_utxos_global
 
-    # selected_utxos comes from JavaScript via gr.Json() — always trust it
-    utxos_to_use = selected_utxos
-    if not utxos_to_use or len(utxos_to_use) == 0:
+    # selected_utxos is now a JSON string from the hidden input
+    if not selected_utxos:
+        utxos_to_use = pruned_utxos_global or []
+    else:
+        try:
+            utxos_to_use = json.loads(selected_utxos)
+        except (json.JSONDecodeError, TypeError) as e:
+            print(f"[DEBUG] JSON parse failed: {e}, falling back to global")
+            utxos_to_use = pruned_utxos_global or []
+
+    if not utxos_to_use:
         return (
-            "<div style='text-align:center;color:#f66;padding:30px;font-size:20px;'>No UTXOs selected — run analysis first</div>",
+            "<div style='text-align:center;color:#f66;padding:40px;font-size:22px;'>No UTXOs selected — please run analysis first</div>",
             gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=False)
         )
 
@@ -983,7 +996,7 @@ with gr.Blocks(
     title="Ωmega Pruner v10.1 — NUCLEAR EDITION: Prune UTXOs Forever",
 ) as demo:
 
-    selected_utxos_state = gr.Json(visible=False)
+    selected_utxos_state = gr.Textbox(visible=False, elem_id="selected-utxos-input")
      # ——— BULLETPROOF OG TAGS — FORCES THUMBNAIL + DESCRIPTION EVERYWHERE ———
     gr.HTML("""
     <head>
