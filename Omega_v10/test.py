@@ -552,7 +552,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos)*(1-ratio)))
     pruned_utxos_global = utxos[:keep]
 
-    # Build rows
+    # === BUILD ROWS ===
     html_rows = ""
     for idx, u in enumerate(pruned_utxos_global):
         val = format_btc(u['value'])
@@ -564,7 +564,8 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         conf_val = "confirmed" if confirmed else "unconfirmed"
 
         html_rows += f'''
-        <tr style="height:66px;" data-value="{u['value']}" data-vout="{u['vout']}" data-confirmed="{conf_val}">
+        <tr style="height:66px;" data-value="{u['value']}" data-vout="{u['vout']}" data-confirmed="{conf_val}" data-index="{idx}">
+            <td style="text-align:center;font-weight:bold;color:#f7931a;">{idx+1}</td>
             <td style="text-align:center;">
                 <input type="checkbox" checked data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
             </td>
@@ -576,7 +577,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                    onmouseout="this.style.color='#00ff9d'; this.querySelector('span').style.background='transparent';"
                    onclick="event.preventDefault(); navigator.clipboard.writeText('{txid_full}'); 
                             let s=this.querySelector('span'); let old=s.innerText; s.innerText='COPIED!'; 
-                            setTimeout(function(){{ s.innerText=old; }}, 1000);"
+                            setTimeout(() => s.innerText = old, 1000);"
                    title="Click to copy full TXID">
                     <span style="cursor:pointer; padding:6px 10px; border-radius:8px; transition:all 0.2s; display:inline-block;">
                         {txid_short}
@@ -587,143 +588,150 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             <td style="text-align:center;font-weight:bold;color:#0f0;">{conf_text}</td>
         </tr>'''
 
+    # === WARNING BANNER ===
+    total_utxos = len(utxos)
+    kept_count = len(pruned_utxos_global)
+    warning_banner = ""
+    if total_utxos > kept_count:
+        warning_banner = f'''
+        <div style="text-align:center; padding:16px; background:rgba(247,147,26,0.2); border:2px solid #f7931a; border-radius:12px; margin:20px 0; color:#f7931a; font-weight:bold;">
+            Found {total_utxos} total UTXOs → Showing top {kept_count} largest for pruning (uncheck to keep forever)
+        </div>'''
+
+    # === FINAL HTML ===
     table_html = f"""
     <div style="margin:30px 0; font-family:system-ui,sans-serif;">
+        {warning_banner}
 
-    <!-- FILTERS & SORT -->
-    <div style="text-align:center; margin-bottom:20px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a; 
-         display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:center;">
-        <input type="text" id="txid-search" placeholder="Search TXID..." 
-               style="padding:14px 20px; width:300px; font-size:17px; border-radius:12px; border:3px solid #f7931a; background:#000; color:#f7931a; font-weight:bold;">
+        <!-- FILTERS & SORT -->
+        <div style="text-align:center; margin-bottom:20px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a; 
+             display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:center;">
+            <input type="text" id="txid-search" placeholder="Search TXID..." 
+                   style="padding:14px 20px; width:300px; font-size:17px; border-radius:12px; border:3px solid #f7931a; background:#000; color:#f7931a; font-weight:bold;">
 
-        <select id="sort-select" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
-            <option value="">Sort by...</option>
-            <option value="value-desc">Size (Largest first)</option>
-            <option value="value-asc">Size (Smallest first)</option>
-            <option value="vout-desc">vout (descending)</option>
-            <option value="vout-asc">vout (ascending)</option>
-        </select>
+            <select id="sort-select" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
+                <option value="">Sort by...</option>
+                <option value="value-desc">Size (Largest first)</option>
+                <option value="value-asc">Size (Smallest first)</option>
+                <option value="vout-desc">vout (descending)</option>
+                <option value="vout-asc">vout (ascending)</option>
+            </select>
 
-        <select id="conf-filter" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
-            <option value="">All confirmations</option>
-            <option value="confirmed">Confirmed only</option>
-            <option value="unconfirmed">Unconfirmed only</option>
-        </select>
+            <select id="conf-filter" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
+                <option value="">All confirmations</option>
+                <option value="confirmed">Confirmed only</option>
+                <option value="unconfirmed">Unconfirmed only</option>
+            </select>
 
-        <button onclick="document.getElementById('txid-search').value=''; 
-                         document.getElementById('sort-select').value=''; 
-                         document.getElementById('conf-filter').value=''; 
-                         applyFilters();" 
-                style="padding:14px 24px; background:#333; color:white; border:2px solid #f7931a; border-radius:12px; font-weight:bold;">Reset</button>
-    </div>
+            <button onclick="document.getElementById('txid-search').value=''; document.getElementById('sort-select').value=''; document.getElementById('conf-filter').value=''; applyFilters();" 
+                    style="padding:14px 24px; background:#333; color:white; border:2px solid #f7931a; border-radius:12px; font-weight:bold;">Reset</button>
+        </div>
 
-    <!-- TABLE -->
-    <div style="max-height:560px; overflow-y:auto; border:4px solid #f7931a; border-radius:16px; background:#0a0a0a;">
-        <table id="utxo-table" style="width:100%; border-collapse:collapse;">
-            <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
-                <tr>
-                    <th style="padding:18px;">Include</th>
-                    <th style="padding:18px; text-align:right;">Value</th>
-                    <th style="padding:18px;">TXID</th>
-                    <th style="padding:18px;">vout <small style="font-weight:normal;color:#333;">(index)</small></th>
-                    <th style="padding:18px;">Confirmed</th>
-                </tr>
-            </thead>
-            <tbody style="font-family:monospace;">
-                {html_rows}
-            </tbody>
-        </table>
-    </div>
+        <!-- TABLE -->
+        <div style="max-height:560px; overflow-y:auto; border:4px solid #f7931a; border-radius:16px; background:#0a0a0a;">
+            <table id="utxo-table" style="width:100%; border-collapse:collapse;">
+                <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
+                    <tr>
+                        <th style="padding:18px;">#</th>
+                        <th style="padding:18px;">Include</th>
+                        <th style="padding:18px; text-align:right;">Value</th>
+                        <th style="padding:18px;">TXID</th>
+                        <th style="padding:18px;">vout</th>
+                        <th style="padding:18px;">Confirmed</th>
+                    </tr>
+                </thead>
+                <tbody style="font-family:monospace;">
+                    {html_rows}
+                </tbody>
+            </table>
+        </div>
 
-    <script>
-    const allRows = document.querySelectorAll('#utxo-table tbody tr');
-    const allUtxos = {json.dumps(pruned_utxos_global)};
+        <script>
+        const allRows = document.querySelectorAll('#utxo-table tbody tr');
+        const allUtxos = {json.dumps(pruned_utxos_global)};
 
-    let stateComp = null;
-    for (let el of document.querySelectorAll('gradio-state, [data-testid=\\"state\\"]')) {{
-        if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
-    }}
-
-    function applyFilters() {{
-        const query = document.getElementById('txid-search').value.toLowerCase();
-        const sort = document.getElementById('sort-select').value;
-        const confFilter = document.getElementById('conf-filter').value;
-
-        let rows = Array.from(allRows);
-
-        if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
-        if (query) rows = rows.filter(r => r.children[2].textContent.toLowerCase().includes(query));
-
-        if (sort) {{
-            rows.sort((a, b) => {{
-                if (sort.includes('value')) {{
-                    const av = parseInt(a.dataset.value);
-                    const bv = parseInt(b.dataset.value);
-                    return sort === 'value-desc' ? bv - av : av - bv;
-                }} else {{
-                    const av = parseInt(a.dataset.vout);
-                    const bv = parseInt(b.dataset.vout);
-                    return sort === 'vout-desc' ? bv - av : av - bv;
-                }}
-            }});
+        let stateComp = null;
+        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
+            if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
         }}
 
-        const tbody = document.querySelector('#utxo-table tbody');
-        rows.forEach(r => tbody.appendChild(r));
-    }}
+        function applyFilters() {{
+            const query = document.getElementById('txid-search').value.toLowerCase();
+            const sort = document.getElementById('sort-select').value;
+            const confFilter = document.getElementById('conf-filter').value;
 
-    function updateSelection() {{
-        const checked = document.querySelectorAll('input[data-idx]:checked');
-        const indices = Array.from(checked).map(c => parseInt(c.dataset.idx));
-        const selected = indices.map(i => allUtxos[i]).filter(Boolean);
-        const total = selected.reduce((a,b) => a + b.value, 0);
+            let rows = Array.from(allRows);
 
-        document.getElementById('selected-summary').innerHTML = `
-            <div style="font-size:34px; color:#f7931a; font-weight:900;">${{indices.length}} UTXOs selected</div>
-            <div style="font-size:50px; color:#00ff9d; font-weight:900;">${{total.toLocaleString()}} sats</div>
-            <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
-        `;
+            if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
+            if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
 
-        if (stateComp) {{
-            if (stateComp.__gradio_internal__) stateComp.__gradio_internal__.setValue(selected);
-            else {{ stateComp.value = selected; stateComp.dispatchEvent(new Event('change')); }}
+            if (sort) {{
+                rows.sort((a, b) => {{
+                    if (sort.includes('value')) {{
+                        const av = parseInt(a.dataset.value);
+                        const bv = parseInt(b.dataset.value);
+                        return sort === 'value-desc' ? bv - av : av - bv;
+                    }} else {{
+                        const av = parseInt(a.dataset.vout);
+                        const bv = parseInt(b.dataset.vout);
+                        return sort === 'vout-desc' ? bv - av : av - bv;
+                    }}
+                }});
+            }}
+
+            const tbody = document.querySelector('#utxo-table tbody');
+            rows.forEach(r => tbody.appendChild(r));
         }}
-    }}
 
-    document.getElementById('txid-search').addEventListener('input', applyFilters);
-    document.getElementById('sort-select').addEventListener('change', applyFilters);
-    document.getElementById('conf-filter').addEventListener('change', applyFilters);
-    document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
+        function updateSelection() {{
+            const checked = document.querySelectorAll('input[data-idx]:checked');
+            const count = checked.length;
+            const total = Array.from(checked).reduce((sum, c) => sum + (allUtxos[parseInt(c.dataset.idx)]?.value || 0), 0);
 
-    applyFilters();
-    updateSelection();
+            document.getElementById('selected-summary').innerHTML = `
+                <div style="font-size:34px; color:#f7931a; font-weight:900;">${count} inputs selected</div>
+                <div style="font-size:50px; color:#00ff9d; font-weight:900;">${total.toLocaleString()} sats</div>
+                <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
+            `;
 
-    // FINAL NUCLEAR FIX — FORCES GENERATE BUTTON TO APPEAR 100%
-    setTimeout(() => {{
-        const btn = document.getElementById('generate-tx-btn');
-        if (btn) {{
-            btn.style.display = 'block';
-            btn.style.visibility = 'visible';
-            btn.style.opacity = '1';
-            const row = btn.closest('.gr-row');
-            if (row) row.style.display = 'flex';
+            if (stateComp) {{
+                const selected = Array.from(checked).map(c => allUtxos[parseInt(c.dataset.idx)]).filter(Boolean);
+                if (stateComp.__gradio_internal__) stateComp.__gradio_internal__.setValue(selected);
+                else {{ stateComp.value = selected; stateComp.dispatchEvent(new Event('change')); }}
+            }}
         }}
-    }}, 400);
 
-    </script>
+        document.getElementById('txid-search').addEventListener('input', applyFilters);
+        document.getElementById('sort-select').addEventListener('change', applyFilters);
+        document.getElementById('conf-filter').addEventListener('change', applyFilters);
+        document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
 
-    <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
-         background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
-         font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
-        Calculating...
+        applyFilters();
+        updateSelection();
+
+        setTimeout(() => {{
+            const btn = document.getElementById('generate-tx-btn');
+            if (btn) {{
+                btn.style.display = 'block';
+                btn.style.visibility = 'visible';
+                btn.style.opacity = '1';
+                btn.closest('.gr-row').style.display = 'flex';
+            }}
+        }}, 400);
+        </script>
+
+        <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
+             background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
+             font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
+            Calculating...
+        </div>
     </div>
-</div>
-""".strip()
+    """.strip()
 
     return (
-        "",                              # output_log
-        gr.update(visible=True),         # generate_row → shows the row
-        gr.update(visible=True),         # coin_control_row
+        "", 
+        gr.update(visible=True),
+        gr.update(visible=True),
         table_html,
         pruned_utxos_global,
         gr.update(visible=True)
@@ -734,81 +742,68 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier, selected_utxos=None):
     global input_vb_global, output_vb_global
 
-    # ← USE selected_utxos if provided, otherwise fall back
     utxos_to_use = selected_utxos or pruned_utxos_global
     if not utxos_to_use:
-        return "No UTXOs selected — run analysis first", gr.update(visible=False), gr.update(visible=False)
+        return "No UTXOs selected — run analysis first", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
       
     total = sum(u['value'] for u in utxos_to_use)
     inputs = len(utxos_to_use)
+
+    # === SPLIT WARNING ===
+    if inputs > 50:
+        split_warning = f'''
+        <div style="background:rgba(255,51,102,0.15); border:2px solid #ff3366; padding:16px; border-radius:14px; 
+                    color:#ff3366; margin:20px 0; font-weight:bold; text-align:center;">
+            Warning: {inputs} inputs detected — PSBT is very large!<br>
+            Use <strong>Electrum</strong> or <strong>Sparrow Wallet</strong> (desktop).<br>
+            For 100+ inputs, consider splitting into 2–3 transactions.
+        </div>'''
+    else:
+        split_warning = ""
 
     sample_addr = utxos_to_use[0].get('address') or user_input.strip()
     _, info = address_to_script_pubkey(sample_addr)
     detected = info['type']
 
-    # === FETCH CURRENT FEE RATE ===
+    # === FEE RATE ===
     try:
         fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=10).json()["fastestFee"]
     except:
-        try:
-            fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended").json()["fastestFee"]
-        except:
-            fee_rate = 10
+        fee_rate = 10
 
-    # === FUTURE RATE ===
-    future_rate = int(fee_rate * future_multiplier)
-    future_rate = max(future_rate, fee_rate + 5)
+    future_rate = max(int(fee_rate * future_multiplier), fee_rate + 5)
 
-    # === TEMPORARY outputs/vsize (assume 1 output for first estimate) ===
-    outputs = 1
+    # === VSIZE ESTIMATE ===
     base_weight = 160
     input_weight = inputs * input_vb_global * 4
-    output_weight = outputs * output_vb_global * 4
     witness_overhead = 2 if detected in ("SegWit", "Taproot") else 0
+    outputs = 1 + (1 if dao_percent > 0 else 0)  # user + optional thank you
+    output_weight = outputs * output_vb_global * 4
     total_weight = base_weight + input_weight + output_weight + witness_overhead
     vsize = (total_weight + 3) // 4
 
-    # === MINER FEE (first pass) ===
-    miner_fee = int(vsize * fee_rate * 1.06) + 1
-    miner_fee = max(miner_fee, vsize * 12)
+    miner_fee = max(int(vsize * fee_rate * 1.06) + 1, vsize * 12)
     miner_fee = min(miner_fee, total // 5)
 
-    # === ESTIMATE FUTURE SAVINGS ===
-    future_cost = int((input_vb_global * inputs + output_vb_global * 2 + 10) * future_rate)  # assume up to 2 outputs
+    future_cost = int((input_vb_global * inputs + output_vb_global * 2 + 10) * future_rate)
     savings = future_cost - miner_fee
 
-    # === THANK YOU CALCULATION (0–500 bps, capped at 25% of savings) ===
+    # === THANK YOU ===
     dao_cut = 0
     if dao_percent > 0 and savings > 3000:
         raw_cut = int(savings * dao_percent / 10_000)
-        dao_cut = max(546, raw_cut)
-        dao_cut = min(dao_cut, savings // 4)  # safety cap
+        dao_cut = max(546, min(raw_cut, savings // 4))
 
-    # === FINAL outputs count (now we know if thank you exists) ===
-    outputs = 1 + (1 if dao_cut > 0 else 0)
-
-    # === RECALCULATE vsize with correct output count ===
-    output_weight = outputs * output_vb_global * 4
-    total_weight = base_weight + input_weight + output_weight + witness_overhead
-    vsize = (total_weight + 3) // 4
-
-    # === FINAL miner fee with accurate vsize ===
-    miner_fee = int(vsize * fee_rate * 1.06) + 1
-    miner_fee = max(miner_fee, vsize * 12)
-    miner_fee = min(miner_fee, total // 5)
-
-    # === FINAL user amount ===
     user_gets = total - miner_fee - dao_cut
     if user_gets < 546:
-        return "Not enough for output after fees", gr.update(visible=False), gr.update(visible=False)
+        return "Not enough for output after fees", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
 
-    # === DESTINATION ===
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return "Invalid destination address", gr.update(visible=False), gr.update(visible=False)
+        return "Invalid destination address", gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False)
 
-    # === BUILD TRANSACTION ===
+    # === BUILD TX ===
     tx = Tx()
     for u in utxos_to_use:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
@@ -817,12 +812,10 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
         dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-    # === GENERATE PSBT & QR ===
     psbt_b64 = make_psbt(tx)
     qr = make_qr(psbt_b64)
     thank = "No thank you given" if dao_cut == 0 else f"Thank you given: {format_btc(dao_cut)}"
 
-    # === COPY BUTTON ===
     copy_button = f"""
     <button onclick="navigator.clipboard.writeText(`{psbt_b64}`).then(()=>{{
         const t=document.createElement('div');
@@ -834,11 +827,10 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
         document.body.appendChild(t);
         setTimeout(()=>t.remove(),2000);
     }})" 
-    style="margin:30px auto;display:block;padding:18px 42px;font-size:1.19rem;
-           font-weight:800;border-radius:16px;border:none;background:#f7931a;
-           color:white;cursor:pointer;box-shadow:0 8px 30px rgba(247,147,26,0.5);
-           transition:all 0.2s;"
-    onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 14px 40px rgba(247,147,26,0.7)'"
+    style="margin:30px auto;display:block;padding:18px 42px;font-size:1.2rem;font-weight:800;
+           border-radius:16px;border:none;background:#f7931a;color:white;cursor:pointer;
+           box-shadow:0 8px 30px rgba(247,147,26,0.5);transition:all 0.2s;"
+    onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 16px 40px rgba(247,147,26,0.7)'"
     onmouseout="this.style.transform='';this.style.boxShadow='0 8px 30px rgba(247,147,26,0.5)'">
         Copy PSBT to Clipboard
     </button>
@@ -846,40 +838,49 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     html = f"""
     <div style="text-align:center; padding:20px;">
-    <h3 style="color:#f7931a;">Transaction Ready — PSBT Generated</h3>
-    <p><b>{inputs}</b> inputs → {format_btc(total)} • Fee: <b>{format_btc(miner_fee)}</b> @ <b>{fee_rate}</b> sat/vB<br>
-       <span style="font-size:18px; color:#f7931a; font-weight:700;">{thank}</span></p>
-    
-    <b style="font-size:32px; color:black; text-shadow: 0 0 20px #00ff9d, 0 0 40px #00ff9d;">
-        You receive: {format_btc(user_gets)}
-    </b>
-    
-    <div style="margin: 30px 0; padding: 18px; background: rgba(247,147,26,0.12); border-radius: 14px; border: 1px solid #f7931a;">
-        Future savings ≈ <b style="font-size:24px; color:#00ff9d; text-shadow: 0 0 12px black, 0 0 24px black;">
-            {format_btc(savings)}
-        </b> (@ <b>{future_rate}</b> sat/vB)
-    </div>
+        {split_warning}
+        <h3 style="color:#f7931a; margin:20px 0;">Transaction Ready — PSBT Generated</h3>
+        <p style="font-size:18px;">
+            <strong>{inputs}</strong> inputs → {format_btc(total)} • 
+            Fee: <strong>{format_btc(miner_fee)}</strong> @ <strong>{fee_rate}</strong> sat/vB<br>
+            <span style="color:#f7931a; font-weight:700;">{thank}</span>
+        </p>
+        
+        <div style="font-size:36px; font-weight:900; color:#00ff9d; text-shadow: 0 0 20px #00ff9d; margin:20px 0;">
+            You receive: {format_btc(user_gets)}
+        </div>
+        
+        <div style="margin:20px 0; padding:18px; background:rgba(247,147,26,0.15); border:1px solid #f7931a; border-radius:14px;">
+            Future savings ≈ <strong style="font-size:26px; color:#00ff9d;">{format_btc(savings)}</strong> 
+            (@ <strong>{future_rate}</strong> sat/vB)
+        </div>
 
-    <div style="margin:40px 0;" class="qr-center">
-        <img src="{qr}">
-    </div>
+        <div style="margin:40px 0;" class="qr-center">
+            <img src="{qr}" style="border:6px solid #f7931a; border-radius:20px; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
+        </div>
 
-    {copy_button}
+        {copy_button}
 
-    <p><small>Scan with wallet • or copy and paste </small></p>
+        <p><small>Scan with wallet • or copy and paste</small></p>
 
-    <details style="margin-top: 32px;">
-        <summary style="cursor: pointer; color: #f7931a; font-weight: bold; font-size: 18px; text-align:center;">
-            View raw PSBT (click to expand)
-        </summary>
-        <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:12px;">
+        <details style="margin-top:32px;">
+            <summary style="cursor:pointer; color:#f7931a; font-weight:bold; font-size:18px;">
+                View raw PSBT (click to expand)
+            </summary>
+            <pre style="background:#000; color:#0f0; padding:18px; border-radius:12px; overflow-x:auto; margin-top:12px; font-size:11px; text-align:left;">
 {psbt_b64}
-        </pre>
-    </details>
+            </pre>
+        </details>
     </div>
     """
 
-    return html, gr.update(visible=False), gr.update(visible=False)
+    return (
+        html, 
+        gr.update(visible=False),  # hide generate button
+        gr.update(visible=False),  # hide row
+        gr.update(visible=False),  # dummy
+        gr.update(visible=False)   # dummy
+    )
 
 # ==============================
 # Gradio UI — Final & Perfect
