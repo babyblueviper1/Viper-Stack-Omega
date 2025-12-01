@@ -677,10 +677,12 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     if len(full_default_selection) > 1500:
         input_count_warning = f"""
         <div style="margin:20px 0;padding:18px;background:#300;border:3px solid #f7931a;border-radius:14px;color:#f7931a;font-weight:bold;text-align:center;">
-            Warning: Transaction will have <strong>{len(full_utxos_for_tx):,}</strong> inputs<br>
+            Warning: Transaction will have <strong>{len(full_default_selection):,}</strong> inputs<br>
             • Use <strong>Electrum or Sparrow</strong> • If over 2,500 → uncheck some and run in batches
         </div>
         """
+    else:
+        input_count_warning = ""
 
     # ——————— PART 1: Table HTML ———————
     table_part1 = f"""
