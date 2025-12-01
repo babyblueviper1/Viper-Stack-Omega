@@ -175,7 +175,8 @@ textarea:focus-within ~ #omega-bg-container-fixed {
 #generate-section[style*="display: none"], #coin-control-section[style*="display: none"] {
     opacity: 0 !important; max-height: 0 !important; overflow: hidden !important;
 }
-
+#generate-section:empty { display: none !important; }
+#generate-section:not(:empty) { display: block !important; }
 """
 # ==============================
 # Bitcoin Helpers
@@ -845,11 +846,11 @@ applyFilters();
     # FINAL RETURN — GRADIO 6+ COMPATIBLE & FLAWLESS
     # ——————————————————————————————————————————————————————
     return (
-        "",                                                                 # output_log
-        "<div id='generate-section' style='display:block !important;'></div>",   # Show generate button section
-        "<div id='coin-control-section' style='display:block !important;'></div>", # Show coin control section
-        table_html,                                                             # Full interactive table + JS
-        json.dumps(full_utxos_for_tx)                                           # Hidden selected UTXOs state
+        "",                                                                        # output_log
+        "<div id='generate-section' style='display:block !important;'></div>",    # ← shows the section
+        "<div id='coin-control-section' style='display:block !important;'></div>",# ← shows coin control
+        table_html,
+        json.dumps(full_utxos_for_tx)
     )
 # ==============================
 
@@ -1036,10 +1037,10 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     """
 
     return (
-        result_html,
-        "",                                            # generate_section_html (empty = hidden)
-        "",                                            # coin_control_section_html (empty = hidden)
-        ""                                             # clear coin_table_html
+       result_html,
+       "<div id='generate-section' style='display:none;'></div>",   # hide
+       "<div id='coin-control-section' style='display:none;'></div>",
+       ""
     )
     
 # ==============================
@@ -1234,9 +1235,20 @@ with gr.Blocks(
     # ==================================================================
     # CORRECT: Use gr.HTML + elem_id for visibility control
     # ==================================================================
+    # CORRECT — real gr.Button that we control with HTML overlay
+    generate_btn = gr.Button(
+        "2. Generate Transaction",
+        variant="primary",
+        size="lg",
+        elem_classes="full-width bump-with-gap",
+        elem_id="generate-tx-btn",
+        visible=False          # ← starts hidden
+    )
+
+    # Keep a tiny HTML container just for smooth show/hide animation
     generate_section = gr.HTML(
-        """<div id="generate-section" style="display:none;"></div>""",
-        visible=True  # We control via inner style
+        """<div id="generate-section" style="display:none; text-align:center; margin:30px 0;"></div>""",
+        visible=True
     )
 
     coin_control_section = gr.HTML(
