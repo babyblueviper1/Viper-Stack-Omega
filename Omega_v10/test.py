@@ -705,13 +705,16 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             </table>
         </div>
 
-        <script>
-const allUtxos = {json.dumps(full_utxos_for_tx)};  // ← This is the FULL list
-const displayedUtxos = {json.dumps(display_utxos)};  // ← This is what the table shows
+    <script>
+const allUtxos = {json.dumps(full_utxos_for_tx)};
+const displayedUtxos = {json.dumps(display_utxos)};
 
 let stateComp = null;
 for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {
-    if (el.__gradio_internal__ || el.value !== undefined) { stateComp = el; break; }
+    if (el.__gradio_internal__ || el.value !== undefined) {
+        stateComp = el;
+        break;
+    }
 }
 
 function applyFilters() {
@@ -748,9 +751,8 @@ function updateSelection() {
     checked.forEach(cb => {
         const idx = parseInt(cb.dataset.idx);
         if (displayedUtxos[idx] !== undefined) {
-            // Find the REAL UTXO object in the full list
-            const realUtxo = allUtxos.find(u => 
-                u.txid === displayedUtxos[idx].txid && 
+            const realUtxo = allUtxos.find(u =>
+                u.txid === displayedUtxos[idx].txid &&
                 u.vout === displayedUtxos[idx].vout
             );
             if (realUtxo) selectedUtxos.push(realUtxo);
