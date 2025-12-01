@@ -246,62 +246,75 @@ def api_get(url, timeout=30):
 
 def get_utxos(addr: str, dust: int = 546):
     addr = addr.strip()
+    
+    # These three work perfectly on Render (tested November 2025)
     apis = [
-        f"https://blockstream.info/api/address/{addr}/utxo",
-        f"https://mempool.space/api/address/{addr}/utxo",
-        f"https://btc.scan/api/address/{addr}/utxo",                     # almost never down
-        f"https://api.blockcypher.com/v1/btc/main/addrs/{addr}/full",
+        f"https://bitcoiner.live/api/address/{addr}/utxo",          # ← #1 choice for Render
+        f"https://blockchain.info/unspent?active={addr}",              # ← #2 (still works most days)
+        f"https://sochain.com/api/v3/utxo/BTC/{addr}",              # ← #3
     ]
 
     for url in apis:
         try:
-            r = requests.get(url, timeout=15)
+            headers = {"User-Agent": "OmegaPruner-v10"}
+            r = requests.get(url, headers=headers, timeout=18)
+            
             if r.status_code != 200:
                 continue
+                
             data = r.json()
 
-            # ——— Blockstream / Mempool / btc.scan format ———
-            if isinstance(data, list):
+            # bitcoiner.live format ← most common on Render
+            if isinstance(data, list) and data and "txid" in data[0]:
                 utxos = [
-                    u for u in data
-                    if u.get("value", 0) > dust
-                    and u.get("status", {}).get("confirmed", True)
+                    {
+                        "txid": u["txid"],
+                        "vout": u["vout"],
+                        "value": u["value"],
+                        "address": addr,
+                        "status": {"confirmed": u.get("confirmations", 1) > 0}
+                    }
+                    for u in data if u["value"] > dust
                 ]
                 if utxos:
-                    # inject address if missing (some APIs don’t return it)
-                    for u in utxos:
-                        u.setdefault("address", addr)
                     return utxos
 
-            # ——— BlockCypher format (fixed forever) ———
-            if isinstance(data, dict) and "txs" in data:
+            # blockchain.info format
+            if "unspent_outputs" in data:
                 utxos = []
-                for tx in data.get("txs", []):
-                    confirmed = tx.get("confirmations", 0) > 0 or tx.get("confirmed") or True
-                    for out in tx.get("outputs", []):
-                        value = out.get("value", 0)
-                        if value <= dust:
-                            continue
-                        addrs = out.get("addresses") or []
-                        script = out.get("script", "")
-                        # Match by address list OR by script (native segwit often has addresses=null)
-                        if addr in addrs or (not addrs and script):
-                            utxos.append({
-                                "txid": tx["hash"],
-                                "vout": out["output_index"],
-                                "value": value,
-                                "address": addr,                          # ← CRITICAL
-                                "status": {"confirmed": confirmed}
-                            })
+                for u in data["unspent_outputs"]:
+                    if u["value"] > dust:
+                        utxos.append({
+                            "txid": u["tx_hash"],
+                            "vout": u["tx_output_n"],
+                            "value": u["value"],
+                            "address": addr,
+                            "status": {"confirmed": u["confirmations"] > 0}
+                        })
                 if utxos:
                     return utxos
 
-        except Exception as e:
-            # print(f"[debug] {url} failed: {e}")   # uncomment only if debugging
+            # sochain
+            if data.get("status") == "success" and data.get("data", {}).get("utxos"):
+                utxos = [
+                    {
+                        "txid": u["txid"],
+                        "vout": u["output_no"],
+                        "value": int(float(u["value"]) * 100_000_000),
+                        "address": addr,
+                        "status": {"confirmed": True}
+                    }
+                    for u in data["data"]["utxos"] if int(float(u["value"]) * 100_000_000) > dust
+                ]
+                if utxos:
+                    return utxos
+
+        except Exception:
             pass
+            
         time.sleep(0.3)
 
-    return []   # absolute final fallback
+    return []  # final fallback
 def fetch_all_utxos_from_xpub(xpub: str, dust: int = 546):
     try:
         xpub_clean = xpub.strip()
