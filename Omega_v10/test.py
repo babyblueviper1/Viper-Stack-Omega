@@ -525,13 +525,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return (msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False))
+            return (msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", [], None)
     else:
         if not addr:
-            return ("Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False))
+            return ("Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", [], None)
         utxos = get_utxos(addr, threshold)
         if not utxos:
-            return ("No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False))
+            return ("No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", [], None)
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
@@ -661,7 +661,6 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             const confFilter = document.getElementById('conf-filter').value;
 
             let rows = Array.from(allRows);
-
             if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
             if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
 
@@ -701,29 +700,39 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
-        // Run on load
+        // ULTIMATE BUTTON FORCE — WORKS EVERY TIME
+        function forceGenerateButton() {{
+            const btn = document.getElementById('generate-tx-btn');
+            const row = btn?.closest('.gr-row');
+            if (btn && row) {{
+                row.style.display = 'flex';
+                row.style.visibility = 'visible';
+                row.style.opacity = '1';
+                btn.style.display = 'block';
+                btn.style.visibility = 'visible';
+                btn.style.opacity = '1';
+                btn.disabled = false;
+            }}
+        }}
+
+        // Run immediately and multiple times
+        forceGenerateButton();
+        setTimeout(forceGenerateButton, 100);
+        setTimeout(forceGenerateButton, 500);
+        setTimeout(forceGenerateButton, 1000);
+
+        // Clear "Calculating..."
+        document.getElementById('selected-summary').innerHTML = '';
+
+        // Run filters + selection
         applyFilters();
         updateSelection();
-
-        // KILL "Calculating..." FOREVER
-        document.getElementById('selected-summary').innerHTML = '';
 
         // Listeners
         document.getElementById('txid-search').addEventListener('input', applyFilters);
         document.getElementById('sort-select').addEventListener('change', applyFilters);
         document.getElementById('conf-filter').addEventListener('change', applyFilters);
         document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
-
-        // FINAL BUTTON FORCE
-        setTimeout(() => {{
-            const btn = document.getElementById('generate-tx-btn');
-            if (btn) {{
-                btn.style.display = 'block';
-                btn.style.visibility = 'visible';
-                btn.style.opacity = '1';
-                btn.closest('.gr-row').style.display = 'flex';
-            }}
-        }}, 500);
         </script>
 
         <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
@@ -735,11 +744,11 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     return (
         "",
-        gr.update(visible=True),
-        gr.update(visible=True),
+        gr.update(visible=True),     # show generate_row
+        gr.update(visible=True),     # show coin_control_row
         table_html,
         pruned_utxos_global,
-        gr.update(visible=True)
+        None                         # dummy — do NOT touch button visibility
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
