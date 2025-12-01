@@ -841,30 +841,15 @@ applyFilters();
 
     table_html = table_part1 + script_part2
 
-# At the end, return updated HTML for visibility
-show_generate = """
-<div id="generate-section" style="display: block !important;">
-    <div class="gr-row full-width bump-with-gap" style="gap: 22px !important;">
-        <button id="generate-tx-btn" class="gr-button size-lg full-width" 
-                style="... (copy the full button style from above) ...">
-            2. Generate Transaction
-        </button>
-    </div>
-</div>
-"""
-
-show_coin_control = """
-<div id="coin-control-section" style="display: block !important;">
-    <!-- Copy the full coin control HTML from above, but with display: block -->
-</div>
-"""
-
-     return (
-        "",                                           # output_log (cleared)
-        "<div id='generate-section' style='display:block !important;'></div>",     # SHOW generate button section
-        "<div id='coin-control-section' style='display:block !important;'></div>", # SHOW coin control section
-        table_html,                                   # coin_table_html – the full interactive table + JS
-        json.dumps(full_utxos_for_tx)                 # selected_utxos_state – hidden JSON
+    # ——————————————————————————————————————————————————————
+    # FINAL RETURN — GRADIO 6+ COMPATIBLE & FLAWLESS
+    # ——————————————————————————————————————————————————————
+    return (
+        "",                                                                 # output_log
+        "<div id='generate-section' style='display:block !important;'></div>",   # Show generate button section
+        "<div id='coin-control-section' style='display:block !important;'></div>", # Show coin control section
+        table_html,                                                             # Full interactive table + JS
+        json.dumps(full_utxos_for_tx)                                           # Hidden selected UTXOs state
     )
 # ==============================
 
