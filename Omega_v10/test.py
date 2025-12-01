@@ -705,19 +705,19 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             </table>
         </div>
 
-    <script>
+<script>
 const allUtxos = {json.dumps(full_utxos_for_tx)};
 const displayedUtxos = {json.dumps(display_utxos)};
 
 let stateComp = null;
-for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {
-    if (el.__gradio_internal__ || el.value !== undefined) {
+for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
+    if (el.__gradio_internal__ || typeof el.value !== 'undefined') {{
         stateComp = el;
         break;
-    }
-}
+    }}
+}}
 
-function applyFilters() {
+function applyFilters() {{
     const query = document.getElementById('txid-search').value.toLowerCase();
     const sort = document.getElementById('sort-select').value;
     const confFilter = document.getElementById('conf-filter').value;
@@ -726,62 +726,62 @@ function applyFilters() {
     if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
     if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
 
-    if (sort) {
-        rows.sort((a, b) => {
-            if (sort.includes('value')) {
+    if (sort) {{
+        rows.sort((a, b) => {{
+            if (sort.includes('value')) {{
                 const av = parseInt(a.dataset.value);
                 const bv = parseInt(b.dataset.value);
                 return sort === 'value-desc' ? bv - av : av - bv;
-            } else {
+            }} else {{
                 const av = parseInt(a.dataset.vout);
                 const bv = parseInt(b.dataset.vout);
                 return sort === 'vout-desc' ? bv - av : av - bv;
-            }
-        });
-    }
+            }}
+        }});
+    }}
 
     const tbody = document.querySelector('#utxo-table tbody');
     rows.forEach(r => tbody.appendChild(r));
-}
+}}
 
-function updateSelection() {
+function updateSelection() {{
     const checked = document.querySelectorAll('input[data-idx]:checked');
     const selectedUtxos = [];
 
-    checked.forEach(cb => {
+    checked.forEach(cb => {{
         const idx = parseInt(cb.dataset.idx);
-        if (displayedUtxos[idx] !== undefined) {
-            const realUtxo = allUtxos.find(u =>
-                u.txid === displayedUtxos[idx].txid &&
+        if (displayedUtxos[idx] !== undefined) {{
+            const realUtxo = allUtxos.find(u => 
+                u.txid === displayedUtxos[idx].txid && 
                 u.vout === displayedUtxos[idx].vout
             );
             if (realUtxo) selectedUtxos.push(realUtxo);
-        }
-    });
+        }}
+    }});
 
     const count = selectedUtxos.length;
     const total = selectedUtxos.reduce((sum, u) => sum + u.value, 0);
 
     document.getElementById('selected-summary').innerHTML = `
-        <div style="font-size:34px; color:#f7931a; font-weight:900;">${count} inputs selected</div>
-        <div style="font-size:50px; color:#00ff9d; font-weight:900;">${total.toLocaleString()} sats</div>
+        <div style="font-size:34px; color:#f7931a; font-weight:900;">${{count}} inputs selected</div>
+        <div style="font-size:50px; color:#00ff9d; font-weight:900;">${{total.toLocaleString()}} sats</div>
         <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
     `;
 
-    if (stateComp) {
-        if (stateComp.__gradio_internal__) {
+    if (stateComp) {{
+        if (stateComp.__gradio_internal__) {{
             stateComp.__gradio_internal__.setValue(selectedUtxos);
-        } else {
+        }} else {{
             stateComp.value = selectedUtxos;
             stateComp.dispatchEvent(new Event('change'));
-        }
-    }
-}
+        }}
+    }}
+}}
 
-function forceGenerateButton() {
+function forceGenerateButton() {{
     const btn = document.getElementById('generate-tx-btn');
     const row = btn?.closest('.gr-row');
-    if (btn && row) {
+    if (btn && row) {{
         row.style.display = 'flex';
         row.style.visibility = 'visible';
         row.style.opacity = '1';
@@ -789,8 +789,8 @@ function forceGenerateButton() {
         btn.style.visibility = 'visible';
         btn.style.opacity = '1';
         btn.disabled = false;
-    }
-}
+    }}
+}}
 
 forceGenerateButton();
 setTimeout(forceGenerateButton, 100);
@@ -803,9 +803,9 @@ updateSelection();
 document.getElementById('txid-search').addEventListener('input', applyFilters);
 document.getElementById('sort-select').addEventListener('change', applyFilters);
 document.getElementById('conf-filter').addEventListener('change', applyFilters);
-document.addEventListener('change', e => {
+document.addEventListener('change', e => {{
     if (e.target.matches('input[data-idx]')) updateSelection();
-});
+}});
 </script>
 
         <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
