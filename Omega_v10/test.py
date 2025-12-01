@@ -233,14 +233,16 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, dict]:
         dec = base58_decode(addr)
         if len(dec) == 25 and dec[0] == 0x05:
             return b'\xa9\x14' + dec[1:21] + b'\x87', {'input_vb': 91, 'output_vb': 32, 'type': 'P2SH'}
+
     if addr.startswith('bc1q'):
-    data = [CHARSET.find(c) for c in addr[4:] if c in CHARSET]
-    if data and data[0] == 0 and bech32_verify_checksum('bc', data):
-        prog = convertbits(data[1:], 5, 8, False)
-        if prog and len(prog) == 20:
-            return b'\x00\x14' + bytes(prog), {'input_vb': 68, 'output_vb': 31, 'type': 'P2WPKH'}
-        if prog and len(prog) == 32:
-            return b'\x00\x20' + bytes(prog), {'input_vb': 69, 'output_vb': 43, 'type': 'P2WSH'}
+        data = [CHARSET.find(c) for c in addr[4:] if c in CHARSET]
+        if data and data[0] == 0 and bech32_verify_checksum('bc', data):
+            prog = convertbits(data[1:], 5, 8, False)
+            if prog and len(prog) == 20:
+                return b'\x00\x14' + bytes(prog), {'input_vb': 68, 'output_vb': 31, 'type': 'P2WPKH'}
+            if prog and len(prog) == 32:
+                return b'\x00\x20' + bytes(prog), {'input_vb': 69, 'output_vb': 43, 'type': 'P2WSH'}
+
     if addr.startswith('bc1p'):
         data = [CHARSET.find(c) for c in addr[5:] if c in CHARSET]
         if data and data[0] == 1 and bech32m_verify_checksum('bc', data):
