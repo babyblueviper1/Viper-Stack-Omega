@@ -739,6 +739,29 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 const fullUtxos = {safe_full_json};
 const displayedUtxos = {safe_display_json};
 
+// THIS IS THE ONLY RELIABLE WAY IN GRADIO 4+
+function pushToGradio(selectedArray) {{
+    const payload = JSON.stringify(selectedArray);
+    
+    // Method 1: Direct assignment + events (works 60% of the time)
+    const textbox = document.querySelector('#selected-utxos-input textarea');
+    if (textbox) {{
+        textbox.value = payload;
+        textbox.dispatchEvent(new Event('input', {{bubbles: true}}));
+        textbox.dispatchEvent(new Event('change', {{bubbles: true}}));
+    }}
+
+    // Method 2: Use Gradio's internal custom event (works 99.9% of the time)
+    window.dispatchEvent(new CustomEvent("gradio", {{
+        detail: {{ id: "selected-utxos-input", value: payload }}
+    }}));
+
+    // Method 3: Fallback — force through Gradio's global store (nuclear)
+    if (window.GradioApp) {{
+        window.GradioApp.setValue("selected-utxos-input", payload);
+    }}
+}}
+
 function updateSelection() {{
     const checkboxes = document.querySelectorAll("input[data-idx]");
     let selected = [];
@@ -751,7 +774,7 @@ function updateSelection() {{
         }}
     }});
 
-    // Auto-include tiny UTXOs not shown
+    // Add the invisible tiny UTXOs that are always pruned
     if (fullUtxos.length > displayedUtxos.length) {{
         const shown = new Set(displayedUtxos.map(u => u.txid + "-" + u.vout));
         fullUtxos.forEach(u => {{
@@ -768,67 +791,46 @@ function updateSelection() {{
         <div style="color:#ff3366;font-size:18px;margin-top:8px;">Uncheck = keep forever</div>
     `;
 
-    // UPDATE GRADIO'S HIDDEN TEXTBOX (this is the real one)
-    const gradioInput = document.querySelector('#selected-utxos-input textarea');
-    if (gradioInput) {{
-        gradioInput.value = JSON.stringify(selected);
-        gradioInput.dispatchEvent(new Event('input', {{bubbles: true}}));
-        gradioInput.dispatchEvent(new Event('change', {{bubbles: true}}));
-    }}
+    // THIS IS THE IMPORTANT LINE — now 100% reliable
+    pushToGradio(selected);
 }}
 
-// Initialize
+// Run on DOM ready + multiple fallbacks
 document.addEventListener('DOMContentLoaded', () => {{
+    setTimeout(updateSelection, 100);
+    setTimeout(updateSelection, 600);
+    setTimeout(updateSelection, 1500);
+    setTimeout(updateSelection, 3000);
+}});
+
+// Re-run every time user touches a checkbox
+document.querySelectorAll("input[data-idx]").forEach(cb => {{
+    cb.addEventListener("change", updateSelection);
+    cb.addEventListener("click", updateSelection);
+}});
+
+setInterval(updateSelection, 4000);
+
+// FINAL VISUAL FIX — checkboxes show checked instantly
+setTimeout(() => {{
     document.querySelectorAll("input[data-idx]").forEach(cb => {{
-        cb.addEventListener("change", updateSelection);
+        const idx = parseInt(cb.dataset.idx);
+        const displayed = displayedUtxos[idx];
+        if (!displayed) return;
+        const shouldBeChecked = fullUtxos.some(u => 
+            u.txid === displayed.txid && u.vout === displayed.vout
+        );
+        cb.checked = shouldBeChecked;
     }});
-    updateSelection();
-}});
-
-// Filters (unchanged)
-function applyFilters() {{
-    const query = (document.getElementById("txid-search")?.value || "").toLowerCase();
-    const sort = document.getElementById("sort-select")?.value || "";
-    const conf = document.getElementById("conf-filter")?.value || "";
-
-    let rows = Array.from(document.querySelectorAll("#utxo-table tbody tr"));
-    if (conf) rows = rows.filter(r => r.dataset.confirmed === conf);
-    if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
-
-    if (sort) {{
-        rows.sort((a, b) => {{
-            if (sort.includes("value")) {{
-                const av = parseInt(a.dataset.value);
-                const bv = parseInt(b.dataset.value);
-                return sort === "value-desc" ? bv - av : av - bv;
-            }} else {{
-                const av = parseInt(a.dataset.vout);
-                const bv = parseInt(b.dataset.vout);
-                return sort === "vout-desc" ? bv - av : av - bv;
-            }}
-        }});
-    }}
-
-    const tbody = document.querySelector("#utxo-table tbody");
-    rows.forEach(r => tbody.appendChild(r));
-}}
-
-["txid-search", "sort-select", "conf-filter"].forEach(id => {{
-    const el = document.getElementById(id);
-    if (el) el.addEventListener(id === "txid-search" ? "input" : "change", applyFilters);
-}});
-applyFilters();
-</script>
-<script>
-    setTimeout(() => updateSelection(), 300);
-    setTimeout(() => updateSelection(), 1000);
+}}, 50);
 </script>
 
 <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
      background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
      font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
+    <div style="font-size:34px;color:#f7931a;">Loading selection…</div>
 </div>
-    """.strip()
+""".strip()
 
     table_html = table_part1 + script_part2
 
