@@ -481,7 +481,15 @@ def make_psbt(tx: Tx) -> str:
 # =================================================================
 
 def make_qr(data: str) -> str:
-    img = qrcode.make(data, box_size=10, border=4)
+    qr = qrcode.QRCode(
+        version=40,                    # ← Force max version (supports ~3k chars)
+        error_correction=qrcode.constants.ERROR_CORRECT_L,  # 7% recovery
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)                  # This forces it to fit
+    img = qr.make_image(fill_color="black", back_color="white")
     buf = io.BytesIO()
     img.save(buf, format='PNG')
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
