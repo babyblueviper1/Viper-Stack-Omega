@@ -1172,7 +1172,7 @@ with gr.Blocks(
             "", []
         ),
         outputs=[
-            user_input, prune_choice, dust_threshold, provoque_addr,
+            user_input, prune_choice, dust_threshold, dest_addr,
             dao_percent, future_multiplier,
             generate_section, coin_control_section,
             coin_table, output_log, selected_utxos_state
