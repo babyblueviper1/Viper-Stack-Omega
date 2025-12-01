@@ -1035,7 +1035,7 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </div>
     """
 
-     return (
+    return (
         result_html,
         "",                                            # generate_section_html (empty = hidden)
         "",                                            # coin_control_section_html (empty = hidden)
