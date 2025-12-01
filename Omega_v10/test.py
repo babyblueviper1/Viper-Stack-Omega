@@ -835,11 +835,11 @@ applyFilters();
     table_html = table_part1 + script_part2
 
     return (
-        "",                                      # output_log
-        gr.update(visible=True),                 # generate_row
-        gr.update(visible=True),                 # coin_control_row
-        table_html,
-        json.dumps(full_utxos_for_tx)            # ← JSON string, not list!
+        "",                                              # output_log
+        gr.Row(visible=True),                            # show generate_row
+        gr.Row(visible=True),                            # show coin_control_row
+        table_html,                                      # coin_table_html value
+        json.dumps(full_utxos_for_tx)                    # selected_utxos_state
     )
 # ==============================
 
@@ -1027,10 +1027,10 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     return (
         result_html,
-        gr.update(visible=False),   # hide generate button
-        gr.update(visible=False),   # hide generate row
-        "",                         # dummy
-        gr.update(visible=False)    # dummy
+        generate_btn.update(visible=False),
+        generate_row.update(visible=False),
+        coin_control_row.update(visible=False),
+        coin_table_html.update(value="")
     )
     
 # ==============================
@@ -1261,46 +1261,71 @@ with gr.Blocks(
 
     submit_btn.click(
         analysis_pass,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
+        inputs=[
+            user_input,
+            prune_choice,
+            dust_threshold,
+            dest_addr,
+            dao_percent,
+            future_multiplier
+        ],
         outputs=[
-            output_log,
-            generate_row,
-            coin_control_row,
-            coin_table_html,
-            selected_utxos_state,
+            output_log,           # HTML log / warnings
+            generate_row,         # Row containing the "Generate" button
+            coin_control_row,     # Coin-control table row
+            coin_table_html,      # The big UTXO table
+            selected_utxos_state  # Hidden JSON state
         ]
     )
 
     generate_btn.click(
         build_real_tx,
         inputs=[
-            user_input, prune_choice, dust_threshold, dest_addr,
-            dao_percent, future_multiplier, selected_utxos_state
+            user_input,
+            prune_choice,
+            dust_threshold,
+            dest_addr,
+            dao_percent,
+            future_multiplier,
+            selected_utxos_state
         ],
         outputs=[
-            output_log,
-            generate_btn,
-            generate_row,
-            gr.update(),   # dummy
-            gr.update()    # dummy
+            output_log,       # Final PSBT + QR result
+            generate_btn,     # Hide the generate button
+            generate_row,     # Hide the whole generate row
+            coin_control_row, # Hide coin-control section
+            coin_table_html   # Clear the table
         ]
     )
 
     start_over_btn.click(
         lambda: (
-            "", "Recommended (40% pruned)", 546, "", 50, "",
-            gr.update(visible=False),
-            gr.update(visible=False),
-            "",
-            "[]"
+            "",                                  # user_input
+            "Recommended (40% pruned)",          # prune_choice
+            546,                                 # dust_threshold
+            "",                                  # dest_addr
+            50,                                  # dao_percent
+            6,                                   # future_multiplier
+            "",                                  # output_log (clear)
+            generate_row.update(visible=False),
+            coin_control_row.update(visible=False),
+            coin_table_html.update(value=""),
+            selected_utxos_state.update(value="[]")
         ),
         outputs=[
-            user_input, prune_choice, dust_threshold, dest_addr, dao_percent, output_log,
-            generate_row, coin_control_row, coin_table_html, selected_utxos_state
+            user_input,
+            prune_choice,
+            dust_threshold,
+            dest_addr,
+            dao_percent,
+            future_multiplier,
+            output_log,
+            generate_row,
+            coin_control_row,
+            coin_table_html,
+            selected_utxos_state
         ]
     )
-
-
 
     
     # Floating BTC QR Scanner + Beautiful Toast
