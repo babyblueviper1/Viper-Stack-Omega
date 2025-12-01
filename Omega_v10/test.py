@@ -689,8 +689,8 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             const total = Array.from(checked).reduce((sum, c) => sum + (allUtxos[parseInt(c.dataset.idx)]?.value || 0), 0);
 
             document.getElementById('selected-summary').innerHTML = `
-                <div style="font-size:34px; color:#f7931a; font-weight:900;">${count} inputs selected</div>
-                <div style="font-size:50px; color:#00ff9d; font-weight:900;">${total.toLocaleString()} sats</div>
+                <div style="font-size:34px; color:#f7931a; font-weight:900;">${{count}} inputs selected</div>
+                <div style="font-size:50px; color:#00ff9d; font-weight:900;">${{total.toLocaleString()}} sats</div>
                 <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
             `;
 
@@ -715,7 +715,8 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                 btn.style.display = 'block';
                 btn.style.visibility = 'visible';
                 btn.style.opacity = '1';
-                btn.closest('.gr-row').style.display = 'flex';
+                const row = btn.closest('.gr-row');
+                if (row) row.style.display = 'flex';
             }}
         }}, 400);
         </script>
@@ -729,7 +730,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     """.strip()
 
     return (
-        "", 
+        "",
         gr.update(visible=True),
         gr.update(visible=True),
         table_html,
