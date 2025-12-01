@@ -38,145 +38,108 @@ input_vb_global = output_vb_global = None
 # CSS
 # ==============================
 css = """
-/* —————————————————————— ΩMEGA PRUNER v10 CSS —————————————————————— */
-
-/* 1. SANE, BEAUTIFUL GAPS — GRADIO 6+ FIX */
+/* —————————————————————— ΩMEGA PRUNER v10.1 — FINAL 2025 CSS —————————————————————— */
+/* 1. CLEAN ROW GAPS */
 .gr-row { gap: 14px !important; }
 .gr-row:has(.full-width),
 .gr-row:has(.bump-with-gap),
-.gr-row:has(.gr-button.size-lg) { gap: 16px !important; }
-#generate-and-startover-row { gap: 22px !important; }
+.gr-row:has(.gr-button.size-lg) { gap: 18px !important; }
 
-/* Kill rogue margins/padding */
-.full-width, .full-width > div, .full-width button,
-.bump-with-gap, .bump-with-gap > div, .bump-with-gap button {
-    margin: 0 !important; padding: 0 !important;
+/* 2. BEEFY PREMIUM BUTTONS — STILL BEST IN CLASS */
+.gr-button button, .gr-button > div, .gr-button > button {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+    padding: 16px 28px !important;
+    min-height: 62px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.16) !important;
+    transition: all 0.22s ease !important;
+    width: 100% !important;
+    text-align: center !important;
 }
-
-/* 2. BEEFY PREMIUM BUTTONS */
-.gr-button button, .gr-button > div, .gr-button > button,
-.gr-button [class*="svelte"], button[class*="svelte"] {
-    font-size: 1.25rem !important; font-weight: 600 !important;
-    padding: 16px 28px !important; min-height: 62px !important;
-    border-radius: 14px !important; box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
-    transition: all 0.22s ease !important; line-height: 1.4 !important;
-    width: 100% !important; text-align: center !important;
-}
-.gr-button[variant="primary"], .gr-button.size-lg,
-.full-width, .bump-with-gap, .tall-button {
-    font-size: 1.38rem !important; font-weight: 750 !important;
-    padding: 22px 32px !important; min-height: 72px !important;
+.gr-button[variant="primary"], .gr-button.size-lg {
+    font-size: 1.38rem !important;
+    font-weight: 750 !important;
+    padding: 22px 32px !important;
+    min-height: 72px !important;
     box-shadow: 0 6px 20px rgba(247,147,26,0.38) !important;
 }
-.gr-button[variant="secondary"] button,
-.gr-button[variant="secondary"] > button {
-    font-size: 1.28rem !important; font-weight: 600 !important;
-    padding: 18px 28px !important; min-height: 64px !important;
+.gr-button[variant="secondary"] button {
+    font-size: 1.28rem !important;
+    padding: 18px 28px !important;
+    min-height: 64px !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
 }
-.gr-button:hover button, .gr-button:hover > button, .gr-button:hover {
-    transform: translateY(-3px) !important;
-    box-shadow: 0 12px 28px rgba(0,0,0,0.22) !important;
-}
-.gr-button[variant="primary"]:hover, .gr-button.size-lg:hover {
-    box-shadow: 0 14px 32px rgba(247,147,26,0.5) !important;
+.gr-button:hover {
     transform: translateY(-4px) !important;
+    box-shadow: 0 14px 32px rgba(247,147,26,0.5) !important;
 }
 
-/* 3. MISC FIXES */
-details summary { list-style: none; cursor: pointer; }
-details summary::-webkit-details-marker { display: none; }
+/* 3. ACTION ROW — STICKY BOTTOM BAR (NUCLEAR UX) */
+#action_row {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: linear-gradient(180deg, transparent, #000 30%) !important;
+    padding: 20px 0 40px !important;
+    margin-top: 80px !important;
+    z-index: 100 !important;
+    backdrop-filter: blur(12px) !important;
+    border-top: 4px solid #f7931a !important;
+    border-radius: 20px 20px 0 0 !important;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.6) !important;
+}
 
-/* ——— FAB BUTTONS ——— */
+/* When Generate button is hidden → Start Over takes full width */
+#action_row:has(button[style*="display: none"]) .gr-button {
+    width: 100% !important;
+    max-width: 600px !important;
+    margin: 0 auto !important;
+}
+
+/* 4. FAB SCANNER BUTTON */
 .qr-fab {
-  position: fixed !important; right: 20px !important;
-  width: 70px !important; height: 70px !important;
-  border-radius: 50% !important;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important;
-  display: flex !important; align-items: center !important; justify-content: center !important;
-  font-size: 38px !important; font-weight: bold !important; cursor: pointer !important;
-  transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
-  border: 5px solid white !important; user-select: none !important;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.5) !important; z-index: 9999 !important;
-  animation: pulse 4s infinite ease-in-out !important;   /* ← SUBTLE PULSE */
+    position: fixed !important; right: 20px !important; bottom: 100px !important;
+    width: 70px !important; height: 70px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, #f7931a, #f9a43f) !important;
+    color: white !important;
+    font-size: 38px !important; font-weight: bold !important;
+    display: flex !important; align-items: center !important; justify-content: center !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.7) !important;
+    border: 5px solid white !important;
+    cursor: pointer !important; z-index: 9999 !important;
+    animation: pulse 4s infinite ease-in-out !important;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1) !important;
 }
-.qr-fab:hover {
-  transform: scale(1.18) !important;
-  box-shadow: 0 16px 50px rgba(0,0,0,0.8) !important;
-  animation: none !important;   /* stop pulse on hover → feels snappier */
-}
-.qr-fab.btc  { bottom: 100px !important; background: linear-gradient(135deg, #f7931a, #f9a43f) !important; color: white !important; }
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50%      { transform: scale(1.08); }
-}
-
-/* ——— DIM GIANT Ω WHEN TYPING ——— */
-input:focus ~ #omega-bg-container-fixed,
-textarea:focus ~ #omega-bg-container-fixed,
-input:focus-within ~ #omega-bg-container-fixed,
-textarea:focus-within ~ #omega-bg-container-fixed {
-    opacity: 0.22 !important;
-    transition: opacity 0.5s ease !important;
-}
-/* ——— KEEP GRADIO'S NATIVE BOTTOM BUTTONS SKINNY & NORMAL ——— */
-.gradio-container .bottom-buttons .gr-button,
-.gradio-container footer .gr-button,
-.gradio-container button[data-testid="block-settings"],
-.gradio-container button[title="Show API"],
-.gradio-container button[title="View API"],
-.gradio-container button[title="Clear"],
-.gradio-container button[title="Stop"] {
-    all: revert !important;
-    font-size: 0.9rem !important;
-    padding: 8px 14px !important;
-    min-height: auto !important;
-    box-shadow: none !important;
-    border-radius: 8px !important;
-    font-weight: 500 !important;
-}
-
-/* ——— QR CENTERING & STYLING ——— */
-.qr-center {
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  margin: 40px 0 !important;
-}
-.qr-center img {
-  width: 460px !important;
-  max-width: 96vw !important;
-  border-radius: 20px !important;
-  border: 6px solid #f7931a !important;
-  box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
-}
-#omega-footer {
-    margin-bottom: -10px !important;
-    padding-bottom: 4px !important;
-}
-.gradio-container .gradio-footer,
-.gradio-container footer {
-    display: none !important;   /* nukes Gradio's own footer completely */
-}
+.qr-fab:hover { transform: scale(1.18) !important; animation: none !important; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @media (max-width: 768px) {
     .qr-fab { bottom: 80px !important; right: 16px !important; width: 64px !important; height: 64px !important; font-size: 34px !important; }
-    .qr-center img { width: 380px !important; }
+}
+
+/* 5. DIM Ω WHEN TYPING */
+input:focus ~ #omega-bg-container-fixed,
+textarea:focus ~ #omega-bg-container-fixed { opacity: 0.22 !important; transition: opacity 0.5s ease !important; }
+
+/* 6. KILL GRADIO'S UGLY FOOTER & NATIVE BUTTONS */
+.gradio-container footer, .gradio-container .gradio-footer { display: none !important; }
+.gradio-container .bottom-buttons .gr-button,
+button[title="Clear"], button[title="Stop"] {
+    all: revert !important; font-size: 0.9rem !important; padding: 8px 14px !important;
+}
+
+/* 7. QR & TABLE BEAUTY */
+.qr-center img {
+    width: 460px !important; max-width: 96vw !important;
+    border: 6px solid #f7931a !important; border-radius: 20px !important;
+    box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
 }
 #utxo-table td a span:hover {
     background: rgba(247,147,26,0.25) !important;
-    border-radius: 6px !important;
-    box-shadow: 0 0 12px rgba(247,147,26,0.4);
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    box-shadow: 0 0 12px rgba(247,147,26,0.4) !important;
 }
-
-#generate-section, #coin-control-section {
-    transition: opacity 0.3s ease, max-height 0.3s ease !important;
-}
-#generate-section[style*="display: none"], #coin-control-section[style*="display: none"] {
-    opacity: 0 !important; max-height: 0 !important; overflow: hidden !important;
-}
-#generate-section:empty { display: none !important; }
-#generate-section:not(:empty) { display: block !important; }
 """
 # ==============================
 # Bitcoin Helpers
@@ -1110,7 +1073,7 @@ with gr.Blocks(
     coin_table_html = gr.HTML(elem_id="coin-table-container")
 
     # The real Generate + Start Over row (starts hidden)
-    with gr.Row(visible=False) as generate_row:
+    with gr.Row(visible=False) as action_row:
         generate_btn = gr.Button(
             "2. Generate Transaction",
             variant="primary",
@@ -1124,7 +1087,6 @@ with gr.Blocks(
             size="lg",
             elem_classes="full-width"
         )
-
     # ==================================================================
     # CRITICAL: Sync hidden textbox → Python State (this is the magic)
     # ==================================================================
@@ -1139,32 +1101,32 @@ with gr.Blocks(
     # ==================================================================
 
     # 1. Analyze UTXOs → show table + reveal Generate button
-    submit_btn.click(
+        submit_btn.click(
         analysis_pass,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[output_log, generate_section, coin_control_section, coin_table_html, selected_utxos_state]
     ).then(
         lambda: gr.update(visible=True),
-        outputs=generate_row
+        outputs=action_row
     )
 
-    # 2. Generate Transaction → build PSBT + hide button row
+    # 2. After generating PSBT → HIDE ONLY THE GENERATE BUTTON, keep Start Over
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],
         outputs=[output_log, generate_section, coin_control_section, coin_table_html]
     ).then(
-        lambda: gr.update(visible=False),
-        outputs=generate_row
+        lambda: gr.update(visible=False),   # ← hides ONLY the Generate button
+        outputs=generate_btn
     )
 
-    # 3. Start Over → reset everything
+    # 3. Start Over → full reset + hide entire row
     start_over_btn.click(
         lambda: (
-            "", "Recommended (40% pruned)", 546, "", 50, 6,           # input fields
-            "<div id='generate-section'></div>",                     # containers
+            "", "Recommended (40% pruned)", 546, "", 50, 6,
+            "<div id='generate-section'></div>",
             "<div id='coin-control-section'></div>",
-            "", "", [],                                              # table + log + state
+            "", "", []
         ),
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
@@ -1174,7 +1136,7 @@ with gr.Blocks(
         ]
     ).then(
         lambda: gr.update(visible=False),
-        outputs=generate_row
+        outputs=action_row
     )
     
     # Floating BTC QR Scanner + Beautiful Toast
