@@ -645,83 +645,61 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     # ——————————————————— NEW 2025 JS (ONLY THIS PART) ———————————————————
     js_section = f"""
 <script>
-const fullUtxos = {{full_json}};
-const displayedUtxos = {{display_json}};
+const fullUtxos = {safe_full_json};
+const displayedUtxos = {safe_display_json};
 
-let lastSent = "[]";  // ← tracks last sent value to force updates
+let lastSent = "[]";
 
-function updateSelection() {
+function updateSelection() {{
     const selected = [];
-    document.querySelectorAll("input[data-idx]").forEach(cb => {
-        if (cb.checked) {
-            const utxo = displayedUtxos[parseInt(cb.dataset.idx)];
-            if (utxo) selected.push(utxo);
-        }
-    });
 
-    // Always include hidden/small UTXOs that are auto-selected
-    if (fullUtxos.length > displayedUtxos.length) {
+    document.querySelectorAll("input[data-idx]").forEach(cb => {{
+        if (cb.checked) {{
+            const idx = parseInt(cb.dataset.idx);
+            if (!isNaN(idx) && displayedUtxos[idx]) {{
+                selected.push(displayedUtxos[idx]);
+            }}
+        }}
+    }});
+
+    if (fullUtxos.length > displayedUtxos.length) {{
         const shown = new Set(displayedUtxos.map(u => u.txid + ":" + u.vout));
-        fullUtxos.forEach(u => {
-            if (!shown.has(u.txid + ":" + u.vout)) selected.push(u);
-        });
-    }
+        fullUtxos.forEach(u => {{
+            if (!shown.has(u.txid + ":" + u.vout)) {{
+                selected.push(u);
+            }}
+        }});
+    }}
 
     const total = selected.reduce((a, u) => a + u.value, 0);
+
     document.getElementById("selected-summary").innerHTML = `
-        <div style="font-size:34px;color:#f7931a;font-weight:900;">${selected.length} inputs → WILL BE PRUNED</div>
-        <div style="font-size:50px;color:#00ff9d;font-weight:900;">${total.toLocaleString()} sats total</div>
+        <div style="font-size:34px;color:#f7931a;font-weight:900;">${{selected.length}} inputs → WILL BE PRUNED</div>
+        <div style="font-size:50px;color:#00ff9d;font-weight:900;">${{total.toLocaleString()}} sats total</div>
         <div style="color:#ff3366;font-size:18px;margin-top:8px;">Uncheck = keep forever</div>
     `;
 
     const newJson = JSON.stringify(selected);
-    
-    // CRITICAL FIX: Only update if changed OR first time
-    if (newJson !== lastSent) {
+    if (newJson !== lastSent) {{
         lastSent = newJson;
         const bridge = document.getElementById("hidden-json-bridge");
         bridge.value = newJson;
-        
-        // TRIPLE FIRE: input + change + custom event
-        bridge.dispatchEvent(new Event("input", {bubbles: true}));
-        bridge.dispatchEvent(new Event("change", {bubbles: true}));
-        
-        // Force Gradio to wake up — this is the nuclear option that NEVER fails
         bridge.setAttribute("value", newJson);
-        bridge.dispatchEvent(new Event("change", {bubbles: true}));
-    }
-}
+        bridge.dispatchEvent(new Event("input", {{bubbles: true}}));
+        bridge.dispatchEvent(new Event("change", {{bubbles: true}}));
+    }}
+}}
 
-// Run on DOM ready
-document.addEventListener("DOMContentLoaded", () => {
-    // Attach listeners
-    document.querySelectorAll("input[data-idx]").forEach(cb => {
+document.addEventListener("DOMContentLoaded", () => {{
+    document.querySelectorAll("input[data-idx]").forEach(cb => {{
         cb.addEventListener("change", updateSelection);
-        cb.addEventListener("click", updateSelection);  // extra safety
-    });
-
-    // Initial run + delayed runs (Gradio sometimes renders late)
+        cb.addEventListener("click", updateSelection);
+    }});
     updateSelection();
     setTimeout(updateSelection, 800);
     setTimeout(updateSelection, 1800);
     setTimeout(updateSelection, 3000);
-
-    // Final nuclear fallback: poll every 2s if user is interacting
-    let ticking = false;
-    document.addEventListener("click", () => {
-        if (!ticking) {
-            ticking = true;
-            const interval = setInterval(() => {
-                if (document.querySelector("input[data-idx]")) {
-                    updateSelection();
-                } else {
-                    clearInterval(interval);
-                    ticking = false;
-                }
-            }, 2000);
-        }
-    });
-});
+}});
 </script>
 
 <input type="hidden" id="hidden-json-bridge" value="[]">
