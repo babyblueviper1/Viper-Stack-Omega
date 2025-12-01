@@ -709,14 +709,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 const fullUtxos = {json.dumps(full_utxos_for_tx)};
 let selectedMap = new Map(fullUtxos.map(u => [`${u.txid}-${u.vout}`, u]));
 
-// Pre-check all by default
+// Pre-check all visible checkboxes
 document.querySelectorAll('input[data-idx]').forEach(cb => cb.checked = true);
 
 function updateSelection() {
-    // Start with ALL UTXOs
+    // Start with EVERY UTXO (this is the key fix)
     const selected = [...fullUtxos];
 
-    // Remove any that user unchecked (only possible for displayed ones)
+    // Remove only the ones the user explicitly unchecked
     document.querySelectorAll('input[data-idx]:not(:checked)').forEach(cb => {
         const idx = parseInt(cb.dataset.idx);
         const displayed = {json.dumps(display_utxos)};
@@ -724,7 +724,7 @@ function updateSelection() {
             const key = `${displayed[idx].txid}-${displayed[idx].vout}`;
             const utxoToRemove = selectedMap.get(key);
             if (utxoToRemove) {
-                const index = selected.indexOf(utxoToRemove);
+                const index = selected.findIndex(u => u === utxoToRemove);
                 if (index > -1) selected.splice(index, 1);
             }
         }
@@ -739,10 +739,10 @@ function updateSelection() {
         <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
     `;
 
-    // Find Gradio state component properly
+    // Update Gradio state
     const stateComp = document.querySelector('gradio-state') || 
                      Array.from(document.querySelectorAll('*')).find(el => 
-                         el.__gradio_internal__ || el.value !== undefined
+                         el.__gradio_internal__ || (el.tagName.toLowerCase() === 'input' && el.type === 'hidden')
                      );
 
     if (stateComp) {
@@ -755,16 +755,40 @@ function updateSelection() {
     }
 }
 
-// Initial + live updates
+// Run on load and on every checkbox change
 updateSelection();
 document.addEventListener('change', e => {
-    if (e.target.matches('input[data-idx]')) {
-        updateSelection();
-    }
+    if (e.target.matches('input[data-idx]')) updateSelection();
 });
 
-// Filters stay the same
-function applyFilters() { /* ... your existing filter code ... */ }
+// Keep your existing filters unchanged
+function applyFilters() {
+    const query = document.getElementById('txid-search').value.toLowerCase();
+    const sort = document.getElementById('sort-select').value;
+    const confFilter = document.getElementById('conf-filter').value;
+
+    let rows = Array.from(document.querySelectorAll('#utxo-table tbody tr'));
+    if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
+    if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
+
+    if (sort) {
+        rows.sort((a, b) => {
+            if (sort.includes('value')) {
+                const av = parseInt(a.dataset.value);
+                const bv = parseInt(b.dataset.value);
+                return sort === 'value-desc' ? bv - av : av - bv;
+            } else {
+                const av = parseInt(a.dataset.vout);
+                const bv = parseInt(b.dataset.vout);
+                return sort === 'vout-desc' ? bv - av : av - bv;
+            }
+        });
+    }
+
+    const tbody = document.querySelector('#utxo-table tbody');
+    rows.forEach(r => tbody.appendChild(r));
+}
+
 document.getElementById('txid-search').addEventListener('input', applyFilters);
 document.getElementById('sort-select').addEventListener('change', applyFilters);
 document.getElementById('conf-filter').addEventListener('change', applyFilters);
