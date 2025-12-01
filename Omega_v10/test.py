@@ -625,13 +625,26 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             <td style="text-align:center;font-weight:bold;color:#0f0;">{conf_text}</td>
         </tr>'''
 
-    # ——————— Warnings ———————
+    # ——————— Smart strategy-aware banner ———————
     old_warning = ""
     if len(utxos) > len(pruned_utxos_global) and len(utxos) <= MAX_UTXOS_SHOWN + 50:
+        if "NUCLEAR" in strategy:
+            # Special fire mode for the brave
+            strategy_display = '<span style="color:#ff3366; text-shadow: 0 0 20px #f33; font-size:22px;">NUCLEAR PRUNE</span><br><small style="color:#f7931a;">(90% sacrificed — for the brave)</small>'
+        else:
+            # Clean version for all other strategies
+            strategy_display = strategy.replace(" (", "<br><small>(").replace(")", ")</small>")
+
         old_warning = f'''
-        <div style="text-align:center; padding:16px; background:rgba(247,147,26,0.2); border:2px solid #f7931a; border-radius:12px; margin:20px 0; color:#f7931a; font-weight:bold;">
-            Found {len(utxos)} total UTXOs → Showing top {len(pruned_utxos_global)} largest for pruning
+        <div style="text-align:center; padding:18px; background:rgba(247,147,26,0.22); border:3px solid #f7931a; border-radius:14px; margin:20px 0; color:#f7931a; font-weight:900; font-size:19px; line-height:1.5;">
+            Found <strong>{len(utxos):,} total UTXOs</strong> → 
+            <span style="color:#00ff9d;">{strategy_display}</span><br>
+            Showing <strong>top {len(pruned_utxos_global):,}</strong> largest for pruning
+            <span style="font-size:14px; color:#aaa; display:block; margin-top:6px; font-weight:600;">
+                (uncheck any you want to keep forever)
+            </span>
         </div>'''
+        
 
     input_count_warning = ""
     if len(full_utxos_for_tx) > 1500:
