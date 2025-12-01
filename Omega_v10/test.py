@@ -511,7 +511,7 @@ def varint_decode(data: bytes, pos: int) -> tuple[int, int]:
 def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier):
     global pruned_utxos_global, input_vb_global, output_vb_global
 
-    addr = user_input გეო.strip()
+    addr = user_input.strip()
     is_xpub = addr.startswith(('xpub', 'zpub', 'ypub', 'tpub', 'vpub', 'upub'))
 
     if is_xpub:
@@ -527,7 +527,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
-    # Detect type
+    # Detect address type
     sample = [u.get('address') or addr for u in utxos[:10]]
     types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
     from collections import Counter
@@ -587,10 +587,10 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
             <select id="sort-select" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
                 <option value="">Sort by...</option>
-                <option value="value-desc">Size ↓ (Largest first)</option>
-                <option value="value-asc">Size ↑ (Smallest first)</option>
-                <option value="vout-desc">vout ↓</option>
-                <option value="vout-asc">vout ↑</option>
+                <option value="value-desc">Size (Largest first)</option>
+                <option value="value-asc">Size (Smallest first)</option>
+                <option value="vout-desc">vout</option>
+                <option value="vout-asc">vout</option>
             </select>
 
             <select id="conf-filter" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
@@ -600,7 +600,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             </select>
 
             <button onclick="document.getElementById('txid-search').value=''; document.getElementById('sort-select').value=''; document.getElementById('conf-filter').value=''; applyFilters();" 
-                    style="padding:14px 24px; background:#333; color:white; border:2px solid #f7931a; border-radius:12px; font-weight:bold;">Reset All</button>
+                    style="padding:14px 24px; background:#333; color:white; border:2px solid #f7931a; border-radius:12px; font-weight:bold;">Reset</button>
         </div>
 
         <!-- TABLE -->
@@ -611,7 +611,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                         <th style="padding:18px;">Include</th>
                         <th style="padding:18px; text-align:right;">Value</th>
                         <th style="padding:18px;">TXID</th>
-                        <th style="padding:18px;">vout <span style="font-weight:normal;font-size:12px;color:#000;">(output index)</span></th>
+                        <th style="padding:18px;">vout <small style="font-weight:normal;color:#333;">(output index)</small></th>
                         <th style="padding:18px;">Confirmed</th>
                     </tr>
                 </thead>
@@ -637,17 +637,9 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
             let rows = Array.from(allRows);
 
-            // Filter confirmed
-            if (confFilter) {{
-                rows = rows.filter(r => r.dataset.confirmed === confFilter);
-            }}
+            if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
+            if (query) rows = rows.filter(r => r.children[2].textContent.toLowerCase().includes(query));
 
-            // Search
-            if (query) {{
-                rows = rows.filter(r => r.children[2].textContent.toLowerCase().includes(query));
-            }}
-
-            // Sort
             if (sort) {{
                 rows.sort((a, b) => {{
                     if (sort.includes('value')) {{
@@ -662,7 +654,6 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                 }});
             }}
 
-            // Apply
             const tbody = document.querySelector('#utxo-table tbody');
             rows.forEach(r => tbody.appendChild(r));
         }}
@@ -685,23 +676,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
-        // Listeners
         document.getElementById('txid-search').addEventListener('input', applyFilters);
         document.getElementById('sort-select').addEventListener('change', applyFilters);
         document.getElementById('conf-filter').addEventListener('change', applyFilters);
         document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
 
-        // Initial
         applyFilters();
         updateSelection();
-
-        // FINAL NUCLEAR FIX: Force Generate button to appear
-        setTimeout(() => {{
-            const row = document.querySelector('gradio-row:contains("Generate Transaction")')?.closest('.gr-row') ||
-                        document.querySelector('#generate-and-startover-row') ||
-                        document.querySelector('.gr-button')?.closest('.gr-row');
-            if (row) row.style.display = 'flex';
-        }}, 500);
         </script>
 
         <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
@@ -718,7 +699,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         gr.update(visible=True),         # coin_control_row
         table_html,
         pruned_utxos_global,
-        gr.update(visible=False)         # dummy — required for 6 outputs
+        gr.update(visible=False)         # dummy
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
