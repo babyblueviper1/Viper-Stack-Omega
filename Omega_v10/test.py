@@ -524,47 +524,51 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         </tr>'''
 
     table_html = f"""
-    <div style="margin:30px 0; font-family: system-ui, sans-serif;">
+    <div style="margin:30px 0; font-family:system-ui,sans-serif;">
 
-        <!-- FILTER BUTTONS -->
-        <div style="text-align:center; margin-bottom:20px; padding:12px; background:#111; border-radius:12px;">
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=true);updateSelection()"
-                    style="padding:12px 28px; margin:6px; background:#f7931a; color:black; border:none; border-radius:10px; font-weight:bold 16px system-ui; cursor:pointer;">
+        <!-- SEARCH + ACTION BUTTONS -->
+        <div style="text-align:center; margin-bottom:20px; padding:16px; background:#111; border-radius:14px; border:2px solid #f7931a;">
+            <input type="text" id="txid-search" placeholder="Search by TXID (e.g. deadbeef)" 
+                   style="padding:12px 20px; width:320px; font-size:16px; border-radius:10px; border:2px solid #f7931a; background:#000; color:white;">
+            <button onclick="document.getElementById('txid-search').value=''; filterTable(); updateSelection();"
+                    style="padding:12px 24px; margin-left:12px; background:#333; color:white; border:2px solid #f7931a; border-radius:10px; font-weight:bold; cursor:pointer;">
+                Clear Search
+            </button>
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=true); updateSelection();"
+                    style="padding:12px 28px; margin:6px; background:#f7931a; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
                 Select All
             </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false);updateSelection()"
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false); updateSelection();"
                     style="padding:12px 28px; margin:6px; background:#333; color:white; border:2px solid #f7931a; border-radius:10px; font-weight:bold; cursor:pointer;">
                 Select None
             </button>
             <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{
-                let sats = parseInt(c.closest('tr').children[1].textContent.replace(/[^0-9]/g,''));
-                c.checked = sats >= 100000;
-            }}); updateSelection()"
+                let row = c.closest('tr');
+                let val = parseInt(row.children[1].textContent.replace(/[^0-9]/g,'') || '0');
+                c.checked = val >= 100000;
+            }}); updateSelection();"
                     style="padding:12px 28px; margin:6px; background:#00ff9d; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
                 ≥ 0.001 BTC
             </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{
-                let sats = parseInt(c.closest('tr').children[1].textContent.replace(/[^0-9]/g,''));
-                c.checked = sats >= 1000000;
-            }}); updateSelection()"
-                    style="padding:12px 28px; margin:6px; background:#ff9900; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
-                ≥ 0.01 BTC
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false); updateSelection();"
+                    style="padding:12px 28px; margin:6px; background:#ff3366; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
+                Reset Selection
             </button>
         </div>
 
         <!-- TABLE -->
         <div style="max-height:540px; overflow-y:auto; border:4px solid #f7931a; border-radius:16px; background:#0a0a0a;">
-            <table style="width:100%; border-collapse:collapse;">
+            <table id="utxo-table" style="width:100%; border-collapse:collapse;">
                 <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
                     <tr>
-                        <th style="padding:18px 12px;">Include</th>
-                        <th style="padding:18px 12px; text-align:right;">Value</th>
-                        <th style="padding:18px 12px;">TXID</th>
-                        <th style="padding:18px 12px;">vout</th>
-                        <th style="padding:18px 12px;">Confirmed</th>
+                        <th style="padding:18px;">Include</th>
+                        <th style="padding:18px; text-align:right;">Value</th>
+                        <th style="padding:18px;">TXID</th>
+                        <th style="padding:18px;">vout</th>
+                        <th style="padding:18px;">Confirmed</th>
                     </tr>
                 </thead>
-                <tbody style="font-family: 'Courier New', monospace;">
+                <tbody style="font-family:monospace;">
                     {html_rows}
                 </tbody>
             </table>
@@ -572,8 +576,9 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
         <script>
         const allUtxos = {json.dumps(pruned_utxos_global)};
+        const tableRows = document.querySelectorAll('#utxo-table tbody tr');
 
-        // Find gr.State component
+        // Find gr.State
         let stateComp = null;
         for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
             if (el.__gradio_internal__ || el.value !== undefined) {{
@@ -582,16 +587,24 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
+        function filterTable() {{
+            const query = document.getElementById('txid-search').value.toLowerCase();
+            tableRows.forEach((row, idx) => {{
+                const txidCell = row.children[2].textContent;
+                row.style.display = txidCell.toLowerCase().includes(query) ? '' : 'none';
+            }});
+        }}
+
         function updateSelection() {{
             const checked = document.querySelectorAll('input[data-idx]:checked');
             const indices = Array.from(checked).map(c => parseInt(c.dataset.idx));
-            const selected = indices.map(i => allUtxos[i]);
+            const selected = indices.map(i => allUtxos[i]).filter(Boolean);
             const total = selected.reduce((a,b) => a + b.value, 0);
 
             document.getElementById('selected-summary').innerHTML = `
                 <div style="font-size:32px; color:#f7931a; font-weight:900;">${{indices.length}} UTXOs selected</div>
-                <div style="font-size:44px; color:#00ff9d; font-weight:900; margin:10px 0;">${{total.toLocaleString()}} sats</div>
-                <div style="color:#aaa;">Ready to prune — click the button below</div>
+                <div style="font-size:48px; color:#00ff9d; font-weight:900; margin:12px 0;">${{total.toLocaleString()}} sats</div>
+                <div style="color:#888; font-size:15px;">Ready — click Generate Transaction below</div>
             `;
 
             if (stateComp) {{
@@ -600,13 +613,19 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
+        // Live search
+        document.getElementById('txid-search').addEventListener('input', filterTable);
+
+        // Initial update
         updateSelection();
+
+        // Checkbox changes
         document.addEventListener('change', e => {{
             if (e.target.matches('input[data-idx]')) updateSelection();
         }});
         </script>
 
-        <div id="selected-summary" style="text-align:center; padding:30px; margin-top:24px; background:linear-gradient(135deg,#1a0d00,#0f0500);
+        <div id="selected-summary" style="text-align:center; padding:32px; margin-top:24px; background:linear-gradient(135deg,#1a0d00,#0a0500);
              border:4px solid #f7931a; border-radius:20px; font-weight:bold; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
             Calculating...
         </div>
