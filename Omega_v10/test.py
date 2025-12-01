@@ -884,8 +884,6 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
 # ==============================
 with gr.Blocks(
     title="Ωmega Pruner v10.1 — NUCLEAR EDITION: Prune UTXOs Forever",
-    theme=gr.themes.Soft(),
-    css=css
 ) as demo:
 
     # ——— Core state ———
