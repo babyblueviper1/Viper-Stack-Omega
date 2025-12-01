@@ -1157,7 +1157,7 @@ with gr.Blocks(
     )
 
     # 3. START OVER → Full reset
-       start_over_btn.click(
+    start_over_btn.click(
         lambda: (
             "", "Recommended (40% pruned)", 546, "", 50, 6,
             "<div id='generate-section'></div>",
