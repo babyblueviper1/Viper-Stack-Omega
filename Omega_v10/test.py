@@ -1101,7 +1101,7 @@ with gr.Blocks(
     # ==================================================================
 
     # 1. Analyze UTXOs → show table + reveal Generate button
-        submit_btn.click(
+    submit_btn.click(
         analysis_pass,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[output_log, generate_section, coin_control_section, coin_table_html, selected_utxos_state]
