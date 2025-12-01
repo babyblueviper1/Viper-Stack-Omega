@@ -610,24 +610,29 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     # ——————— SAFETY CAP — Show largest first ———————
     MAX_UTXOS_SHOWN = 1200
+    display_utxos = utxos[:MAX_UTXOS_SHOWN]
+
+    default_checked_keys = {(u['txid'], u['vout']) for u in pruned_by_default}
+
+    # Full list of UTXOs that will be pruned if checked
+    full_default_selection = pruned_by_default.copy()
+    # Add any tiny UTXOs not shown (they must be pruned)
+    for u in utxos[MAX_UTXOS_SHOWN:]:
+        if (u['txid'], u['vout']) not in default_checked_keys:
+            full_default_selection.append(u)
+
+    safe_full_json = json.dumps(full_default_selection, separators=(',', ':'))
+    safe_display_json = json.dumps(display_utxos, separators=(',', ':'))
+    # Warning banner
+    warning_banner = ""
     if len(utxos) > MAX_UTXOS_SHOWN + 50:
         warning_banner = f'''
         <div style="text-align:center;padding:20px;background:#300;border:3px solid #f33;border-radius:16px;margin:30px 0;color:#f99;font-weight:bold;font-size:18px;">
             EXTREME ADDRESS DETECTED: {len(utxos):,} total UTXOs<br>
             Showing only the <strong>{MAX_UTXOS_SHOWN} largest</strong> for coin control<br>
-            <span style="color:#ff3366;">All smaller UTXOs are automatically included → will be pruned</span>
+            <span style="color:#ff3366;">All smaller UTXOs are automatically selected → will be pruned</span>
         </div>'''
-        display_utxos = utxos[:MAX_UTXOS_SHOWN]
-        full_utxos_for_tx = pruned_by_default + kept_utxos
-    else:
-        warning_banner = ""
-        display_utxos = utxos[:MAX_UTXOS_SHOWN]   # Show largest first
-        full_utxos_for_tx = pruned_by_default + kept_utxos
 
-    # ——————— Safe JSON ———————
-    import json
-    safe_full_json = json.dumps(full_utxos_for_tx, separators=(',', ':'))
-    safe_display_json = json.dumps(display_utxos, separators=(',', ':'))
 
     # ——————— Build table rows ———————
     html_rows = ""
@@ -639,33 +644,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         confirmed = u.get('status', {}).get('confirmed', True)
         conf_text = "Yes" if confirmed else '<span style="color:#ff3366;">No</span>'
         conf_val = "confirmed" if confirmed else "unconfirmed"
-
-        # Determine if this UTXO is checked by default (i.e. will be pruned)
-        is_in_pruned = any(u['txid'] == p['txid'] and u['vout'] == p['vout'] for p in pruned_by_default)
-        is_in_kept = any(u['txid'] == k['txid'] and u['vout'] == k['vout'] for k in kept_utxos)
-        checked = "checked" if is_in_pruned or (is_in_kept and len(utxos) <= MAX_UTXOS_SHOWN + 50) else ""
+        checked = "checked" if (u['txid'], u['vout']) in default_checked_keys else ""
 
         html_rows += f'''
         <tr style="height:66px;" data-value="{u['value']}" data-vout="{u['vout']}" data-confirmed="{conf_val}" data-index="{idx}">
             <td style="text-align:center;font-weight:bold;color:#f7931a;">{idx+1}</td>
-            <td style="text-align:center;">
-                <input type="checkbox" {checked} data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
-            </td>
+            <td style="text-align:center;"><input type="checkbox" {checked} data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;"></td>
             <td style="text-align:right;padding-right:30px;font-weight:800;color:#f7931a;font-size:20px;">{val}</td>
-            <td style="padding:8px 12px;">
-                <a href="{explorer_url}" target="_blank"
-                   style="color:#00ff9d !important; font-family:monospace; font-size:0.95rem; font-weight:600; text-decoration:none;"
-                   onmouseover="this.style.color='#f7931a'; this.querySelector('span').style.background='rgba(247,147,26,0.25)';"
-                   onmouseout="this.style.color='#00ff9d'; this.querySelector('span').style.background='transparent';"
-                   onclick="event.preventDefault(); navigator.clipboard.writeText('{txid_full}'); 
-                            let s=this.querySelector('span'); let old=s.innerText; s.innerText='COPIED!'; 
-                            setTimeout(() => s.innerText = old, 1000);"
-                   title="Click to copy full TXID">
-                    <span style="cursor:pointer; padding:6px 10px; border-radius:8px; transition:all 0.2s; display:inline-block;">
-                        {txid_short}
-                    </span>
-                </a>
-            </td>
+            <td style="padding:8px 12px;"><a href="{explorer_url}" target="_blank" style="color:#00ff9d !important; font-family:monospace;" onclick="event.preventDefault(); navigator.clipboard.writeText('{txid_full}'); this.querySelector('span').innerText='COPIED!'; setTimeout(() => this.querySelector('span').innerText='{txid_short}', 1000);"><span style="cursor:pointer;padding:6px 10px;border-radius:8px;display:inline-block;">{txid_short}</span></a></td>
             <td style="text-align:center;color:white;font-weight:bold;font-size:19px;">{u['vout']}</td>
             <td style="text-align:center;font-weight:bold;color:#0f0;">{conf_text}</td>
         </tr>'''
@@ -688,7 +674,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         </div>'''
 
     input_count_warning = ""
-    if len(full_utxos_for_tx) > 1500:
+    if len(full_default_selection) > 1500:
         input_count_warning = f"""
         <div style="margin:20px 0;padding:18px;background:#300;border:3px solid #f7931a;border-radius:14px;color:#f7931a;font-weight:bold;text-align:center;">
             Warning: Transaction will have <strong>{len(full_utxos_for_tx):,}</strong> inputs<br>
@@ -846,12 +832,13 @@ applyFilters();
     # FINAL RETURN — GRADIO 6+ COMPATIBLE & FLAWLESS
     # ——————————————————————————————————————————————————————
     return (
-        "",                                                                        # output_log
-        "<div id='generate-section' style='display:block !important;'></div>",    # ← shows the section
-        "<div id='coin-control-section' style='display:block !important;'></div>",# ← shows coin control
+        "",  # output_log
+        "<div id='generate-section' style='display:block !important;'></div>",
+        "<div id='coin-control-section' style='display:block !important;'></div>",
         table_html,
-        json.dumps(full_utxos_for_tx)
+        json.dumps(full_default_selection)
     )
+
 # ==============================
 
 
@@ -912,10 +899,10 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     future_rate = max(int(fee_rate * future_multiplier), fee_rate + 5)
 
     # ——— 4. Accurate vsize estimate (fixed witness detection) ———
-    is_segwit = input_vb_global in {57, 68}  # Taproot (57) or Native SegWit (68)
+    is_segwit = input_vb_global in {57, 68, 69}  # Taproot, P2WPKH, P2WSH
     witness_overhead = 2 if is_segwit else 0
 
-    outputs = 1 + (1 if dao_percent > 0 else 0)
+    outputs = 1 + (1 if dao_cut > 0 else 0)       # ← CORRECT — uses real donation amount
 
     total_weight = (
         160 +                                   # base
@@ -1255,7 +1242,8 @@ with gr.Blocks(
     # ------------------------------------------------------------------
     # THE ONLY REAL GENERATE BUTTON (visible = False → we show it with JS)
     # ------------------------------------------------------------------
-    with gr.Row(elem_id="generate-and-startover-row", visible=False):   # ← hidden at start
+    # REPLACE THE ENTIRE "generate-and-startover-row" SECTION WITH THIS:
+    with gr.Row(visible=False) as generate_row:
         generate_btn = gr.Button(
             "2. Generate Transaction",
             variant="primary",
@@ -1271,34 +1259,7 @@ with gr.Blocks(
         )
 
     # ------------------------------------------------------------------
-    # Tiny JS helpers — pure CSS, no fake button creation needed
-    # ------------------------------------------------------------------
-    gr.HTML("""
-    <script>
-    function showGenerateRow() {
-        const row = document.getElementById('generate-and-startover-row');
-        if (row) {
-            row.style.display = 'flex';
-            row.style.opacity = '0';
-            row.style.transition = 'opacity 0.4s ease';
-            setTimeout(() => row.style.opacity = '1', 50);
-        }
-    }
-    function hideGenerateRow() {
-        const row = document.getElementById('generate-and-startover-row');
-        if (row) row.style.display = 'none';
-    }
-    function showCoinControl() {
-        const sec = document.getElementById('coin-control-section');
-        if (sec) sec.style.display = 'block';
-    }
-    function hideCoinControl() {
-        const sec = document.getElementById('coin-control-section');
-        if (sec) sec.style.display = 'none';
-    }
-    </script>
-    """)
-
+    
     # ==================================================================
     # EVENTS — clean & reliable
     # ==================================================================
@@ -1309,37 +1270,32 @@ with gr.Blocks(
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[output_log, generate_section, coin_control_section, coin_table_html, selected_utxos_state]
     ).then(
-        None,
-        js="() => { showCoinControl(); showGenerateRow(); }"
+        lambda: (gr.update(visible=True), gr.update(visible=True)),
+        outputs=[generate_row, generate_row]  # show the row
     )
 
-    # 2. Generate → build PSBT & hide everything again
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],
         outputs=[output_log, generate_section, coin_control_section, coin_table_html]
     ).then(
-        None,
-    s="() => { hideGenerateRow(); hideCoinControl(); }"
+        lambda: gr.update(visible=False),
+        outputs=[generate_row]
     )
 
-    # 3. Start Over → reset + hide button row
+     # 3. Start Over → reset + hide button row
     start_over_btn.click(
-        lambda: (
-            "", "Recommended (40% pruned)", 546, "", 50, 6,
-            "<div id='generate-section'></div>",
-            "<div id='coin-control-section'></div>",
-            "", "", "[]"
-        ),
-        outputs=[
-            user_input, prune_choice, dust_threshold, dest_addr,
-            dao_percent, future_multiplier,
-            generate_section, coin_control_section,
-            coin_table_html, output_log, selected_utxos_state
-        ]
+        lambda: ("", "Recommended (40% pruned)", 546, "", 50, 6,
+             "<div id='generate-section'></div>",
+             "<div id='coin-control-section'></div>",
+             "", "", "[]"),
+        outputs=[user_input, prune_choice, dust_threshold, dest_addr,
+             dao_percent, future_multiplier,
+             generate_section, coin_control_section,
+             coin_table_html, output_log, selected_utxos_state]
     ).then(
-        None,
-        js="() => { hideGenerateRow(); hideCoinControl(); }"
+        lambda: gr.update(visible=False),
+        outputs=[generate_row]
     )
     
     # Floating BTC QR Scanner + Beautiful Toast
