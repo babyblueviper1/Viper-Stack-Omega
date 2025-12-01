@@ -575,14 +575,25 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
-    # Detect address type + vbytes
-    sample = [u.get('address') or addr for u in utxos[:10]]
-    types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
-    detected = Counter(types).most_common(1)[0][0] if types else "P2WPKH"
+    # ——— ULTRA-SAFE ADDRESS TYPE + VBYTES DETECTION (2025 FINAL) ———
+    # Works even with 0 UTXOs, corrupted addresses, xpub scans, etc.
+    detected = "P2WPKH"  # safest default (bc1q...)
+    if utxos:
+        # Take first confirmed UTXO's address, fallback to user input
+        sample_addr = utxos[0].get('address') or addr
+        try:
+            _, info = address_to_script_pubkey(sample_addr.strip())
+            detected = info['type']
+        except:
+            pass  # keep default
+
     input_vb_global, output_vb_global = {
-        'P2PKH': (148, 34), 'P2SH': (91, 32), 'P2WPKH': (68, 31),
-        'P2WSH': (69, 43), 'Taproot': (57, 43)
-    }.get(detected, (68, 31))
+        'P2PKH':   (148, 34),
+        'P2SH':    (91,  32),
+        'P2WPKH':  (68,  31),
+        'P2WSH':   (69,  43),
+        'Taproot': (57,  43),
+    }.get(detected, (68, 31))  # final fallback
 
     # Strategy logic
     NUCLEAR = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
