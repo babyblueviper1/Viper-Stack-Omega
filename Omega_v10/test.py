@@ -1258,14 +1258,12 @@ with gr.Blocks(
     # ==================================================================
     # Events
     # ==================================================================
-    
-    # === OUTPUTS ORDER — CRITICAL (must match analysis_pass return order) ===
 
     submit_btn.click(
         analysis_pass,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[
-            output_log,           # ← can stay, we just send empty string
+            output_log,
             generate_row,
             coin_control_row,
             coin_table_html,
@@ -1280,24 +1278,24 @@ with gr.Blocks(
             output_log,
             generate_btn,
             generate_row,
-            None,  # or gr.update(), doesn't matter
+            None,
             None
         ]
     )
 
-   start_over_btn.click(
-    lambda: (
-        "", "Recommended (40% pruned)", 546, "", 50, "",
-        gr.update(visible=False),
-        gr.update(visible=False),
-        "",
-        "[]"   # ← JSON string, not Python list
-    ),
-    outputs=[
-        user_input, prune_choice, dust_threshold, dest_addr, dao_percent, output_log,
-        generate_row, coin_control_row, coin_table_html, selected_utxos_state
-    ]
-)
+    start_over_btn.click(
+        lambda: (
+            "", "Recommended (40% pruned)", 546, "", 50, "",
+            gr.update(visible=False),
+            gr.update(visible=False),
+            "",
+            "[]"
+        ),
+        outputs=[
+            user_input, prune_choice, dust_threshold, dest_addr, dao_percent, output_log,
+            generate_row, coin_control_row, coin_table_html, selected_utxos_state
+        ]
+    )
 
 
 
