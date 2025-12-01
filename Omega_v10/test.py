@@ -747,8 +747,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         gr.update(visible=True),     # show generate_row
         gr.update(visible=True),     # show coin_control_row
         table_html,
-        pruned_utxos_global,
-        None                         # dummy — do NOT touch button visibility
+        pruned_utxos_global
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
@@ -1131,7 +1130,6 @@ with gr.Blocks(
             coin_control_row,
             coin_table_html,
             selected_utxos_state,
-            generate_row  
         ]
     )
 
