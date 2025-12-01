@@ -819,6 +819,10 @@ function applyFilters() {{
 }});
 applyFilters();
 </script>
+<script>
+    setTimeout(() => updateSelection(), 300);
+    setTimeout(() => updateSelection(), 1000);
+</script>
 
 <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
      background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
