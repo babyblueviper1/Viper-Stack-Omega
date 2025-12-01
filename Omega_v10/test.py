@@ -1320,7 +1320,7 @@ with gr.Blocks(
         outputs=[output_log, generate_section, coin_control_section, coin_table_html]
     ).then(
         None,
-        js="() => { hideGenerateRow(); hideCoinControl(); }"
+    s="() => { hideGenerateRow(); hideCoinControl(); }"
     )
 
     # 3. Start Over → reset + hide button row
@@ -1339,7 +1339,7 @@ with gr.Blocks(
         ]
     ).then(
         None,
-        _js="() => { hideGenerateRow(); hideCoinControl(); }"
+        js="() => { hideGenerateRow(); hideCoinControl(); }"
     )
     
     # Floating BTC QR Scanner + Beautiful Toast
