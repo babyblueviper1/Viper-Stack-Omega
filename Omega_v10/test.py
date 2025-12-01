@@ -706,85 +706,105 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         </div>
 
         <script>
-        const allUtxos = {json.dumps(full_utxos_for_tx)};
+const allUtxos = {json.dumps(full_utxos_for_tx)};  // ← This is the FULL list
+const displayedUtxos = {json.dumps(display_utxos)};  // ← This is what the table shows
 
-        let stateComp = null;
-        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
-            if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
-        }}
+let stateComp = null;
+for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {
+    if (el.__gradio_internal__ || el.value !== undefined) { stateComp = el; break; }
+}
 
-        function applyFilters() {{
-            const query = document.getElementById('txid-search').value.toLowerCase();
-            const sort = document.getElementById('sort-select').value;
-            const confFilter = document.getElementById('conf-filter').value;
+function applyFilters() {
+    const query = document.getElementById('txid-search').value.toLowerCase();
+    const sort = document.getElementById('sort-select').value;
+    const confFilter = document.getElementById('conf-filter').value;
 
-            let rows = Array.from(document.querySelectorAll('#utxo-table tbody tr'));
-            if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
-            if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
+    let rows = Array.from(document.querySelectorAll('#utxo-table tbody tr'));
+    if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
+    if (query) rows = rows.filter(r => r.children[3].textContent.toLowerCase().includes(query));
 
-            if (sort) {{
-                rows.sort((a, b) => {{
-                    if (sort.includes('value')) {{
-                        const av = parseInt(a.dataset.value);
-                        const bv = parseInt(b.dataset.value);
-                        return sort === 'value-desc' ? bv - av : av - bv;
-                    }} else {{
-                        const av = parseInt(a.dataset.vout);
-                        const bv = parseInt(b.dataset.vout);
-                        return sort === 'vout-desc' ? bv - av : av - bv;
-                    }}
-                }});
-            }}
+    if (sort) {
+        rows.sort((a, b) => {
+            if (sort.includes('value')) {
+                const av = parseInt(a.dataset.value);
+                const bv = parseInt(b.dataset.value);
+                return sort === 'value-desc' ? bv - av : av - bv;
+            } else {
+                const av = parseInt(a.dataset.vout);
+                const bv = parseInt(b.dataset.vout);
+                return sort === 'vout-desc' ? bv - av : av - bv;
+            }
+        });
+    }
 
-            const tbody = document.querySelector('#utxo-table tbody');
-            rows.forEach(r => tbody.appendChild(r));
-        }}
+    const tbody = document.querySelector('#utxo-table tbody');
+    rows.forEach(r => tbody.appendChild(r));
+}
 
-        function updateSelection() {{
-            const checked = document.querySelectorAll('input[data-idx]:checked');
-            const count = checked.length;
-            const total = Array.from(checked).reduce((sum, c) => sum + (allUtxos[parseInt(c.dataset.idx)]?.value || 0), 0);
+function updateSelection() {
+    const checked = document.querySelectorAll('input[data-idx]:checked');
+    const selectedUtxos = [];
 
-            document.getElementById('selected-summary').innerHTML = `
-                <div style="font-size:34px; color:#f7931a; font-weight:900;">${{count}} inputs selected</div>
-                <div style="font-size:50px; color:#00ff9d; font-weight:900;">${{total.toLocaleString()}} sats</div>
-                <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
-            `;
+    checked.forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        if (displayedUtxos[idx] !== undefined) {
+            // Find the REAL UTXO object in the full list
+            const realUtxo = allUtxos.find(u => 
+                u.txid === displayedUtxos[idx].txid && 
+                u.vout === displayedUtxos[idx].vout
+            );
+            if (realUtxo) selectedUtxos.push(realUtxo);
+        }
+    });
 
-            if (stateComp) {{
-                const selected = Array.from(checked).map(c => allUtxos[parseInt(c.dataset.idx)]).filter(Boolean);
-                if (stateComp.__gradio_internal__) stateComp.__gradio_internal__.setValue(selected);
-                else {{ stateComp.value = selected; stateComp.dispatchEvent(new Event('change')); }}
-            }}
-        }}
+    const count = selectedUtxos.length;
+    const total = selectedUtxos.reduce((sum, u) => sum + u.value, 0);
 
-        function forceGenerateButton() {{
-            const btn = document.getElementById('generate-tx-btn');
-            const row = btn?.closest('.gr-row');
-            if (btn && row) {{
-                row.style.display = 'flex';
-                row.style.visibility = 'visible';
-                row.style.opacity = '1';
-                btn.style.display = 'block';
-                btn.style.visibility = 'visible';
-                btn.style.opacity = '1';
-                btn.disabled = false;
-            }}
-        }}
+    document.getElementById('selected-summary').innerHTML = `
+        <div style="font-size:34px; color:#f7931a; font-weight:900;">${count} inputs selected</div>
+        <div style="font-size:50px; color:#00ff9d; font-weight:900;">${total.toLocaleString()} sats</div>
+        <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
+    `;
 
-        forceGenerateButton();
-        setTimeout(forceGenerateButton, 100);
-        setTimeout(forceGenerateButton, 500);
-        setTimeout(forceGenerateButton, 1000);
+    if (stateComp) {
+        if (stateComp.__gradio_internal__) {
+            stateComp.__gradio_internal__.setValue(selectedUtxos);
+        } else {
+            stateComp.value = selectedUtxos;
+            stateComp.dispatchEvent(new Event('change'));
+        }
+    }
+}
 
-        applyFilters();
-        updateSelection();
+function forceGenerateButton() {
+    const btn = document.getElementById('generate-tx-btn');
+    const row = btn?.closest('.gr-row');
+    if (btn && row) {
+        row.style.display = 'flex';
+        row.style.visibility = 'visible';
+        row.style.opacity = '1';
+        btn.style.display = 'block';
+        btn.style.visibility = 'visible';
+        btn.style.opacity = '1';
+        btn.disabled = false;
+    }
+}
 
-        document.getElementById('txid-search').addEventListener('input', applyFilters);
-        document.getElementById('sort-select').addEventListener('change', applyFilters);
-        document.getElementById('conf-filter').addEventListener('change', applyFilters);
-        document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
-        </script>
+forceGenerateButton();
+setTimeout(forceGenerateButton, 100);
+setTimeout(forceGenerateButton, 500);
+setTimeout(forceGenerateButton, 1000);
+
+applyFilters();
+updateSelection();
+
+document.getElementById('txid-search').addEventListener('input', applyFilters);
+document.getElementById('sort-select').addEventListener('change', applyFilters);
+document.getElementById('conf-filter').addEventListener('change', applyFilters);
+document.addEventListener('change', e => {
+    if (e.target.matches('input[data-idx]')) updateSelection();
+});
+</script>
 
         <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
              background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
@@ -968,7 +988,6 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
         "",                        # dummy
         gr.update(visible=False)   # dummy
     )
-
 # ==============================
 # Gradio UI — Final & Perfect
 # ==============================
