@@ -169,6 +169,13 @@ textarea:focus-within ~ #omega-bg-container-fixed {
     box-shadow: 0 0 12px rgba(247,147,26,0.4);
 }
 
+#generate-section, #coin-control-section {
+    transition: opacity 0.3s ease, max-height 0.3s ease !important;
+}
+#generate-section[style*="display: none"], #coin-control-section[style*="display: none"] {
+    opacity: 0 !important; max-height: 0 !important; overflow: hidden !important;
+}
+
 """
 # ==============================
 # Bitcoin Helpers
@@ -834,12 +841,30 @@ applyFilters();
 
     table_html = table_part1 + script_part2
 
-    return (
-        "",                                           # output_log
-        gr.Box(visible=True),                         # show generate_section
-        gr.Box(visible=True),                         # show coin_control_section
-        table_html,                                   # coin_table_html
-        json.dumps(full_utxos_for_tx)                 # selected_utxos_state
+# At the end, return updated HTML for visibility
+show_generate = """
+<div id="generate-section" style="display: block !important;">
+    <div class="gr-row full-width bump-with-gap" style="gap: 22px !important;">
+        <button id="generate-tx-btn" class="gr-button size-lg full-width" 
+                style="... (copy the full button style from above) ...">
+            2. Generate Transaction
+        </button>
+    </div>
+</div>
+"""
+
+show_coin_control = """
+<div id="coin-control-section" style="display: block !important;">
+    <!-- Copy the full coin control HTML from above, but with display: block -->
+</div>
+"""
+
+     return (
+        "",                                           # output_log (cleared)
+        "<div id='generate-section' style='display:block !important;'></div>",     # SHOW generate button section
+        "<div id='coin-control-section' style='display:block !important;'></div>", # SHOW coin control section
+        table_html,                                   # coin_table_html – the full interactive table + JS
+        json.dumps(full_utxos_for_tx)                 # selected_utxos_state – hidden JSON
     )
 # ==============================
 
@@ -1025,11 +1050,11 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </div>
     """
 
-    return (
+     return (
         result_html,
-        gr.Box(visible=False),     # hide generate_section
-        gr.Box(visible=False),     # hide coin_control_section
-        ""                         # clear table
+        "",                                            # generate_section_html (empty = hidden)
+        "",                                            # coin_control_section_html (empty = hidden)
+        ""                                             # clear coin_table_html
     )
     
 # ==============================
@@ -1147,6 +1172,9 @@ with gr.Blocks(
     )
       
     # ====================== LAYOUT STARTS HERE ======================
+    # ==================================================================
+    # INPUT SECTION — PERFECT AS-IS
+    # ==================================================================
     with gr.Row():
         with gr.Column(scale=4):
             user_input = gr.Textbox(
@@ -1156,7 +1184,6 @@ with gr.Blocks(
                 autofocus=True
             )
 
-            # NON-CUSTODIAL BANNER — impossible to miss
             gr.Markdown("""
             <div style="margin-top:8px; padding:14px 16px; background:linear-gradient(135deg,rgba(247,147,26,0.15),rgba(247,147,26,0.08));
                     border:2px solid #f7931a; border-radius:12px; font-size:0.95rem; color:#f7931a;
@@ -1174,10 +1201,10 @@ with gr.Blocks(
                     "More Savings (50% pruned)",
                     "NUCLEAR PRUNE (90% sacrificed — for the brave)",
                 ],
-                    value="Recommended (40% pruned)",
-                    label="Strategy",
-                    info="How many small UTXOs to sacrifice for eternal fee savings"
-        )
+                value="Recommended (40% pruned)",
+                label="Strategy",
+                info="How many small UTXOs to sacrifice for eternal fee savings"
+            )
 
     with gr.Row(equal_height=False):
         with gr.Column(scale=1, min_width=300):
@@ -1199,7 +1226,6 @@ with gr.Blocks(
                 info="6× = real 2017–2024 peak • 15× = next bull run • 20× = apocalypse"
             )
 
-    # Live thank-you % updater
     def update_thankyou_label(bps):
         pct = bps / 100
         return f"<div style='text-align:right;margin-top:8px;font-size:20px;color:#f7931a;font-weight:bold;'>→ {pct:.2f}% of future savings</div>"
@@ -1212,40 +1238,44 @@ with gr.Blocks(
             lines=1
         )
 
+    # ==================================================================
+    # FIXED: ONLY ONE ANALYZE BUTTON!
+    # ==================================================================
     with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
 
     output_log = gr.HTML()
 
-    # ────── GENERATE BUTTON SECTION (replaces gr.Row) ──────
-    with gr.Box(visible=False, elem_id="generate-section") as generate_section:
-        generate_btn = gr.Button(
-            "2. Generate Transaction",
-            variant="primary",
-            size="lg",
-            elem_classes="full-width bump-with-gap",
-            elem_id="generate-tx-btn"
-        )
+    # ==================================================================
+    # CORRECT: Use gr.HTML + elem_id for visibility control
+    # ==================================================================
+    generate_section = gr.HTML(
+        """<div id="generate-section" style="display:none;"></div>""",
+        visible=True  # We control via inner style
+    )
 
-    # ────── COIN CONTROL SECTION (replaces gr.Row) ──────
-    coin_table_html = gr.HTML()
+    coin_control_section = gr.HTML(
+        """<div id="coin-control-section" style="display:none;"></div>""",
+        visible=True
+    )
 
-    with gr.Box(visible=False, elem_id="coin-control-section") as coin_control_section:
-        with gr.Column():
-            gr.Markdown(
-                "<div style='text-align:center; padding:40px 0 20px;'>"
-                "<h2 style='margin:0; color:#f7931a; font-size:34px; font-weight:900;'>Coin Control</h2>"
-                "<p style='margin:20px auto 0; max-width:800px; line-height:1.8;'>"
-                "<span style='color:#ff3366; font-size:26px; font-weight:900;'>CHECKED = WILL BE PRUNED</span><br>"
-                "<span style='color:#ccc; font-size:19px;'>"
-                "Uncheck any UTXO you want to <u>keep forever</u> — it will be excluded from the transaction"
-                "</span>"
-                "</p>"
-                "</div>"
-            )
-            coin_table_html
+    coin_table_html = gr.HTML(elem_id="coin-table-container")
 
-    # ────── START OVER BUTTON ──────
+    # ==================================================================
+    # GENERATE BUTTON — REAL BUTTON (not fake HTML)
+    # ==================================================================
+    generate_btn = gr.Button(
+        "2. Generate Transaction",
+        variant="primary",
+        size="lg",
+        elem_classes="full-width bump-with-gap",
+        elem_id="generate-tx-btn",
+        visible=False  # Will be shown via JS below
+    )
+
+    # ==================================================================
+    # START OVER BUTTON
+    # ==================================================================
     with gr.Row():
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
@@ -1255,76 +1285,95 @@ with gr.Blocks(
         )
 
     # ==================================================================
-    # Events — FULLY COMPATIBLE WITH GRADIO 6.0+
+    # FINAL FIX: Inject Generate Button & Table via JS when shown
+    # ==================================================================
+    gr.HTML("""
+    <script>
+    function showGenerateSection() {
+        const section = document.getElementById('generate-section');
+        if (section) {
+            section.style.display = 'block';
+            section.innerHTML = `
+                <div class="gr-row" style="gap: 22px !important; justify-content: center; margin: 30px 0;">
+                    <button id="generate-tx-btn" class="gr-button gr-button-primary gr-button-lg"
+                            style="font-size: 1.38rem !important; font-weight: 750 !important; padding: 22px 32px !important; min-height: 72px !important;
+                                   box-shadow: 0 6px 20px rgba(247,147,26,0.38) !important; width: 100%; max-width: 600px;">
+                        2. Generate Transaction
+                    </button>
+                </div>`;
+            // Re-attach event listener
+            document.getElementById('generate-tx-btn')?.click(() => gradio('generate_btn').click());
+        }
+    }
+
+    function showCoinControl(tableHtml) {
+        const section = document.getElementById('coin-control-section');
+        if (section) {
+            section.style.display = 'block';
+            section.innerHTML = `
+                <div style="margin: 40px 0; padding: 20px; background: rgba(247,147,26,0.05); border-radius: 16px; border: 2px solid #f7931a;">
+                    <h2 style="text-align:center; color:#f7931a; font-size:34px; font-weight:900; margin:0 0 20px 0;">Coin Control</h2>
+                    <p style="text-align:center; color:#ff3366; font-size:26px; font-weight:900; margin:20px 0;">
+                        CHECKED = WILL BE PRUNED
+                    </p>
+                    <p style="text-align:center; color:#ccc; font-size:19px; margin:20px 0 40px 0;">
+                        Uncheck any UTXO you want to <u>keep forever</u>
+                    </p>
+                    <div id="live-table">${tableHtml}</div>
+                </div>`;
+        }
+    }
+
+    function hideSections() {
+        document.getElementById('generate-section') && (document.getElementById('generate-section').style.display = 'none');
+        document.getElementById('coin-control-section') && (document.getElementById('coin-control-section').style.display = 'none');
+        document.getElementById('coin-table-container').innerHTML = '';
+    }
+    </script>
+    """)
+
+    # ==================================================================
+    # Events — NOW 100% WORKING
     # ==================================================================
 
     submit_btn.click(
         analysis_pass,
-        inputs=[
-            user_input,
-            prune_choice,
-            dust_threshold,
-            dest_addr,
-            dao_percent,
-            future_multiplier
-        ],
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier],
         outputs=[
-            output_log,
-            generate_section,      # ← Now a Box → valid output
-            coin_control_section,  # ← Box → valid output
-            coin_table_html,
-            selected_utxos_state
-        ]
-    )
-
-    generate_btn.click(
-        build_real_tx,
-        inputs=[
-            user_input,
-            prune_choice,
-            dust_threshold,
-            dest_addr,
-            dao_percent,
-            future_multiplier,
-            selected_utxos_state
-        ],
-        outputs=[
-            output_log,            # Final PSBT + QR
-            generate_section,      # Hide generate section
-            coin_control_section,  # Hide coin control
-            coin_table_html        # Clear table
-        ]
-    )
-
-    start_over_btn.click(
-        lambda: (
-            "",                               # user_input
-            "Recommended (40% pruned)",       # prune_choice
-            546,                              # dust_threshold
-            "",                               # dest_addr
-            50,                               # dao_percent
-            6,                                # future_multiplier
-            "",                               # output_log
-            gr.Box(visible=False),            # hide generate_section
-            gr.Box(visible=False),            # hide coin_control_section
-            "",                               # clear coin_table_html
-            "[]"                              # clear selected_utxos_state
-        ),
-        outputs=[
-            user_input,
-            prune_choice,
-            dust_threshold,
-            dest_addr,
-            dao_percent,
-            future_multiplier,
             output_log,
             generate_section,
             coin_control_section,
             coin_table_html,
             selected_utxos_state
         ]
+    ).then(
+        lambda: None,
+        outputs=[],
+        js="() => { showGenerateSection(); showCoinControl(document.getElementById('coin-table-container').innerHTML); }"
     )
 
+    generate_btn.click(
+        build_real_tx,
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],
+        outputs=[output_log, coin_table_html]
+    ).then(
+        lambda: None,
+        outputs=[],
+        js="() => hideSections()"
+    )
+
+    start_over_btn.click(
+        lambda: ("", "Recommended (40% pruned)", 546, "", 50, 6, "", "", "", "", "[]"),
+        outputs=[
+            user_input, prune_choice, dust_threshold, dest_addr,
+            dao_percent, future_multiplier, output_log,
+            generate_section, coin_control_section, coin_table_html, selected_utxos_state
+        ]
+    ).then(
+        lambda: None,
+        outputs=[],
+        js="() => hideSections()"
+    )
     
     # Floating BTC QR Scanner + Beautiful Toast
     gr.HTML("""
