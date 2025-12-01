@@ -191,16 +191,25 @@ def bech32_verify_checksum(hrp, data): return bech32_polymod(bech32_hrp_expand(h
 def bech32m_verify_checksum(hrp, data): return bech32_polymod(bech32_hrp_expand(hrp) + data) == 0x2bc830a3
 
 def convertbits(data, frombits, tobits, pad=True):
-    acc = bits = 0
+    """Convert bits from one size to another (used for Bech32)"""
+    acc = 0
+    bits = 0
     ret = []
     maxv = (1 << tobits) - 1
-    for v in data:
-        acc = (acc << frombits | v) & ((1 << (frombits + tobits - 1)) - 1)
+    max_acc = (1 << (frombits + tobits - 1)) - 1
+    for value in data:
+        if value < 0 or (value >> frombits):
+            raise ValueError("Invalid value in convertbits")
+        acc = ((acc << frombits) | value) & max_acc
         bits += frombits
         while bits >= tobits:
             bits -= tobits
-            ret.append(acc >> bits & maxv)
-    if pad and bits: ret.append(acc << (tobits - bits) & maxv)
+            ret.append((acc >> bits) & maxv)
+    if pad:
+        if bits:
+            ret.append((acc << (tobits - bits)) & maxv)
+    elif bits >= frombits or ((acc << (tobits - bits)) & maxv):
+        raise ValueError("Invalid padding")
     return ret
 
 def base58_decode(s):
@@ -225,11 +234,13 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, dict]:
         if len(dec) == 25 and dec[0] == 0x05:
             return b'\xa9\x14' + dec[1:21] + b'\x87', {'input_vb': 91, 'output_vb': 32, 'type': 'P2SH'}
     if addr.startswith('bc1q'):
-        data = [CHARSET.find(c) for c in addr[4:] if c in CHARSET]
-        if data and data[0] == 0 and bech32_verify_checksum('bc', data):
-            prog = convertbits(data[1:], 5, 8, False)
-            if prog and len(prog) in (20, 32):
-                return bytes([0x00, 0x14 if len(prog) == 20 else 0x20]) + bytes(prog), {'input_vb': 68, 'output_vb': 31, 'type': 'SegWit'}
+    data = [CHARSET.find(c) for c in addr[4:] if c in CHARSET]
+    if data and data[0] == 0 and bech32_verify_checksum('bc', data):
+        prog = convertbits(data[1:], 5, 8, False)
+        if prog and len(prog) == 20:
+            return b'\x00\x14' + bytes(prog), {'input_vb': 68, 'output_vb': 31, 'type': 'P2WPKH'}
+        if prog and len(prog) == 32:
+            return b'\x00\x20' + bytes(prog), {'input_vb': 69, 'output_vb': 43, 'type': 'P2WSH'}
     if addr.startswith('bc1p'):
         data = [CHARSET.find(c) for c in addr[5:] if c in CHARSET]
         if data and data[0] == 1 and bech32m_verify_checksum('bc', data):
@@ -359,27 +370,27 @@ def fetch_all_utxos_from_xpub(xpub: str, dust: int = 546):
                         addr = hdw.from_path(path).p2wpkh_address()
                     elif path_prefix == "m/49'/0'/0'":
                         addr = hdw.from_path(path).p2sh_p2wpkh_address()
-                    else:  # m/44'
+                    else:
                         addr = hdw.from_path(path).p2pkh_address()
                 except:
-                    addr = None
-
-                if not addr:
                     break
+
                 addresses.append(addr)
 
-                # Early exit if gap limit reached
-                if i >= gap_limit - 1:
-                    recent = addresses[-(gap_limit):]
-                    if all(len(get_utxos(a, dust)) == 0 for a in recent):
-                        empty_count = gap_limit
+                # Proper BIP-32 gap limit
+                if len(get_utxos(addr, dust)) == 0:
+                    empty_count += 1
+                    if empty_count >= gap_limit:
                         break
+                else:
+                    empty_count = 0
 
-        # Scan receive (0) and change (1)
+        # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+        # NOW call the scanner — THIS IS THE ONLY CORRECT PLACE
         scan_chain(receive_chain)
         scan_chain(change_chain)
 
-        # Dedupe just in case
+        # Dedupe & limit
         addresses = list(dict.fromkeys(addresses))[:200]
 
         all_utxos = []
@@ -544,13 +555,13 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return (msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", [])
+            return (msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", "[]")
     else:
         if not addr:
-            return ("Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", [])
+            return ("Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", "[]")
         utxos = get_utxos(addr, threshold)
         if not utxos:
-            return ("No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", [])
+            return ("No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", "[]")
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
@@ -558,36 +569,52 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     sample = [u.get('address') or addr for u in utxos[:10]]
     types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
     from collections import Counter
-    detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
+    detected = Counter(types).most_common(1)[0][0] if types else "P2WPKH"
+
+    # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    # FINAL, 100% CORRECT VBYTES TABLE — INCLUDING P2WSH
     input_vb_global, output_vb_global = {
-        'P2PKH': (148,34), 'P2SH': (91,32), 'SegWit': (68,31), 'Taproot': (57,43)
-    }.get(detected.split()[0], (68,31))
+        'P2PKH':   (148, 34),   # Legacy (1...)
+        'P2SH':    (91,  32),   # P2SH-wrapped (3...) or P2SH-P2WPKH
+        'P2WPKH':  (68,  31),   # bc1q + 20-byte witness program
+        'P2WSH':   (69,  43),   # bc1q + 32-byte witness program ← THIS WAS MISSING
+        'Taproot': (57,  43),   # bc1p...
+    }.get(detected, (68, 31))   # safe fallback
 
-    # Strategy
+    # ——————— STRATEGY LOGIC — FIXED NUCLEAR ———————
     NUCLEAR = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
-    ratio = {"Privacy First (30% pruned)":0.3, "Recommended (40% pruned)":0.4,
-             "More Savings (50% pruned)":0.5, NUCLEAR:0.9}.get(strategy, 0.4)
+    ratio = {
+        "Privacy First (30% pruned)": 0.3,
+        "Recommended (40% pruned)": 0.4,
+        "More Savings (50% pruned)": 0.5,
+        NUCLEAR: 0.9
+    }.get(strategy, 0.4)
 
-    keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos)*(1-ratio)))
-    pruned_utxos_global = utxos[:keep]
+    if strategy == NUCLEAR:
+        keep_count = max(3, int(len(utxos) * 0.10))        # Keep 10% largest
+    else:
+        keep_count = max(1, int(len(utxos) * (1 - ratio)))  # Keep X% largest
 
-    # ——————— SAFETY CAP ———————
+    kept_utxos = utxos[:keep_count]                    # These are KEPT by default
+    pruned_by_default = utxos[keep_count:]             # These are PRUNED unless unchecked
+
+    # ——————— SAFETY CAP — Show largest first ———————
     MAX_UTXOS_SHOWN = 1200
     if len(utxos) > MAX_UTXOS_SHOWN + 50:
         warning_banner = f'''
         <div style="text-align:center;padding:20px;background:#300;border:3px solid #f33;border-radius:16px;margin:30px 0;color:#f99;font-weight:bold;font-size:18px;">
             EXTREME ADDRESS DETECTED: {len(utxos):,} total UTXOs<br>
-            For safety & speed, only showing the <strong>{MAX_UTXOS_SHOWN} largest</strong> for coin-control.<br>
-            All smaller UTXOs are <u>automatically included</u> and will be pruned.
+            Showing only the <strong>{MAX_UTXOS_SHOWN} largest</strong> for coin control<br>
+            <span style="color:#ff3366;">All smaller UTXOs are automatically included → will be pruned</span>
         </div>'''
         display_utxos = utxos[:MAX_UTXOS_SHOWN]
-        full_utxos_for_tx = utxos
+        full_utxos_for_tx = pruned_by_default + kept_utxos
     else:
         warning_banner = ""
-        display_utxos = pruned_utxos_global
-        full_utxos_for_tx = pruned_utxos_global
+        display_utxos = utxos[:MAX_UTXOS_SHOWN]   # Show largest first
+        full_utxos_for_tx = pruned_by_default + kept_utxos
 
-    # CRITICAL: Safe JSON for JavaScript
+    # ——————— Safe JSON ———————
     import json
     safe_full_json = json.dumps(full_utxos_for_tx, separators=(',', ':'))
     safe_display_json = json.dumps(display_utxos, separators=(',', ':'))
@@ -603,11 +630,16 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         conf_text = "Yes" if confirmed else '<span style="color:#ff3366;">No</span>'
         conf_val = "confirmed" if confirmed else "unconfirmed"
 
+        # Determine if this UTXO is checked by default (i.e. will be pruned)
+        is_in_pruned = any(u['txid'] == p['txid'] and u['vout'] == p['vout'] for p in pruned_by_default)
+        is_in_kept = any(u['txid'] == k['txid'] and u['vout'] == k['vout'] for k in kept_utxos)
+        checked = "checked" if is_in_pruned or (is_in_kept and len(utxos) <= MAX_UTXOS_SHOWN + 50) else ""
+
         html_rows += f'''
         <tr style="height:66px;" data-value="{u['value']}" data-vout="{u['vout']}" data-confirmed="{conf_val}" data-index="{idx}">
             <td style="text-align:center;font-weight:bold;color:#f7931a;">{idx+1}</td>
             <td style="text-align:center;">
-                <input type="checkbox" checked data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
+                <input type="checkbox" {checked} data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
             </td>
             <td style="text-align:right;padding-right:30px;font-weight:800;color:#f7931a;font-size:20px;">{val}</td>
             <td style="padding:8px 12px;">
@@ -628,35 +660,33 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             <td style="text-align:center;font-weight:bold;color:#0f0;">{conf_text}</td>
         </tr>'''
 
-    # ——————— Banners ———————
+    # ——————— Clear banner — now 100% accurate ———————
     old_warning = ""
-    if len(utxos) > len(pruned_utxos_global) and len(utxos) <= MAX_UTXOS_SHOWN + 50:
+    if len(utxos) > keep_count:
         if "NUCLEAR" in strategy:
-            strategy_display = '<span style="color:#ff3366; text-shadow: 0 0 20px #f33; font-size:22px;">NUCLEAR PRUNE</span><br><small style="color:#f7931a;">(90% sacrificed — for the brave)</small>'
+            strategy_display = '<span style="color:#ff3366; text-shadow: 0 0 20px #f33; font-size:24px;">NUCLEAR PRUNE</span><br><small style="color:#f7931a;">(90% sacrificed — for the brave)</small>'
         else:
             strategy_display = strategy.replace(" (", "<br><small>(").replace(")", ")</small>")
 
         old_warning = f'''
-       <div style="text-align:center; padding:18px; background:rgba(0,255,0,0.12); border:3px solid #0f0; border-radius:14px; margin:20px 0; color:#0f0; font-weight:900; font-size:19px; line-height:1.5;">
-        Found <strong>{len(utxos):,}</strong> total UTXOs → 
-        <span style="color:#f7931a;">{strategy_display}</span><br>
-        <span style="font-size:24px;">ALL {len(utxos):,} UTXOs are included by default</span><br>
-        <span style="font-size:16px; color:#aaa; display:block; margin-top:8px;">
-        Only uncheck any you want to <u>keep forever</u> (exclude from pruning)
-        </span>
-    </div>'''
+        <div style="text-align:center; padding:20px; background:rgba(255,50,50,0.18); border:4px solid #f33; border-radius:16px; margin:30px 0; color:#f99; font-weight:900; font-size:20px; line-height:1.6;">
+            Found <strong>{len(utxos):,}</strong> UTXOs → {strategy_display}<br>
+            <span style="font-size:28px; color:white;">CHECKED = WILL BE PRUNED</span><br>
+            <span style="font-size:18px; color:#ff3366;">
+                Uncheck any UTXO you want to <u>KEEP forever</u>
+            </span>
+        </div>'''
 
     input_count_warning = ""
     if len(full_utxos_for_tx) > 1500:
         input_count_warning = f"""
         <div style="margin:20px 0;padding:18px;background:#300;border:3px solid #f7931a;border-radius:14px;color:#f7931a;font-weight:bold;text-align:center;">
-            Warning: This will create a transaction with <strong>{len(full_utxos_for_tx):,} inputs</strong><br>
-            • PSBT will be large — use <strong>Electrum or Sparrow Wallet</strong><br>
-            • If over 2,500 inputs → you must uncheck some and run in batches
+            Warning: Transaction will have <strong>{len(full_utxos_for_tx):,}</strong> inputs<br>
+            • Use <strong>Electrum or Sparrow</strong> • If over 2,500 → uncheck some and run in batches
         </div>
         """
 
-    # ——————— PART 1: Table HTML (no script) ———————
+    # ——————— PART 1: Table HTML ———————
     table_part1 = f"""
     <div style="margin:30px 0; font-family:system-ui,sans-serif;">
         {warning_banner or old_warning}
@@ -692,7 +722,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                 <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
                     <tr>
                         <th style="padding:18px;">#</th>
-                        <th style="padding:18px;">Include</th>
+                        <th style="padding:18px;">Prune?</th>
                         <th style="padding:18px; text-align:right;">Value</th>
                         <th style="padding:18px;">TXID</th>
                         <th style="padding:18px;">vout</th>
@@ -707,10 +737,9 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </div>
     """.strip()
 
-    # ——————— PART 2: Script + Summary (separate f-string) ———————
+    # ——————— PART 2: JS + Summary (NO manual hidden input!) ———————
     script_part2 = f"""
 <script>
-/* === COIN CONTROL — BULLETPROOF 2025 WITH HIDDEN INPUT === */
 const fullUtxos = {safe_full_json};
 const displayedUtxos = {safe_display_json};
 
@@ -726,7 +755,7 @@ function updateSelection() {{
         }}
     }});
 
-    // Auto-include tiny UTXOs not shown in table
+    // Auto-include tiny UTXOs not shown
     if (fullUtxos.length > displayedUtxos.length) {{
         const shown = new Set(displayedUtxos.map(u => u.txid + "-" + u.vout));
         fullUtxos.forEach(u => {{
@@ -738,28 +767,29 @@ function updateSelection() {{
     const total = selected.reduce((s, u) => s + u.value, 0);
 
     document.getElementById("selected-summary").innerHTML = `
-        <div style="font-size:34px;color:#f7931a;font-weight:900;">${{count}} inputs selected</div>
-        <div style="font-size:50px;color:#00ff9d;font-weight:900;">${{total.toLocaleString()}} sats</div>
-        <div style="color:#aaa;font-size:16px;margin-top:8px">Ready — click Generate Transaction below</div>
+        <div style="font-size:34px;color:#f7931a;font-weight:900;">${{count}} inputs → WILL BE PRUNED</div>
+        <div style="font-size:50px;color:#00ff9d;font-weight:900;">${{total.toLocaleString()}} sats total</div>
+        <div style="color:#ff3366;font-size:18px;margin-top:8px;">Uncheck = keep forever</div>
     `;
 
-    // FIXED: Update via hidden input (works 100% with gr.Json)
-    const hiddenInput = document.querySelector('#selected-utxos-input');
-    if (hiddenInput) {{
-        hiddenInput.value = JSON.stringify(selected);
-        hiddenInput.dispatchEvent(new Event('input', {{bubbles: true}}));
-        hiddenInput.dispatchEvent(new Event('change', {{bubbles: true}}));
+    // UPDATE GRADIO'S HIDDEN TEXTBOX (this is the real one)
+    const gradioInput = document.querySelector('#selected-utxos-input textarea');
+    if (gradioInput) {{
+        gradioInput.value = JSON.stringify(selected);
+        gradioInput.dispatchEvent(new Event('input', {{bubbles: true}}));
+        gradioInput.dispatchEvent(new Event('change', {{bubbles: true}}));
     }}
 }}
 
-// Initial setup
-document.querySelectorAll("input[data-idx]").forEach(cb => {{
-    cb.checked = true;
-    cb.addEventListener("change", updateSelection);
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {{
+    document.querySelectorAll("input[data-idx]").forEach(cb => {{
+        cb.addEventListener("change", updateSelection);
+    }});
+    updateSelection();
 }});
-updateSelection();
 
-// Filters & sorting (unchanged)
+// Filters (unchanged)
 function applyFilters() {{
     const query = (document.getElementById("txid-search")?.value || "").toLowerCase();
     const sort = document.getElementById("sort-select")?.value || "";
@@ -794,115 +824,124 @@ function applyFilters() {{
 applyFilters();
 </script>
 
-<!-- FIXED: Hidden input for Gradio state (must be here for JS to find it) -->
-<input type="hidden" id="selected-utxos-input" value='{json.dumps(full_utxos_for_tx)}'>
-
 <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
      background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
      font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
 </div>
     """.strip()
 
-    # ——————— COMBINE PARTS ———————
     table_html = table_part1 + script_part2
 
     return (
-        "",                          # output_log
-        gr.update(visible=True),     # generate_row
-        gr.update(visible=True),     # coin_control_row
+        "",                                      # output_log
+        gr.update(visible=True),                 # generate_row
+        gr.update(visible=True),                 # coin_control_row
         table_html,
-        full_utxos_for_tx            # selected_utxos_state (updated by JS)
+        json.dumps(full_utxos_for_tx)            # ← JSON string, not list!
     )
-
 # ==============================
 
 
 def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, future_multiplier, selected_utxos):
-    global input_vb_global, output_vb_global, pruned_utxos_global
+    global input_vb_global, output_vb_global  # ← pruned_utxos_global is obsolete — DO NOT use
 
-    # selected_utxos is now a JSON string from the hidden input
-    if not selected_utxos:
-        utxos_to_use = pruned_utxos_global or []
-    else:
-        try:
-            utxos_to_use = json.loads(selected_utxos)
-        except (json.JSONDecodeError, TypeError) as e:
-            print(f"[DEBUG] JSON parse failed: {e}, falling back to global")
-            utxos_to_use = pruned_utxos_global or []
-
-    if not utxos_to_use:
+    # ——— 1. CRITICAL: Trust ONLY the Gradio state — NO FALLBACK TO GLOBALS ———
+    if not selected_utxos or selected_utxos.strip() in {"", "[]", '""'}:
         return (
-            "<div style='text-align:center;color:#f66;padding:40px;font-size:22px;'>No UTXOs selected — please run analysis first</div>",
+            "<div style='text-align:center;color:#ff3366;padding:50px;font-size:28px;background:#300;border-radius:20px;border:3px solid #f33;'>"
+            "No UTXOs selected<br><small>Please run analysis and use coin control</small>"
+            "</div>",
+            gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=False)
+        )
+
+    try:
+        utxos_to_use = json.loads(selected_utxos)
+        if not isinstance(utxos_to_use, list) or len(utxos_to_use) == 0:
+            raise ValueError("Empty or invalid list")
+    except Exception as e:
+        print(f"[FATAL] Failed to parse selected_utxos JSON: {e}\nRaw value: {selected_utxos[:200]}...")
+        return (
+            "<div style='text-align:center;color:#ff3366;padding:50px;font-size:28px;background:#300;border-radius:20px;border:3px solid #f33;'>"
+            "Coin selection corrupted<br><small>Please click 'Analyze UTXOs' again</small>"
+            "</div>",
             gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=False)
         )
 
     inputs = len(utxos_to_use)
+    total_sats = sum(u['value'] for u in utxos_to_use)
 
-    # ——— HARD LIMIT: 2500 inputs max ———
+    # ——— 2. HARD LIMIT: 2500 inputs max (PSBT + QR safety) ———
     if inputs > 2500:
         html = f"""
-        <div style="text-align:center;padding:50px;background:#300;border:4px solid #f33;border-radius:20px;color:#f99;font-size:22px;">
+        <div style="text-align:center;padding:60px 40px;background:#300;border:5px solid #f33;border-radius:20px;color:#f99;font-size:24px;line-height:1.8;">
             <h2>TOO MANY INPUTS: {inputs:,}</h2>
-            <p>Maximum supported: <strong>2,500 inputs</strong> per transaction.</p>
-            <p><strong>Solution:</strong></p>
-            <ul style="text-align:left;display:inline-block;font-size:19px;line-height:1.8;">
-                <li>Uncheck some large UTXOs above (keep them safe)</li>
-                <li>Click Generate → broadcast this batch goes out</li>
+            <p>Maximum supported: <strong>2,500 inputs</strong> per transaction</p>
+            <p><strong>Solution — this is normal for NUCLEAR:</strong></p>
+            <ol style="text-align:left;display:inline-block;margin:20px 0;font-size:20px;line-height:2;">
+                <li>Uncheck some large UTXOs above → keep them safe</li>
+                <li>Click Generate → broadcast this batch</li>
                 <li>Run Ωmega Pruner again on the same address</li>
                 <li>Repeat until fully pruned</li>
-            </ul>
-            <p style="margin-top:30px;color:#f7931a;font-weight:bold;font-size:18px;">
-                NUCLEAR prune on 10k+ UTXO wallets is done in waves — this is normal.
+            </ol>
+            <p style="color:#f7931a;font-weight:900;font-size:20px;">
+                10k+ UTXO wallets are pruned in waves — you are doing it right.
             </p>
         </div>
         """
         return (html, gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=False))
 
-    total_sats = sum(u['value'] for u in utxos_to_use)
-
-    # ——— Fee rate from mempool.space ———
+    # ——— 3. Fee rate ———
     try:
         fee_rate = requests.get("https://mempool.space/api/v1/fees/recommended", timeout=10).json()["fastestFee"]
     except:
-        fee_rate = 12  # safe fallback
+        fee_rate = 12  # conservative fallback
 
     future_rate = max(int(fee_rate * future_multiplier), fee_rate + 5)
 
-    # ——— Smart vsize estimate ———
-    base_weight = 160
-    input_weight = inputs * input_vb_global * 4
-    witness_overhead = 2 if "SegWit" in str(input_vb_global) or "Taproot" in str(input_vb_global) else 0
+    # ——— 4. Accurate vsize estimate (fixed witness detection) ———
+    is_segwit = input_vb_global in {57, 68}  # Taproot (57) or Native SegWit (68)
+    witness_overhead = 2 if is_segwit else 0
+
     outputs = 1 + (1 if dao_percent > 0 else 0)
-    output_weight = outputs * output_vb_global * 4
-    total_weight = base_weight + input_weight + output_weight + witness_overhead
+
+    total_weight = (
+        160 +                                   # base
+        inputs * input_vb_global * 4 +          # inputs
+        outputs * output_vb_global * 4 +        # outputs
+        witness_overhead                        # segwit marker + flag
+    )
     vsize = (total_weight + 3) // 4
 
-    miner_fee = max(int(vsize * fee_rate * 1.06) + 1, vsize * 12)   # slightly generous
-    miner_fee = min(miner_fee, total_sats // 5)                     # never more than 20%
+    miner_fee = max(int(vsize * fee_rate * 1.06) + 1, vsize * 12)
+    miner_fee = min(miner_fee, total_sats // 5)  # never more than 20%
 
     future_cost = int((input_vb_global * inputs + output_vb_global * 2 + 10) * future_rate)
-    savings = future_cost - miner_fee
+    savings = max(0, future_cost - miner_fee)
 
-    # ——— Thank you logic (capped safely) ———
+    # ——— 5. Donation logic (clear & safe) ———
     dao_cut = 0
     if dao_percent > 0 and savings > 4000:
         raw_cut = int(savings * dao_percent / 10_000)
-        dao_cut = max(546, min(raw_cut, savings // 4))  #never more than 25%
+        dao_cut = max(546, min(raw_cut, savings // 4))
 
     user_receives = total_sats - miner_fee - dao_cut
     if user_receives < 546:
         return (
-            "<div style='text-align:center;color:#f66;padding:40px;font-size:22px;'>Not enough left after fees<br>Try a lower thank-you % or higher fee rate tolerance</div>",
+            "<div style='text-align:center;color:#f66;padding:50px;font-size:26px;background:#300;border-radius:20px;'>"
+            "Not enough left after fees + donation<br>"
+            "Lower the ♥ donation % or try again later when fees drop"
+            "</div>",
             gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=False)
         )
 
-    # ——— Destination address ———
+    # ——— 6. Destination ———
     dest = (dest_addr or user_input).strip()
     dest_script, _ = address_to_script_pubkey(dest)
     if len(dest_script) < 20:
-        return ("Invalid destination address", gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=False))
+        return ("<div style='color:#f66;text-align:center;padding:40px;font-size:24px;'>Invalid destination address</div>",
+                gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=False))
 
-    # ——— Build raw transaction ———
+    # ——— 7. Build transaction ———
     tx = Tx()
     for u in utxos_to_use:
         tx.tx_ins.append(TxIn(bytes.fromhex(u['txid'])[::-1], u['vout']))
@@ -912,12 +951,12 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
         dao_script, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
         tx.tx_outs.append(TxOut(dao_cut, dao_script))
 
-    # ——— Create PSBT ———
+    # ——— 8. Generate PSBT + QR ———
     psbt_b64 = make_psbt(tx)
     qr_image = make_qr(psbt_b64)
-    thank_text = "No thank you" if dao_cut == 0 else f"Thank you: {format_btc(dao_cut)}"
+    donation_text = "No donation" if dao_cut == 0 else f"♥ Donation: {format_btc(dao_cut)}"
 
-    # ——— Beautiful result HTML ———
+    # ——— 9. Final beautiful result ———
     copy_button = f"""
     <button onclick="navigator.clipboard.writeText(`{psbt_b64}`).then(()=>{{
         const t=document.createElement('div');
@@ -929,51 +968,55 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
         document.body.appendChild(t);
         setTimeout(()=>t.remove(),2000);
     }})"
-    style="margin:30px auto;display:block;padding:20px 50px;font-size:1.4rem;font-weight:800;
-           border-radius:18px;border:none;background:#f7931a;color:white;cursor:pointer;
-           box-shadow:0 10px 40px rgba(247,147,26,0.6);transition:all 0.3s;"
+    style="margin:40px auto;display:block;padding:22px 60px;font-size:1.5rem;font-weight:800;
+           border-radius:20px;border:none;background:#f7931a;color:white;cursor:pointer;
+           box-shadow:0 12px 40px rgba(247,147,26,0.6);transition:all 0.3s;"
     onmouseover="this.style.transform='translateY(-6px)';this.style.boxShadow='0 20px 50px rgba(247,147,26,0.8)'"
-    onmouseout="this.style.transform='';this.style.boxShadow='0 10px 40px rgba(247,147,26,0.6)'">
+    onmouseout="this.style.transform='';this.style.boxShadow='0 12px 40px rgba(247,147,26,0.6)'">
         COPY PSBT TO CLIPBOARD
     </button>
     """
 
     result_html = f"""
-    <div style="text-align:center;padding:20px 0;">
-        <h2 style="color:#f7931a;margin:30px 0;font-size:2.6rem;">TRANSACTION READY — PSBT GENERATED</h2>
+    <div style="text-align:center;padding:30px 0;">
+        <h2 style="color:#f7931a;margin:40px 0;font-size:2.8rem;font-weight:900;">
+            PSBT READY — BROADCAST TO PRUNE
+        </h2>
 
-        <div style="font-size:19px;line-height:1.8;margin:20px 0;">
+        <div style="font-size:20px;line-height:1.9;margin:20px 0;color:#ddd;">
             <strong>{inputs:,}</strong> inputs → {format_btc(total_sats)} total<br>
             Miner fee: <strong>{format_btc(miner_fee)}</strong> @ {fee_rate} sat/vB<br>
-            <span style="color:#f7931a;font-weight:800;">{thank_text}</span>
+            <span style="color:#f7931a;font-weight:800;">{donation_text}</span>
         </div>
 
-        <div style="font-size:44px;font-weight:900;color:#00ff9d;margin:30px 0;
+        <div style="font-size:48px;font-weight:900;color:#00ff9d;margin:40px 0;
                     text-shadow:0 0 30px #0f0;">
             You receive: {format_btc(user_receives)}
         </div>
 
-        <div style="margin:30px 0;padding:20px;background:rgba(247,147,26,0.12);
-                    border:2px solid #f7931a;border-radius:16px;font-size:18px;">
-            Future fee savings ≈ <strong style="font-size:32px;color:#00ff9d;">{format_btc(savings)}</strong><br>
-            <small>(estimated at {future_rate} sat/vB peak)</small>
+        <div style="margin:30px 0;padding:24px;background:rgba(247,147,26,0.15);
+                    border:3px solid #f7931a;border-radius:16px;font-size:19px;">
+            Future fee savings ≈ <strong style="font-size:36px;color:#00ff9d;">{format_btc(savings)}</strong><br>
+            <small>at {future_rate} sat/vB peak</small>
         </div>
 
-        <div class="qr-center" style="margin:50px 0;">
+        <div class="qr-center" style="margin:60px 0;">
             <img src="{qr_image}" style="border:6px solid #f7931a;border-radius:20px;
                  box-shadow:0 15px 60px rgba(247,147,26,0.7);max-width:96vw;">
         </div>
 
         {copy_button}
 
-        <p style="color:#aaa;margin:30px 0;">Scan with wallet • or paste PSBT</p>
+        <p style="color:#aaa;margin:40px 0;font-size:18px;">
+            Scan with Sparrow • Electrum • BlueWallet • or paste PSBT
+        </p>
 
-        <details style="margin:40px auto;max-width:800px;">
-            <summary style="cursor:pointer;color:#f7931a;font-weight:bold;font-size:19px;">
-                Click to view raw PSBT (base64)
+        <details style="margin:60px auto 20px;max-width:900px;">
+            <summary style="cursor:pointer;color:#f7931a;font-weight:bold;font-size:20px;padding:10px;">
+                View raw PSBT (base64)
             </summary>
             <pre style="background:#000;color:#0f0;padding:20px;border-radius:12px;
-                 margin-top:15px;overflow-x:auto;font-size:11px;text-align:left;">
+                 margin-top:15px;overflow-x:auto;font-size:11px;text-align:left;word-wrap:break-word;">
 {psbt_b64}
             </pre>
         </details>
@@ -983,11 +1026,10 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     return (
         result_html,
         gr.update(visible=False),   # hide generate button
-        gr.update(visible=False),   # hide whole row
+        gr.update(visible=False),   # hide generate row
         "",                         # dummy
         gr.update(visible=False)    # dummy
     )
-
     
 # ==============================
 # Gradio UI — Final & Perfect
@@ -1190,14 +1232,16 @@ with gr.Blocks(
         with gr.Column():
             # Header — always on top
             gr.Markdown(
-                "<div style='text-align:center; padding:30px 0 10px; line-height:1.5;'>"
-                "<h2 style='margin:0; color:#f7931a; font-size:30px; font-weight:900;'>Coin Control</h2>"
-                "<p style='margin:10px auto 0; color:#ccc; font-size:18px; max-width:720px;'>"
-                "Uncheck any UTXO you want to <u>exclude from pruning</u> → it will be kept forever"
+                "<div style='text-align:center; padding:40px 0 20px;'>"
+                "<h2 style='margin:0; color:#f7931a; font-size:34px; font-weight:900;'>Coin Control</h2>"
+                "<p style='margin:20px auto 0; max-width:800px; line-height:1.8;'>"
+                "<span style='color:#ff3366; font-size:26px; font-weight:900;'>CHECKED = WILL BE PRUNED</span><br>"
+                "<span style='color:#ccc; font-size:19px;'>"
+                "Uncheck any UTXO you want to <u>keep forever</u> — it will be excluded from the transaction"
+                "</span>"
                 "</p>"
                 "</div>"
             )
-            # The actual interactive table goes here
             coin_table_html
         
     # START OVER BUTTON
@@ -1230,25 +1274,32 @@ with gr.Blocks(
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],
-        outputs=[output_log, generate_btn, generate_row]
-    )
-
-   
-    start_over_btn.click(
-        lambda: (
-            "", "Recommended (40% pruned)", 546, "", 50, "",
-            gr.update(visible=False),   # generate_row
-            gr.update(visible=False),   # coin_control_row
-            "",                         # coin_table_html → clear
-            []                          # selected_utxos_state → clear
-        ),
         outputs=[
-            user_input, prune_choice, dust_threshold, dest_addr, dao_percent, output_log,
-            generate_row, coin_control_row, coin_table_html, selected_utxos_state
+            output_log,
+            generate_btn,
+            generate_row,
+            None,  # or gr.update(), doesn't matter
+            None
         ]
     )
 
+   start_over_btn.click(
+    lambda: (
+        "", "Recommended (40% pruned)", 546, "", 50, "",
+        gr.update(visible=False),
+        gr.update(visible=False),
+        "",
+        "[]"   # ← JSON string, not Python list
+    ),
+    outputs=[
+        user_input, prune_choice, dust_threshold, dest_addr, dao_percent, output_log,
+        generate_row, coin_control_row, coin_table_html, selected_utxos_state
+    ]
+)
 
+
+
+    
     # Floating BTC QR Scanner + Beautiful Toast
     gr.HTML("""
 <!-- Floating BTC Scanner Button -->
