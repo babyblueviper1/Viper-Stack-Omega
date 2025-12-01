@@ -1310,7 +1310,7 @@ with gr.Blocks(
         outputs=[output_log, generate_section, coin_control_section, coin_table_html, selected_utxos_state]
     ).then(
         None,
-        _js="() => { showCoinControl(); showGenerateRow(); }"
+        js="() => { showCoinControl(); showGenerateRow(); }"
     )
 
     # 2. Generate → build PSBT & hide everything again
@@ -1320,7 +1320,7 @@ with gr.Blocks(
         outputs=[output_log, generate_section, coin_control_section, coin_table_html]
     ).then(
         None,
-        _js="() => { hideGenerateRow(); hideCoinControl(); }"
+        js="() => { hideGenerateRow(); hideCoinControl(); }"
     )
 
     # 3. Start Over → reset + hide button row
