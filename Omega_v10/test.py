@@ -542,7 +542,7 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
-    # Detect type
+    # Detect address type
     sample = [u.get('address') or addr for u in utxos[:10]]
     types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
     from collections import Counter
@@ -563,14 +563,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos) * (1 - ratio)))
     pruned_utxos_global = utxos[:keep]
 
-    # Build rows — PERFECT TXID with copy + link
+    # Build beautiful, bright, functional TXID rows
     html_rows = ""
     for idx, u in enumerate(pruned_utxos_global):
         val = format_btc(u['value'])
         txid_full = u['txid']
         txid_short = txid_full[:12] + "…" + txid_full[-10:]
         explorer_url = f"https://mempool.space/tx/{txid_full}"
-        conf = "Yes" if u.get('status', {}).get('confirmed', True) else "warning"
+        conf = "Yes" if u.get('status', {}).get('confirmed', True) else "No"
 
         html_rows += f'''
         <tr style="height:66px;">
@@ -578,47 +578,38 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                 <input type="checkbox" checked data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
             </td>
             <td style="text-align:right;padding-right:30px;font-weight:800;color:#f7931a;font-size:20px;">{val}</td>
-            <td style="position:relative;">
+            <td style="padding:8px 12px;">
                 <a href="{explorer_url}" target="_blank"
-                   style="color:#0f0; font-family:monospace; font-size:0.92rem; text-decoration:none; word-break:break-all;"
-                   onmouseover="this.style.textDecoration='underline'"
-                   onmouseout="this.style.textDecoration='none'"
+                   style="color:#00ff9d !important; font-family:monospace; font-size:0.95rem; font-weight:600; text-decoration:none;"
+                   onmouseover="this.style.color='#f7931a'; this.querySelector('span').style.background='rgba(247,147,26,0.25)'; this.querySelector('span').style.borderRadius='8px';"
+                   onmouseout="this.style.color='#00ff9d'; this.querySelector('span').style.background='transparent';"
                    onclick="event.preventDefault(); navigator.clipboard.writeText('{txid_full}');
-                            let s=this.querySelector('span'); let o=s.innerText; s.innerText='Copied!'; setTimeout(()=>s.innerText=o, 1200);"
-                   title="Click to copy full TXID • {txid_full}">
-                    <span style="cursor:pointer; padding:2px 6px; border-radius:4px; transition:all 0.2s;">{txid_short}</span>
+                            let s = this.querySelector('span'); let old = s.innerText; s.innerText = 'COPIED!'; s.style.color='# Orange'; 
+                            setTimeout(() => {{ s.innerText = old; s.style.color='#00ff9d'; }}, 1000);"
+                   title="Click to copy • Opens in mempool.space">
+                    <span style="cursor:pointer; padding:6px 10px; border-radius:8px; transition:all 0.2s; display:inline-block;">
+                        {txid_short}
+                    </span>
                 </a>
             </td>
             <td style="text-align:center;color:white;font-weight:bold;font-size:19px;">{u['vout']}</td>
-            <td style="text-align:center;color:#0f0;font-weight:bold;">{conf or "Yes"}</td>
+            <td style="text-align:center;color:#0f0;font-weight:bold;">{conf}</td>
         </tr>'''
 
     table_html = f"""
     <div style="margin:30px 0; font-family:system-ui,sans-serif;">
-        <!-- SEARCH + ACTION BUTTONS -->
-        <div style="text-align:center; margin-bottom:20px; padding:16px; background:#111; border-radius:14px; border:2px solid #f7931a;">
-            <input type="text" id="txid-search" placeholder="Search by TXID (e.g. deadbeef)"
-                   style="padding:12px 20px; width:320px; font-size:16px; border-radius:10px; border:2px solid #f7931a; background:#000; color:white;">
-            <button onclick="document.getElementById('txid-search').value=''; filterTable(); updateSelection();"
-                    style="padding:12px 24px; margin-left:12px; background:#333; color:white; border:2px solid #f7931a; border-radius:10px; font-weight:bold; cursor:pointer;">
-                Clear Search
-            </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=true); updateSelection();"
-                    style="padding:12px 28px; margin:6px; background:#f7931a; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
-                Select All
-            </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false); updateSelection();"
-                    style="padding:12px 28px; margin:6px; background:#333; color:white; border:2px solid #f7931a; border-radius:10px; font-weight:bold; cursor:pointer;">
-                Select None
-            </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{let r=c.closest('tr'); let v=parseInt(r.children[1].textContent.replace(/[^0-9]/g,'')||'0'); c.checked=v>=100000;}}); updateSelection();"
-                    style="padding:12px 28px; margin:6px; background:#00ff9d; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
-                ≥ 0.001 BTC
-            </button>
+
+        <!-- LIVE SEARCH — NO BUTTON NEEDED -->
+        <div style="text-align:center; margin-bottom:24px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a;">
+            <input type="text" id="txid-search" placeholder="Live search TXID..." 
+                   style="padding:16px 24px; width:420px; font-size:18px; font-weight:bold; text-align:center;
+                          border-radius:14px; border:3px solid #f7931a; background:#000; color:#f7931a;"
+                   oninput="filterTable()">
+            <div style="margin-top:12px; color:#888; font-size:15px;">Type to filter instantly</div>
         </div>
 
         <!-- TABLE -->
-        <div style="max-height:540px; overflow-y:auto; border:4px solid #f7931a; border-radius:16px; background:#0a0a0a;">
+        <div style="max-height:560px; overflow-y:auto; border:4px solid #f7931a; border-radius:16px; background:#0a0a0a;">
             <table id="utxo-table" style="width:100%; border-collapse:collapse;">
                 <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
                     <tr>
@@ -638,7 +629,6 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         <script>
         const allUtxos = {json.dumps(pruned_utxos_global)};
         const tableRows = document.querySelectorAll('#utxo-table tbody tr');
-
         let stateComp = null;
         for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
             if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
@@ -647,8 +637,8 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         function filterTable() {{
             const query = document.getElementById('txid-search').value.toLowerCase();
             tableRows.forEach(row => {{
-                const txidCell = row.children[2].textContent;
-                row.style.display = txidCell.toLowerCase().includes(query) ? '' : 'none';
+                const txid = row.children[2].textContent.toLowerCase();
+                row.style.display = txid.includes(query) ? '' : 'none';
             }});
         }}
 
@@ -656,12 +646,12 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             const checked = document.querySelectorAll('input[data-idx]:checked');
             const indices = Array.from(checked).map(c => parseInt(c.dataset.idx));
             const selected = indices.map(i => allUtxos[i]).filter(Boolean);
-            const total = selected.reduce((a,b) => a + b.value, 0);
+            const total = selected.reduce((a, b) => a + b.value, 0);
 
             document.getElementById('selected-summary').innerHTML = `
-                <div style="font-size:32px; color:#f7931a; font-weight:900;">${{indices.length}} UTXOs selected</div>
-                <div style="font-size:48px; color:#00ff9d; font-weight:900; margin:12px 0;">${{total.toLocaleString()}} sats</div>
-                <div style="color:#888; font-size:15px;">Ready — click Generate Transaction below</div>
+                <div style="font-size:34px; color:#f7931a; font-weight:900;">${{indices.length}} UTXOs selected</div>
+                <div style="font-size:50px; color:#00ff9d; font-weight:900; margin:14px 0;">${{total.toLocaleString()}} sats</div>
+                <div style="color:#aaa; font-size:16px;">Ready — click Generate Transaction below</div>
             `;
 
             if (stateComp) {{
@@ -670,26 +660,44 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
+        // Live search + checkbox updates
         document.getElementById('txid-search').addEventListener('input', filterTable);
-        updateSelection();
         document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
+
+        // Initial update
+        updateSelection();
+
+        // FINAL KICK — FORCE GENERATE BUTTON TO APPEAR (Gradio sometimes needs this)
+        setTimeout(() => {{
+            const row = document.querySelector('[data-testid="generate_row"]') || 
+                        document.querySelector('#generate-and-startover-row') ||
+                        document.querySelector('.gr-button:contains("Generate")')?.closest('.gr-row');
+            if (row) row.style.display = 'flex';
+            const btn = document.querySelector('button:contains("Generate Transaction")');
+            if (btn) {{
+                btn.style.display = 'block';
+                btn.style.visibility = 'visible';
+                btn.style.opacity = '1';
+            }}
+        }}, 400);
         </script>
 
-        <div id="selected-summary" style="text-align:center; padding:32px; margin-top:24px; background:linear-gradient(135deg,#1a0d00,#0a0500);
-             border:4px solid #f7931a; border-radius:20px; font-weight:bold; box-shadow:0 12px 50px rgba(247,147,26,0.6);">
+        <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
+             background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
+             font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
             Calculating...
         </div>
     </div>
     """.strip()
 
-    # FINAL RETURN — 6 values, perfect order, button appears instantly
+    # FINAL RETURN — 6 outputs, bulletproof
     return (
-        "",                                            # output_log
-        gr.update(visible=True),                       # generate_row → show row
-        gr.update(visible=True),                       # coin_control_row → show table
-        table_html,                                    # coin_table_html
-        pruned_utxos_global,                           # selected_utxos_state
-        gr.update(value="2. Generate Transaction", visible=True)  # generate_btn → force visible
+        "",                              # output_log
+        gr.update(visible=True),         # generate_row → shows the row
+        gr.update(visible=True),         # coin_control_row → shows table
+        table_html,                      # coin_table_html
+        pruned_utxos_global,             # selected_utxos_state
+        gr.update(visible=False)         # dummy update — required for 6 outputs
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
@@ -1031,8 +1039,8 @@ with gr.Blocks(
         "2. Generate Transaction",
         variant="primary",
         size="lg",
-        elem_classes="full-width",
-        visible=False   # ← explicitly start hidden
+        elem_classes="full-width bump-with-gap"
+        # ← NO visible=False HERE!
     )
 
     # COIN CONTROL SECTION — FINAL & PERFECT
