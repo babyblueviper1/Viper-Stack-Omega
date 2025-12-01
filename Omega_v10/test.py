@@ -739,12 +739,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 const fullUtxos = {safe_full_json};
 const displayedUtxos = {safe_display_json};
 
-// In your <script> — replace the whole pushToGradio with:
-function pushToGradio(selectedArray) {
-    window.dispatchEvent(new CustomEvent("gradio", {
-        detail: { id: "selected-utxos-input", value: selectedArray }
-    }));
-}
+function pushToGradio(selectedArray) {{
+    window.dispatchEvent(new CustomEvent("gradio", {{
+        detail: {{
+            id: "selected-utxos-input",
+            value: selectedArray
+        }}
+    }}));
+}}
 
 function updateSelection() {{
     const checkboxes = document.querySelectorAll("input[data-idx]");
@@ -758,7 +760,6 @@ function updateSelection() {{
         }}
     }});
 
-    // Add the invisible tiny UTXOs that are always pruned
     if (fullUtxos.length > displayedUtxos.length) {{
         const shown = new Set(displayedUtxos.map(u => u.txid + "-" + u.vout));
         fullUtxos.forEach(u => {{
@@ -775,43 +776,31 @@ function updateSelection() {{
         <div style="color:#ff3366;font-size:18px;margin-top:8px;">Uncheck = keep forever</div>
     `;
 
-    // THIS IS THE IMPORTANT LINE — now 100% reliable
     pushToGradio(selected);
 }}
 
-// Run on DOM ready + multiple fallbacks
-document.addEventListener('DOMContentLoaded', () => {{
-    setTimeout(updateSelection, 100);
-    setTimeout(updateSelection, 600);
+document.addEventListener("DOMContentLoaded", () => {{
+    updateSelection();
+    setTimeout(updateSelection, 500);
     setTimeout(updateSelection, 1500);
-    setTimeout(updateSelection, 3000);
 }});
 
-// Re-run every time user touches a checkbox
 document.querySelectorAll("input[data-idx]").forEach(cb => {{
     cb.addEventListener("change", updateSelection);
-    cb.addEventListener("click", updateSelection);
 }});
 
-setInterval(updateSelection, 4000);
+setInterval(updateSelection, 5000);
 
-// FINAL VISUAL FIX — checkboxes show checked instantly
 setTimeout(() => {{
     document.querySelectorAll("input[data-idx]").forEach(cb => {{
         const idx = parseInt(cb.dataset.idx);
-        const displayed = displayedUtxos[idx];
-        if (!displayed) return;
-        const shouldBeChecked = fullUtxos.some(u => 
-            u.txid === displayed.txid && u.vout === displayed.vout
-        );
-        cb.checked = shouldBeChecked;
+        const utxo = displayedUtxos[idx];
+        if (utxo) cb.checked = fullUtxos.some(u => u.txid === utxo.txid && u.vout === utxo.vout);
     }});
-}}, 50);
+}}, 100);
 </script>
 
-<div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
-     background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
-     font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
+<div id="selected-summary" style="text-align:center;padding:36px;margin-top:28px;background:linear-gradient(135deg,#1a0d00,#0a0500);border:4px solid #f7931a;border-radius:20px;font-weight:bold;box-shadow:0 14px 50px rgba(247,147,26,0.7);">
     <div style="font-size:34px;color:#f7931a;">Loading selection…</div>
 </div>
 """.strip()
