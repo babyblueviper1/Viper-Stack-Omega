@@ -582,138 +582,143 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     table_html = f"""
     <div style="margin:30px 0; font-family:system-ui,sans-serif;">
 
-        <!-- FILTERS & SORT -->
-        <div style="text-align:center; margin-bottom:20px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a; 
-             display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:center;">
-            <input type="text" id="txid-search" placeholder="Search TXID..." 
-                   style="padding:14px 20px; width:300px; font-size:17px; border-radius:12px; border:3px solid #f7931a; background:#000; color:#f7931a; font-weight:bold;">
+    <!-- FILTERS & SORT -->
+    <div style="text-align:center; margin-bottom:20px; padding:20px; background:#111; border-radius:16px; border:3px solid #f7931a; 
+         display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:center;">
+        <input type="text" id="txid-search" placeholder="Search TXID..." 
+               style="padding:14px 20px; width:300px; font-size:17px; border-radius:12px; border:3px solid #f7931a; background:#000; color:#f7931a; font-weight:bold;">
 
-            <select id="sort-select" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
-                <option value="">Sort by...</option>
-                <option value="value-desc">Size (Largest first)</option>
-                <option value="value-asc">Size (Smallest first)</option>
-                <option value="vout-desc">vout (descending)</option>
-                <option value="vout-asc">vout (ascending)</option>
-            </select>
+        <select id="sort-select" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
+            <option value="">Sort by...</option>
+            <option value="value-desc">Size (Largest first)</option>
+            <option value="value-asc">Size (Smallest first)</option>
+            <option value="vout-desc">vout (descending)</option>
+            <option value="vout-asc">vout (ascending)</option>
+        </select>
 
-            <select id="conf-filter" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
-                <option value="">All confirmations</option>
-                <option value="confirmed">Confirmed only</option>
-                <option value="unconfirmed">Unconfirmed only</option>
-            </select>
+        <select id="conf-filter" style="padding:14px; font-size:16px; border-radius:12px; background:#000; color:#f7931a; border:2px solid #f7931a;">
+            <option value="">All confirmations</option>
+            <option value="confirmed">Confirmed only</option>
+            <option value="unconfirmed">Unconfirmed only</option>
+        </select>
 
-            <button onclick="document.getElementById('txid-search').value=''; 
-                             document.getElementById('sort-select').value=''; 
-                             document.getElementById('conf-filter').value=''; 
-                             applyFilters();" 
-                    style="padding:14px 24px; background:#333; color:white; border:2px solid #f7931a; border-radius:12px; font-weight:bold;">Reset</button>
-        </div>
-
-        <!-- TABLE -->
-        <div style="max-height:560px; overflow-y:auto; border:4px solid #f7931a; border-radius:16px; background:#0a0a0a;">
-            <table id="utxo-table" style="width:100%; border-collapse:collapse;">
-                <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
-                    <tr>
-                        <th style="padding:18px;">Include</th>
-                        <th style="padding:18px; text-align:right;">Value</th>
-                        <th style="padding:18px;">TXID</th>
-                        <th style="padding:18px;">vout <small style="font-weight:normal;color:#333;">(index)</small></th>
-                        <th style="padding:18px;">Confirmed</th>
-                    </tr>
-                </thead>
-                <tbody style="font-family:monospace;">
-                    {html_rows}
-                </tbody>
-            </table>
-        </div>
-
-        <script>
-        const allRows = document.querySelectorAll('#utxo-table tbody tr');
-        const allUtxos = {json.dumps(pruned_utxos_global)};
-
-        let stateComp = null;
-        for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
-            if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
-        }}
-
-        function applyFilters() {{
-            const query = document.getElementById('txid-search').value.toLowerCase();
-            const sort = document.getElementById('sort-select').value;
-            const confFilter = document.getElementById('conf-filter').value;
-
-            let rows = Array.from(allRows);
-
-            if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
-            if (query) rows = rows.filter(r => r.children[2].textContent.toLowerCase().includes(query));
-
-            if (sort) {{
-                rows.sort((a, b) => {{
-                    if (sort.includes('value')) {{
-                        const av = parseInt(a.dataset.value);
-                        const bv = parseInt(b.dataset.value);
-                        return sort === 'value-desc' ? bv - av : av - bv;
-                    }} else {{
-                        const av = parseInt(a.dataset.vout);
-                        const bv = parseInt(b.dataset.vout);
-                        return sort === 'vout-desc' ? bv - av : av - bv;
-                    }}
-                }});
-            }}
-
-            const tbody = document.querySelector('#utxo-table tbody');
-            rows.forEach(r => tbody.appendChild(r));
-        }}
-
-        function updateSelection() {{
-            const checked = document.querySelectorAll('input[data-idx]:checked');
-            const indices = Array.from(checked).map(c => parseInt(c.dataset.idx));
-            const selected = indices.map(i => allUtxos[i]).filter(Boolean);
-            const total = selected.reduce((a,b) => a + b.value, 0);
-
-            document.getElementById('selected-summary').innerHTML = `
-                <div style="font-size:34px; color:#f7931a; font-weight:900;">${{indices.length}} UTXOs selected</div>
-                <div style="font-size:50px; color:#00ff9d; font-weight:900;">${{total.toLocaleString()}} sats</div>
-                <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
-            `;
-
-            if (stateComp) {{
-                if (stateComp.__gradio_internal__) stateComp.__gradio_internal__.setValue(selected);
-                else {{ stateComp.value = selected; stateComp.dispatchEvent(new Event('change')); }}
-            }}
-        }}
-
-        document.getElementById('txid-search').addEventListener('input', applyFilters);
-        document.getElementById('sort-select').addEventListener('change', applyFilters);
-        document.getElementById('conf-filter').addEventListener('change', applyFilters);
-        document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
-
-        applyFilters();
-        updateSelection();
-
-        // Force Generate button to appear
-        setTimeout(() => {{
-            const row = document.querySelector('.gr-row:has(button:contains("Generate Transaction"))') ||
-                        document.querySelector('#generate_row') ||
-                        document.querySelector('gradio-row');
-            if (row) row.style.display = 'flex';
-        }}, 500);
-        </script>
-
-        <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
-             background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
-             font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
-            Calculating...
-        </div>
+        <button onclick="document.getElementById('txid-search').value=''; 
+                         document.getElementById('sort-select').value=''; 
+                         document.getElementById('conf-filter').value=''; 
+                         applyFilters();" 
+                style="padding:14px 24px; background:#333; color:white; border:2px solid #f7931a; border-radius:12px; font-weight:bold;">Reset</button>
     </div>
-    """.strip()
+
+    <!-- TABLE -->
+    <div style="max-height:560px; overflow-y:auto; border:4px solid #f7931a; border-radius:16px; background:#0a0a0a;">
+        <table id="utxo-table" style="width:100%; border-collapse:collapse;">
+            <thead style="position:sticky; top:0; background:#f7931a; color:black; font-weight:900; z-index:10;">
+                <tr>
+                    <th style="padding:18px;">Include</th>
+                    <th style="padding:18px; text-align:right;">Value</th>
+                    <th style="padding:18px;">TXID</th>
+                    <th style="padding:18px;">vout <small style="font-weight:normal;color:#333;">(index)</small></th>
+                    <th style="padding:18px;">Confirmed</th>
+                </tr>
+            </thead>
+            <tbody style="font-family:monospace;">
+                {html_rows}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+    const allRows = document.querySelectorAll('#utxo-table tbody tr');
+    const allUtxos = {json.dumps(pruned_utxos_global)};
+
+    let stateComp = null;
+    for (let el of document.querySelectorAll('gradio-state, [data-testid=\\"state\\"]')) {{
+        if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
+    }}
+
+    function applyFilters() {{
+        const query = document.getElementById('txid-search').value.toLowerCase();
+        const sort = document.getElementById('sort-select').value;
+        const confFilter = document.getElementById('conf-filter').value;
+
+        let rows = Array.from(allRows);
+
+        if (confFilter) rows = rows.filter(r => r.dataset.confirmed === confFilter);
+        if (query) rows = rows.filter(r => r.children[2].textContent.toLowerCase().includes(query));
+
+        if (sort) {{
+            rows.sort((a, b) => {{
+                if (sort.includes('value')) {{
+                    const av = parseInt(a.dataset.value);
+                    const bv = parseInt(b.dataset.value);
+                    return sort === 'value-desc' ? bv - av : av - bv;
+                }} else {{
+                    const av = parseInt(a.dataset.vout);
+                    const bv = parseInt(b.dataset.vout);
+                    return sort === 'vout-desc' ? bv - av : av - bv;
+                }}
+            }});
+        }}
+
+        const tbody = document.querySelector('#utxo-table tbody');
+        rows.forEach(r => tbody.appendChild(r));
+    }}
+
+    function updateSelection() {{
+        const checked = document.querySelectorAll('input[data-idx]:checked');
+        const indices = Array.from(checked).map(c => parseInt(c.dataset.idx));
+        const selected = indices.map(i => allUtxos[i]).filter(Boolean);
+        const total = selected.reduce((a,b) => a + b.value, 0);
+
+        document.getElementById('selected-summary').innerHTML = `
+            <div style="font-size:34px; color:#f7931a; font-weight:900;">${{indices.length}} UTXOs selected</div>
+            <div style="font-size:50px; color:#00ff9d; font-weight:900;">${{total.toLocaleString()}} sats</div>
+            <div style="color:#aaa; font-size:16px; margin-top:8px;">Ready — click Generate Transaction below</div>
+        `;
+
+        if (stateComp) {{
+            if (stateComp.__gradio_internal__) stateComp.__gradio_internal__.setValue(selected);
+            else {{ stateComp.value = selected; stateComp.dispatchEvent(new Event('change')); }}
+        }}
+    }}
+
+    document.getElementById('txid-search').addEventListener('input', applyFilters);
+    document.getElementById('sort-select').addEventListener('change', applyFilters);
+    document.getElementById('conf-filter').addEventListener('change', applyFilters);
+    document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
+
+    applyFilters();
+    updateSelection();
+
+    // FINAL NUCLEAR FIX — FORCES GENERATE BUTTON TO APPEAR 100%
+    setTimeout(() => {{
+        const btn = document.getElementById('generate-tx-btn');
+        if (btn) {{
+            btn.style.display = 'block';
+            btn.style.visibility = 'visible';
+            btn.style.opacity = '1';
+            const row = btn.closest('.gr-row');
+            if (row) row.style.display = 'flex';
+        }}
+    }}, 400);
+
+    </script>
+
+    <div id="selected-summary" style="text-align:center; padding:36px; margin-top:28px; 
+         background:linear-gradient(135deg,#1a0d00,#0a0500); border:4px solid #f7931a; border-radius:20px; 
+         font-weight:bold; box-shadow:0 14px 50px rgba(247,147,26,0.7);">
+        Calculating...
+    </div>
+</div>
+""".strip()
 
     return (
         "",                              # output_log
-        gr.update(visible=True),         # generate_row
+        gr.update(visible=True),         # generate_row → shows the row
         gr.update(visible=True),         # coin_control_row
         table_html,
         pruned_utxos_global,
-        gr.update(visible=False)         # dummy
+        gr.update(visible=True) dummy
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
@@ -1050,13 +1055,14 @@ with gr.Blocks(
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
 
     output_log = gr.HTML()
-    with gr.Row(visible=False) as generate_row:
+    generate_row = gr.Row(visible=False)
+    with generate_row:
        generate_btn = gr.Button(
-           "2. Generate Transaction",
+            "2. Generate Transaction",
             variant="primary",
             size="lg",
-            elem_classes="full-width bump-with-gap"
-            # ← NO visible=False HERE
+            elem_classes="full-width bump-with-gap",
+            elem_id="generate-tx-btn"   # ← THIS IS THE KEY
         )
 
     # COIN CONTROL SECTION — FINAL & PERFECT
