@@ -1273,13 +1273,16 @@ with gr.Blocks(
 
     generate_btn.click(
         build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],
+        inputs=[
+            user_input, prune_choice, dust_threshold, dest_addr,
+            dao_percent, future_multiplier, selected_utxos_state
+        ],
         outputs=[
             output_log,
             generate_btn,
             generate_row,
-            None,
-            None
+            gr.update(),   # dummy
+            gr.update()    # dummy
         ]
     )
 
