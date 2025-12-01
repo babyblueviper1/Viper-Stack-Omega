@@ -163,6 +163,11 @@ textarea:focus-within ~ #omega-bg-container-fixed {
     .qr-fab { bottom: 80px !important; right: 16px !important; width: 64px !important; height: 64px !important; font-size: 34px !important; }
     .qr-center img { width: 380px !important; }
 }
+#utxo-table td a span:hover {
+    background: rgba(247,147,26,0.25) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 0 12px rgba(247,147,26,0.4);
+}
 
 """
 # ==============================
@@ -512,13 +517,28 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     if is_xpub:
         utxos, msg = fetch_all_utxos_from_xpub(addr, threshold)
         if not utxos:
-            return msg or "xpub scan failed", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False)
+            return (msg or "xpub scan failed",
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    "",
+                    [],
+                    gr.update(visible=False))
     else:
         if not addr:
-            return "Enter address or xpub", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False)
+            return ("Enter address or xpub",
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    "",
+                    [],
+                    gr.update(visible=False))
         utxos = get_utxos(addr, threshold)
         if not utxos:
-            return "No UTXOs above dust", gr.update(visible=False), gr.update(visible=False), "", [], gr.update(visible=False)
+            return ("No UTXOs above dust",
+                    gr.update(visible=False),
+                    gr.update(visible=False),
+                    "",
+                    [],
+                    gr.update(visible=False))
 
     utxos.sort(key=lambda x: x['value'], reverse=True)
 
@@ -527,42 +547,57 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     types = [address_to_script_pubkey(a)[1]['type'] for a in sample]
     from collections import Counter
     detected = Counter(types).most_common(1)[0][0] if types else "SegWit"
-    input_vb_global, output_vb_global = {'P2PKH':(148,34),'P2SH':(91,32),'SegWit':(68,31),'Taproot':(57,43)}.get(detected.split()[0], (68,31))
+    input_vb_global, output_vb_global = {
+        'P2PKH': (148, 34), 'P2SH': (91, 32), 'SegWit': (68, 31), 'Taproot': (57, 43)
+    }.get(detected.split()[0], (68, 31))
 
     # Strategy
     NUCLEAR = "NUCLEAR PRUNE (90% sacrificed — for the brave)"
-    ratio = {"Privacy First (30% pruned)":0.3, "Recommended (40% pruned)":0.4,
-             "More Savings (50% pruned)":0.5, NUCLEAR:0.9}.get(strategy, 0.4)
-    name = {"Privacy First (30% pruned)":"Privacy First", "Recommended (40% pruned)":"Recommended",
-            "More Savings (50% pruned)":"More Savings",
-            NUCLEAR:'<span style="color:#ff0066;font-weight:900;">NUCLEAR PRUNE</span>'}.get(strategy, strategy)
+    ratio = {
+        "Privacy First (30% pruned)": 0.3,
+        "Recommended (40% pruned)": 0.4,
+        "More Savings (50% pruned)": 0.5,
+        NUCLEAR: 0.9
+    }.get(strategy, 0.4)
 
-    keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos)*(1-ratio)))
+    keep = max(1, min(3, len(utxos))) if strategy == NUCLEAR else max(1, int(len(utxos) * (1 - ratio)))
     pruned_utxos_global = utxos[:keep]
 
-    # Build rows
+    # Build rows — PERFECT TXID with copy + link
     html_rows = ""
     for idx, u in enumerate(pruned_utxos_global):
         val = format_btc(u['value'])
-        txid = u['txid'][:10] + "..." + u['txid'][-8:]
+        txid_full = u['txid']
+        txid_short = txid_full[:12] + "…" + txid_full[-10:]
+        explorer_url = f"https://mempool.space/tx/{txid_full}"
         conf = "Yes" if u.get('status', {}).get('confirmed', True) else "warning"
+
         html_rows += f'''
         <tr style="height:66px;">
             <td style="text-align:center;">
                 <input type="checkbox" checked data-idx="{idx}" style="width:26px;height:26px;cursor:pointer;">
             </td>
             <td style="text-align:right;padding-right:30px;font-weight:800;color:#f7931a;font-size:20px;">{val}</td>
-            <td style="color:#ccc;font-size:0.92rem;word-break:break-all;">{txid}</td>
+            <td style="position:relative;">
+                <a href="{explorer_url}" target="_blank"
+                   style="color:#0f0; font-family:monospace; font-size:0.92rem; text-decoration:none; word-break:break-all;"
+                   onmouseover="this.style.textDecoration='underline'"
+                   onmouseout="this.style.textDecoration='none'"
+                   onclick="event.preventDefault(); navigator.clipboard.writeText('{txid_full}');
+                            let s=this.querySelector('span'); let o=s.innerText; s.innerText='Copied!'; setTimeout(()=>s.innerText=o, 1200);"
+                   title="Click to copy full TXID • {txid_full}">
+                    <span style="cursor:pointer; padding:2px 6px; border-radius:4px; transition:all 0.2s;">{txid_short}</span>
+                </a>
+            </td>
             <td style="text-align:center;color:white;font-weight:bold;font-size:19px;">{u['vout']}</td>
             <td style="text-align:center;color:#0f0;font-weight:bold;">{conf or "Yes"}</td>
         </tr>'''
 
     table_html = f"""
     <div style="margin:30px 0; font-family:system-ui,sans-serif;">
-
         <!-- SEARCH + ACTION BUTTONS -->
         <div style="text-align:center; margin-bottom:20px; padding:16px; background:#111; border-radius:14px; border:2px solid #f7931a;">
-            <input type="text" id="txid-search" placeholder="Search by TXID (e.g. deadbeef)" 
+            <input type="text" id="txid-search" placeholder="Search by TXID (e.g. deadbeef)"
                    style="padding:12px 20px; width:320px; font-size:16px; border-radius:10px; border:2px solid #f7931a; background:#000; color:white;">
             <button onclick="document.getElementById('txid-search').value=''; filterTable(); updateSelection();"
                     style="padding:12px 24px; margin-left:12px; background:#333; color:white; border:2px solid #f7931a; border-radius:10px; font-weight:bold; cursor:pointer;">
@@ -576,17 +611,9 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
                     style="padding:12px 28px; margin:6px; background:#333; color:white; border:2px solid #f7931a; border-radius:10px; font-weight:bold; cursor:pointer;">
                 Select None
             </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{
-                let row = c.closest('tr');
-                let val = parseInt(row.children[1].textContent.replace(/[^0-9]/g,'') || '0');
-                c.checked = val >= 100000;
-            }}); updateSelection();"
+            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>{{let r=c.closest('tr'); let v=parseInt(r.children[1].textContent.replace(/[^0-9]/g,'')||'0'); c.checked=v>=100000;}}); updateSelection();"
                     style="padding:12px 28px; margin:6px; background:#00ff9d; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
                 ≥ 0.001 BTC
-            </button>
-            <button onclick="document.querySelectorAll('input[data-idx]').forEach(c=>c.checked=false); updateSelection();"
-                    style="padding:12px 28px; margin:6px; background:#ff3366; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">
-                Reset Selection
             </button>
         </div>
 
@@ -612,18 +639,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
         const allUtxos = {json.dumps(pruned_utxos_global)};
         const tableRows = document.querySelectorAll('#utxo-table tbody tr');
 
-        // Find gr.State
         let stateComp = null;
         for (let el of document.querySelectorAll('gradio-state, [data-testid="state"]')) {{
-            if (el.__gradio_internal__ || el.value !== undefined) {{
-                stateComp = el;
-                break;
-            }}
+            if (el.__gradio_internal__ || el.value !== undefined) {{ stateComp = el; break; }}
         }}
 
         function filterTable() {{
             const query = document.getElementById('txid-search').value.toLowerCase();
-            tableRows.forEach((row, idx) => {{
+            tableRows.forEach(row => {{
                 const txidCell = row.children[2].textContent;
                 row.style.display = txidCell.toLowerCase().includes(query) ? '' : 'none';
             }});
@@ -647,16 +670,9 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
             }}
         }}
 
-        // Live search
         document.getElementById('txid-search').addEventListener('input', filterTable);
-
-        // Initial update
         updateSelection();
-
-        // Checkbox changes
-        document.addEventListener('change', e => {{
-            if (e.target.matches('input[data-idx]')) updateSelection();
-        }});
+        document.addEventListener('change', e => {{ if (e.target.matches('input[data-idx]')) updateSelection(); }});
         </script>
 
         <div id="selected-summary" style="text-align:center; padding:32px; margin-top:24px; background:linear-gradient(135deg,#1a0d00,#0a0500);
@@ -666,13 +682,14 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </div>
     """.strip()
 
+    # FINAL RETURN — 6 values, perfect order, button appears instantly
     return (
-        "",                                      # output_log (empty now)
-        gr.update(visible=True),                 # generate_row → shows the Generate button
-        gr.update(visible=True),                 # coin_control_row → shows the whole coin control section
-        table_html,                              # your full beautiful table + filters + live total
-        pruned_utxos_global,                     # selected UTXOs → gr.State
-        gr.update(visible=True)                  # generate_row again → forces Generate button to appear
+        "",                                            # output_log
+        gr.update(visible=True),                       # generate_row → show row
+        gr.update(visible=True),                       # coin_control_row → show table
+        table_html,                                    # coin_table_html
+        pruned_utxos_global,                           # selected_utxos_state
+        gr.update(value="2. Generate Transaction", visible=True)  # generate_btn → force visible
     )
 # ==============================
 # UPDATED build_real_tx — PSBT ONLY
@@ -1010,7 +1027,13 @@ with gr.Blocks(
 
     output_log = gr.HTML()
     with gr.Row(visible=False) as generate_row:
-        generate_btn = gr.Button("2. Generate Transaction", visible=False, variant="primary", size="lg", elem_classes="full-width")
+        generate_btn = gr.Button(
+        "2. Generate Transaction",
+        variant="primary",
+        size="lg",
+        elem_classes="full-width",
+        visible=False   # ← explicitly start hidden
+    )
 
     # COIN CONTROL SECTION — FINAL & PERFECT
     coin_table_html = gr.HTML()  # ← Define it first, outside the row
