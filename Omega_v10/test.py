@@ -1212,7 +1212,7 @@ with gr.Blocks(
             lines=1
         )
 
-       with gr.Row():
+    with gr.Row():
         submit_btn = gr.Button("1. Analyze UTXOs", variant="secondary", size="lg")
 
     output_log = gr.HTML()
