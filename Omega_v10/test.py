@@ -1149,33 +1149,35 @@ with gr.Blocks(
     # 2. GENERATE PSBT → Show result, hide controls
     generate_btn.click(
         build_real_tx,
-        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],
-        outputs=[
-            output_log,           # PSBT + QR
-            generate_section,     # Hide inputs
-            coin_control_section, # Hide coin control
-            coin_table            # Clear with "Prune complete" message
-        ]
+        inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],  # ← ADDED THE STATE
+        outputs=[output_log, generate_section, coin_control_section, coin_table]
     ).then(
         lambda: gr.update(visible=False),
         outputs=generate_btn
     )
 
     # 3. START OVER → Full reset
-    start_over_btn.click(
+       start_over_btn.click(
         lambda: (
             "", "Recommended (40% pruned)", 546, "", 50, 6,
             "<div id='generate-section'></div>",
             "<div id='coin-control-section'></div>",
-            "<div style='text-align:center;padding:120px;color:#f7931a;font-size:28px;opacity:0.7;'>"
-            "Ready for next address • Ω</div>",
-            "", []
+            "<div style='text-align:center;padding:140px 20px;color:#f7931a;font-size:32px;opacity:0.9;font-weight:900;letter-spacing:1px;'>
+                PRUNE COMPLETE • Ω<br><br>
+                <span style='font-size:20px;opacity:0.7;font-weight:normal;'>
+                    Ready for the next sacrifice
+                </span>
+            </div>",
+            "",      # output_log
+            []       # selected_utxos_state → now properly assigned
         ),
         outputs=[
             user_input, prune_choice, dust_threshold, dest_addr,
             dao_percent, future_multiplier,
             generate_section, coin_control_section,
-            coin_table, output_log, selected_utxos_state
+            coin_table,          # ← CORRECT: this is your persistent table
+            output_log,
+            selected_utxos_state
         ]
     ).then(
         lambda: gr.update(visible=False),
