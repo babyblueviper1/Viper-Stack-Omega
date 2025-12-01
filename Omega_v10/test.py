@@ -739,28 +739,12 @@ def analysis_pass(user_input, strategy, threshold, dest_addr, dao_percent, futur
 const fullUtxos = {safe_full_json};
 const displayedUtxos = {safe_display_json};
 
-// THIS IS THE ONLY RELIABLE WAY IN GRADIO 4+
-function pushToGradio(selectedArray) {{
-    const payload = JSON.stringify(selectedArray);
-    
-    // Method 1: Direct assignment + events (works 60% of the time)
-    const textbox = document.querySelector('#selected-utxos-input textarea');
-    if (textbox) {{
-        textbox.value = payload;
-        textbox.dispatchEvent(new Event('input', {{bubbles: true}}));
-        textbox.dispatchEvent(new Event('change', {{bubbles: true}}));
-    }}
-
-    // Method 2: Use Gradio's internal custom event (works 99.9% of the time)
-    window.dispatchEvent(new CustomEvent("gradio", {{
-        detail: {{ id: "selected-utxos-input", value: payload }}
-    }}));
-
-    // Method 3: Fallback — force through Gradio's global store (nuclear)
-    if (window.GradioApp) {{
-        window.GradioApp.setValue("selected-utxos-input", payload);
-    }}
-}}
+// In your <script> — replace the whole pushToGradio with:
+function pushToGradio(selectedArray) {
+    window.dispatchEvent(new CustomEvent("gradio", {
+        detail: { id: "selected-utxos-input", value: selectedArray }
+    }));
+}
 
 function updateSelection() {{
     const checkboxes = document.querySelectorAll("input[data-idx]");
@@ -1043,7 +1027,7 @@ with gr.Blocks(
     title="Ωmega Pruner v10.1 — NUCLEAR EDITION: Prune UTXOs Forever",
 ) as demo:
 
-    selected_utxos_state = gr.Textbox(visible=False, elem_id="selected-utxos-input")
+    selected_utxos_state = gr.JSON(visible=False, elem_id="selected-utxos-input")
      # ——— BULLETPROOF OG TAGS — FORCES THUMBNAIL + DESCRIPTION EVERYWHERE ———
     gr.HTML("""
     <head>
