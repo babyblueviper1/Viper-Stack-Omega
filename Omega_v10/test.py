@@ -45,33 +45,25 @@ css = """
 .gr-row:has(.bump-with-gap),
 .gr-row:has(.gr-button.size-lg) { gap: 18px !important; }
 
-/* 2. BEEFY PREMIUM BUTTONS — STILL BEST IN CLASS */
+/* BEEFY PREMIUM BUTTONS — FULLY RESTORED & PERFECT */
 .gr-button button, .gr-button > div, .gr-button > button {
-    font-size: 1.25rem !important;
-    font-weight: 600 !important;
-    padding: 16px 28px !important;
-    min-height: 62px !important;
-    border-radius: 14px !important;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.16) !important;
-    transition: all 0.22s ease !important;
-    width: 100% !important;
-    text-align: center !important;
+    font-size: 1.25rem !important; font-weight: 600 !important;
+    padding: 16px 28px !important; min-height: 62px !important;
+    border-radius: 14px !important; box-shadow: 0 4px 14px rgba(0,0,0,0.16) !important;
+    transition: all 0.22s ease !important; line-height: 1.4 !important;
+    width: 100% !important; text-align: center !important;
 }
 .gr-button[variant="primary"], .gr-button.size-lg {
-    font-size: 1.38rem !important;
-    font-weight: 750 !important;
-    padding: 22px 32px !important;
-    min-height: 72px !important;
+    font-size: 1.38rem !important; font-weight: 750 !important;
+    padding: 22px 32px !important; min-height: 72px !important;
     box-shadow: 0 6px 20px rgba(247,147,26,0.38) !important;
 }
 .gr-button[variant="secondary"] button {
-    font-size: 1.28rem !important;
-    padding: 18px 28px !important;
-    min-height: 64px !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    font-size: 1.28rem !important; padding: 18px 28px !important;
+    min-height: 64px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
 }
-.gr-button:hover {
-    transform: translateY(-4px) !important;
+.gr-button:hover { transform: translateY(-4px) !important; }
+.gr-button[variant="primary"]:hover {
     box-shadow: 0 14px 32px rgba(247,147,26,0.5) !important;
 }
 
@@ -79,21 +71,30 @@ css = """
 #action_row {
     position: sticky !important;
     bottom: 0 !important;
-    background: linear-gradient(180deg, transparent, #000 30%) !important;
-    padding: 20px 0 40px !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: linear-gradient(180deg, transparent, #000 20%) !important;
+    padding: 20px 20px 40px 20px !important;
     margin-top: 80px !important;
     z-index: 100 !important;
     backdrop-filter: blur(12px) !important;
     border-top: 4px solid #f7931a !important;
     border-radius: 20px 20px 0 0 !important;
     box-shadow: 0 -10px 40px rgba(0,0,0,0.6) !important;
+    display: flex !important;
+    justify-content: center !important;
+    gap: 18px !important;
+    flex-wrap: wrap !important;
 }
 
-/* When Generate button is hidden → Start Over takes full width */
+/* When Generate button is hidden → Start Over takes center stage */
+#action_row:has(button[style*="display: none"]) {
+    justify-content: center !important;
+}
 #action_row:has(button[style*="display: none"]) .gr-button {
     width: 100% !important;
     max-width: 600px !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
 }
 
 /* 4. FAB SCANNER BUTTON */
@@ -129,10 +130,25 @@ button[title="Clear"], button[title="Stop"] {
 }
 
 /* 7. QR & TABLE BEAUTY */
+.qr-center {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin: 60px auto !important;
+    padding: 20px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+}
 .qr-center img {
-    width: 460px !important; max-width: 96vw !important;
-    border: 6px solid #f7931a !important; border-radius: 20px !important;
+    width: 460px !important;
+    max-width: 96vw !important;
+    border: 6px solid #f7931a !important;
+    border-radius: 20px !important;
     box-shadow: 0 12px 50px rgba(247,147,26,0.6) !important;
+}
+.qr-center img {
+    image-rendering: -webkit-optimize-contrast; /* sharper QR on retina */
 }
 #utxo-table td a span:hover {
     background: rgba(247,147,26,0.25) !important;
@@ -824,47 +840,50 @@ def build_real_tx(user_input, strategy, threshold, dest_addr, dao_percent, futur
     </button>
     """
 
-    result_html = f"""
-    <div style="text-align:center;padding:30px 0;">
-        <h2 style="color:#f7931a;margin:40px 0;font-size:2.8rem;font-weight:900;">
-            PSBT READY — BROADCAST TO PRUNE
-        </h2>
+result_html = f"""
+<div style="text-align:center; padding:30px 0; width:100%; max-width:100vw; box-sizing:border-box;">
+    <h2 style="color:#f7931a; margin:40px 0; font-size:2.8rem; font-weight:900;">
+        PSBT READY — BROADCAST TO PRUNE
+    </h2>
 
-        <div style="font-size:20px;line-height:1.9;margin:20px 0;color:#ddd;">
-            <strong>{inputs:,}</strong> inputs → {format_btc(total_sats)} total<br>
-            Miner fee: <strong>{format_btc(miner_fee)}</strong> @ {fee_rate} sat/vB<br>
-            <span style="color:#f7931a;font-weight:800;">{donation_text}</span>
-        </div>
-
-        <div style="font-size:48px;font-weight:900;color:#00ff9d;margin:40px 0;text-shadow:0 0 30px #0f0;">
-            You receive: {format_btc(user_receives)}
-        </div>
-
-        <div style="margin:30px 0;padding:24px;background:rgba(247,147,26,0.15);border:3px solid #f7931a;border-radius:16px;font-size:19px;">
-            Future fee savings ≈ <strong style="font-size:36px;color:#00ff9d;">{format_btc(savings)}</strong><br>
-            <small>at {future_rate} sat/vB peak</small>
-        </div>
-
-        <div class="qr-center" style="margin:60px 0;">
-            <img src="{qr_image}" style="border:6px solid #f7931a;border-radius:20px;box-shadow:0 15px 60px rgba(247,147,26,0.7);max-width:96vw;">
-        </div>
-
-        {copy_button}
-
-        <p style="color:#aaa;margin:40px 0;font-size:18px;">
-            Scan with Sparrow • Electrum • BlueWallet • or paste PSBT
-        </p>
-
-        <details style="margin:60px auto 20px;max-width:900px;">
-            <summary style="cursor:pointer;color:#f7931a;font-weight:bold;font-size:20px;padding:10px;">
-                View raw PSBT (base64)
-            </summary>
-            <pre style="background:#000;color:#0f0;padding:20px;border-radius:12px;margin-top:15px;overflow-x:auto;font-size:11px;text-align:left;word-wrap:break-word;">
-{psbt_b64}
-            </pre>
-        </details>
+    <div style="font-size:20px; line-height:1.9; margin:20px 0; color:#ddd;">
+        <strong>{inputs:,}</strong> inputs → {format_btc(total_sats)} total<br>
+        Miner fee: <strong>{format_btc(miner_fee)}</strong> @ {fee_rate} sat/vB<br>
+        <span style="color:#f7931a; font-weight:800;">{donation_text}</span>
     </div>
-    """
+
+    <div style="font-size:48px; font-weight:900; color:#00ff9d; margin:40px 0; text-shadow:0 0 30px #0f0;">
+        You receive: {format_btc(user_receives)}
+    </div>
+
+    <div style="margin:30px 0; padding:24px; background:rgba(247,147,26,0.15); border:3px solid #f7931a; border-radius:16px; font-size:19px;">
+        Future fee savings ≈ <strong style="font-size:36px; color:#00ff9d;">{format_btc(savings)}</strong><br>
+        <small>at {future_rate} sat/vB peak</small>
+    </div>
+
+    <!-- QR — NOW 100% BULLETPROOF CENTERED -->
+    <div style="display:flex; justify-content:center; align-items:center; margin:60px 0; width:100%;">
+        <div class="qr-center">
+            <img src="{qr_image}" style="width:460px; max-width:96vw; border:6px solid #f7931a; border-radius:20px; box-shadow:0 15px 60px rgba(247,147,26,0.7);">
+        </div>
+    </div>
+
+    {copy_button}
+
+    <p style="color:#aaa; margin:40px 0; font-size:18px;">
+        Scan with Sparrow • Electrum • BlueWallet • or paste PSBT
+    </p>
+
+    <details style="margin:60px auto 20px; max-width:900px;">
+        <summary style="cursor:pointer; color:#f7931a; font-weight:bold; font-size:20px; padding:10px;">
+            View raw PSBT (base64)
+        </summary>
+        <pre style="background:#000; color:#0f0; padding:20px; border-radius:12px; margin-top:15px; overflow-x:auto; font-size:11px; text-align:left; word-wrap:break-word;">
+{psbt_b64}
+        </pre>
+    </details>
+</div>
+"""
 
     return (
         result_html,
@@ -1073,20 +1092,22 @@ with gr.Blocks(
     coin_table_html = gr.HTML(elem_id="coin-table-container")
 
     # The real Generate + Start Over row (starts hidden)
-    with gr.Row(visible=False) as action_row:
-        generate_btn = gr.Button(
-            "2. Generate Transaction",
-            variant="primary",
-            size="lg",
-            elem_classes="full-width bump-with-gap",
-            elem_id="generate-tx-btn"
-        )
+    with gr.Row(elem_id="action_row"):
         start_over_btn = gr.Button(
             "Start Over — Clear Everything",
             variant="secondary",
             size="lg",
             elem_classes="full-width"
         )
+        generate_btn = gr.Button(
+            "2. Generate Transaction",
+            variant="primary",
+            size="lg",
+            elem_classes="full-width bump-with-gap",
+            elem_id="generate-tx-btn",
+            visible=False  # starts hidden
+        )
+
     # ==================================================================
     # CRITICAL: Sync hidden textbox → Python State (this is the magic)
     # ==================================================================
@@ -1107,20 +1128,20 @@ with gr.Blocks(
         outputs=[output_log, generate_section, coin_control_section, coin_table_html, selected_utxos_state]
     ).then(
         lambda: gr.update(visible=True),
-        outputs=action_row
+        outputs=generate_btn
     )
 
-    # 2. After generating PSBT → HIDE ONLY THE GENERATE BUTTON, keep Start Over
+    # After generating PSBT → hide Generate button (job done), keep Start Over
     generate_btn.click(
         build_real_tx,
         inputs=[user_input, prune_choice, dust_threshold, dest_addr, dao_percent, future_multiplier, selected_utxos_state],
         outputs=[output_log, generate_section, coin_control_section, coin_table_html]
     ).then(
-        lambda: gr.update(visible=False),   # ← hides ONLY the Generate button
+        lambda: gr.update(visible=False),
         outputs=generate_btn
     )
 
-    # 3. Start Over → full reset + hide entire row
+    # Start Over → full reset, hide Generate button
     start_over_btn.click(
         lambda: (
             "", "Recommended (40% pruned)", 546, "", 50, 6,
@@ -1136,7 +1157,7 @@ with gr.Blocks(
         ]
     ).then(
         lambda: gr.update(visible=False),
-        outputs=action_row
+        outputs=generate_btn
     )
     
     # Floating BTC QR Scanner + Beautiful Toast
