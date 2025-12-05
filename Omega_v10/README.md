@@ -1,76 +1,72 @@
-# Ωmega Pruner v10.0
+# Ωmega Pruner v10.2.1 — NUCLEAR EDITION
 
-**The last UTXO consolidator . . .**  
+**The last UTXO consolidator you'll ever need.**
 
-**LIVE (English):** https://omega-v10.onrender.com  
-**LIVE (Español):** https://omega-v10-es.onrender.com  
-**LIVE (Português):** https://omega-v10-pt.onrender.com  
+**LIVE:** [https://omegapruner.onrender.com](https://omegapruner.onrender.com)
+**Launched:** 5 December 2025
 
-**Launched:** November 26, 2025
+| Property                              | Ωmega Pruner v10.2.1                                     | Everyone Else in 2025  |
+| ------------------------------------- | -------------------------------------------------------- | ---------------------- |
+| Private keys ever leave your browser? | Never                                                    | Some still do          |
+| Transaction encoding                  | Hand-rolled, bit-perfect, zero dependencies              | Usually broken         |
+| Full SegWit v0 + v1 (Taproot) support | Automatic, zero silent failures                          | Partial or dead        |
+| PSBT output                           | Minimal, universally valid — signs in every 2025 wallet  | Often malformed        |
+| Copy PSBT + mobile toast              | One-tap paste into Sparrow/Electrum                      | Nobody                 |
+| Dust creation                         | Literally impossible — <546 sats → absorbed with warning | Still happens          |
+| Transparent miner fee absorption      | Shows exactly when tiny amounts go to miners             | Hidden or wrong        |
+| Clear privacy warning                 | “Reduces privacy, regardless of chosen strategy”         | Sugar-coated or silent |
 
-| Property                                 | Ωmega Pruner v10.0                                          | Everyone Else in 2025 |
-|------------------------------------------|------------------------------------------------------------|-----------------------|
-| Private keys ever touch the server?      | Never                                                      | Some still do         |
-| Transaction encoding                     | Hand-rolled, zero deps, bit-perfect                        | Usually broken        |
-| SegWit v0 + v1 (Taproot) support          | Full, automatic, zero silent failures                    | Partial or dead       |
-| PSBT output                              | Minimal, universally valid — works in every 2025 wallet  | Often malformed       |
-| Copy PSBT button + mobile toast         | LIVE                                                       | Nobody                |
-| Future-fee stress-test slider          | 3× → 20× live — see ₿2+ savings appear in real time        | Hardcoded or fake     |
-| Future-savings math                      | Transparent, user-controlled, mathematically perfect     | Vague or wrong        |
-| Fund-loss bugs                           | Triple-audited → literally impossible                   | Still happen weekly   |
+---
 
 ### What happens in 8 seconds
-- Paste or **QR-scan** any address / xpub (legacy → Taproot → xpub/zpub/ypub/tpub)  
-- Floating orange **B** → instant camera scan  
-- Slide the **Future fee stress test** to 15× or 20× → watch the green number go nuclear  
-- Generate → get perfect PSBT + giant QR + **Copy PSBT** button
-  
-Works flawlessly with **every** wallet in 2025 and beyond:  
+
+1. Paste or **QR-scan** any address / xpub (legacy → Taproot → xpub/zpub/ypub)
+2. Floating orange **B** → instant camera scan
+3. Choose your pruning strategy
+4. **1. ANALYZE & LOAD UTXOs**
+5. **2. GENERATE NUCLEAR PSBT**
+6. Scan giant QR or tap **COPY PSBT** → sign → broadcast
+
+Works flawlessly with **every wallet in 2025+**:
 Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trezor • Specter • Fully Noded • UniSat • OKX • Xverse • Leather • Aqua • Keystone
 
-### Final Feature Matrix — v10.0 Infinite Edition
-| Feature                                  | Status   | Notes                                                  |
-|------------------------------------------|----------|--------------------------------------------------------|
-| Address / xpub QR scanner                | LIVE     | Orange floating B button                             |
-| Giant perfectly centered QR              | LIVE     | Looks god-tier on phones                             |
-| PSBT + Copy PSBT button + toast          | LIVE     | One-tap paste into Sparrow/Electrum desktop          |
-| Future-fee stress-test slider (3×–20×)     | LIVE     | 6× = historical peak • 20× = apocalypse mode            |
-| Live thank-you slider (0.00–5.00%)          | LIVE     | Only on future savings — truly voluntary               |
-| Taproot key-path spend protection        | LIVE     | No accidental dust outputs                           |
-| Works with every wallet in 2025+          | LIVE     | Verified on hardware & software                          |
-| Zero custody • Zero lies • Zero regrets | FOREVER  | Apache 2.0                                              |
+---
 
-### Ωmega Pruner+ Lifetime License — 0.042 BTC (one-time payment)
+### Final Feature Matrix — v10.2.1
 
-Price locked at 0.042 BTC for the next 48 hours only.  
-After Monday 1 Dec 23:59 UTC → price doubles to 0.084 BTC forever.
+| Feature                                  | Status  | Notes                                            |
+| ---------------------------------------- | ------- | ------------------------------------------------ |
+| Address / xpub QR scanner                | LIVE    | Floating orange B button                         |
+| Giant perfectly centered QR              | LIVE    | Nuclear glow on every screen                     |
+| PSBT + Copy PSBT + toast                 | LIVE    | One-tap paste into any wallet                    |
+| Thank-you / DAO slider (0–5%)            | LIVE    | Only on future savings — truly voluntary         |
+| Dust protection (<546 sats)              | LIVE    | Shows exactly why tiny amounts go to miners      |
+| “‘Sent back to your wallet’” explanation | LIVE    | No more “where did my money go?”                 |
+| Cleaar privacy warning                   | LIVE    | “Reduces privacy, regardless of chosen strategy” |
+| Zero custody • Zero lies • Zero regrets  | FOREVER | Apache 2.0                                       |
 
-First 21 people only. Then the door closes.
+---
 
-You get forever:
-- Name etched on-chain via OP_RETURN (immortal)
-- Priority support + direct line to Federico
-- Every future feature the day it drops (Lightning sweep, mobile PWA, collaborative pruning, IPFS version, NUCLEAR+ modes, etc.)
-- Custom builds & private integrations (your node, your vault, your rules)
-- Permanent spot on the Ωmega Pruner+ Founders wall
+### Ωmega Pruner — Custom Builds
 
-Founders secured so far: 0 / 21 
-bc1qhtq6avlzyzrh3hxmcjtch6578mvarh9lu28ej8
+Your treasury. Your rules. Built by the Ω.
 
-### Quick start
-1. Paste or scan address / xpub  
-2. (Optional) Crank the **Future fee stress test** slider to 20× and watch people lose their minds  
-3. Choose pruning → **1. Analyze UTXOs**  
-4. → **2. Generate Transaction**  
-5. Scan QR or tap **Copy PSBT** → sign → broadcast
-   
-**Dust → annihilated.**  
-**Future fees → obliterated.**  
-**Peace of mind → eternal.**
+* Custom wallet / exchange integrations
+* Air-gapped or on-premises deployments
+* Branded dashboards & governance policies
+* Dedicated dev hours + SLA
+* Full control over workflow & security
 
-**No custody. No mercy.**
+By quote only — pay for exactly the build you want.
+
+> The future is custom. The Ω is watching.
+
+**Contact:** [omegapruner@proton.me](mailto:omegapruner@proton.me)
+**Baby Blue Viper:** [babyblueviper.com](https://babyblueviper.com)
+
+---
 
 **Prune today. Win forever. • Ω**
+**babyblueviper & the swarm** • December 2025
 
-**babyblueviper & the swarm** • November 26, 2025  
-**Contact:** omegapruner@proton.me
+---
