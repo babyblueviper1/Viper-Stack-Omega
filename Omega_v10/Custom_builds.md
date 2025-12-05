@@ -17,7 +17,7 @@ In short: consolidate with confidence — saving time, saving sats, keeping your
 Built with Bitcoin sovereignty in mind.  
 Modular, auditable, battle-tested.  
 AI-assisted pruning and predictive analytics for users who demand precision.  
-Trusted by operators who treat Bitcoin as gold, not a game.
+For those who treat Bitcoin as gold, not a game.
 
 Ωmega is more than software — it’s a personalized Bitcoin weapon.
 
