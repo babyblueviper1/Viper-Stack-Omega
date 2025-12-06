@@ -784,8 +784,15 @@ with gr.Blocks(
     <p id="subtitle" style="
         color:#0f0;
         font-size:1.3rem;
-        font-weight:bold;
-        text-shadow:0 0 12px black, 0 0 24px black;
+        font-weight:900;
+        letter-spacing:0.6px;
+        text-shadow:
+            0 0 12px #0f0,                 /* neon core */
+            0 0 24px #0f0,                 /* outer glow */
+            0 0 40px #0f0,                 /* massive halo */
+            0 2px 6px #000,                /* sharp black drop */
+            0 6px 16px #000000cc,          /* deep black shadow */
+            0 12px 32px #000000e6;         /* nuclear black halo */
         animation: subtitle-glow 2s infinite alternate;
         margin-top:12px;
     ">
