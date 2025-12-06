@@ -730,6 +730,17 @@ def generate_psbt(
 with gr.Blocks(
     title="Ωmega Pruner v11 — NUCLEAR EDITION"
 ) as demo:
+    # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
+    gr.HTML("""
+    <meta property="og:title" content="Ωmega Pruner v10.2.1 — NUCLEAR EDITION">
+    <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
+    <meta property="og:image" content="Omega_Pruner/omega_thumbnail.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:url" content="https://omega-pruner.onrender.com">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    """, visible=False)
     gr.HTML("""
 <!-- Ω Background (unchanged, working, with gradient-scale pulse) -->
 <div id="omega-bg" style="
