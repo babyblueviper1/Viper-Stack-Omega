@@ -1010,12 +1010,21 @@ body { overflow-y: auto !important; }
     '</a>'
     '</div><br>'
 
-    # TAGLINE
-    '<span style="color:#0f0; font-size:0.88rem;'
-    'text-shadow: 0 0 10px rgba(0,255,0,0.4);">'
+    # TAGLINE — NUCLEAR BLACK SHADOW, READABLE ON ANY DISPLAY
+    '<span style="'
+    'color:#0f0; '
+    'font-size:0.88rem; '
+    'font-weight:800; '
+    'letter-spacing:0.6px; '
+    'text-shadow: '
+        '0 0 12px #0f0, '                    # neon glow
+        '0 0 24px #0f0, '                    # outer glow
+        '0 0  6px #000, '                    # sharp black drop
+        '0  4px 10px #000, '                 # deep shadow
+        '0  8px 20px #000000e6; '            # massive black halo
+    '">'
     'Prune today. Win forever. • Ω'
     '</span>'
-
     '</div>',
     elem_id="omega_footer"
 )
