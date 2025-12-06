@@ -734,7 +734,7 @@ with gr.Blocks(
     gr.HTML("""
     <meta property="og:title" content="Ωmega Pruner v10.2.1 — NUCLEAR EDITION">
     <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
-    <meta property="og:image" content="Omega_Pruner/omega_thumbnail.png">
+    <meta property="og:image" content="docs/omega_thumbnail.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:url" content="https://omega-pruner.onrender.com">
