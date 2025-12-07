@@ -728,7 +728,7 @@ def generate_psbt(
 # --------------------------
 
 with gr.Blocks(
-    title="Ωmega Pruner v11 — NUCLEAR EDITION"
+    title="Ωmega Pruner v10.2.1 — NUCLEAR EDITION"
 ) as demo:
     # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
     gr.HTML("""
