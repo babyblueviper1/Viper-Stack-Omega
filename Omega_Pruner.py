@@ -1,4 +1,4 @@
-# Omega_Oruner.py
+# Omega_Pruner.py
 import gradio as gr
 import requests, time, base64, io, qrcode, json, os
 from dataclasses import dataclass
