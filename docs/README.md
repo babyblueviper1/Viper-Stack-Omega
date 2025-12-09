@@ -1,4 +1,4 @@
-# Ωmega Pruner v10.3 — FINAL NUCLEAR FORM
+# Ωmega Pruner v10.3 — NUCLEAR SURGICAL
 
 **The last UTXO consolidator you’ll ever need. Now with surgical transparency.**
 
