@@ -496,10 +496,10 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
     </strong><br>
     <span style='color:#ff9900;font-weight:700;
                  text-shadow:1px 1px 0 #000, 0 0 8px rgba(255,153,0,0.8);'>
+      <span style='color:#ff9900;font-weight:700;
+                 text-shadow:1px 1px 0 #000, 0 0 8px rgba(255,153,0,0.8);'>
       Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
-      <strong style='font-weight:700;text-shadow:1px 1px 0 #000, 0 0 8px rgba(255,153,0,0.8);'>
-        Choose the strategy that best fits your needs.
-      </strong>
+      Choose the strategy that best fits your needs.
     </span>
   </div>
 </div>
