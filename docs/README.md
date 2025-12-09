@@ -21,7 +21,7 @@
 
 ### What happens in 8 seconds (now even deadlier)
 
-1. Paste or **QR-scan** any address / xpub (legacy → Taproot → xpub/zpub/ypub)  
+1. Paste any address / xpub (legacy → Taproot → xpub/zpub/ypub)  
 2. Choose your pruning strategy  
 3. **1. ANALYZE & LOAD UTXOs** → instantly see current tx size if you sent everything today  
 4. **2. GENERATE NUCLEAR PSBT** → watch the vsize drop and the **NUCLEAR** badge glow  
