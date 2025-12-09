@@ -1,4 +1,4 @@
-# Ωmega Pruner v10.2.1 — NUCLEAR EDITION
+# Ωmega Pruner v10.3 — NUCLEAR EDITION
 
 The last UTXO consolidator you’ll ever need.
 
