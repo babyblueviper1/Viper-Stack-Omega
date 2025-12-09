@@ -488,15 +488,16 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
       {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>{sats_to_btc_str(dao_raw)}</span> <span style='color:#ff3366;font-size:0.9rem;'>(dust — absorbed)</span>" if 0 < dao_raw < 546 else ""}
     </div>
 
-    <div style='text-align:center;margin:15px 0;padding:18px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 60px rgba(247,147,26,0.6);'>
-  <div style='color:#ff3366;font-size:1.1rem;font-weight:900;letter-spacing:2px;line-height:1.6;'>
-    <strong style='text-shadow:0 0 14px #ff3366, 1px 1px 0 #000, 0 0 24px #ff0000;'>
+<div style='text-align:center;margin:15px 0;padding:18px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 60px rgba(247,147,26,0.6);'>
+  <div style='font-size:1.1rem;font-weight:700;letter-spacing:1.2px;line-height:1.6;'>
+    <strong style='color:#ff3366;font-size:1.35rem;font-weight:900;letter-spacing:3px;
+                  text-shadow:0 0 16px #ff3366, 0 0 28px #ff0000, 1px 1px 0 #000;'>
       CAUTION
     </strong><br>
-    Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
-    <strong style='color:#ff3366;text-shadow:0 0 14px #ff3366, 1px 1px 0 #000;'>
-      Choose the strategy that best fits your needs.
-    </strong>
+    <span style='color:#ff9900;'>
+      Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
+      <strong>Choose the strategy that best fits your needs.</strong>
+    </span>
   </div>
 </div>
 
