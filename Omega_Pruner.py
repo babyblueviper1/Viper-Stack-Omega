@@ -488,12 +488,17 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
       {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>{sats_to_btc_str(dao_raw)}</span> <span style='color:#ff3366;font-size:0.9rem;'>(dust — absorbed)</span>" if 0 < dao_raw < 546 else ""}
     </div>
 
-    <div style='text-align:center;margin:15px 0;padding:16px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 50px rgba(247,147,26,0.5);'>
-      <div style='color:#ff9900;font-size:1rem;font-weight:700;letter-spacing:1.2px;line-height:1.5;'>
-        <strong style='text-shadow:1px 1px 0px #000, 0 0 8px rgba(255,153,0,0.9);'>Warning: Note:</strong> Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
-        <strong style='color:#ff9900;text-shadow:1px 1px 0px #000, 0 0 8px rgba(255,102,0,0.9);'>Choose the strategy that best fits your needs.</strong>
-      </div>
-    </div>
+    <div style='text-align:center;margin:15px 0;padding:18px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 60px rgba(247,147,26,0.6);'>
+  <div style='color:#ff3366;font-size:1.1rem;font-weight:900;letter-spacing:2px;line-height:1.6;'>
+    <strong style='text-shadow:0 0 14px #ff3366, 1px 1px 0 #000, 0 0 24px #ff0000;'>
+      CAUTION
+    </strong><br>
+    Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
+    <strong style='color:#ff3366;text-shadow:0 0 14px #ff3366, 1px 1px 0 #000;'>
+      Choose the strategy that best fits your needs.
+    </strong>
+  </div>
+</div>
 
     <style>
     .mobile-break {{ display: none; }}
@@ -748,11 +753,11 @@ def generate_psbt(
 # --------------------------
 
 with gr.Blocks(
-    title="Ωmega Pruner v10.2.1 — NUCLEAR EDITION"
+    title="Ωmega Pruner v10.3 — NUCLEAR EDITION"
 ) as demo:
     # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
     gr.HTML("""
-    <meta property="og:title" content="Ωmega Pruner v10.2.1 — NUCLEAR EDITION">
+    <meta property="og:title" content="Ωmega Pruner v10.3 — NUCLEAR EDITION">
     <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
     <meta property="og:image" content="docs/omega_thumbnail.png">
     <meta property="og:image:width" content="1200">
@@ -1025,7 +1030,7 @@ body { overflow-y: auto !important; }
     # VERSION
     '<strong style="color:#f7931a; font-size:1.08rem; letter-spacing:0.5px; '
     'text-shadow:0 0 12px rgba(247,147,26,0.65);">'
-    'Ωmega Pruner v10.2.1 — NUCLEAR EDITION'
+    'Ωmega Pruner v10.3 — NUCLEAR EDITION'
     '</strong><br>'
 
     # GITHUB LINK
