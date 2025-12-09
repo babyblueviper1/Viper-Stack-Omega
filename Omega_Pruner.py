@@ -459,11 +459,11 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
     </div>
 
     <div style='text-align:center;margin:15px 0;padding:16px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 50px rgba(247,147,26,0.5);'>
-        <div style='color:#ff9900;font-size:1rem;font-weight:700;letter-spacing:1.2px;text-shadow:0 0 12px #ff6600;line-height:1.5;'>
-            <strong>⚠️ Note:</strong> Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
-            <strong style='color:#ff9900;text-shadow:0 0 12px #ff6600;'>Choose the strategy that best fits your needs.</strong>
-        </div>
+    <div style='color:#ff9900;font-size:1rem;font-weight:700;letter-spacing:1.2px;line-height:1.5;'>
+        <strong style='text-shadow:1px 1px 0px #000, 0 0 8px rgba(255,153,0,0.9);'>Warning: Note:</strong> Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
+        <strong style='color:#ff9900;text-shadow:1px 1px 0px #000, 0 0 8px rgba(255,102,0,0.9);'>Choose the strategy that best fits your needs.</strong>
     </div>
+</div>
     <style>
     .mobile-break {{ display: none; }}
     @media (max-width: 768px) {{
