@@ -293,6 +293,18 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
         return f"<div style='color:#ff3366;'>No UTXOs above {dust_threshold} sats</div>", [], [], "", gr.update(visible=False), gr.update(visible=False)
 
     utxos = sorted(utxos_raw, key=lambda x: x["value"], reverse=True)
+
+    # === CALCULATE PRE-PRUNE SIZE ONCE (for banner) ===
+    all_input_weight = sum(
+        (lambda meta: meta['input_vb'] * 4)(
+            address_to_script_pubkey(u['address'])[1]
+        ) for u in utxos
+    )
+    pre_vsize = max(
+        (all_input_weight + 43*4 + 31*4 + 10*4 + len(utxos)) // 4 + 10,
+        (all_input_weight + 150 + len(utxos)*60) // 4
+    )
+
     ratio = {
         "Privacy First (30% pruned)": 0.30,
         "Recommended (40% pruned)": 0.40,
@@ -316,13 +328,15 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
         is_prune = key in default_selected
 
         df_rows.append([
-            is_prune,           # True = checked = will be PRUNED
+            is_prune,
             u2['txid'],
             u2['vout'],
-            u2['value'],        # raw int sats → perfect for array type
-            u2['address']
+            u2['value'],
+            u2['address'],
+            u2['input_weight'] // 4   # vB per input
         ])
 
+    # === UPGRADED BANNER WITH PRE-PRUNE SIZE ===
     status = f"""
 <div style='text-align:center;margin:30px 0;padding:20px;background:#000;border:3px solid #f7931a;border-radius:16px;box-shadow:0 0 60px rgba(247,147,26,0.6);'>
     <div style='color:#0f0;font-size:2.4rem;font-weight:900;letter-spacing:2px;text-shadow:0 0 30px #0f0;'>
@@ -332,6 +346,9 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
         FOUND <span style='color:#0f0;text-shadow:0 0 30px #0f0;'>{len(utxos):,}</span> UTXOs
     </div>
     <div style='color:#fff;font-size:1.3rem;font-weight:700;opacity:0.9;'>
+        Current tx size if sent today: <span style='color:#ff6600;font-weight:800;'>{pre_vsize:,}</span> vB
+    </div>
+    <div style='color:#0f8;font-size:1.1rem;margin-top:8px;opacity:0.88;'>
         {info}
     </div>
 </div>
@@ -343,12 +360,12 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
 
 
 def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: int = 15, dao_percent: float = 0.5):
-
     selected_utxos = []
     for row in df_rows:
-        if len(row) < 5 or not row[0]:
+        if not row or len(row) < 5 or not row[0]:
             continue
-        _, txid, vout, _, _ = row
+        txid = row[1]
+        vout = row[2]
         for u in enriched_state:
             if u['txid'] == txid and u['vout'] == vout:
                 selected_utxos.append(u)
@@ -356,34 +373,27 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
 
     if not selected_utxos:
         return (
-            "<div style='"
-            "color:#868686;"
-            "font-size:0.96rem;"
-            "text-align:center;"
-            "text-shadow:0 0 10px rgba(0,255,0,0.4);"
-            "'>"
+            "<div style='color:#868686;font-size:0.96rem;text-align:center;"
+            "text-shadow:0 0 10px rgba(0,255,0,0.4);'>"
             "No UTXOs selected for pruning."
             "</div>"
         )
 
     # --- CORE MATH (MUST MATCH PSBT) ---
     total_in = sum(u['value'] for u in selected_utxos)
-
     input_weight = sum(u['input_weight'] for u in selected_utxos)
     base_vsize = (input_weight + 43*4 + 31*4 + 10*4 + len(selected_utxos)) // 4 + 10
     vsize = max(base_vsize, (input_weight + 150 + len(selected_utxos)*60) // 4)
-
     fee = max(600, int(vsize * fee_rate))
     remaining = total_in - fee
 
-    # === NEGATIVE REMAINING GUARD (SAFETY FAILSTOP) ===
     if remaining <= 0:
         return f"""
     <div style='text-align:center;margin:20px;padding:20px;background:#330000;
                 border:2px solid #ff3366;border-radius:14px;
                 box-shadow:0 0 40px rgba(255,51,102,0.6);'>
         <div style='color:#ff3366;font-size:1.2rem;font-weight:800;'>
-            ⚠️ Transaction Invalid
+            Transaction Invalid
         </div>
         <div style='color:#fff;margin-top:10px;line-height:1.6;'>
             Fee exceeds available balance after pruning.<br>
@@ -396,79 +406,98 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
     </div>
     """
 
-    # === DUST-PROOF DAO (MATH ONLY — EXACT PSBT MATCH) ===
+    # === DAO (dust-proof) ===
     dao_raw = int(remaining * (dao_percent / 100.0)) if dao_percent > 0 else 0
-
-    if dao_raw >= 546:
-        dao_amt = dao_raw
-    else:
-        dao_amt = 0
-        if dao_raw > 0:
-            fee += dao_raw  # absorbed into fee
-
+    dao_amt = dao_raw if dao_raw >= 546 else 0
+    if 0 < dao_raw < 546:
+        fee += dao_raw
     remaining -= dao_amt
 
-    # === CHANGE (MATH ONLY — EXACT PSBT MATCH) ===
-    change_amt = remaining if remaining >= 546 else 0
+    # === PRE/POST PRUNE SIZE + DYNAMIC COLOR SAVINGS ===
+    all_input_weight = sum(u['input_weight'] for u in enriched_state)
+    pre_vsize = max(
+        (all_input_weight + 43*4 + 31*4 + 10*4 + len(enriched_state)) // 4 + 10,
+        (all_input_weight + 150 + len(enriched_state)*60) // 4
+    )
+    post_vsize = vsize
+    savings_pct = round(100 * (1 - post_vsize / pre_vsize), 1) if pre_vsize > 0 else 0
 
-    if change_amt < 546 and change_amt > 0:
+    # Dynamic color: green = nuclear win, orange = decent, red = weak prune
+    if savings_pct >= 70:
+        savings_color = "#0f0"
+        savings_label = "NUCLEAR"
+    elif savings_pct >= 50:
+        savings_color = "#00ff9d"
+        savings_label = "EXCELLENT"
+    elif savings_pct >= 30:
+        savings_color = "#ff9900"
+        savings_label = "GOOD"
+    else:
+        savings_color = "#ff3366"
+        savings_label = "WEAK"
+
+    # === CHANGE ===
+    change_amt = remaining if remaining >= 546 else 0
+    if 0 < change_amt < 546:
         fee += change_amt
         change_amt = 0
 
-    # === POST-ABSORPTION SAFETY GUARD ===
     if total_in - fee <= 0:
         return f"""
     <div style='text-align:center;margin:20px;padding:20px;background:#330000;
             border:2px solid #ff3366;border-radius:14px;
             box-shadow:0 0 40px rgba(255,51,102,0.6);'>
-    <div style='color:#ff3366;font-size:1.2rem;font-weight:900;'>
-        ⚠️ Transaction Invalid
+        <div style='color:#ff3366;font-size:1.2rem;font-weight:900;'>
+            Transaction Invalid
+        </div>
+        <div style='color:#fff;margin-top:10px;line-height:1.6;'>
+            Fee exceeds available balance after DAO + dust absorption.<br>
+            <strong>Reduce fee rate</strong> or <strong>select more UTXOs</strong>.
+        </div>
     </div>
-    <div style='color:#fff;margin-top:10px;line-height:1.6;'>
-        Fee exceeds available balance after DAO + dust absorption.<br>
-        <strong>Reduce fee rate</strong> or <strong>select more UTXOs</strong>.
-    </div>
-    <div style='color:#ff9900;margin-top:10px;font-size:0.95rem;'>
-        Total Inputs: {sats_to_btc_str(total_in)}<br>
-        Final Fee: {fee:,} sats
-    </div>
-</div>
-"""
+    """
 
-
-
-    # --- DISPLAY (HTML ONLY, NO MATH) ---
+    # === FINAL NUCLEAR DISPLAY ===
     return f"""
-    <div style='text-align:center;margin:10px;padding:12px;background:#111;border:2px solid #f7931a;border-radius:12px;max-width:95%;font-size:1rem;line-height:2;'>
+    <div style='text-align:center;margin:10px;padding:14px;background:#111;border:2px solid #f7931a;border-radius:14px;max-width:95%;font-size:1rem;line-height:2.1;'>
       <span style='color:#fff;font-weight:600;'>Selected Inputs:</span> 
-      <span style='color:#0f0;font-weight:800;'>{len(selected_utxos)}</span><br>
+      <span style='color:#0f0;font-weight:800;'>{len(selected_utxos):,}</span><br>
 
       <span style='color:#fff;font-weight:600;'>Total Pruned:</span> 
       <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(total_in)}</span><br>
 
       <span style='color:#fff;font-weight:600;'>Est. Fee:</span> 
-      <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> <span style='color:#0f0;font-weight:600;'>@</span> 
+      <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> 
+      <span style='color:#0f0;font-weight:600;'>@</span> 
       <strong style='color:#0f0;font-weight:800;'>{fee_rate} s/vB</strong><br>
+
+      <span style='color:#fff;font-weight:600;'>Pre-prune size:</span> 
+      <span style='color:#888;font-weight:700;'>{pre_vsize:,} vB</span><br>
+
+      <span style='color:#fff;font-weight:600;'>Post-prune size:</span> 
+      <span style='color:#0f0;font-weight:800;'>{post_vsize:,} vB</span>
+      <span style='color:{savings_color};font-weight:900;font-size:1.05rem;text-shadow:0 0 15px {savings_color};'>
+        {' ' + savings_label} (-{savings_pct}%)
+      </span><br>
 
       <span style='color:#fff;font-weight:600;'>Change:</span> 
       <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
-      {f" <span style='color:#ff6600;font-size:0.9rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if change_amt == 0 and (total_in - fee) > 0 else ""}
+      {f" <span style='color:#ff6600;font-size:0.9rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if change_amt == 0 and remaining > 0 else ""}
 
       {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>" if dao_amt >= 546 else ""}
-      {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>{sats_to_btc_str(dao_raw)}</span> <span style='color:#ff3366;font-size:0.9rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if 0 < dao_raw < 546 else ""}
+      {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>{sats_to_btc_str(dao_raw)}</span> <span style='color:#ff3366;font-size:0.9rem;'>(dust — absorbed)</span>" if 0 < dao_raw < 546 else ""}
     </div>
 
     <div style='text-align:center;margin:15px 0;padding:16px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 50px rgba(247,147,26,0.5);'>
-    <div style='color:#ff9900;font-size:1rem;font-weight:700;letter-spacing:1.2px;line-height:1.5;'>
+      <div style='color:#ff9900;font-size:1rem;font-weight:700;letter-spacing:1.2px;line-height:1.5;'>
         <strong style='text-shadow:1px 1px 0px #000, 0 0 8px rgba(255,153,0,0.9);'>Warning: Note:</strong> Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
         <strong style='color:#ff9900;text-shadow:1px 1px 0px #000, 0 0 8px rgba(255,102,0,0.9);'>Choose the strategy that best fits your needs.</strong>
+      </div>
     </div>
-</div>
+
     <style>
     .mobile-break {{ display: none; }}
-    @media (max-width: 768px) {{
-        .mobile-break {{ display: inline; }}
-    }}
+    @media (max-width: 768px) {{ .mobile-break {{ display: inline; }} }}
     </style>
     """
 
@@ -482,20 +511,24 @@ def generate_psbt(
     if not df_rows or not enriched_state:
         return "<div style='color:#ff3366; text-align:center; padding:30px;'>Run Analyze first.</div>", gr.update(), gr.update(), ""
 
+    # === SAFELY EXTRACT SELECTED UTXOs (6+ columns safe) ===
     selected_utxos = []
     for row in df_rows:
-        if len(row) < 5 or not row[0]: continue
-        _, txid, vout, _, _ = row
+        if not row or len(row) < 5 or not row[0]:
+            continue
+        txid = row[1]
+        vout = row[2]
         for u in enriched_state:
-            if u["txid"] == txid and u["vout"] == int(vout):
+            if u["txid"] == txid and u["vout"] == vout:
                 selected_utxos.append(u)
                 break
 
     if not selected_utxos:
         return "<div style='color:#ff3366; text-align:center; padding:30px;'>No UTXOs selected for pruning!</div>", gr.update(), gr.update(), ""
 
-    total_in     = sum(u["value"] for u in selected_utxos)
-    input_count  = len(selected_utxos)
+    # === CORE MATH ===
+    total_in = sum(u["value"] for u in selected_utxos)
+    input_count = len(selected_utxos)
     input_weight = sum(u.get("input_weight", 272) for u in selected_utxos)
 
     base_vsize = (input_weight + 43*4 + 31*4 + 10*4 + input_count) // 4 + 10
@@ -503,46 +536,49 @@ def generate_psbt(
     fee = max(600, int(vsize * fee_rate))
     remaining = total_in - fee
 
-    # === HARD PSBT FAILSTOP — MATCHED TO SUMMARY GUARD ===
+    # === PRE-PRUNE SIZE (ALL UTXOs) ===
+    all_input_weight = sum(u['input_weight'] for u in enriched_state)
+    pre_vsize = max(
+        (all_input_weight + 43*4 + 31*4 + 10*4 + len(enriched_state)) // 4 + 10,
+        (all_input_weight + 150 + len(enriched_state)*60) // 4
+    )
+    savings_pct = round(100 * (1 - vsize / pre_vsize), 1) if pre_vsize > 0 else 0
+
+    # Dynamic savings badge
+    if savings_pct >= 70:
+        savings_color = "#0f0"
+        savings_label = "NUCLEAR"
+    elif savings_pct >= 50:
+        savings_color = "#00ff9d"
+        savings_label = "EXCELLENT"
+    elif savings_pct >= 30:
+        savings_color = "#ff9900"
+        savings_label = "GOOD"
+    else:
+        savings_color = "#ff3366"
+        savings_label = "WEAK"
+
+    # === FAILSTOPS ===
     if remaining <= 0:
-        return (
-            f"""
+        return (f"""
         <div style='text-align:center;margin:20px;padding:20px;background:#330000;
                     border:2px solid #ff3366;border-radius:14px;
                     box-shadow:0 0 40px rgba(255,51,102,0.6);'>
-            <div style='color:#ff3366;font-size:1.2rem;font-weight:900;'>
-                ⚠️ Transaction Invalid
-            </div>
+            <div style='color:#ff3366;font-size:1.2rem;font-weight:900;'>Transaction Invalid</div>
             <div style='color:#fff;margin-top:10px;line-height:1.6;'>
                 Fee exceeds available balance after pruning.<br>
                 <strong>Reduce fee rate</strong> or <strong>select more UTXOs</strong>.
             </div>
-            <div style='color:#ff9900;margin-top:10px;font-size:0.95rem;'>
-                Total Inputs: {sats_to_btc_str(total_in)}<br>
-                Estimated Fee: {fee:,} sats
-            </div>
         </div>
-        """,
-        gr.update(visible=False),   # gen_btn
-        gr.update(visible=False),   # generate_row
-        ""
-    )
+        """, gr.update(visible=False), gr.update(visible=False), "")
 
-    # === DUST-PROOF DAO + SAVE FOR DISPLAY ===
+    # === DAO + CHANGE (dust-proof) ===
     dao_raw = int(remaining * (dao_percent / 100.0)) if dao_percent > 0 else 0
-    dao_raw_for_display = dao_raw
-
-    if dao_raw >= 546:
-        dao_amt = dao_raw
-    elif dao_raw > 0:
-        dao_amt = 0
+    dao_amt = dao_raw if dao_raw >= 546 else 0
+    if 0 < dao_raw < 546:
         fee += dao_raw
-    else:
-        dao_amt = 0
-
     remaining -= dao_amt
 
-    # === CHANGE ===
     dest = (dest_addr or "").strip() or selected_utxos[0]["address"]
     if not dest.startswith(("1","3","bc1")):
         return "<div style='color:#ff3366;text-align:center;'>Invalid destination address.</div>", gr.update(), gr.update(), ""
@@ -551,35 +587,21 @@ def generate_psbt(
     dao_spk, _  = address_to_script_pubkey(DEFAULT_DAO_ADDR)
 
     change_amt = remaining if remaining >= 546 else 0
-    if change_amt < 546 and change_amt > 0:
+    if 0 < change_amt < 546:
         fee += change_amt
         change_amt = 0
 
-    
-# === POST-ABSORPTION SAFETY GUARD ===
     if total_in - fee <= 0:
-        return (
-            f"""
+        return (f"""
         <div style='text-align:center;margin:20px;padding:20px;background:#330000;
                 border:2px solid #ff3366;border-radius:14px;
                 box-shadow:0 0 40px rgba(255,51,102,0.6);'>
-        <div style='color:#ff3366;font-size:1.2rem;font-weight:900;'>
-            ⚠️ Transaction Invalid
+            <div style='color:#ff3366;font-size:1.2rem;font-weight:900;'>Transaction Invalid</div>
+            <div style='color:#fff;margin-top:10px;line-height:1.6;'>
+                Fee exceeds balance after DAO + dust absorption.
+            </div>
         </div>
-        <div style='color:#fff;margin-top:10px;line-height:1.6;'>
-            Fee exceeds available balance after DAO + dust absorption.<br>
-            <strong>Reduce fee rate</strong> or <strong>select more UTXOs</strong>.
-        </div>
-        <div style='color:#ff9900;margin-top:10px;font-size:0.95rem;'>
-            Total Inputs: {sats_to_btc_str(total_in)}<br>
-            Final Fee: {fee:,} sats
-        </div>
-        </div>
-        """,
-        gr.update(visible=False),
-        gr.update(visible=False),
-        ""
-    )
+        """, gr.update(visible=False), gr.update(visible=False), "")
 
     # === BUILD TX ===
     tx = Tx()
@@ -614,82 +636,76 @@ def generate_psbt(
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     qr_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    qr_img_html = f'<img src="{qr_uri}" style="width:100%;height:auto;display:block;image-rendering:crisp-edges;border-radius:12px;" alt="NUCLEAR QR"/>'
 
-    # QR IMG HTML
-    qr_img_html = f'<img src="{qr_uri}" style="width:100%;height:auto;display:block;image-rendering:crisp-edges;image-rendering:pixelated;border-radius:12px;" alt="NUCLEAR QR CODE"/>'
-
-    # === QR SIZE WARNING ===
     qr_warning_html = ""
     if len(psbt_b64) > 2800:
         qr_warning_html = """
-        <div style="
-            margin-top:12px;
-            padding:10px 14px;
-            border-radius:8px;
-            background:#331a00;
-            color:#ffb347;
-            font-family:monospace;
-            font-size:0.95rem;
-            line-height:1.4;
-            border:1px solid #ff9900aa;
-        ">
-            ⚠️ <strong>Large PSBT detected.</strong><br>
-            Some wallet QR scanners may struggle with PSBTs this size.<br>
-            If the QR does not scan instantly, tap <strong>COPY PSBT</strong> and paste it directly into your wallet.
+        <div style="margin-top:12px;padding:10px 14px;border-radius:8px;background:#331a00;color:#ffb347;
+                     font-family:monospace;font-size:0.95rem;line-height:1.4;border:1px solid #ff9900aa;">
+            Large PSBT detected.<br>
+            If QR fails → tap <strong>COPY PSBT</strong> and paste directly.
         </div>
         """
 
-    # === FINAL RETURN ===
+    # === FINAL NUCLEAR RESULT PAGE ===
     return f"""
    <div style="text-align:center;margin:80px auto;max-width:960px;">
     <div style="display:inline-block;padding:55px;background:#000;border:14px solid #f7931a;border-radius:36px;
                 box-shadow:0 0 140px rgba(247,147,26,0.95);
                 background:radial-gradient(circle at center,#0a0a0a 0%,#000 100%);">
 
-        <!-- FINAL BUTTON — NOW CRYSTAL SHARP -->
         <div style="margin:40px 0 60px;">
             <button disabled style="padding:30px 100px;font-size:2.4rem;font-weight:800;
                                     background:#000;color:#0f0;letter-spacing:8px;
                                     border:8px solid #0f0;border-radius:34px;
-                                    box-shadow:0 0 100px #0f0;
-                                    text-shadow:0 0 20px #0f0; /* reduced from 45px */
-                                    cursor:not-allowed;">
+                                    box-shadow:0 0 100px #0f0;text-shadow:0 0 20px #0f0;cursor:not-allowed;">
                 RAW UNSIGNED TRANSACTION
             </button>
         </div>
 
-        <!-- QR -->
         <div style="margin:0 auto 40px;width:520px;max-width:96vw;padding:20px;background:#000;
-                    border:8px solid #0f0;border-radius:24px;
-                    box-shadow:0 0 60px #0f0,inset 0 0 40px #0f0;">
+                    border:8px solid #0f0;border-radius:24px;box-shadow:0 0 60px #0f0,inset 0 0 40px #0f0;">
             {qr_img_html}
         </div>
 
         {qr_warning_html}
 
-        <!-- TEXT BLOCK — FIXED BLURRY @ AND NUMBERS -->
-        <div style='text-align:center;margin:40px 0;padding:16px;background:#111;border:2px solid #f7931a;
-                    border-radius:12px;max-width:95%;font-size:1.4rem;line-height:2;'>
+        <!-- NUCLEAR SUMMARY BLOCK -->
+        <div style='text-align:center;margin:40px 0;padding:18px;background:#111;border:2px solid #f7931a;
+                    border-radius:14px;max-width:95%;font-size:1.4rem;line-height:2.1;'>
             <span style='color:#fff;font-weight:600;'>Inputs:</span> 
-            <span style='color:#0f0;font-weight:800;'>{input_count}</span><br>
-            
+            <span style='color:#0f0;font-weight:800;'>{input_count:,}</span><br>
+
             <span style='color:#fff;font-weight:600;'>Total Pruned:</span> 
             <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(total_in)}</span><br>
-            
-            <span style='color:#fff;font-weight:600;'>Fee:</span> 
-            <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> <span style='color:#0f0;font-weight:600;'>@</span> 
+
+            <span style='color:#fff;font-weight:600;'>Input Weight:</span> 
+            <span style='color:#0f0;font-weight:800;'>{input_weight:,} wu → {input_weight//4:,} vB</span><br>
+
+            <span style='color:#fff;font-weight:600;'>Pre-prune size:</span> 
+            <span style='color:#888;font-weight:700;'>{pre_vsize:,} vB</span><br>
+
+            <span style='color:#fff;font-weight:600;'>Post-prune size:</span> 
+            <span style='color:#0f0;font-weight:800;'>{vsize:,} vB</span>
+            <span style='color:{savings_color};font-weight:900;font-size:1.15rem;text-shadow:0 0 18px {savings_color};'>
+                {' ' + savings_label} (-{savings_pct}%)
+            </span><br>
+
+            <span style='color:#fff;font-weight:600;'>Final Fee:</span> 
+            <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> 
+            <span style='color:#0f0;font-weight:600;'>@</span> 
             <strong style='color:#0f0;font-weight:800;'>{fee_rate} s/vB</strong><br>
-            
+
             <span style='color:#fff;font-weight:600;'>Change:</span> 
             <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
-            {f" <span style='color:#ff6600;font-size:1.1rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if change_amt == 0 and (total_in - fee) > 0 else ""}
-            {f" <span style='color:#0f8;font-size:1.1rem;'>(sent back to your wallet)</span>" if change_amt > 0 and (not dest_addr.strip() or any(dest_addr.strip().lower() == u['address'].lower() for u in selected_utxos)) else ""}
-            {f" <span style='color:#0f8;font-size:1.1rem;'>(to {dest_addr[:8]}…)</span>" if change_amt > 0 and dest_addr.strip() and dest_addr.strip().lower() not in [u['address'].lower() for u in selected_utxos] else ""}<br>
-            {"<span style='color:#fff;font-weight:600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>" + sats_to_btc_str(dao_amt) + "</span>" if dao_amt >= 546 else ""}
-            {"<span style='color:#ff6600;font-weight:600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>" + sats_to_btc_str(dao_raw_for_display) + "</span> <span style='color:#ff3366;font-size:1.1rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if 0 < dao_raw_for_display < 546 else ""}
+            {f" <span style='color:#ff6600;'>(dust absorbed)</span>" if change_amt == 0 and remaining > 0 else ""}
+
+            {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>" if dao_amt >= 546 else ""}
+            {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>{sats_to_btc_str(dao_raw)}</span> <span style='color:#ff3366;'>(dust absorbed)</span>" if 0 < dao_raw < 546 else ""}
         </div>
 
-        <!-- PSBT OUTPUT -->
+        <!-- PSBT + COPY -->
         <div style="margin:60px auto 20px;width:92%;max-width:880px;">
             <div style="position:relative;background:#000;border:6px solid #f7931a;border-radius:18px;
                         box-shadow:0 0 40px #0f0;overflow:hidden;">
@@ -698,10 +714,8 @@ def generate_psbt(
                            padding:24px;padding-right:140px;border:none;outline:none;resize:none;
                            font-family:monospace;font-weight:700;box-sizing:border-box;">
                     {psbt_b64}</textarea>
-
                 <button onclick="navigator.clipboard.writeText(document.getElementById('psbt-output').value).then(() => {{ 
-                    this.innerText='COPIED'; 
-                    setTimeout(() => this.innerText='COPY PSBT', 1500); 
+                    this.innerText='COPIED'; setTimeout(() => this.innerText='COPY PSBT', 1500); 
                 }})"
                     style="position:absolute;top:14px;right:14px;padding:12px 28px;background:#f7931a;
                            color:#000;border:none;border-radius:14px;font-weight:900;cursor:pointer;
@@ -709,27 +723,20 @@ def generate_psbt(
                     COPY PSBT
                 </button>
             </div>
-
             <div style="text-align:center;margin-top:12px;">
-                <span style="color:#00f0ff;font-size:0.95rem;font-weight:700;text-shadow:0 0 10px #0f0;">
-                    RBF enabled
-                </span>
-                <span style="color:#888;font-size:0.9rem;"> • </span>
-                <span style="color:#888;font-size:0.9rem;">
-                    Raw PSBT • Tap COPY to clipboard
-                </span>
+                <span style="color:#00f0ff;font-weight:700;text-shadow:0 0 10px #0f0;">RBF enabled</span>
+                <span style="color:#888;"> • Raw PSBT • Tap COPY to clipboard</span>
             </div>
         </div>
 
-        <!-- PSBT SUPPORT WARNING — NOW SHARP -->
         <div style='color:#ff9900;font-size:1rem;text-align:center;margin:40px 0 20px;padding:16px;
                     background:#220000;border:2px solid #f7931a;border-radius:12px;
                     box-shadow:0 0 40px rgba(247,147,26,0.4);'>
-            <div style='color:#fff;font-weight:800;letter-spacing:0.5px;text-shadow:0 0 12px #f7931a;'>
-                Important: Your wallet must support <strong style='color:#0f0;font-weight:800;text-shadow:0 0 15px #0f0;'>PSBT</strong> to sign this transaction.
+            <div style='color:#fff;font-weight:800;text-shadow:0 0 12px #f7931a;'>
+                Important: Wallet must support <strong style='color:#0f0;text-shadow:0 0 15px #0f0;'>PSBT</strong>
             </div>
-            <div style='color:#0f8;font-size:0.95rem;margin-top:8px;opacity:0.9;'>
-                Sparrow • BlueWallet • Electrum • UniSat • Most modern wallets = OK
+            <div style='color:#0f8;margin-top:8px;opacity:0.9;'>
+                Sparrow • BlueWallet • Electrum • UniSat • OK
             </div>
         </div>
 
@@ -912,8 +919,8 @@ body { overflow-y: auto !important; }
             visible=False
         )
     df = gr.DataFrame(
-        headers=["PRUNE","TXID","vout (output index)","Value (sats)","Address"],
-        datatype=["bool","str","number","number","str"],
+        headers=["PRUNE","TXID","vout (output index)","Value (sats)","Address", "Weight (vB)"],
+        datatype=["bool","str","number","number","str", "number"],
         type="array",
         interactive=True,
         wrap=True,
@@ -954,8 +961,8 @@ body { overflow-y: auto !important; }
             gr.update(   # df (table) FULL RESET
                 value=[],
                 row_count=1,
-                col_count=5,
-                datatype=["bool", "str", "number", "number", "str"]),     # df  ✅ clears table
+                col_count=6,
+                datatype=["bool", "str", "number", "number", "str", "number"]),     # df  ✅ clears table
             [],     # enriched_state
             "",     # summary
             "",     # addr
