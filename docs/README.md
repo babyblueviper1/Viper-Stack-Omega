@@ -1,11 +1,11 @@
-# Ωmega Pruner v10.2.1 — NUCLEAR EDITION
+# Ωmega Pruner v10.3 — FINAL NUCLEAR FORM
 
-**The last UTXO consolidator you'll ever need.**
+**The last UTXO consolidator you’ll ever need. Now with surgical transparency.**
 
-**LIVE:** [https://omegapruner.onrender.com](https://omegapruner.onrender.com)
-**Launched:** 5 December 2025
+**LIVE:** https://omegapruner.onrender.com  
+**Launched:** 9 December 2025
 
-| Property                              | Ωmega Pruner v10.2.1                                     | Everyone Else in 2025  |
+| Property                              | Ωmega Pruner v10.3                                     | Everyone Else in 2025  |
 | ------------------------------------- | -------------------------------------------------------- | ---------------------- |
 | Private keys ever leave your browser? | Never                                                    | Some still do          |
 | Transaction encoding                  | Hand-rolled, bit-perfect, zero dependencies              | Usually broken         |
@@ -13,60 +13,53 @@
 | PSBT output                           | Minimal, universally valid — signs in every 2025 wallet  | Often malformed        |
 | Copy PSBT + mobile toast              | One-tap paste into Sparrow/Electrum                      | Nobody                 |
 | Dust creation                         | Literally impossible — <546 sats → absorbed with warning | Still happens          |
-| Transparent miner fee absorption      | Shows exactly when tiny amounts go to miners             | Hidden or wrong        |
-| Clear privacy warning                 | “Reduces privacy, regardless of chosen strategy”         | Sugar-coated or silent |
+| **Per-input weight column**           | **LIVE**                                                 | Never                  |
+| **Pre-prune vs post-prune vsize**     | **LIVE**                                                 | Never                  |
+| **Live % savings + NUCLEAR badge**    | **LIVE** (70%+ = glowing red NUCLEAR)                   | Never                  |
+| 100% match between preview & final PSBT| **LIVE**                                                 | Usually lies           |
+| Clear privacy warning                 | **CAUTION** — blood-red, impossible to miss             | Sugar-coated or silent |
 
----
+### What happens in 8 seconds (now even deadlier)
 
-### What happens in 8 seconds
+1. Paste or **QR-scan** any address / xpub (legacy → Taproot → xpub/zpub/ypub)  
+2. Choose your pruning strategy  
+3. **1. ANALYZE & LOAD UTXOs** → instantly see current tx size if you sent everything today  
+4. **2. GENERATE NUCLEAR PSBT** → watch the vsize drop and the **NUCLEAR** badge glow  
+5. Scan giant QR or tap **COPY PSBT** → sign → broadcast
 
-1. Paste or **QR-scan** any address / xpub (legacy → Taproot → xpub/zpub/ypub)
-2. Floating orange **B** → instant camera scan
-3. Choose your pruning strategy
-4. **1. ANALYZE & LOAD UTXOs**
-5. **2. GENERATE NUCLEAR PSBT**
-6. Scan giant QR or tap **COPY PSBT** → sign → broadcast
-
-Works flawlessly with **every wallet in 2025+**:
+Works flawlessly with **every wallet in 2025+**:  
 Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trezor • Specter • Fully Noded • UniSat • OKX • Xverse • Leather • Aqua • Keystone
 
----
-
-### Final Feature Matrix — v10.2.1
+### Final Feature Matrix — v10.3
 
 | Feature                                  | Status  | Notes                                            |
 | ---------------------------------------- | ------- | ------------------------------------------------ |
-| Address / xpub QR scanner                | LIVE    | Floating orange B button                         |
 | Giant perfectly centered QR              | LIVE    | Nuclear glow on every screen                     |
 | PSBT + Copy PSBT + toast                 | LIVE    | One-tap paste into any wallet                    |
 | Thank-you / DAO slider (0–5%)            | LIVE    | Only on future savings — truly voluntary         |
 | Dust protection (<546 sats)              | LIVE    | Shows exactly why tiny amounts go to miners      |
-| “‘Sent back to your wallet’” explanation | LIVE    | No more “where did my money go?”                 |
-| Cleaar privacy warning                   | LIVE    | “Reduces privacy, regardless of chosen strategy” |
+| Per-input weight column                  | LIVE    | 68 = healthy, 57 = Taproot, 91/148 = ancient dust |
+| Pre-prune vs post-prune vsize            | LIVE    | Immediate savings visibility                     |
+| Live % savings + NUCLEAR badge           | LIVE    | 70%+ = glowing red NUCLEAR                       |
+| CAUTION privacy warning                  | LIVE    | Blood-red, reactor-alarm style                   |
 | Zero custody • Zero lies • Zero regrets  | FOREVER | Apache 2.0                                       |
-
----
 
 ### Ωmega Pruner — Custom Builds
 
 Your treasury. Your rules. Built by the Ω.
 
-* Custom wallet / exchange integrations
-* Air-gapped or on-premises deployments
-* Branded dashboards & governance policies
-* Dedicated dev hours + SLA
-* Full control over workflow & security
+- Custom wallet / exchange integrations  
+- Air-gapped or on-premises deployments  
+- Branded dashboards & governance policies  
+- Dedicated dev hours + SLA  
+- Full control over workflow & security
 
 By quote only — pay for exactly the build you want.
 
 > The future is custom. The Ω is watching.
 
-**Contact:** [omegapruner@proton.me](mailto:omegapruner@proton.me)
-**Baby Blue Viper:** [babyblueviper.com](https://babyblueviper.com)
+**Contact:** omegapruner@proton.me  
+**Baby Blue Viper:** https://babyblueviper.com
 
----
-
-**Prune today. Win forever. • Ω**
-**babyblueviper & the swarm** • December 2025
-
----
+**Prune today. Win forever. • Ω**  
+**babyblueviper & the swarm** • 9 December 2025
