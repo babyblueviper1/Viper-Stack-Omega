@@ -382,7 +382,7 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
     <div style='text-align:center;margin:20px;padding:20px;background:#330000;
                 border:2px solid #ff3366;border-radius:14px;
                 box-shadow:0 0 40px rgba(255,51,102,0.6);'>
-        <div style='color:#ff3366;font-size:1.2rem;font-weight:900;'>
+        <div style='color:#ff3366;font-size:1.2rem;font-weight:800;'>
             ⚠️ Transaction Invalid
         </div>
         <div style='color:#fff;margin-top:10px;line-height:1.6;'>
@@ -441,30 +441,29 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
     return f"""
     <div style='text-align:center;margin:10px;padding:12px;background:#111;border:2px solid #f7931a;border-radius:12px;max-width:95%;font-size:1rem;line-height:2;'>
       <span style='color:#fff;font-weight:600;'>Selected Inputs:</span> 
-      <span style='color:#0f0;font-weight:900;'>{len(selected_utxos)}</span><br>
+      <span style='color:#0f0;font-weight:800;'>{len(selected_utxos)}</span><br>
 
       <span style='color:#fff;font-weight:600;'>Total Pruned:</span> 
-      <span style='color:#0f0;font-weight:900;'>{sats_to_btc_str(total_in)}</span><br>
+      <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(total_in)}</span><br>
 
       <span style='color:#fff;font-weight:600;'>Est. Fee:</span> 
-      <span style='color:#0f0;font-weight:900;'>{fee:,} sats</span> @ 
-      <strong style='color:#0f0;font-weight:900;'>{fee_rate} s/vB</strong><br>
+      <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> <span style='color:#0f0;font-weight:600;'>@</span> 
+      <strong style='color:#0f0;font-weight:800;'>{fee_rate} s/vB</strong><br>
 
       <span style='color:#fff;font-weight:600;'>Change:</span> 
-      <span style='color:#0f0;font-weight:900;'>{sats_to_btc_str(change_amt)}</span>
+      <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
       {f" <span style='color:#ff6600;font-size:0.9rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if change_amt == 0 and (total_in - fee) > 0 else ""}
 
-      {f" • <span style='color:#ff9900;'>DAO:</span> <span style='color:#0f0;font-weight:900;'>{sats_to_btc_str(dao_amt)}</span>" if dao_amt >= 546 else ""}
-      {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#ff3366;font-weight:900;'>{sats_to_btc_str(dao_raw)}</span> <span style='color:#ff3366;font-size:0.9rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if 0 < dao_raw < 546 else ""}
+      {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>" if dao_amt >= 546 else ""}
+      {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>{sats_to_btc_str(dao_raw)}</span> <span style='color:#ff3366;font-size:0.9rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if 0 < dao_raw < 546 else ""}
     </div>
 
     <div style='text-align:center;margin:15px 0;padding:16px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 50px rgba(247,147,26,0.5);'>
-        <div style='color:#ff9900;font-size:1rem;font-weight:900;letter-spacing:1px;text-shadow:0 0 25px #ff6600;line-height:1.5;'>
+        <div style='color:#ff9900;font-size:1rem;font-weight:700;letter-spacing:1.2px;text-shadow:0 0 12px #ff6600;line-height:1.5;'>
             <strong>⚠️ Note:</strong> Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
-            <strong style='color:#ff9900;text-shadow:0 0 25px #ff6600;'>Choose the strategy that best fits your needs.</strong>
+            <strong style='color:#ff9900;text-shadow:0 0 12px #ff6600;'>Choose the strategy that best fits your needs.</strong>
         </div>
     </div>
-
     <style>
     .mobile-break {{ display: none; }}
     @media (max-width: 768px) {{
@@ -642,52 +641,63 @@ def generate_psbt(
 
     # === FINAL RETURN ===
     return f"""
-    <div style="text-align:center;margin:80px auto;max-width:960px;">
-    <div style="display:inline-block;padding:55px;background:#000;border:14px solid #f7931a;border-radius:36px;box-shadow:0 0 140px rgba(247,147,26,0.95);background:radial-gradient(circle at center,#0a0a0a 0%,#000 100%);">
+   <div style="text-align:center;margin:80px auto;max-width:960px;">
+    <div style="display:inline-block;padding:55px;background:#000;border:14px solid #f7931a;border-radius:36px;
+                box-shadow:0 0 140px rgba(247,147,26,0.95);
+                background:radial-gradient(circle at center,#0a0a0a 0%,#000 100%);">
 
-        <!-- FINAL BUTTON -->
+        <!-- FINAL BUTTON — NOW CRYSTAL SHARP -->
         <div style="margin:40px 0 60px;">
-            <button disabled style="padding:30px 100px;font-size:2.4rem;font-weight:900;background:#000;color:#0f0;letter-spacing:8px;border:8px solid #0f0;border-radius:34px;box-shadow:0 0 130px #0f0;text-shadow:0 0 45px #0f0;cursor:not-allowed;">
+            <button disabled style="padding:30px 100px;font-size:2.4rem;font-weight:800;
+                                    background:#000;color:#0f0;letter-spacing:8px;
+                                    border:8px solid #0f0;border-radius:34px;
+                                    box-shadow:0 0 100px #0f0;
+                                    text-shadow:0 0 20px #0f0; /* reduced from 45px */
+                                    cursor:not-allowed;">
                 RAW UNSIGNED TRANSACTION
             </button>
         </div>
 
         <!-- QR -->
-        <div style="margin:0 auto 40px;width:520px;max-width:96vw;padding:20px;background:#000;border:8px solid #0f0;border-radius:24px;box-shadow:0 0 60px #0f0,inset 0 0 40px #0f0;">
+        <div style="margin:0 auto 40px;width:520px;max-width:96vw;padding:20px;background:#000;
+                    border:8px solid #0f0;border-radius:24px;
+                    box-shadow:0 0 60px #0f0,inset 0 0 40px #0f0;">
             {qr_img_html}
         </div>
 
         {qr_warning_html}
 
-        <!-- TEXT BLOCK -->
-        <div style='text-align:center;margin:40px 0;padding:16px;background:#111;border:2px solid #f7931a;border-radius:12px;max-width:95%;font-size:1.4rem;line-height:2;'>
-        <span style='color:#fff;font-weight:600;'>Inputs:</span> 
-        <span style='color:#0f0;font-weight:900;'>{input_count}</span><br>
-        
-        <span style='color:#fff;font-weight:600;'>Total Pruned:</span> 
-        <span style='color:#0f0;font-weight:900;'>{sats_to_btc_str(total_in)}</span><br>
-        
-        <span style='color:#fff;font-weight:600;'>Fee:</span> 
-        <span style='color:#0f0;font-weight:900;'>{fee:,} sats</span> @ <strong style='color:#0f0;font-weight:900;'>{fee_rate} s/vB</strong><br>
-        
-        <span style='color:#fff;font-weight:600;'>Change:</span> 
-        <span style='color:#0f0;font-weight:900;'>{sats_to_btc_str(change_amt)}</span>
-        {f" <span style='color:#ff6600;font-size:1.1rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if change_amt == 0 and (total_in - fee) > 0 else ""}
-        {f" <span style='color:#0f8;font-size:1.1rem;'>(sent back to your wallet)</span>" if change_amt > 0 and (not dest_addr.strip() or any(dest_addr.strip().lower() == u['address'].lower() for u in selected_utxos)) else ""}
-        {f" <span style='color:#0f8;font-size:1.1rem;'>(to {dest_addr[:8]}…)</span>" if change_amt > 0 and dest_addr.strip() and dest_addr.strip().lower() not in [u['address'].lower() for u in selected_utxos] else ""}<br>
-        {"<span style='color:#fff;font-weight:600;'>DAO:</span> <span style='color:#0f0;font-weight:900;'>" + sats_to_btc_str(dao_amt) + "</span>" if dao_amt >= 546 else ""}
-        {"<span style='color:#ff6600;font-weight:600;'>DAO:</span> <span style='color:#ff3366;font-weight:900;'>" + sats_to_btc_str(dao_raw_for_display) + "</span> <span style='color:#ff3366;font-size:1.1rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if 0 < dao_raw_for_display < 546 else ""}
+        <!-- TEXT BLOCK — FIXED BLURRY @ AND NUMBERS -->
+        <div style='text-align:center;margin:40px 0;padding:16px;background:#111;border:2px solid #f7931a;
+                    border-radius:12px;max-width:95%;font-size:1.4rem;line-height:2;'>
+            <span style='color:#fff;font-weight:600;'>Inputs:</span> 
+            <span style='color:#0f0;font-weight:800;'>{input_count}</span><br>
             
+            <span style='color:#fff;font-weight:600;'>Total Pruned:</span> 
+            <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(total_in)}</span><br>
+            
+            <span style='color:#fff;font-weight:600;'>Fee:</span> 
+            <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> <span style='color:#0f0;font-weight:600;'>@</span> 
+            <strong style='color:#0f0;font-weight:800;'>{fee_rate} s/vB</strong><br>
+            
+            <span style='color:#fff;font-weight:600;'>Change:</span> 
+            <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
+            {f" <span style='color:#ff6600;font-size:1.1rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if change_amt == 0 and (total_in - fee) > 0 else ""}
+            {f" <span style='color:#0f8;font-size:1.1rem;'>(sent back to your wallet)</span>" if change_amt > 0 and (not dest_addr.strip() or any(dest_addr.strip().lower() == u['address'].lower() for u in selected_utxos)) else ""}
+            {f" <span style='color:#0f8;font-size:1.1rem;'>(to {dest_addr[:8]}…)</span>" if change_amt > 0 and dest_addr.strip() and dest_addr.strip().lower() not in [u['address'].lower() for u in selected_utxos] else ""}<br>
+            {"<span style='color:#fff;font-weight:600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>" + sats_to_btc_str(dao_amt) + "</span>" if dao_amt >= 546 else ""}
+            {"<span style='color:#ff6600;font-weight:600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>" + sats_to_btc_str(dao_raw_for_display) + "</span> <span style='color:#ff3366;font-size:1.1rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if 0 < dao_raw_for_display < 546 else ""}
         </div>
-              <!-- PSBT — PERFECTLY CENTERED, ALWAYS, NO f-STRING ERRORS -->
+
+        <!-- PSBT OUTPUT -->
         <div style="margin:60px auto 20px;width:92%;max-width:880px;">
-            <div style="position:relative;background:#000;border:6px solid #f7931a;border-radius:18px;box-shadow:0 0 40px #0f0;overflow:hidden;">
+            <div style="position:relative;background:#000;border:6px solid #f7931a;border-radius:18px;
+                        box-shadow:0 0 40px #0f0;overflow:hidden;">
                 <textarea id="psbt-output" readonly 
                     style="width:100%;height:180px;background:#000;color:#0f0;font-size:1rem;
                            padding:24px;padding-right:140px;border:none;outline:none;resize:none;
-                           font-family:monospace;-webkit-font-smoothing:antialiased;
-                           font-weight:700;box-sizing:border-box;">
-                    {psbt_b64} </textarea>
+                           font-family:monospace;font-weight:700;box-sizing:border-box;">
+                    {psbt_b64}</textarea>
 
                 <button onclick="navigator.clipboard.writeText(document.getElementById('psbt-output').value).then(() => {{ 
                     this.innerText='COPIED'; 
@@ -699,21 +709,24 @@ def generate_psbt(
                     COPY PSBT
                 </button>
             </div>
-                  <!-- RBF + COPY HINT — SUBTLE BUT IMPOSSIBLE TO MISS -->
-                <div style="text-align:center;margin-top:12px;">
-                    <span style="color:##00f0ff;font-size:0.95rem;font-weight:700;text-shadow:0 0 12px #0f0;">
-                        RBF enabled
-                    </span>
+
+            <div style="text-align:center;margin-top:12px;">
+                <span style="color:#00f0ff;font-size:0.95rem;font-weight:700;text-shadow:0 0 10px #0f0;">
+                    RBF enabled
+                </span>
                 <span style="color:#888;font-size:0.9rem;"> • </span>
                 <span style="color:#888;font-size:0.9rem;">
                     Raw PSBT • Tap COPY to clipboard
                 </span>
             </div>
         </div>
-        <!-- PSBT SUPPORT WARNING -->
-        <div style='color:#ff9900;font-size:1rem;text-align:center;margin:40px 0 20px;padding:16px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 40px rgba(247,147,26,0.4);'>
-            <div style='color:#fff;font-weight:900;letter-spacing:0.5px;text-shadow:0 0 20px #f7931a;'>
-                <strong>Important:</strong> Your wallet must support <strong style='color:#0f0;text-shadow:0 0 20px #0f0;'>PSBT</strong> to sign this transaction.
+
+        <!-- PSBT SUPPORT WARNING — NOW SHARP -->
+        <div style='color:#ff9900;font-size:1rem;text-align:center;margin:40px 0 20px;padding:16px;
+                    background:#220000;border:2px solid #f7931a;border-radius:12px;
+                    box-shadow:0 0 40px rgba(247,147,26,0.4);'>
+            <div style='color:#fff;font-weight:800;letter-spacing:0.5px;text-shadow:0 0 12px #f7931a;'>
+                Important: Your wallet must support <strong style='color:#0f0;font-weight:800;text-shadow:0 0 15px #0f0;'>PSBT</strong> to sign this transaction.
             </div>
             <div style='color:#0f8;font-size:0.95rem;margin-top:8px;opacity:0.9;'>
                 Sparrow • BlueWallet • Electrum • UniSat • Most modern wallets = OK
