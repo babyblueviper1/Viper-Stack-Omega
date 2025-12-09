@@ -757,11 +757,11 @@ def generate_psbt(
 # --------------------------
 
 with gr.Blocks(
-    title="Ωmega Pruner v10.3 — NUCLEAR EDITION"
+    title="Ωmega Pruner v10.3 — NUCLEAR SURGICAL"
 ) as demo:
     # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
     gr.HTML("""
-    <meta property="og:title" content="Ωmega Pruner v10.3 — NUCLEAR EDITION">
+    <meta property="og:title" content="Ωmega Pruner v10.3 — NUCLEAR SURGICAL">
     <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
     <meta property="og:image" content="docs/omega_thumbnail.png">
     <meta property="og:image:width" content="1200">
@@ -1034,7 +1034,7 @@ body { overflow-y: auto !important; }
     # VERSION
     '<strong style="color:#f7931a; font-size:1.08rem; letter-spacing:0.5px; '
     'text-shadow:0 0 12px rgba(247,147,26,0.65);">'
-    'Ωmega Pruner v10.3 — NUCLEAR EDITION'
+    'Ωmega Pruner v10.3 — NUCLEAR SURGICAL'
     '</strong><br>'
 
     # GITHUB LINK
