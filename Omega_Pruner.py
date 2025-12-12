@@ -1141,11 +1141,11 @@ input:disabled, select:disabled, button:disabled, .gr-button:disabled {
 
     # Fee preset buttons
     with gr.Row():
-        fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
-        halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
-        hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn")
         economy_btn = gr.Button("Economy", size="sm", elem_classes="fee-btn")
-
+        hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn")
+        halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
+        fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
+        
     # Outputs
     html_out = gr.HTML()
     summary = gr.HTML()
