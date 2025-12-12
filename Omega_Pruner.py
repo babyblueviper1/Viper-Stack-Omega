@@ -4,6 +4,8 @@ import requests, time, base64, io, qrcode, json, os
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Any
 import warnings, logging
+from functools import partial
+import threading
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -47,6 +49,29 @@ def safe_get(url: str):
                 requests.exceptions.RequestException):
             if attempt < 2:
                 time.sleep(0.2 * (2 ** attempt))  # exponential backoff
+    return None
+
+def get_live_fees():
+    """Fetch recommended fees from mempool.space – with 30-second caching"""
+    if hasattr(get_live_fees, "cache") and time.time() - get_live_fees.cache_time < 30:
+        return get_live_fees.cache
+    
+    try:
+        r = session.get("https://mempool.space/api/v1/fees/recommended", timeout=8)
+        if r.status_code == 200:
+            data = r.json()
+            fees = {
+                "fastest": data["fastestFee"],
+                "half_hour": data["halfHourFee"],
+                "hour": data["hourFee"],
+                "economy": data["economyFee"],
+                "minimum": data["minimumFee"]
+            }
+            get_live_fees.cache = fees
+            get_live_fees.cache_time = time.time()
+            return fees
+    except:
+        pass
     return None
 # =========================
 # Config / Constants
@@ -189,7 +214,14 @@ class Tx:
         self.tx_outs = self.tx_outs or []
 
 def create_psbt(tx_hex: str) -> str:
-    psbt = b'psbt\xff\x00' + encode_varint(len(bytes.fromhex(tx_hex))) + bytes.fromhex(tx_hex) + b'\x00\xff'
+    tx = bytes.fromhex(tx_hex)
+    psbt = (
+        b'psbt\xff' +
+        b'\x00' +                                    # global unsigned tx
+        encode_varint(len(tx)) + tx +
+        b'\x00' +                                    # separator
+        b'\xff'                                      # end of global
+    )
     return base64.b64encode(psbt).decode()
 
 # -----------------------
@@ -275,9 +307,10 @@ def scan_xpub(xpub: str, dust: int = 546, gap_limit: int = 20):
 
 
 
-def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider):
+def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider):
     fee_rate = fee_rate_slider if isinstance(fee_rate_slider, (int, float)) else fee_rate_slider.value
     dao_percent = dao_slider if isinstance(dao_slider, (int, float)) else dao_slider.value
+    future_fee_rate = future_fee_slider if isinstance(future_fee_slider, (int, float)) else future_fee_slider.value
     addr = (addr or "").strip()
     if not addr:
         return "<div style='color:#ff3366;'>Enter address or xpub</div>", [], [], "", gr.update(visible=False), gr.update(visible=False)
@@ -296,9 +329,8 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
 
     # === CALCULATE PRE-PRUNE SIZE ONCE (for banner) ===
     all_input_weight = sum(
-        (lambda meta: meta['input_vb'] * 4)(
-            address_to_script_pubkey(u['address'])[1]
-        ) for u in utxos
+        address_to_script_pubkey(u['address'])[1]['input_vb'] * 4 
+        for u in utxos
     )
     pre_vsize = max(
         (all_input_weight + 43*4 + 31*4 + 10*4 + len(utxos)) // 4 + 10,
@@ -354,12 +386,12 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
 </div>
 """
 
-    summary_html = generate_summary(df_rows, enriched, fee_rate, dao_percent)
+    summary_html = generate_summary(df_rows, enriched, fee_rate, future_fee_rate, dao_percent)
 
     return status, df_rows, enriched, summary_html, gr.update(visible=True), gr.update(visible=True)
 
 
-def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: int = 15, dao_percent: float = 0.5):
+def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: int = 15, future_fee_rate: int = 60, dao_percent: float = 0.5):
     selected_utxos = []
     for row in df_rows:
         if not row or len(row) < 5 or not row[0]:
@@ -392,20 +424,21 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
     <div style='text-align:center;margin:20px;padding:20px;background:#330000;
                 border:2px solid #ff3366;border-radius:14px;
                 box-shadow:0 0 40px rgba(255,51,102,0.6);'>
-        <div style='color:#ff3366;font-size:1.2rem;font-weight:800;'>
+        <div style='color:#ff3366;font-size:1.25rem;font-weight:700;letter-spacing:1.8px;
+                    text-transform:uppercase;text-shadow:0 0 16px #ff3366, 0 0 30px #ff0000;'>
             Transaction Invalid
         </div>
-        <div style='color:#fff;margin-top:10px;line-height:1.6;'>
+        <div style='color:#fff;margin-top:12px;line-height:1.7;font-size:1.02rem;'>
             Fee exceeds available balance after pruning.<br>
-            <strong>Reduce fee rate</strong> or <strong>select more UTXOs</strong>.
+            <strong style='color:#ff9966;font-weight:700;'>Reduce fee rate</strong> or 
+            <strong style='color:#ff9966;font-weight:700;'>select more UTXOs</strong>.
         </div>
-        <div style='color:#ff9900;margin-top:10px;font-size:0.95rem;'>
+        <div style='color:#ff9900;margin-top:14px;font-size:0.98rem;line-height:1.6;'>
             Total Inputs: {sats_to_btc_str(total_in)}<br>
             Estimated Fee: {fee:,} sats
         </div>
     </div>
     """
-
     # === DAO (dust-proof) ===
     dao_raw = int(remaining * (dao_percent / 100.0)) if dao_percent > 0 else 0
     dao_amt = dao_raw if dao_raw >= 546 else 0
@@ -436,6 +469,31 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
         savings_color = "#ff3366"
         savings_label = "WEAK"
 
+       # === PRUNE NOW VS LATER SAVINGS ===
+    fee_today = vsize * fee_rate
+    fee_later = vsize * future_fee_rate
+    sats_saved_by_pruning_now = max(0, fee_later - fee_today)
+    
+    if sats_saved_by_pruning_now > 0:
+        if sats_saved_by_pruning_now >= 100_000:
+            savings_text = (
+                f"<span style='color:#0f0; font-size:1.18rem; font-weight:800; letter-spacing:1.2px; "
+                f"text-shadow:0 0 10px #0f0, 0 0 22px #0f0;'>"
+                f"+{sats_saved_by_pruning_now:,}</span> "
+                f"<span style='color:#0f0; font-weight:800; letter-spacing:3px; "
+                f"text-shadow:0 0 18px #0f0, 0 0 42px #0f0; text-transform:uppercase;'>"
+                f"NUCLEAR MOVE</span>"
+            )
+        else:
+            savings_text = (
+                f"<span style='color:#0f0; font-size:1.12rem; font-weight:800; letter-spacing:0.9px; "
+                f"text-shadow:0 0 8px #0f0, 0 0 18px #0f0;'>"
+                f"+{sats_saved_by_pruning_now:,} sats saved</span>"
+            )
+    else:
+        savings_text = ""
+    
+    
     # === CHANGE ===
     change_amt = remaining if remaining >= 546 else 0
     if 0 < change_amt < 546:
@@ -445,14 +503,20 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
     if total_in - fee <= 0:
         return f"""
     <div style='text-align:center;margin:20px;padding:20px;background:#330000;
-            border:2px solid #ff3366;border-radius:14px;
-            box-shadow:0 0 40px rgba(255,51,102,0.6);'>
-        <div style='color:#ff3366;font-size:1.2rem;font-weight:900;'>
+                border:2px solid #ff3366;border-radius:14px;
+                box-shadow:0 0 50px rgba(255, 51, 102, 0.7);'>
+        <div style='color:#ff3366; font-size:1.35rem; font-weight:700; letter-spacing:3px;
+                    text-transform:uppercase; text-shadow:0 0 16px #ff3366, 0 0 32px #ff0000;'>
             Transaction Invalid
         </div>
-        <div style='color:#fff;margin-top:10px;line-height:1.6;'>
-            Fee exceeds available balance after DAO + dust absorption.<br>
-            <strong>Reduce fee rate</strong> or <strong>select more UTXOs</strong>.
+        <div style='color:#ff8877; margin-top:14px; line-height:1.7; font-size:1.05rem;'>
+            Fee exceeds available balance after DAO + dust absorption.<br><br>
+            <strong style='color:#ff9966; font-weight:700; letter-spacing:0.5px;'>
+                Reduce fee rate
+            </strong> or 
+            <strong style='color:#ff9966; font-weight:700; letter-spacing:0.5px;'>
+                select more UTXOs
+            </strong>.
         </div>
     </div>
     """
@@ -476,16 +540,18 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
 
       <span style='color:#fff;font-weight:600;'>Post-prune size:</span> 
       <span style='color:#0f0;font-weight:800;'>{post_vsize:,} vB</span>
-      <span style='color:{savings_color};font-weight:900;font-size:1.05rem;text-shadow:0 0 15px {savings_color};'>
-        {' ' + savings_label} (-{savings_pct}%)
+      <span style='color:{savings_color};font-weight:800;font-size:1.05rem;letter-spacing:0.5px;text-shadow:0 0 20px {savings_color}, 0 0 40px {savings_color};'>
+        {' ' + savings_label.upper()} (-{savings_pct}%)
       </span><br>
-
+        {f"<span style='color:#fff;font-weight:600;'>Prune now →</span> {savings_text}" if sats_saved_by_pruning_now > 0 else ""}
+        
       <span style='color:#fff;font-weight:600;'>Change:</span> 
       <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
       {f" <span style='color:#ff6600;font-size:0.9rem;'>(below 546 sats — absorbed into miner’s fee)</span>" if change_amt == 0 and remaining > 0 else ""}
 
       {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>" if dao_amt >= 546 else ""}
       {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#ff3366;font-weight:800;'>{sats_to_btc_str(dao_raw)}</span> <span style='color:#ff3366;font-size:0.9rem;'>(dust — absorbed)</span>" if 0 < dao_raw < 546 else ""}
+    
     </div>
 
 <div style='text-align:center;margin:15px 0;padding:18px;background:#220000;border:2px solid #f7931a;border-radius:12px;box-shadow:0 0 60px rgba(247,147,26,0.6);'>
@@ -494,8 +560,6 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
                   text-shadow:0 0 16px #ff3366, 0 0 28px #ff0000, 1px 1px 0 #000;'>
       CAUTION
     </strong><br>
-    <span style='color:#ff9900;font-weight:700;
-                 text-shadow:1px 1px 0 #000, 0 0 8px rgba(255,153,0,0.8);'>
       <span style='color:#ff9900;font-weight:700;
                  text-shadow:1px 1px 0 #000, 0 0 8px rgba(255,153,0,0.8);'>
       Combining UTXOs lowers fees but reduces privacy.<br class="mobile-break">
@@ -510,9 +574,17 @@ def generate_summary(df_rows: List[list], enriched_state: List[dict], fee_rate: 
     </style>
     """
 
+
+def generate_summary_safe(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, locked):
+    if locked:
+        return gr.update()   # do nothing — frozen in time
+    return generate_summary(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent)
+
+
 def generate_psbt(
     dest_addr: str,
     fee_rate: int,
+    future_fee_rate: int,
     dao_percent: float,
     df_rows: list,
     enriched_state: list
@@ -543,6 +615,12 @@ def generate_psbt(
     base_vsize = (input_weight + 43*4 + 31*4 + 10*4 + input_count) // 4 + 10
     vsize = max(base_vsize, (input_weight + 150 + input_count*60) // 4)
     fee = max(600, int(vsize * fee_rate))
+
+    # === PRUNE NOW VS LATER SAVINGS ===
+    fee_today = vsize * fee_rate
+    fee_later = vsize * future_fee_rate
+    sats_saved_by_pruning_now = max(0, fee_later - fee_today)
+
     remaining = total_in - fee
 
     # === PRE-PRUNE SIZE (ALL UTXOs) ===
@@ -624,14 +702,14 @@ def generate_psbt(
 
     raw_tx = (
         tx.version.to_bytes(4, 'little') +
-        b'\x00\x01' +
+        b'\x00\x01' +  # ← CORRECT: SegWit marker + flag
         encode_varint(len(tx.tx_ins)) +
         b''.join(i.serialize() for i in tx.tx_ins) +
         encode_varint(len(tx.tx_outs)) +
         b''.join(o.serialize() for o in tx.tx_outs) +
-        b'\x00' * len(tx.tx_ins) +
         tx.locktime.to_bytes(4, 'little')
-    )
+        # ← NO witness placeholders — unsigned SegWit PSBT doesn't need them
+     )
 
     psbt_b64 = create_psbt(raw_tx.hex())
 
@@ -697,9 +775,23 @@ def generate_psbt(
 
             <span style='color:#fff;font-weight:600;'>Post-prune size:</span> 
             <span style='color:#0f0;font-weight:800;'>{vsize:,} vB</span>
-            <span style='color:{savings_color};font-weight:900;font-size:1.15rem;text-shadow:0 0 18px {savings_color};'>
+            <span style='color:{savings_color};font-weight:800;font-size:1.2rem;letter-spacing:1.5px;
+                        text-transform:uppercase;text-shadow:0 0 20px {savings_color}, 0 0 50px {savings_color};'>
                 {' ' + savings_label} (-{savings_pct}%)
-            </span><br>
+                </span><br>
+                        <!-- SATS SAVED BY PRUNING NOW — THE MONEY LINE -->
+            {(
+                f"<span style=\'color:#fff;font-weight:600;\'>Sats saved by pruning now:</span> "
+                f"<span style=\'color:#0f0; font-size:1.45rem; font-weight:800; letter-spacing:1.8px; "
+                f"text-shadow:0 0 12px #0f0, 0 0 30px #0f0;\'>+{sats_saved_by_pruning_now:,}</span>"
+                f"{' '}<span style=\'color:#0f0; font-weight:800; letter-spacing:3.5px; text-transform:uppercase; "
+                f"text-shadow:0 0 20px #0f0, 0 0 50px #0f0;\'>NUCLEAR MOVE</span>"
+                if sats_saved_by_pruning_now >= 100_000 else
+                f"<span style=\'color:#fff;font-weight:600;\'>Sats saved by pruning now:</span> "
+                f"<span style=\'color:#0f0; font-size:1.35rem; font-weight:800; letter-spacing:1.2px; "
+                f"text-shadow:0 0 10px #0f0, 0 0 25px #0f0;\'>+{sats_saved_by_pruning_now:,}</span>"
+                if sats_saved_by_pruning_now > 0 else ""
+            )}<br>
 
             <span style='color:#fff;font-weight:600;'>Final Fee:</span> 
             <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> 
@@ -723,12 +815,13 @@ def generate_psbt(
                            padding:24px;padding-right:140px;border:none;outline:none;resize:none;
                            font-family:monospace;font-weight:700;box-sizing:border-box;">
                     {psbt_b64}</textarea>
-                <button onclick="navigator.clipboard.writeText(document.getElementById('psbt-output').value).then(() => {{ 
+                    <button onclick="navigator.clipboard.writeText(document.getElementById('psbt-output').value).then(() => {{ 
                     this.innerText='COPIED'; setTimeout(() => this.innerText='COPY PSBT', 1500); 
-                }})"
-                    style="position:absolute;top:14px;right:14px;padding:12px 28px;background:#f7931a;
-                           color:#000;border:none;border-radius:14px;font-weight:900;cursor:pointer;
-                           font-size:1.1rem;z-index:10;">
+                    }})"
+                style="position:absolute;top:14px;right:14px;padding:12px 30px;background:#f7931a;
+                   color:#000;border:none;border-radius:14px;font-weight:800;letter-spacing:1.5px;
+                       font-size:1.12rem;text-transform:uppercase;cursor:pointer;
+                       box-shadow:0 0 30px #f7931a, inset 0 0 20px rgba(0,0,0,0.4);z-index:10;">
                     COPY PSBT
                 </button>
             </div>
@@ -757,11 +850,11 @@ def generate_psbt(
 # --------------------------
 
 with gr.Blocks(
-    title="Ωmega Pruner v10.3 — NUCLEAR SURGICAL"
+    title="Ωmega Pruner v10.4 — FEE ORACLE"
 ) as demo:
     # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
     gr.HTML("""
-    <meta property="og:title" content="Ωmega Pruner v10.3 — NUCLEAR SURGICAL">
+    <meta property="og:title" content="Ωmega Pruner v10.4 — FEE ORACLE">
     <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
     <meta property="og:image" content="docs/omega_thumbnail.png">
     <meta property="og:image:width" content="1200">
@@ -884,15 +977,148 @@ body { overflow-y: auto !important; }
 }
 </style>
 """, elem_id="omega-banner-intense")
+    
+   # — NUCLEAR GLOW CSS —
+    gr.HTML("""
+<style>
+/* General disabled styling */
+input:disabled, select:disabled, button:disabled, .gr-button:disabled {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+    background: #111 !important;
+}
+.gr-slider input:disabled { background: #222 !important; }
 
-    # Input rows
+/* Fee button glow */
+.fee-btn button:not(:disabled), .fee-btn [role="button"]:not(:disabled) {
+    box-shadow: 0 0 20px rgba(247,147,26,0.6) !important;
+    animation: fee-glow 3s infinite alternate !important;
+}
+.fee-btn button:disabled, .fee-btn [role="button"]:disabled {
+    box-shadow: none !important;
+    animation: none !important;
+    opacity: 0.35 !important;
+}
+@keyframes fee-glow {
+    from { box-shadow: 0 0 20px rgba(247,147,26,0.6); }
+    to   { box-shadow: 0 0 40px rgba(247,147,26,0.9); }
+}
+
+/* Slider glow */
+.gr-slider {
+    position: relative;
+}
+.gr-slider::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 12px;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow: 0 0 30px rgba(247,147,26,0.8);
+    animation: slider-halo 3.5s infinite alternate;
+    transition: opacity 0.5s;
+}
+.gr-slider:not(:has(input:disabled))::after { opacity: 1; }
+.gr-slider:has(input:disabled)::after { opacity: 0; animation: none; }
+@keyframes slider-halo {
+    from { box-shadow: 0 0 25px rgba(247,147,26,0.7); }
+    to   { box-shadow: 0 0 45px rgba(247,147,26,1); }
+}
+
+/* Locked badge animation */
+@keyframes badge-pulse {
+    0% { transform: scale(1); box-shadow: 0 0 60px rgba(0,255,0,0.7); }
+    50% { transform: scale(1.1); box-shadow: 0 0 120px rgba(0,255,0,1); }
+    100% { transform: scale(1); box-shadow: 0 0 60px rgba(0,255,0,0.7); }
+}
+.locked-badge {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 16px 40px;
+    background: #000;
+    border: 6px solid #f7931a;
+    border-radius: 24px;
+    color: #0f0;
+    font-weight: 900;
+    font-size: 2.2rem;
+    letter-spacing: 10px;
+    text-shadow: 0 0 60px #0f0, 0 0 120px #0f0;
+    pointer-events: none;
+    opacity: 1;
+    animation: badge-pulse 2s infinite alternate;
+}
+@keyframes badge-entry {
+    0%   { opacity:0; transform:scale(0.3) translateY(-30px); }
+    70%  { transform:scale(1.15); }
+    100% { opacity:1; transform:scale(1) translateY(0); }
+}
+.locked-badge {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 18px 48px;
+    background: #000;
+    border: 7px solid #f7931a;
+    border-radius: 28px;
+    box-shadow: 0 0 140px rgba(247,147,26,1);
+    color: #0f0;
+    font-weight: 900;
+    font-size: 2.4rem;
+    letter-spacing: 12px;
+    text-shadow: 0 0 80px #0f0, 0 0 160px #0f0;
+    pointer-events: none;
+    opacity: 0;
+    animation: badge-entry 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
+               badge-pulse 2.5s infinite alternate 0.9s;
+}
+</style>
+""")
+
+    # =============================
+    # — BACKGROUND FEE CACHE REFRESH —
+    # =============================
+    def refresh_fees_periodically():
+        while True:
+            time.sleep(30)
+            try:
+                get_live_fees()  # keeps internal cache warm
+            except:
+                pass
+
+    threading.Thread(target=refresh_fees_periodically, daemon=True).start()
+
+    # =============================
+    # — LOCK-SAFE FEE PRESET FUNCTION —
+    # =============================
+    def apply_fee_preset_locked(preset: str, df_rows, enriched_state, future_fee_slider, thank_you_slider, locked):
+        if locked:
+            return gr.update(), gr.update()  # do nothing if locked
+
+        future_fee = future_fee_slider.value if hasattr(future_fee_slider, "value") else future_fee_slider
+        thank_you = thank_you_slider.value if hasattr(thank_you_slider, "value") else thank_you_slider
+
+        fees = get_live_fees() or {"fastestFee":150, "halfHourFee":80, "hourFee":40, "economyFee":10}
+        rate_map = {
+            "fastest":   fees.get("fastestFee", 150),
+            "half_hour": fees.get("halfHourFee", 80),
+            "hour":      fees.get("hourFee", 40),
+            "economy":   fees.get("economyFee", 10),
+        }
+        new_rate = rate_map.get(preset, 15)
+        new_summary = generate_summary_safe(df_rows, enriched_state, new_rate, future_fee, thank_you, locked)
+        return new_rate, new_summary
+
+
+    # =================================================================
+    # ========================= UI STARTS HERE ========================
+    # =================================================================
+
     with gr.Row():
-        addr = gr.Textbox(
-            label="Address or xpub • No private keys ever entered • 100% Non-custodial",
-            placeholder="bc1q... | zpub... | xpub...",
-            lines=2,
-            scale=3
-        )
+        addr = gr.Textbox(label="Address or xpub", placeholder="bc1q... | zpub... | xpub...", lines=2, scale=3)
         strategy = gr.Dropdown(
             choices=[
                 "Privacy First (30% pruned)",
@@ -906,118 +1132,152 @@ body { overflow-y: auto !important; }
 
     with gr.Row():
         dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
-        dest = gr.Textbox(
-            label="Change Address (optional)",
-            placeholder="Leave blank → reuse first input"
-        )
-        fee_rate = gr.Slider(1, 300, 15, step=1, label="Fee Rate (sat/vB)")
-        thank_you = gr.Slider(0, 5, 0.5, step=0.1, label="Thank-You / DAO Donation (%)")
+        dest = gr.Textbox(label="Change Address (optional)", placeholder="Leave blank → reuse first input")
 
-    # Analyze button at top
-    analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
-    html_out = gr.HTML() 
+    with gr.Row():
+        fee_rate = gr.Slider(1, 300, 15, step=1, label="Fee Rate now (sat/vB)", scale=3)
+        future_fee = gr.Slider(5, 500, 60, step=1, label="Future fee rate in 3–6 months (sat/vB)", scale=3)
+        thank_you = gr.Slider(0, 5, 0.5, step=0.1, label="Thank-You / DAO Donation (%)", scale=2)
+
+    # Fee preset buttons
+    with gr.Row():
+        fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
+        halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
+        hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn")
+        economy_btn = gr.Button("Economy", size="sm", elem_classes="fee-btn")
+
+    # Outputs
+    html_out = gr.HTML()
     summary = gr.HTML()
     enriched_state = gr.State()
-    # Generate button between summary and table
+    locked = gr.State(False)
+    locked_badge = gr.HTML("")  # ← start empty = hidden
 
-    
+    analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
     with gr.Row(visible=False) as generate_row:
-        gen_btn = gr.Button(
-            "2. GENERATE NUCLEAR PSBT",
-            variant="primary",
-            visible=False
-        )
+        gen_btn = gr.Button("2. GENERATE NUCLEAR PSBT", variant="primary")
+
     df = gr.DataFrame(
         headers=["PRUNE","TXID","vout (output index)","Value (sats)","Address", "Weight (vB)"],
-        datatype=["bool","str","number","number","str", "number"],
+        datatype=["bool","str","number","number","str","number"],
         type="array",
         interactive=True,
         wrap=True,
-        label="CHECK TO PRUNE • Uncheck to keep • Pre-checked UTXOs start at bottom of table",
+        label="CHECK TO PRUNE • Uncheck to keep"
     )
 
+    reset_btn = gr.Button("NUCLEAR RESET · START OVER", variant="secondary")
 
+    # =============================
+    # — FEE PRESET BUTTONS WIRING —
+    # =============================
+    for btn, preset in [
+        (fastest_btn, "fastest"),
+        (halfhour_btn, "half_hour"),
+        (hour_btn, "hour"),
+        (economy_btn, "economy"),
+    ]:
+        btn.click(
+            fn=partial(apply_fee_preset_locked, preset),
+            inputs=[df, enriched_state, future_fee, thank_you, locked],
+            outputs=[fee_rate, summary]
+        )
 
-    # Start over button below table
-    reset_btn = gr.Button("START OVER", variant="secondary")
-
-    # --------------------------
-    # BUTTON / TABLE WIRING — FINAL, BULLETPROOF
-    # --------------------------
-
-    # 1. ANALYZE — inline gr.State() for reliability
+    # =============================
+    # — ANALYZE BUTTON —
+    # =============================
     analyze_btn.click(
         fn=analyze,
-        inputs=[addr, strategy, dust, dest, fee_rate, thank_you],
+        inputs=[addr, strategy, dust, dest, fee_rate, thank_you, future_fee],
         outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row]
-    )
+    ).then(lambda: gr.update(visible=False), outputs=analyze_btn)
 
-    # 2. GENERATE PSBT — outputs only to html
+    # =============================
+    # — GENERATE BUTTON (NUCLEAR LOCK + ANIMATED BADGE) —
+    # =============================
     gen_btn.click(
-            fn=generate_psbt,
-        inputs=[dest, fee_rate, thank_you, df, enriched_state],
-        outputs=[html_out, gen_btn, generate_row , summary]
-        
+        fn=generate_psbt,
+        inputs=[dest, fee_rate, future_fee, thank_you, df, enriched_state],
+        outputs=[html_out, gen_btn, generate_row, summary]
     ).then(
-        lambda _ : gr.update(interactive=False),
+        lambda: gr.update(interactive=False),
         outputs=df
-    )
-        
-
-    reset_btn.click(
-        fn=lambda: (
-            "",     # html_out
-            gr.update(   # df (table) FULL RESET
-                value=[],
-                row_count=1,
-                col_count=6,
-                datatype=["bool", "str", "number", "number", "str", "number"]),     # df  ✅ clears table
-            [],     # enriched_state
-            "",     # summary
-            "",     # addr
-            "Recommended (40% pruned)",  # strategy
-            546,    # dust
-            "",     # dest
-            0.5,    # thank_you
-            15,     # fee_rate
-            gr.update(visible=False),   # gen_btn
-            gr.update(visible=False)    # generate_row
-        ),
+    ).then(
+        lambda: True,
+        outputs=locked
+    ).then(
+        lambda: [
+            gr.update(interactive=False),  # addr
+            gr.update(interactive=False),  # strategy
+            gr.update(interactive=False),  # dust
+            gr.update(interactive=False),  # dest
+            gr.update(interactive=False),   # fee_rate
+            gr.update(interactive=False),  # future_fee
+            gr.update(interactive=False),  # thank_you
+            gr.update(interactive=False),  # fastest_btn
+            gr.update(interactive=False),  # halfhour_btn
+            gr.update(interactive=False),  # hour_btn
+            gr.update(interactive=False),  # economy_btn
+            # THIS IS THE ONLY WAY — RAW HTML STRING, NO visible=True
+            '''
+            <div class="locked-badge">
+                LOCKED
+            </div>
+            '''
+        ],
         outputs=[
-            html_out,
-            df,             # ✅ table cleared normally
-            enriched_state,
-            summary,
-            addr,
-            strategy,
-            dust,
-            dest,
-            thank_you,
-            fee_rate,
-            gen_btn,
-            generate_row
+            addr, strategy, dust, dest,
+            fee_rate, future_fee, thank_you,
+            fastest_btn, halfhour_btn, hour_btn, economy_btn,
+            locked_badge
         ]
     )
+    # =============================
+    # — NUCLEAR RESET BUTTON —
+    # =============================
+    def nuclear_reset():
+        return (
+            "",  # html_out
+            [],  # df
+            [],  # enriched_state
+            "",  # summary
+            gr.update(visible=True),    # ANALYZE button
+            gr.update(visible=False),   # GENERATE row
+            gr.update(value="", interactive=True),  # addr
+            gr.update(value="Recommended (40% pruned)", interactive=True),  # strategy
+            gr.update(value=546, interactive=True),  # dust
+            gr.update(value="", interactive=True),  # dest
+            gr.update(value=15, interactive=True),  # fee_rate
+            gr.update(value=60, interactive=True),  # future_fee
+            gr.update(value=0.5, interactive=True), # thank_you
+            False,  # unlock state
+            "",                          # ← clears the HTML completely (cleanest)
+            gr.update(interactive=True),   # fastest_btn
+            gr.update(interactive=True),   # halfhour_btn
+            gr.update(interactive=True),   # hour_btn
+            gr.update(interactive=True),   # economy_btn
+        )
 
+    reset_btn.click(
+        fn=nuclear_reset,
+        inputs=None,
+        outputs=[html_out, df, enriched_state, summary,
+                 analyze_btn, generate_row,
+                 addr, strategy, dust, dest,
+                 fee_rate, future_fee, thank_you,
+                 locked, locked_badge,
+                 fastest_btn, halfhour_btn, hour_btn, economy_btn]
+    )
 
-    df.change(lambda _ : gr.update(interactive=True), outputs=df)
-    
-    # 4. LIVE SUMMARY UPDATES — safe and fast
-    df.change(
-        fn=generate_summary,
-        inputs=[df, enriched_state, fee_rate, thank_you],
-        outputs=summary
-    )
-    fee_rate.change(
-        fn=generate_summary,
-        inputs=[df, enriched_state, fee_rate, thank_you],
-        outputs=summary
-    )
-    thank_you.change(
-        fn=generate_summary,
-        inputs=[df, enriched_state, fee_rate, thank_you],
-        outputs=summary
-    )
+    # =============================
+    # — LIVE SUMMARY —
+    # =============================
+    df.change(fn=generate_summary_safe, inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked], outputs=summary)
+    fee_rate.change(fn=generate_summary_safe, inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked], outputs=summary)
+    future_fee.change(fn=generate_summary_safe, inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked], outputs=summary)
+    thank_you.change(fn=generate_summary_safe, inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked], outputs=summary)
+
+    # CRITICAL: DO NOT use .change() on fee_rate/future_fee for anything else
     # 5. FOOTER
     gr.HTML(
     '<div style="'
@@ -1034,7 +1294,7 @@ body { overflow-y: auto !important; }
     # VERSION
     '<strong style="color:#f7931a; font-size:1.08rem; letter-spacing:0.5px; '
     'text-shadow:0 0 12px rgba(247,147,26,0.65);">'
-    'Ωmega Pruner v10.3 — NUCLEAR SURGICAL'
+    'Ωmega Pruner v10.4 — FEE ORACLE'
     '</strong><br>'
 
     # GITHUB LINK
