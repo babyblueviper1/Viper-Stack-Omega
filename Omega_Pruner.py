@@ -399,7 +399,7 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
     addr = (addr or "").strip()
     if not addr:
         return (
-            "<div style='color:#ff3366;'>Enter address or xpub</div>",
+            "",
             [], [], "",
             gr.update(visible=False),
             gr.update(visible=False)
