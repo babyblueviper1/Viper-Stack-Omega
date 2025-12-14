@@ -487,11 +487,11 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
         value = u["value"]
 
         # Script classification (heuristic)
-        if input_wu <= 70:
+        if input_wu <= 228:
             script_type = "Taproot"
-        elif input_wu <= 95:
+        elif input_wu <= 272:
             script_type = "Native SegWit"
-        elif input_wu <= 130:
+        elif input_wu <= 364:
             script_type = "Nested SegWit"
         else:
             script_type = "Legacy"
