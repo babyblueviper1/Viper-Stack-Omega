@@ -496,17 +496,23 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
         else:
             script_type = "Legacy"
 
-        # Health decision tree
+        # Health decision tree — RELATIVE to actual script type
+        if script_type == "Taproot":          # 228 wu
+            health, recommend = "OPTIMAL", "KEEP"
+        elif script_type == "Native SegWit":  # 272 wu
+            health, recommend = "OPTIMAL", "KEEP"
+        elif script_type == "Nested SegWit":  # 364 wu
+            health, recommend = "MEDIUM", "OPTIONAL"
+        else:  # Legacy (592 wu) or unknown
+            health, recommend = "HEAVY", "PRUNE"
+
+        # Additional dust override (applies to all types)
         if value < 10_000:
             health, recommend = "DUST", "PRUNE"
-        elif input_wu > 120:
-            health, recommend = "HEAVY", "PRUNE"
-        elif value > 100_000_000 and input_wu > 91:
+
+        # After the main classification
+        if value > 100_000_000 and script_type in ("Nested SegWit", "Legacy"):
             health, recommend = "CAREFUL", "OPTIONAL"
-        elif input_wu > 91:
-            health, recommend = "MEDIUM", "OPTIONAL"
-        else:
-            health, recommend = "OPTIMAL", "KEEP"
 
         enriched.append({
             **u,
