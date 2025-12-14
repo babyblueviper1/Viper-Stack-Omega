@@ -1266,8 +1266,8 @@ with gr.Blocks(
 
     with gr.Row():
         addr = gr.Textbox(
-            label="Address or xpub",
-            placeholder="bc1q... | zpub... | xpub...",
+            label="Address or xpub — 100% non-custodial, keys never entered",
+            placeholder="Paste address/xpub → press Enter or click ANALYZE",
             lines=2,
             scale=3,
         )
@@ -1279,7 +1279,7 @@ with gr.Blocks(
                 "NUCLEAR PRUNE (90% sacrificed)",
             ],
             value="Recommended (40% pruned)",
-            label="Strategy",
+            label="Pruning Strategy — changes apply instantly",
         )
 
     with gr.Row():
@@ -1501,7 +1501,17 @@ with gr.Blocks(
         inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked],
         outputs=summary,
     )
-
+    strategy.change(
+        fn=analyze,
+        inputs=[addr, strategy, dust, dest, fee_rate, thank_you, future_fee],
+        outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
+    )
+    dust.change(
+        fn=analyze,
+        inputs=[addr, strategy, dust, dest, fee_rate, thank_you, future_fee],
+        outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
+    )
+    
     # CRITICAL: DO NOT use .change() on fee_rate/future_fee for anything else
     # 5. FOOTER
     gr.HTML(
