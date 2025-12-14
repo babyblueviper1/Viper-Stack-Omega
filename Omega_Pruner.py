@@ -710,16 +710,16 @@ def generate_summary(
       <span style='color:#0f0;font-weight:800;'>{econ.fee:,} sats</span> 
       <strong style='color:#0f0;'> @ {fee_rate} s/vB</strong><br>
 
-      <span style='color:#fff;font-weight:600;'>Pre-prune size:</span> 
+      <span style='color:#fff;font-weight:600;'>Pre-prune tx size:</span> 
       <span style='color:#888;font-weight:700;'>{pre_vsize:,} vB</span><br>
 
-      <span style='color:#fff;font-weight:600;'>Post-prune size:</span> 
+      <span style='color:#fff;font-weight:600;'>Post-prune tx size:</span> 
       <span style='color:#0f0;font-weight:800;'>{econ.vsize:,} vB</span>
       <span style='color:{savings_color};font-weight:800;
                    text-shadow:0 0 20px {savings_color}, 0 0 40px {savings_color};'>
         {' ' + savings_label} (-{savings_pct}%)
       </span><br>
-
+        <small style='color:#666;font-size:0.85rem;opacity:0.8;'>Pre-prune = all UTXOs • Post-prune = selected for pruning</small><br>
       {f"<span style='color:#fff;font-weight:600;'>Prune now →</span> {savings_text}<br>" if savings_text else ""}
 
       <span style='color:#fff;font-weight:600;'>Change:</span> 
@@ -886,10 +886,10 @@ def generate_psbt(
             <span style='color:#fff;font-weight:600;'>Input Weight:</span> 
             <span style='color:#0f0;font-weight:800;'>{input_weight:,} wu → {input_weight//4:,} vB</span><br>
 
-            <span style='color:#fff;font-weight:600;'>Pre-prune size:</span> 
+            <span style='color:#fff;font-weight:600;'>Pre-prune tx size:</span> 
             <span style='color:#888;font-weight:700;'>{pre_vsize:,} vB</span><br>
 
-            <span style='color:#fff;font-weight:600;'>Post-prune size:</span> 
+            <span style='color:#fff;font-weight:600;'>Post-prune tx size:</span> 
             <span style='color:#0f0;font-weight:800;'>{vsize:,} vB</span>
             <span style='color:{savings_color};font-weight:800;font-size:1.2rem;letter-spacing:1.5px;
                         text-transform:uppercase;text-shadow:0 0 20px {savings_color}, 0 0 50px {savings_color};'>
