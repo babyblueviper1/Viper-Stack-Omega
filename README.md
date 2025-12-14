@@ -11,7 +11,9 @@ The last UTXO consolidator you’ll ever need.
 - Blood-red **CAUTION** privacy warning  
 - 100% preview-to-PSBT match  
 - Zero blur, laser-etched typography on every device  
-- Zero custody • Full coin-control • RBF • Taproot • Dust-proof
+- Zero custody • Full coin-control • RBF • Taproot • Dust-proof  
+
+**Pre-checked boxes = recommended for pruning (worst health starts at bottom)**
 
 Custom builds → omegapruner@proton.me
 
