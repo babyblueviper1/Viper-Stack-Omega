@@ -1299,7 +1299,7 @@ with gr.Blocks(
 
     with gr.Row():
         fee_rate = gr.Slider(
-            1, 300, 15, step=1, label="Fee Rate now (sat/vB)", scale=3
+            1, 300, 15, step=1, label="Fee Rate now (sat/vB)", scale=3, preprocess=lambda x: max(1, min(300, x or 15)),
         )
         future_fee = gr.Slider(
             5,
@@ -1308,9 +1308,10 @@ with gr.Blocks(
             step=1,
             label="Future fee rate in 3–6 months (sat/vB)",
             scale=3,
+            preprocess=lambda x: max(5, min(500, x or 60)),
         )
         thank_you = gr.Slider(
-            0, 5, 0.5, step=0.1, label="Thank-You / DAO Donation (%)", scale=2
+            0, 5, 0.5, step=0.1, label="Thank-You / DAO Donation (%)", scale=2, preprocess=lambda x: max(0, min(5, x or 0.5)),
         )
 
     # Fee preset buttons
