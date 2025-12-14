@@ -16,7 +16,7 @@
 | Giant perfectly centered QR           | Nuclear glow, pixel-perfect on every screen               | Usually ugly          |
 | Copy PSBT + mobile toast              | One-tap paste into Sparrow / Electrum / Coldcard          | Nobody                |
 | Dust creation                         | Literally impossible — <546 sats absorbed with warning    | Still happens         |
-| **Per-input weight column**           | **LIVE**                                                  | Never                 |
+| **Per-input weight column in wu**     | **LIVE**                                                  | Never                 |
 | **Pre-prune vs post-prune vsize**     | **LIVE**                                                  | Never                 |
 | **Live % savings + NUCLEAR badge**    | **LIVE** — 70%+ = blinding radioactive NUCLEAR            | Never                 |
 | **“Pruning today saves you X sats”**  | **LIVE** — 100k+ = “NUCLEAR MOVE” in burning green        | Never                 |
