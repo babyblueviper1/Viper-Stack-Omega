@@ -1287,11 +1287,11 @@ with gr.Blocks(
                 "NUCLEAR PRUNE (90% sacrificed)",
             ],
             value="Recommended (40% pruned)",
-            label="Pruning Strategy — changes apply instantly",
+            label="Pruning Strategy",
         )
 
     with gr.Row():
-        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
+        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)", preprocess=lambda x: max(0, min(5000, x or 546)),)
         dest = gr.Textbox(
             label="Change Address (optional)",
             placeholder="Leave blank → reuse first input",
