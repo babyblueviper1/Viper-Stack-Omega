@@ -703,7 +703,7 @@ def generate_summary(
       <span style='color:#fff;font-weight:600;'>Selected Inputs:</span> 
       <span style='color:#0f0;font-weight:800;'>{len(selected_utxos):,}</span><br>
 
-      <span style='color:#fff;font-weight:600;'>Total Pruned Value:</span> 
+      <span style='color:#fff;font-weight:600;'>Total Value Pruned:</span> 
       <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.total_in)}</span><br>
 
       <span style='color:#fff;font-weight:600;'>Selected Input Weight:</span> 
@@ -884,13 +884,13 @@ def generate_psbt(
         <!-- NUCLEAR SUMMARY BLOCK -->
         <div style='text-align:center;margin:40px 0;padding:18px;background:#111;border:2px solid #f7931a;
                     border-radius:14px;max-width:95%;font-size:1.4rem;line-height:2.1;'>
-            <span style='color:#fff;font-weight:600;'>Selected Inputs:</span> 
+            <span style='color:#fff;font-weight:600;'>Inputs:</span> 
             <span style='color:#0f0;font-weight:800;'>{input_count:,}</span><br>
 
-            <span style='color:#fff;font-weight:600;'>Total Pruned Value:</span> 
+            <span style='color:#fff;font-weight:600;'>Total Value Pruned:</span> 
             <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(total_in)}</span><br>
 
-            <span style='color:#fff;font-weight:600;'>Selcted Input Weight:</span> 
+            <span style='color:#fff;font-weight:600;'>Input Weight:</span> 
             <span style='color:#0f0;font-weight:800;'>{input_weight:,} wu ({input_weight//4:,} vB)</span><br>
 
             <span style='color:#fff;font-weight:600;'>Pre-prune tx size:</span> 
