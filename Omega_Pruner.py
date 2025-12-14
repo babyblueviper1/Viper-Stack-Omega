@@ -674,14 +674,14 @@ def generate_summary(
     extra_warning = ""
     if bad_ratio > 0.8:
         extra_warning = (
-            "<div class='warning' style='margin-top:12px;color:#ff9966;'>"
+            "<div class='warning' style='margin-top:12px;color:#ffcc77;'>"
             "This prune heavily consolidates dusty/heavy inputs — strong fee savings.<br>"
             "Consider CoinJoin afterward to restore privacy."
             "</div>"
         )
     elif bad_ratio > 0.6:
         extra_warning = (
-            "<div class='warning' style='margin-top:12px;color:#ff9966;'>"
+            "<div class='warning' style='margin-top:12px;color:#ffcc77;'>"
             "High proportion of dusty/heavy inputs selected — good savings, real privacy trade-off."
             "</div>"
         )
@@ -739,7 +739,6 @@ def generate_summary(
       {f"• <span style='color:#ff6600;'>DAO:</span> "
        f"<span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.dao_amt)}</span>" 
        if econ.dao_amt >= 546 else ""}
-
       {extra_warning}
     </div>
     """
