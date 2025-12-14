@@ -1336,7 +1336,7 @@ with gr.Blocks(
         row_count=(50, "dynamic"),
         max_height=500,
         max_chars=None,
-        label="CHECK TO PRUNE • Pre-checked inputs start at bottom of table  •  Health is relative to address type: OPTIMAL = ideal • DUST/HEAVY = prune",
+        label="CHECK TO PRUNE • Pre-checked inputs start at bottom of table  •  Health is relative to address type: OPTIMAL = ideal • DUST/HEAVY = prune recommended",
         static_columns=[1, 2, 3, 4, 5, 6, 7],
         column_widths=[
         "90px",    # PRUNE (checkboxes)
