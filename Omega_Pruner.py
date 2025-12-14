@@ -626,6 +626,8 @@ def generate_summary(
 
     econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
 
+    input_weight = sum(u["input_weight"] for u in selected_utxos)
+
     if econ.remaining <= 0:
         return (
             "<div style='text-align:center;margin:20px;padding:20px;background:#330000;"
