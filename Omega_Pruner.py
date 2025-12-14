@@ -724,10 +724,10 @@ def generate_summary(
       {f"<span style='color:#fff;font-weight:600;'>Sats saved by pruning at today's fees →</span> {savings_text}<br>" if savings_text else ""}
 
       <small style='color:#ffaa55;font-size:0.85rem;opacity:0.9;'>
-      Savings based on your future fee estimate
+      Savings based on future fee of {future_fee_rate} s/vB
     </small><br>
       
-      <span style='color:#fff;font-weight:600;'>Est. Fee:</span> 
+      <span style='color:#fff;font-weight:600;'> Current Fee:</span> 
       <span style='color:#0f0;font-weight:800;'>{econ.fee:,} sats</span> 
       <strong style='color:#0f0;'> @ {fee_rate} s/vB</strong><br>
 
