@@ -525,7 +525,7 @@ def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slid
     # ===============================
     # SORT BY HEALTH (WORST FIRST)
     # ===============================
-    enriched.sort(key=lambda u: HEALTH_PRIORITY[u["health"]])
+    enriched.sort(key=lambda u: HEALTH_PRIORITY[u["health"]], reverse=True)
 
     # ===============================
     # BUILD DATAFRAME (UI PROJECTION)
@@ -1342,7 +1342,7 @@ with gr.Blocks(
         row_count=(50, "dynamic"),
         max_height=500,
         max_chars=None,
-        label="CHECK TO PRUNE • Pre-checked inputs start at bottom of table  •  Health is relative to address type: OPTIMAL = ideal • DUST/HEAVY = prune recommended",
+        label="CHECK TO PRUNE • Pre-checked = recommended to prune (worst health at bottom)  •  Health is relative to address type: OPTIMAL = ideal • DUST/HEAVY = prune recommended",
         static_columns=[1, 2, 3, 4, 5, 6, 7],
         column_widths=[
         "90px",    # PRUNE (checkboxes)
