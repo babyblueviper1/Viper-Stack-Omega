@@ -720,10 +720,10 @@ def generate_summary(
                    text-shadow:0 0 20px {savings_color}, 0 0 40px {savings_color};'>
         {' ' + savings_label} (-{savings_pct}%)
       </span><br>
-        <small style='color:#666;font-size:0.85rem;opacity:0.8;'>Pre-prune = all UTXOs • Post-prune = selected for pruning</small><br>
+        <small style='color:#ffaa55;font-size:0.85rem;opacity:0.9;'>Pre-prune = all UTXOs • Post-prune = selected for pruning</small><br>
       {f"<span style='color:#fff;font-weight:600;'>Sats saved by pruning at today's fees →</span> {savings_text}<br>" if savings_text else ""}
 
-      <small style='color:#888;font-size:0.85rem;opacity:0.8;'>
+      <small style='color:#ffaa55;font-size:0.85rem;opacity:0.9;'>
       Savings based on your future fee estimate
     </small><br>
       
