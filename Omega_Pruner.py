@@ -389,20 +389,11 @@ def scan_xpub(xpub: str, dust: int = 546, gap_limit: int = 20) -> Tuple[List[dic
 
 
 def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider):
-    # Clamp sliders to valid ranges (silent, no error)
-    fee_rate = max(1, min(300, int(fee_rate_slider or 15)))
-    future_fee_rate = max(5, min(500, int(future_fee_slider or 60)))
-    dao_percent = max(0, min(5, float(dao_slider or 0.5)))
-    dust_threshold = max(0, min(5000, int(dust_threshold or 546)))
-    
-    
-    
-    # ===============================
-    # NORMALIZE EXTERNAL INPUTS
-    # ===============================
-    fee_rate = int(fee_rate_slider)
-    future_fee_rate = int(future_fee_slider)
-    dao_percent = float(dao_slider)
+    # === SAFE INPUT CLAMPING (protects against manual text entry exploits) ===
+    fee_rate = max(1, min(500, int(float(fee_rate_slider or 15))))          # Wider than slider for flexibility, but safe
+    future_fee_rate = max(1, min(1000, int(float(future_fee_slider or 60))))
+    dao_percent = max(0.0, min(10.0, float(dao_slider or 0.5)))             # Allow up to 10% if someone wants crazy donation
+    dust_threshold = max(0, min(10000, int(float(dust_threshold or 546))))  
 
     addr = (addr or "").strip()
     if not addr:
@@ -1263,18 +1254,18 @@ with gr.Blocks(
 
         # Fetch live fees with fallback to conservative defaults
         fees = get_live_fees() or {
-            "fastestFee": 150,
-            "halfHourFee": 80,
-            "hourFee": 40,
-            "economyFee": 10,
+            "fastestFee": 10,
+            "halfHourFee": 6,
+            "hourFee": 3,
+            "economyFee": 1,
         }
         rate_map = {
-            "fastest": fees.get("fastestFee", 150),
-            "half_hour": fees.get("halfHourFee", 80),
-            "hour": fees.get("hourFee", 40),
-            "economy": fees.get("economyFee", 10),
+            "fastest": fees.get("fastestFee", 10),
+            "half_hour": fees.get("halfHourFee", 6),
+            "hour": fees.get("hourFee", 3),
+            "economy": fees.get("economyFee", 1),
         }
-        new_rate = rate_map.get(preset, 15)  # Safe default
+        new_rate = rate_map.get(preset, 3)  # Safe default
 
         new_summary = generate_summary_safe(
             df_rows, enriched_state, new_rate, future_fee, thank_you, locked
