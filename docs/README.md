@@ -10,11 +10,11 @@
 | Private keys ever leave your browser? | Never                                                     | Some still do         |
 | Transaction encoding                  | Hand-rolled, bit-perfect, zero dependencies               | Usually broken        |
 | Full SegWit v0 + v1 (Taproot) support | Automatic, zero silent failures                           | Partial or dead       |
-| PSBT output                           | Minimal, universally valid — signs in every 2025+ wallet   | Often malformed       |
-| **Live mempool fee oracle**           | **ONE-CLICK “Fastest / 30 min / 1 hour / Economy”**       | Manual entry or dead  |
+| PSBT output                           | Minimal, universally valid — signs in every 2025+ wallet  | Often malformed       |
+| **Live mempool fee oracle**           | **ONE-CLICK “Economy / 1 hour / 30 min / Fastest”**       | Manual entry or dead  |
 | **Instant slider + summary update**   | **Zero lag, zero stale numbers**                          | Never                 |
 | **Privacy Score (0–100)**             | **LIVE — CIOH strength, address merging, wealth reveal**  | Never                 |
-| **CIOH warnings with full explanation**| **LIVE — spelled out, impossible to miss**                | Silent or vague       |
+| **CIOH warnings with full explanation**| **LIVE — spelled out, impossible to miss**               | Silent or vague       |
 | Giant perfectly centered QR           | Nuclear glow, pixel-perfect on every screen               | Usually ugly          |
 | Copy PSBT + mobile toast              | One-tap paste into Sparrow / Electrum / Coldcard          | Nobody                |
 | Dust creation                         | Literally impossible — <546 sats absorbed with warning    | Still happens         |
@@ -22,7 +22,7 @@
 | **Pre-prune vs post-prune vsize**     | **LIVE**                                                  | Never                 |
 | **Live % savings + NUCLEAR badge**    | **LIVE** — 70%+ = blinding radioactive NUCLEAR            | Never                 |
 | **“Pruning today saves you X sats”**  | **LIVE** — 100k+ = “NUCLEAR MOVE” in burning green        | Never                 |
-| 100% match between preview & final PSBT| **LIVE**                                                | Usually lies          |
+| 100% match between preview & final PSBT| **LIVE**                                                 | Usually lies          |
 | Privacy + fee trade-off warnings      | Blood-red reactor alarm + green reassurance               | Sugar-coated or silent|
 | Zero blur, zero 900-weight text       | **EVERY PIXEL IS CRISP FOREVER**                          | Blurry garbage        |
 
