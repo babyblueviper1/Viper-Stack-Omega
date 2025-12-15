@@ -389,6 +389,14 @@ def scan_xpub(xpub: str, dust: int = 546, gap_limit: int = 20) -> Tuple[List[dic
 
 
 def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider):
+    # Clamp sliders to valid ranges (silent, no error)
+    fee_rate = max(1, min(300, int(fee_rate_slider or 15)))
+    future_fee_rate = max(5, min(500, int(future_fee_slider or 60)))
+    dao_percent = max(0, min(5, float(dao_slider or 0.5)))
+    dust_threshold = max(0, min(5000, int(dust_threshold or 546)))
+    
+    
+    
     # ===============================
     # NORMALIZE EXTERNAL INPUTS
     # ===============================
@@ -747,6 +755,11 @@ def generate_summary(
 def generate_summary_safe(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, locked):
     if locked:
         return gr.update()   # do nothing — frozen in time
+
+    # Clamp sliders to valid ranges (silent, no error)
+    fee_rate = max(1, min(300, int(fee_rate_slider or 15)))
+    future_fee_rate = max(5, min(500, int(future_fee_slider or 60)))
+    dao_percent = max(0, min(5, float(dao_slider or 0.5)))
     return generate_summary(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent)
 
 
@@ -1235,6 +1248,10 @@ with gr.Blocks(
     ):
         if locked:
             return gr.update(), gr.update()  # No changes when locked
+
+        # Clamp here too
+        future_fee = max(5, min(500, int(future_fee_slider or 60)))
+        thank_you = max(0, min(5, float(thank_you_slider or 0.5)))
 
         # Safely extract slider values (handles both raw values and components)
         future_fee = (
