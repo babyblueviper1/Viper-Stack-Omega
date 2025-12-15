@@ -756,10 +756,6 @@ def generate_summary_safe(df_rows, enriched_state, fee_rate, future_fee_rate, da
     if locked:
         return gr.update()   # do nothing — frozen in time
 
-    # Clamp sliders to valid ranges (silent, no error)
-    fee_rate = max(1, min(300, int(fee_rate_slider or 15)))
-    future_fee_rate = max(5, min(500, int(future_fee_slider or 60)))
-    dao_percent = max(0, min(5, float(dao_slider or 0.5)))
     return generate_summary(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent)
 
 
