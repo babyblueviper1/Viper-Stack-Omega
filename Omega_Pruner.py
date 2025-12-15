@@ -682,14 +682,14 @@ def generate_summary(
     extra_warning = ""
     if bad_ratio > 0.8:
         extra_warning = (
-            "<div class='warning' style='margin-top:18px;color:#ae2029;font-weight:900;'>"
+            "<div class='warning' style='margin-top:12px;color:#ae2029;font-weight:900;'>"
             "CAUTION: This prune heavily consolidates dusty/heavy inputs — strong fee savings.<br>"
             "Consider CoinJoin afterward to restore privacy."
             "</div>"
         )
     elif bad_ratio > 0.6:
         extra_warning = (
-            "<div class='warning' style='margin-top:18px;color:#fcf75e;'>"
+            "<div class='warning' style='margin-top:12px;color:#fcf75e;'>"
             "High proportion of dusty/heavy inputs selected — good savings, real privacy trade-off."
             "</div>"
         )
