@@ -1077,7 +1077,7 @@ def generate_psbt(
 # --------------------------
 
 with gr.Blocks(
-    title="Ωmega Pruner v10.4 — FEE ORACLE"
+    title="Ωmega Pruner v10.5 — PRIVACY SCORE + FEE ORACLE"
 ) as demo:
     # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
     gr.HTML("""
