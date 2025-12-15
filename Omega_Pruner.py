@@ -1325,7 +1325,6 @@ with gr.Blocks(
             step=1,
             label="Future fee rate in 3–6 months (sat/vB)",
             scale=3,
-            preprocess=lambda x: max(5, min(500, x or 60)),
         )
         thank_you = gr.Slider(
             0, 5, 0.5, step=0.1, label="Thank-You / DAO Donation (%)", scale=2,
