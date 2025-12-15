@@ -89,6 +89,80 @@ def sats_to_btc_str(sats: int) -> str:
         return f"{btc:,.8f}".rstrip("0").rstrip(".") + " BTC"
     return f"{int(sats):,} sats"
 
+def calculate_privacy_score(selected_utxos: List[dict], total_utxos: int) -> int:
+    if not selected_utxos or len(selected_utxos) <= 1:
+        return 95  # Single input or none = minimal linkage
+    
+    input_count = len(selected_utxos)
+    distinct_addrs = len(set(u["address"] for u in selected_utxos))
+    total_value_btc = sum(u["value"] for u in selected_utxos) / 100_000_000
+    
+    score = 100
+    
+    # CIOH linkage penalty (core privacy cost)
+    if input_count >= 50: score -= 60
+    elif input_count >= 20: score -= 45
+    elif input_count >= 10: score -= 30
+    elif input_count >= 5: score -= 15
+    elif input_count > 1: score -= 8
+    
+    # Address merging penalty
+    if distinct_addrs >= 15: score -= 40
+    elif distinct_addrs >= 8: score -= 25
+    elif distinct_addrs >= 4: score -= 12
+    elif distinct_addrs > 1: score -= 6
+    
+    # Wealth reveal
+    if total_value_btc >= 10: score -= 20
+    elif total_value_btc >= 1: score -= 8
+    elif total_value_btc >= 0.1: score -= 3
+    
+    # Tiny bonus for script diversity (confuses clustering)
+    script_types = set(u.get("script_type", "Unknown") for u in selected_utxos)
+    if len(script_types) >= 3: score += 6
+    elif len(script_types) == 2: score += 3
+    
+    return max(5, min(100, score))  # Never 0 — some privacy always remains
+
+
+def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) -> str:
+    if input_count <= 1:
+        return ""
+    
+    if privacy_score <= 30:
+        return (
+            "<div style='margin-top:14px;padding:14px;background:#440000;border:3px solid #ff3366;border-radius:12px;"
+            "box-shadow:0 0 40px rgba(255,51,102,0.9);font-size:1.1rem;'>"
+            "<strong style='color:#ff3366;font-size:1.3rem;'>EXTREME CIOH LINKAGE</strong><br>"
+            "<strong>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "This consolidation strongly proves common ownership of many inputs/addresses.<br>"
+            "Privacy significantly reduced. Consider CoinJoin, PayJoin, or silent payments afterward."
+            "</div>"
+        )
+    elif privacy_score <= 50:
+        return (
+            "<div style='margin-top:12px;padding:12px;background:#331100;border:2px solid #ff8800;border-radius:10px;'>"
+            "<strong style='color:#ff9900;'>High CIOH Risk</strong><br>"
+            "<strong>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            f"Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as yours.<br>"
+            "Good fee savings, but real privacy trade-off."
+            "</div>"
+        )
+    elif privacy_score <= 70:
+        return (
+            "<div style='margin-top:10px;padding:10px;background:#113300;border:1px solid #00ff9d;border-radius:8px;color:#aaffaa;'>"
+            "<strong style='color:#00ff9d;'>Moderate CIOH</strong><br>"
+            "<strong>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "Some linkage created, but not extreme. Acceptable during low-fee periods."
+            "</div>"
+        )
+    else:
+        return (
+            "<div style='margin-top:8px;color:#aaffaa;font-size:0.9rem;'>"
+            "Low CIOH impact <strong>(Common Input Ownership Heuristic)</strong> — minimal new linkage."
+            "</div>"
+        )
+
 # =========================
 # Helper Functions for Bitcoin Addresses
 # =========================
@@ -623,6 +697,11 @@ def generate_summary(
             "</div>"
         )
 
+    distinct_addrs = len(set(u["address"] for u in selected_utxos))
+    privacy_score = calculate_privacy_score(selected_utxos, len(enriched_state))
+    cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
+    score_color = "#0f0" if privacy_score >= 70 else "#ff9900" if privacy_score >= 40 else "#ff3366"
+
     econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
 
     input_weight = sum(u["input_weight"] for u in selected_utxos)
@@ -730,6 +809,16 @@ def generate_summary(
       <span style='color:#0f0;font-weight:800;'>{econ.fee:,} sats</span> 
       <strong style='color:#0f0;'> @ {fee_rate} s/vB</strong><br>
 
+    <span style='color:#fff;font-weight:600;'>Privacy Score:</span> 
+    <span style='color:{score_color};font-weight:800;font-size:1.6rem;text-shadow:0 0 20px {score_color};'>
+    {privacy_score}/100
+    </span>
+    <small style='color:#bbb;display:block;margin:4px 0 8px;'>
+    Accounts for CIOH strength, address merging, and wealth reveal
+    </small>
+    {cioh_warning}
+    <br>
+
       <span style='color:#fff;font-weight:600;'>Change:</span> 
       <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.change_amt)}</span>
       {f" <span style='color:#ff6600;font-size:0.9rem;'>(dust — absorbed into fee)</span>" 
@@ -772,6 +861,12 @@ def generate_psbt(
 
     if not selected_utxos:
         return "<div style='color:#ff3366; text-align:center; padding:30px;'>No UTXOs selected for pruning!</div>", gr.update(), gr.update(), ""
+
+    distinct_addrs = len(set(u["address"] for u in selected_utxos))
+    privacy_score = calculate_privacy_score(selected_utxos, len(enriched_state))
+    cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
+    score_color = "#0f0" if privacy_score >= 70 else "#ff9900" if privacy_score >= 40 else "#ff3366"
+
 
     # === CANONICAL ECONOMICS — SINGLE SOURCE OF TRUTH ===
     try:
@@ -921,12 +1016,21 @@ def generate_psbt(
             <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> 
             <span style='color:#0f0;font-weight:600;'>@</span> 
             <strong style='color:#0f0;font-weight:800;'>{fee_rate} s/vB</strong><br>
-
+            <br>
+            <span style='color:#fff;font-weight:600;'>Privacy Score:</span> 
+            <span style='color:{score_color};font-weight:800;font-size:1.6rem;text-shadow:0 0 20px {score_color};'>
+                {privacy_score}/100
+            </span>
+            <br><br>
+            {cioh_warning}
+            <br>
             <span style='color:#fff;font-weight:600;'>Change:</span> 
             <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
             {f" <span style='color:#ff6600;'>(dust absorbed)</span>" if change_amt == 0 and econ.remaining > 0 else ""}
 
             {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>" if dao_amt >= 546 else ""}
+        <br>
+        <br>
         </div>
 
         <!-- PSBT + COPY BUTTON -->
@@ -977,7 +1081,7 @@ with gr.Blocks(
 ) as demo:
     # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
     gr.HTML("""
-    <meta property="og:title" content="Ωmega Pruner v10.4 — FEE ORACLE">
+    <meta property="og:title" content="Ωmega Pruner v10.5 — PRIVACY SCORE + FEE ORACLE">
     <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
     <meta property="og:image" content="https://omega-pruner.onrender.com/docs/omega_thumbnail.png">
     <meta property="og:image:width" content="1200">
@@ -1546,7 +1650,7 @@ with gr.Blocks(
             letter-spacing: 0.5px;
             text-shadow: 0 0 12px rgba(247,147,26,0.65);
         ">
-            Ωmega Pruner v10.4 — FEE ORACLE
+            Ωmega Pruner v10.5 — PRIVACY SCORE + FEE ORACLE
         </strong><br>
 
         <!-- GITHUB LINK -->
