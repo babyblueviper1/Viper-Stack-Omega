@@ -1421,6 +1421,13 @@ with gr.Blocks(
     font-size: 0.8em;
     margin-top: 2px;
 }
+/* Make disabled textboxes obviously grayed out */
+.gr-textbox input:disabled {
+    background-color: #111 !important;
+    color: #555 !important;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 </style>
         """)
     # =============================
@@ -1496,58 +1503,89 @@ with gr.Blocks(
     # ========================= UI STARTS HERE ========================
     # =================================================================
     with gr.Column():
+        # Mode status — big, bold, impossible to miss
+        mode_status = gr.Markdown(
+            value="**Online mode** • API calls enabled",
+            elem_classes="mode-status"  # optional: for extra styling
+        )
+
+        with gr.Row():
+            offline_toggle = gr.Checkbox(
+                label="🔒 Offline mode — no internet / API calls (fully air-gapped)",
+                value=False,
+                interactive=True,
+                info="Disables all network requests. Safe for air-gapped or privacy-focused use.",
+            )
+
         addr_input = gr.Textbox(
             label="Address or xpub (one per line for batch mode) — 100% non-custodial, keys never entered",
             placeholder="Paste one or many addresses/xpubs (one per line)\nClick ANALYZE when ready",
             lines=6,
         )
 
-        strategy_state = gr.State("Recommended — ~40% pruned (balanced savings & privacy)")
+        with gr.Row(visible=False) as manual_box_row:
+            manual_utxo_input = gr.Textbox(
+                label="🔒 OFFLINE MODE • ACTIVE INPUT • Paste raw UTXOs (one per line) • Format: txid:vout:value_in_sats  (address optional at end)",
+                placeholder="""Paste raw UTXOs — one per line
 
-        with gr.Row():
-            strategy = gr.Dropdown(
-                choices=[
-                    "Privacy First — ~30% pruned (lowest CIOH risk)",
-                    "Recommended — ~40% pruned (balanced savings & privacy)",
-                    "More Savings — ~50% pruned (stronger fee reduction)",
-                    "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)",
-                ],
-                value="Recommended — ~40% pruned (balanced savings & privacy)",
-                label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
+Format: txid:vout:value_in_sats[:address]
+
+Examples:
+abc123...000:0:125000:bc1qexample...
+def456...789:1:5000000          ← 0.05 BTC, address optional
+txidhere:2:999999
+
+No API calls • Fully air-gapped safe""",
+                lines=10,
             )
+
+        # === Seamless mode switching with guidance ===
+        offline_toggle.change(
+            fn=lambda x: gr.update(visible=x, value="" if not x else gr.update()),
+            inputs=offline_toggle,
+            outputs=manual_box_row,
+        ).then(
+            # Clear main address box when entering offline
+            fn=lambda x: gr.update(value="") if x else gr.update(),
+            inputs=offline_toggle,
+            outputs=addr_input,
+        ).then(
+            # Gray out + change placeholder to guide user to the correct box
+            fn=lambda x: gr.update(
+                interactive=not x,
+                placeholder="🔒 Offline mode active — paste raw UTXOs in the box below 👇" if x
+                else "Paste one or many addresses/xpubs (one per line)\nClick ANALYZE when ready"
+            ),
+            inputs=offline_toggle,
+            outputs=addr_input,
+        ).then(
+            # Update mode status banner
+            fn=lambda x: 
+                "**🔒 Offline mode** • No API calls • Fully air-gapped" if x 
+                else "**Online mode** • API calls enabled",
+            inputs=offline_toggle,
+            outputs=mode_status,
+        )
+
+    # === Now outside the Column — back to base indentation ===
+    strategy_state = gr.State("Recommended — ~40% pruned (balanced savings & privacy)")
+
+    with gr.Row():
+        strategy = gr.Dropdown(
+            choices=[
+                "Privacy First — ~30% pruned (lowest CIOH risk)",
+                "Recommended — ~40% pruned (balanced savings & privacy)",
+                "More Savings — ~50% pruned (stronger fee reduction)",
+                "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)",
+            ],
+            value="Recommended — ~40% pruned (balanced savings & privacy)",
+            label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
+        )
+
     strategy.change(fn=lambda x: x, inputs=strategy, outputs=strategy_state)
-    with gr.Row():
-        offline_toggle = gr.Checkbox(
-            label="🔒 Offline mode — no internet / API calls (fully air-gapped)",
-            value=False,
-            interactive=True,
-            info="Disables all network requests. Safe for air-gapped or privacy-focused use.",
-        )
-
-    with gr.Row(visible=False) as manual_box_row:
-        manual_utxo_input = gr.Textbox(
-            label="Paste raw UTXOs (one per line) • Format: txid:vout:value_in_sats  (address optional at end)",
-            placeholder="""Paste raw UTXOs — one per line
-
-            Format: txid:vout:value_in_sats[:address]
-            
-            Examples:
-            abc123...000:0:125000:bc1qexample...
-            def456...789:1:5000000          ← 0.05 BTC, address optional
-            txidhere:2:999999
-
-            No API calls • Fully air-gapped safe""",
-            lines=10,
-        )
-
-    offline_toggle.change(
-        fn=lambda x: gr.update(visible=x),
-        inputs=offline_toggle,
-        outputs=manual_box_row,
-    )
 
     with gr.Row():
-        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)",)
+        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
         dest = gr.Textbox(
             label="Change Address (optional)",
             placeholder="Leave blank → reuse first input",
@@ -1593,8 +1631,6 @@ with gr.Blocks(
 
 
     analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
-
-  
 
     # Export button and file output
     # First row: the title — centered and prominent
