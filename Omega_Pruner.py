@@ -1,7 +1,7 @@
 # Omega_Pruner.py
 import gradio as gr
 import requests, time, base64, io, qrcode, json, os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Any, Optional
 import warnings, logging
 from functools import partial
