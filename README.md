@@ -17,7 +17,7 @@ The last UTXO consolidator you’ll ever need.
 - Zero blur, laser-etched typography on every device  
 - Zero custody • Full coin-control • RBF • Taproot • Dust-proof  
 
-**Pre-checked boxes = recommended for pruning (worst health starts at bottom)**
+**Pre-checked boxes = recommended for pruning**
 
 Custom builds → omegapruner@proton.me
 
