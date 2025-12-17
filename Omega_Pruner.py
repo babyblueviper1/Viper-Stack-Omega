@@ -55,6 +55,10 @@ session.headers.update({
 })
 
 
+from threading import Lock
+_fee_cache_lock = Lock()
+
+
 # ===========================
 # Selection resolver
 # ===========================
@@ -146,7 +150,12 @@ def safe_get(url: str) -> Optional[requests.Response]:
 
 def get_live_fees() -> Optional[Dict[str, int]]:
     """Fetch recommended fees from mempool.space with 30-second caching."""
-    if hasattr(get_live_fees, "cache") and time.time() - get_live_fees.cache_time < 30:
+    # Safe cache check — avoid AttributeError on first call
+    if (
+        hasattr(get_live_fees, "cache")
+        and hasattr(get_live_fees, "cache_time")
+        and time.time() - get_live_fees.cache_time < 30
+    ):
         return get_live_fees.cache
 
     try:
@@ -154,19 +163,28 @@ def get_live_fees() -> Optional[Dict[str, int]]:
         if r.status_code == 200:
             data = r.json()
             fees = {
-                "fastest": data["fastestFee"],
-                "half_hour": data["halfHourFee"],
-                "hour": data["hourFee"],
-                "economy": data["economyFee"],
-                "minimum": data["minimumFee"]
+                "fastest": int(data["fastestFee"]),
+                "half_hour": int(data["halfHourFee"]),
+                "hour": int(data["hourFee"]),
+                "economy": int(data["economyFee"]),
+                "minimum": int(data["minimumFee"]),
             }
-            get_live_fees.cache = fees
-            get_live_fees.cache_time = time.time()
+            now = time.time()
+            with _fee_cache_lock:
+                get_live_fees.cache = fees
+                get_live_fees.cache_time = now
             return fees
     except requests.exceptions.RequestException as e:
         log.warning(f"Failed to fetch live fees: {e}")
-    return None
 
+    # Fallback conservative defaults
+    return {
+        "fastest": 10,
+        "half_hour": 6,
+        "hour": 3,
+        "economy": 1,
+        "minimum": 1,
+    }
 
 
 
@@ -302,43 +320,82 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
     if not addr:
         return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'unknown'}
 
-    # P2PKH (Legacy)
+    # === Legacy P2PKH (starts with '1') ===
     if addr.startswith('1'):
         try:
             dec = base58_decode(addr)
-            if len(dec) == 25 and dec[0] == 0x00:
-                return b'\x76\xa9\x14' + dec[1:21] + b'\x88\xac', {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
-        except:
-            pass
+            if len(dec) == 25 and dec[0] == 0x00:  # version byte for mainnet P2PKH
+                hash160 = dec[1:21]
+                return b'\x76\xa9\x14' + hash160 + b'\x88\xac', {
+                    'input_vb': 148,
+                    'output_vb': 34,
+                    'type': 'P2PKH'
+                }
+        except Exception:
+            pass  # Invalid Base58 → fall through
 
-    # P2SH
+    # === P2SH (starts with '3') ===
     if addr.startswith('3'):
         try:
             dec = base58_decode(addr)
-            if len(dec) == 25 and dec[0] == 0x05:
-                return b'\xa9\x14' + dec[1:21] + b'\x87', {'input_vb': 91, 'output_vb': 32, 'type': 'P2SH'}
-        except:
+            if len(dec) == 25 and dec[0] == 0x05:  # version byte for mainnet P2SH
+                hash160 = dec[1:21]
+                return b'\xa9\x14' + hash160 + b'\x87', {
+                    'input_vb': 91,
+                    'output_vb': 32,
+                    'type': 'P2SH'
+                }
+        except Exception:
             pass
 
-    # P2WPKH / P2WSH (Bech32)
-    if addr.startswith('bc1q'):
-        data = [CHARSET.find(c) for c in addr[4:] if c in CHARSET]
-        if data and data[0] == 0 and bech32_verify_checksum('bc', data):
-            prog = convertbits(data[1:], 5, 8, False)
-            if prog and len(prog) == 20:
-                return b'\x00\x14' + bytes(prog), {'input_vb': 68, 'output_vb': 31, 'type': 'P2WPKH'}
-            if prog and len(prog) == 32:
-                return b'\x00\x20' + bytes(prog), {'input_vb': 69, 'output_vb': 43, 'type': 'P2WSH'}
+    # === Bech32 / Bech32m (bc1q... or bc1p...) ===
+    if addr.startswith('bc1'):
+        data_part = addr[4:]
 
-    # Taproot (Bech32m)
-    if addr.startswith('bc1p'):
-        data = [CHARSET.find(c) for c in addr[4:] if c in CHARSET]
-        if data and len(data) > 1 and data[0] == 1 and bech32m_verify_checksum('bc', data):
+        # Early validation: all characters must be in CHARSET
+        if any(c not in CHARSET for c in data_part):
+            return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
+
+        # Convert to 5-bit data array (no filtering needed — already validated)
+        data = [CHARSET.find(c) for c in data_part]
+
+        # Witness version is data[0]
+        if len(data) < 1:
+            return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
+
+        witness_version = data[0]
+
+        # === P2WPKH / P2WSH (Bech32, witness v0) ===
+        if addr.startswith('bc1q') and witness_version == 0 and bech32_verify_checksum('bc', data):
+            prog = convertbits(data[1:], 5, 8, False)
+            if prog:
+                if len(prog) == 20:
+                    return b'\x00\x14' + bytes(prog), {
+                        'input_vb': 68,
+                        'output_vb': 31,
+                        'type': 'P2WPKH'
+                    }
+                elif len(prog) == 32:
+                    return b'\x00\x20' + bytes(prog), {
+                        'input_vb': 69,
+                        'output_vb': 43,
+                        'type': 'P2WSH'
+                    }
+
+        # === Taproot (Bech32m, witness v1) ===
+        elif addr.startswith('bc1p') and witness_version == 1 and bech32m_verify_checksum('bc', data):
             prog = convertbits(data[1:], 5, 8, False)
             if prog and len(prog) == 32:
-                return b'\x51\x20' + bytes(prog), {'input_vb': 57, 'output_vb': 43, 'type': 'Taproot'}
+                return b'\x51\x20' + bytes(prog), {
+                    'input_vb': 57,
+                    'output_vb': 43,
+                    'type': 'Taproot'
+                }
 
-    # Fallback
+        # Invalid Bech32/Bech32m (bad checksum, wrong version, etc.)
+        return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
+
+    # === Final fallback for any unsupported or malformed address ===
     return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'fallback'}
 
 # =========================
@@ -434,13 +491,9 @@ class TxOut:
 @dataclass
 class Tx:
     version: int = 2
-    tx_ins: List[TxIn] = None
-    tx_outs: List[TxOut] = None
+    tx_ins: List[TxIn] = field(default_factory=list)
+    tx_outs: List[TxOut] = field(default_factory=list)
     locktime: int = 0
-
-    def __post_init__(self):
-        self.tx_ins = self.tx_ins or []
-        self.tx_outs = self.tx_outs or []
 
 def create_psbt(tx_hex: str) -> str:
     tx = bytes.fromhex(tx_hex)
