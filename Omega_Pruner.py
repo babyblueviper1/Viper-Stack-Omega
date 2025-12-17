@@ -19,6 +19,8 @@ log = logging.getLogger(__name__)
 # Config / Constants
 # =========================
 DEFAULT_DAO_ADDR = "bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj"
+
+
 MEMPOOL_API = "https://mempool.space/api"
 BLOCKSTREAM_API = "https://blockstream.info/api/address/{addr}/utxo"
 BITCOINER_API = "https://bitcoiner.live/api/address/{addr}/utxo"
@@ -186,8 +188,33 @@ def get_live_fees() -> Optional[Dict[str, int]]:
         "minimum": 1,
     }
 
+def _coerce_int(value, default: int) -> int:
+    """
+    Safely coerce a value to int, falling back to default on failure.
+    Handles None, "", malformed strings, floats, etc.
+    Used for slider inputs that can arrive as None or empty in Gradio edge cases.
+    """
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return default
 
+def _coerce_float(value, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
 
+def clamp_dao(percent) -> float:
+    """
+    Clamp DAO donation percentage to valid range [0.0, 10.0].
+    Returns 0.5 on invalid input (default user-visible value).
+    """
+    try:
+        return max(0.0, min(10.0, float(percent)))
+    except (TypeError, ValueError, OverflowError):
+        return 0.5
+        
 def sats_to_btc_str(sats: int) -> str:
     btc = sats / 100_000_000
     if btc >= 1:
@@ -398,6 +425,7 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
     # === Final fallback for any unsupported or malformed address ===
     return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'fallback'}
 
+DEFAULT_DAO_SCRIPT_PUBKEY, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
 # =========================
 # Transaction Economics (Single Source of Truth)
 # =========================
@@ -603,11 +631,13 @@ def scan_xpub(xpub: str, dust: int = 546, gap_limit: int = 20) -> Tuple[List[dic
 
 
 def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider, offline_mode, manual_utxo_input):
-    # === SAFE INPUT CLAMPING ===
-    fee_rate = max(1, min(500, int(float(fee_rate_slider or 15))))
-    future_fee_rate = max(1, min(1000, int(float(future_fee_slider or 60))))
-    dao_percent = max(0.0, min(10.0, float(dao_slider or 0.5)))
-    dust_threshold = max(0, min(10000, int(float(dust_threshold or 546))))
+   # === SAFE INPUT CLAMPING ===
+    fee_rate        = max(1,   min(500,  _coerce_int(fee_rate_slider, 15)))
+    future_fee_rate = max(1,   min(1000, _coerce_int(future_fee_slider, 60)))
+    dust_threshold  = max(0,   min(10000, _coerce_int(dust_threshold, 546)))
+
+    # DAO percent: use the dedicated clamp function (coerces + enforces range + specific default)
+    dao_percent     = clamp_dao(dao_slider)
 
     all_enriched = []
     successful_sources = 0
@@ -644,7 +674,7 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                     "input_weight": input_wu,
                     "health": "MANUAL",           # Fixed: only once
                     "recommend": "REVIEW",        # Fixed: only once
-                    "script_type": meta["type"] if addr != "unknown (manual)" else "Unknown",
+                    "script_type": "Manual" if addr == "unknown (manual)" else meta["type"],
                     "source": "Manual Offline",
                 }
                 all_enriched.append(enriched)
@@ -719,7 +749,7 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
     # ===============================
     # CANONICAL ORDERING & PRUNING LOGIC
     # ===============================
-    # Sort all enriched by value (largest first) for determinism
+    # Deterministic ordering: ensures stable table rows + consistent fingerprint across runs
     all_enriched.sort(key=lambda u: (u["value"], u["txid"], u["vout"]), reverse=True)
 
     # Pre-prune vsize estimate
@@ -777,28 +807,26 @@ def generate_summary(
     current_strategy: str = "Recommended — ~40% pruned (balanced savings & privacy)",
 ) -> Tuple[str, gr.update, str]:
 
+    """
+    SINGLE SOURCE OF TRUTH for:
+    - Privacy score
+    - Pruning statistics
+    - CIOH warnings
+    - Button visibility logic
+    All other functions (including generate_psbt) must derive from this.
+    """
+
     total_utxos = len(enriched_state)
 
-    # === CRITICAL GUARD: No UTXOs loaded yet (pre-ANALYZE state) ===
     if total_utxos == 0:
         return "", gr.update(visible=False), ""
 
-    # === Resolve current selection ===
     selected_utxos = _resolve_selected(df_rows, enriched_state)
     pruned_count = len(selected_utxos)
 
-    # === Privacy score ===
-    privacy_score = (
-        calculate_privacy_score(selected_utxos, total_utxos)
-        if selected_utxos else 100
-    )
-    score_color = (
-        "#0f0" if privacy_score >= 70
-        else "#ff9900" if privacy_score >= 40
-        else "#ff3366"
-    )
+    privacy_score = calculate_privacy_score(selected_utxos, total_utxos) if selected_utxos else 100
+    score_color = "#0f0" if privacy_score >= 70 else "#ff9900" if privacy_score >= 40 else "#ff3366"
 
-    # === Banner — always built when UTXOs exist ===
     banner_html = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#000;
                 border:3px solid #f7931a;border-radius:16px;
@@ -825,27 +853,22 @@ def generate_summary(
     </div>
     """
 
-    # === Button visibility — single source of truth ===
     button_visibility = gr.update(visible=bool(selected_utxos))
 
-    # === Case: UTXOs loaded, but none selected yet ===
     if not selected_utxos:
         return (
             banner_html,
-            button_visibility,  # False
+            button_visibility,
             "<div style='text-align:center;margin:60px 0;color:#888;font-size:1.1rem;'>"
             "No UTXOs selected yet — check the boxes in the table to begin pruning"
             "</div>"
         )
 
-    # === Economics calculation ===
     try:
         econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
     except ValueError:
-        # Shouldn't happen with valid selection, but safety
         return banner_html, gr.update(visible=False), ""
 
-    # === Invalid transaction (fee too high) ===
     if econ.remaining <= 0:
         invalid_html = (
             "<div style='text-align:center;margin:20px;padding:20px;background:#330000;"
@@ -859,12 +882,10 @@ def generate_summary(
         )
         return banner_html, gr.update(visible=False), invalid_html
 
-    # === Size & savings calculations ===
-    input_weight = sum(u["input_weight"] for u in selected_utxos)
+    # Pre-prune size
     all_input_weight = sum(u["input_weight"] for u in enriched_state)
-
     pre_vsize = max(
-        (all_input_weight + 172 + total_utxos) // 4 + 10,  # more accurate base
+        (all_input_weight + 172 + total_utxos) // 4 + 10,
         (all_input_weight + 150 + total_utxos * 60) // 4 + 10,
     )
 
@@ -874,24 +895,41 @@ def generate_summary(
     savings_color = "#0f0" if savings_pct >= 70 else "#00ff9d" if savings_pct >= 50 else "#ff9900" if savings_pct >= 30 else "#ff3366"
     savings_label = "NUCLEAR" if savings_pct >= 70 else "EXCELLENT" if savings_pct >= 50 else "GOOD" if savings_pct >= 30 else "WEAK"
 
-    # === Future savings ===
+    # Future savings with context
     sats_saved = max(0, econ.vsize * (future_fee_rate - fee_rate))
-    savings_text = ""
+    savings_line = ""
     if sats_saved >= 100_000:
-        savings_text = (
-            f"<span style='color:#0f0;font-size:1.18rem;font-weight:800;text-shadow:0 0 20px #0f0;'>"
-            f"+{sats_saved:,} sats saved</span> "
-            f"<span style='color:#0f0;font-weight:800;letter-spacing:3px;text-transform:uppercase;"
-            f"text-shadow:0 0 30px #0f0;'>NUCLEAR MOVE</span>"
+        savings_line = (
+            f"<b style='color:#fff;'>Unlocking now saves:</b> "
+            f"<span style='color:#0f0;font-size:1.45rem;font-weight:800;letter-spacing:1.8px;"
+            f"text-shadow:0 0 12px #0f0, 0 0 30px #0f0;'>"
+            f"+{sats_saved:,} sats</span> "
+            f"<span style='color:#0f0;font-weight:800;letter-spacing:3.5px;text-transform:uppercase;"
+            f"text-shadow:0 0 20px #0f0, 0 0 50px #0f0;'>NUCLEAR MOVE</span>"
+            f"<br><span style='color:#888;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
         )
     elif sats_saved > 0:
-        savings_text = f"<span style='color:#0f0;font-weight:800;'>+{sats_saved:,} sats saved</span>"
+        savings_line = (
+            f"<b style='color:#fff;'>Pruning now saves:</b> "
+            f"<span style='color:#0f0;font-weight:800;'>+{sats_saved:,} sats</span>"
+            f"<br><span style='color:#888;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
+        )
 
-    # === Privacy warnings ===
+    dao_amt = econ.dao_amt
+
+    # DAO amount (always show intent)
+    dao_raw = int((econ.total_in - econ.fee) * (dao_percent / 100.0)) if dao_percent > 0 else 0
+    dao_line = ""
+    if dao_amt >= 546:
+        dao_line = f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>"
+    elif dao_raw > 0:
+        dao_line = f" • <span style='color:#666;font-size:0.9rem;' title='Below dust threshold — absorbed into fee'>DAO: {sats_to_btc_str(dao_raw)} (dust)</span>"
+
+    # Privacy warnings
     distinct_addrs = len({u["address"] for u in selected_utxos})
     cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
 
-    bad_ratio = len([u for u in selected_utxos if u.get("health") in ("DUST", "HEAVY")]) / len(selected_utxos)
+    bad_ratio = len([u for u in selected_utxos if u.get("health") in ("DUST", "HEAVY")]) / len(selected_utxos) if selected_utxos else 0
     extra_warning = (
         "<div style='margin-top:12px;color:#ae2029;font-weight:900;'>"
         "CAUTION: Heavy consolidation — strong fee savings.<br>"
@@ -902,37 +940,45 @@ def generate_summary(
         if bad_ratio > 0.6 else ""
     )
 
-    # === Final details block ===
+    # === Final details block with visual grouping ===
     details_html = f"""
-    <div style='text-align:center;margin:10px;padding:14px;background:#111;
+    <div style='text-align:center;margin:10px;padding:18px;background:#111;
                 border:2px solid #f7931a;border-radius:14px;max-width:100%;
                 font-size:1rem;line-height:2.1;'>
-      <b style='color:#fff;'>Selected Inputs:</b> <span style='color:#0f0;font-weight:800;'>{len(selected_utxos):,}</span><br>
-      <b style='color:#fff;'>Total Value Pruned:</b> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.total_in)}</span><br>
+      <!-- Band 1: Inputs & Size -->
+      <b style='color:#fff;'>Selected Inputs:</b> 
+      <span style='color:#0f0;font-weight:800;'>{len(selected_utxos):,}</span><br>
+      <b style='color:#fff;'>Total Value Pruned:</b> 
+      <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.total_in)}</span><br>
       <b style='color:#fff;'>Post-prune tx size:</b> 
       <span style='color:#0f0;font-weight:800;'>{econ.vsize:,} vB</span>
       <span style='color:{savings_color};font-weight:800;text-shadow:0 0 20px {savings_color};'>
         {' ' + savings_label} (-{savings_pct}%)
       </span><br>
-      {f"<b style='color:#fff;'>Sats saved →</b> {savings_text}<br>" if savings_text else ""}
-      <b style='color:#fff;'>Fee:</b> 
-      <span style='color:#0f0;font-weight:800;'>{econ.fee:,} sats @ {fee_rate} s/vB</span><br>
+      <hr style="border:none;border-top:1px solid rgba(247,147,26,0.25);margin:20px 0;">
+
+      <!-- Band 2: Savings & Fee -->
+      {savings_line}<br>
+      <b style='color:#fff;'>Current Fee:</b> 
+      <span style='color:#0f0;font-weight:800;'>{econ.fee:,} sats @ {fee_rate} s/vB</span>{dao_line}<br>
+      <hr style="border:none;border-top:1px solid rgba(247,147,26,0.25);margin:20px 0;">
+
+      <!-- Band 3: Privacy & Warnings -->
       <b style='color:#fff;'>Privacy Score:</b> 
       <span style='color:{score_color};font-weight:800;font-size:1.6rem;text-shadow:0 0 20px {score_color};'>
         {privacy_score}/100
-      </span>
+      </span><br>
       <div style='margin-top:12px;'>{cioh_warning}</div>
       <div style='margin-top:6px;'>{extra_warning}</div>
     </div>
     """
 
-    # === Single return point ===
     return banner_html, button_visibility, details_html
 
 
 def generate_summary_safe(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, locked, current_strategy):
     if locked:
-        return None, None, None
+        return gr.update(), gr.update(), gr.update()
     return generate_summary(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, current_strategy)
 
 
@@ -944,47 +990,33 @@ def generate_psbt(
     df_rows: list,
     enriched_state: list
 ):
-    if not df_rows or not enriched_state:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Run Analyze first.</div>", gr.update(), gr.update(), "",gr.update(visible=False), gr.update(visible=False), None, []   
+    dao_percent = clamp_dao(dao_percent)  # re-clamp for safety
 
-    # === SAFELY EXTRACT SELECTED UTXOs ===
+    if not df_rows or not enriched_state:
+        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Run Analyze first.</div>", gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
+
     selected_utxos = _resolve_selected(df_rows, enriched_state)
     snapshot = _selection_snapshot(selected_utxos)
-    fingerprint = snapshot["fingerprint"]  # for display
+    fingerprint = snapshot["fingerprint"]
 
-    # === CREATE TEMP JSON FILE FOR DOWNLOAD ===
+    # Temp JSON download
     json_str = json.dumps(snapshot, indent=2, ensure_ascii=False)
     date_str = datetime.now().strftime("%Y%m%d")
-
     prefix = f"omega_selection_{date_str}_{fingerprint[:8]}_" if fingerprint != "none" else f"omega_selection_{date_str}_"
-    tmp_file = tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        suffix=".json",
-        prefix=prefix,
-        delete=False
-    )
+    tmp_file = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", prefix=prefix, delete=False)
     tmp_file.write(json_str)
     tmp_file.close()
     json_filepath = tmp_file.name
 
-
     if not selected_utxos:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>No UTXOs selected for pruning!</div>", gr.update(), gr.update(), "",gr.update(visible=False), gr.update(visible=False), None, []    
+        return "<div style='color:#ff3366; text-align:center; padding:30px;'>No UTXOs selected for pruning!</div>", gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
 
-    distinct_addrs = len(set(u["address"] for u in selected_utxos))
-    privacy_score = calculate_privacy_score(selected_utxos, len(enriched_state))
-    cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
-    score_color = "#0f0" if privacy_score >= 70 else "#ff9900" if privacy_score >= 40 else "#ff3366"
-
-
-    # === CANONICAL ECONOMICS — SINGLE SOURCE OF TRUTH ===
+    # Economics
     try:
         econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
     except ValueError:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Invalid selection.</div>", gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []    
+        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Invalid selection.</div>", gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
 
-    # Unpack for readability and UI
     total_in = econ.total_in
     vsize = econ.vsize
     fee = econ.fee
@@ -993,42 +1025,58 @@ def generate_psbt(
     input_count = len(selected_utxos)
     input_weight = sum(u["input_weight"] for u in selected_utxos)
 
-    # === PRE-PRUNE SIZE & SAVINGS ===
+    # Pre-prune size
     all_input_weight = sum(u["input_weight"] for u in enriched_state)
     pre_vsize = max(
-        (all_input_weight + 43 * 4 + 31 * 4 + 10 * 4 + len(enriched_state)) // 4 + 10,
+        (all_input_weight + 43*4 + 31*4 + 10*4 + len(enriched_state)) // 4 + 10,
         (all_input_weight + 150 + len(enriched_state) * 60) // 4,
     )
     savings_pct = round(100 * (1 - vsize / pre_vsize), 1) if pre_vsize > 0 else 0
 
-    if savings_pct >= 70:
-        savings_color, savings_label = "#0f0", "NUCLEAR"
-    elif savings_pct >= 50:
-        savings_color, savings_label = "#00ff9d", "EXCELLENT"
-    elif savings_pct >= 30:
-        savings_color, savings_label = "#ff9900", "GOOD"
-    else:
-        savings_color, savings_label = "#ff3366", "WEAK"
+    savings_color = "#0f0" if savings_pct >= 70 else "#00ff9d" if savings_pct >= 50 else "#ff9900" if savings_pct >= 30 else "#ff3366"
+    savings_label = "NUCLEAR" if savings_pct >= 70 else "EXCELLENT" if savings_pct >= 50 else "GOOD" if savings_pct >= 30 else "WEAK"
 
-    sats_saved_by_pruning_now = max(0, vsize * future_fee_rate - vsize * fee_rate)
+    # Future savings with emotional peak
+    sats_saved = max(0, vsize * (future_fee_rate - fee_rate))
+    savings_line = ""
+    if sats_saved >= 100_000:
+        savings_line = (
+            f"<span style='color:#fff;font-weight:600;'>Unlocking now saves:</span> "
+            f"<span style='color:#0f0;font-size:1.45rem;font-weight:800;letter-spacing:1.8px;"
+            f"text-shadow:0 0 12px #0f0, 0 0 30px #0f0;'>"
+            f"+{sats_saved:,} sats</span> "
+            f"<span style='color:#0f0;font-weight:800;letter-spacing:3.5px;text-transform:uppercase;"
+            f"text-shadow:0 0 20px #0f0, 0 0 50px #0f0;'>NUCLEAR MOVE</span>"
+            f"<br><span style='color:#888;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
+        )
+    elif sats_saved > 0:
+        savings_line = (
+            f"<span style='color:#fff;font-weight:600;'>Pruning now saves:</span> "
+            f"<span style='color:#0f0;font-weight:800;'>+{sats_saved:,} sats</span>"
+            f"<br><span style='color:#888;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
+        )
 
-    # === DESTINATION ADDRESS VALIDATION ===
-    dest = (dest_addr or "").strip()
-    if not dest:
-        dest = selected_utxos[0]["address"]  # fallback
+    # DAO visibility
+    dao_raw = int((econ.total_in - econ.fee) * (dao_percent / 100.0)) if dao_percent > 0 else 0
+    dao_line = ""
+    if dao_amt >= 546:
+        dao_line = f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>"
+    elif dao_raw > 0:
+        dao_line = f" • <span style='color:#666;font-size:0.9rem;' title='Below dust threshold — absorbed into fee'>DAO: {sats_to_btc_str(dao_raw)} (dust)</span>"
 
+    # Destination
+    dest = (dest_addr or "").strip() or selected_utxos[0]["address"]
     try:
         dest_spk, _ = address_to_script_pubkey(dest)
     except Exception:
         return (
             "<div style='color:#ff3366;text-align:center;padding:30px;'>Invalid or unsupported destination address.</div>",
             gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
-        )                      
+        )
 
-    dest_spk, _ = address_to_script_pubkey(dest)
-    dao_spk, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
+    dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
 
-    # === BUILD UNSIGNED TRANSACTION ===
+    # Build transaction
     tx = Tx()
     for u in selected_utxos:
         tx.tx_ins.append(TxIn(bytes.fromhex(u["txid"]), int(u["vout"])))
@@ -1040,7 +1088,7 @@ def generate_psbt(
 
     raw_tx = (
         tx.version.to_bytes(4, 'little') +
-        b'\x00\x01' +  # SegWit marker + flag
+        b'\x00\x01' +
         encode_varint(len(tx.tx_ins)) +
         b''.join(i.serialize() for i in tx.tx_ins) +
         encode_varint(len(tx.tx_outs)) +
@@ -1050,17 +1098,16 @@ def generate_psbt(
 
     psbt_b64 = create_psbt(raw_tx.hex())
 
-    # === QR CODE GENERATION ===
-    box_size = 6
+    # QR
     error_correction = qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2800 else qrcode.constants.ERROR_CORRECT_M
-    qr = qrcode.QRCode(version=None, error_correction=error_correction, box_size=box_size, border=4)
+    qr = qrcode.QRCode(version=None, error_correction=error_correction, box_size=6, border=4)
     qr.add_data(f"bitcoin:?psbt={psbt_b64}")
     qr.make(fit=True)
     img = qr.make_image(fill_color="#f7931a", back_color="#000000")
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     qr_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-    qr_img_html = f'<img src="{qr_uri}" style="width:100%;height:auto;display:block;image-rendering:crisp-edges;border-radius:12px;" alt="NUCLEAR QR"/>'
+    qr_img_html = f'<img src="{qr_uri}" style="width:100%;height:auto;display:block;image-rendering:crisp-edges;border-radius:12px;" alt="PSBT QR Code"/>'
 
     qr_warning_html = ""
     if len(psbt_b64) > 2800:
@@ -1071,17 +1118,7 @@ def generate_psbt(
             If QR fails → tap <strong>COPY PSBT</strong> and paste directly.
         </div>
         """
-    
-     # OUTPUT CONTRACT (do not reorder without updating all .click() chains)
-    # 0: html_out              → full PSBT + QR + summary UI
-    # 1: gen_btn               → hide generate button (prevent re-click)
-    # 2: generate_row          → hide the row
-    # 3: summary               → clear old summary
-    # 4: export_title_row      → show download title
-    # 5: export_file_row       → show file download
-    # 6: export_file           → tempfile path
-    # 7: selection_snapshot_state → full snapshot dict for audit
-    
+
     return f"""
     <div style="text-align:center;margin:60px auto 0px;max-width:960px;">
     <div style="display:inline-block;padding:55px;background:#000;border:14px solid #f7931a;border-radius:36px;
@@ -1096,22 +1133,31 @@ def generate_psbt(
                 RAW UNSIGNED TRANSACTION
             </button>
         </div>
+
+        <!-- Fingerprint with tooltip + copy -->
         <div style="margin:40px 0;padding:16px;background:#001100;border:2px solid #0f0;border-radius:12px;
-            box-shadow:0 0 40px rgba(0,255,0,0.6);font-family:monospace;">
-    <strong style="color:#0f0;font-size:1.1rem;">SELECTION FINGERPRINT</strong><br>
-<span style="color:#00ff9d;font-size:1.6rem;letter-spacing:4px;font-family:monospace;">{fingerprint.upper()}</span><br>
-<small style="color:#aaa;">Locked inputs • Verify this matches any exported selection</small>
-</div>
-<div style='text-align:center;margin:40px 0;padding:20px;background:#001133;border:3px solid #4488ff;border-radius:16px;
-            box-shadow:0 0 50px rgba(68,136,255,0.5);'>
-    <strong style='color:#44ccff;font-size:1.4rem;font-weight:800;text-shadow:0 0 15px #4488ff;'>
-        🧊 Frozen Selection Snapshot (JSON)
-    </strong><br><br>
-    <span style='color:#aaddff;font-size:1.1rem;'>
-        Your exact pruned inputs are locked below.<br>
-        Download for backup, audit, or future verification.
-    </span>
-</div>
+            box-shadow:0 0 40px rgba(0,255,0,0.6);font-family:monospace;"
+            title="This hash uniquely identifies your exact input selection. Export and verify later — if it matches, inputs are identical.">
+            <strong style="color:#0f0;font-size:1.1rem;">SELECTION FINGERPRINT</strong><br>
+            <span style="color:#00ff9d;font-size:1.6rem;letter-spacing:4px;font-family:monospace;">{fingerprint.upper()}</span>
+            <button onclick="navigator.clipboard.writeText('{fingerprint.upper()}').then(() => {{this.innerText='COPIED'; setTimeout(() => this.innerText='COPY', 1500);}})"
+                style="margin-left:12px;padding:4px 10px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:8px;
+                       font-size:0.9rem;font-weight:800;cursor:pointer;">
+                COPY
+            </button><br>
+            <small style="color:#aaa;">Locked inputs • Verify against exported JSON</small>
+        </div>
+
+        <div style='text-align:center;margin:40px 0;padding:20px;background:#001133;border:3px solid #4488ff;border-radius:16px;
+                    box-shadow:0 0 50px rgba(68,136,255,0.5);'>
+            <strong style='color:#44ccff;font-size:1.4rem;font-weight:800;text-shadow:0 0 15px #4488ff;'>
+                🧊 Frozen Selection Snapshot (JSON)
+            </strong><br><br>
+            <span style='color:#aaddff;font-size:1.1rem;'>
+                Your exact pruned inputs are locked below.<br>
+                Download for backup, audit, or future verification.
+            </span>
+        </div>
 
         <div style="margin:0 auto 40px;width:520px;max-width:96vw;padding:20px;background:#000;
                     border:8px solid #0f0;border-radius:24px;box-shadow:0 0 60px #0f0,inset 0 0 40px #0f0;">
@@ -1120,59 +1166,36 @@ def generate_psbt(
 
         {qr_warning_html}
 
-        <!-- NUCLEAR SUMMARY BLOCK -->
+        <!-- NUCLEAR SUMMARY BLOCK (grouped) -->
         <div style='text-align:center;margin:40px 0;padding:18px;background:#111;border:2px solid #f7931a;
                     border-radius:14px;max-width:95%;font-size:1.4rem;line-height:2.1;'>
+            <!-- Band 1: Inputs & Size -->
             <span style='color:#fff;font-weight:600;'>Inputs:</span> 
             <span style='color:#0f0;font-weight:800;'>{input_count:,}</span><br>
-
             <span style='color:#fff;font-weight:600;'>Total Value Pruned:</span> 
             <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(total_in)}</span><br>
-
-            <span style='color:#fff;font-weight:600;'>Input Weight:</span> 
-            <span style='color:#0f0;font-weight:800;'>{input_weight:,} wu ({input_weight//4:,} vB)</span><br>
-
-            <span style='color:#fff;font-weight:600;'>Pre-prune tx size:</span> 
-            <span style='color:#888;font-weight:700;'>{pre_vsize:,} vB</span><br>
-
             <span style='color:#fff;font-weight:600;'>Post-prune tx size:</span> 
             <span style='color:#0f0;font-weight:800;'>{vsize:,} vB</span>
             <span style='color:{savings_color};font-weight:800;font-size:1.2rem;letter-spacing:1.5px;
                         text-transform:uppercase;text-shadow:0 0 20px {savings_color}, 0 0 50px {savings_color};'>
                 {' ' + savings_label} (-{savings_pct}%)
             </span><br>
+            <hr style="border:none;border-top:1px solid rgba(247,147,26,0.25);margin:20px 0;">
 
-            {(
-                f"<span style='color:#fff;font-weight:600;'>Sats saved by pruning now:</span> "
-                f"<span style='color:#0f0; font-size:1.45rem; font-weight:800; letter-spacing:1.8px; "
-                f"text-shadow:0 0 12px #0f0, 0 0 30px #0f0;'>+{sats_saved_by_pruning_now:,}</span>"
-                f" <span style='color:#0f0; font-weight:800; letter-spacing:3.5px; text-transform:uppercase; "
-                f"text-shadow:0 0 20px #0f0, 0 0 50px #0f0;'>NUCLEAR MOVE</span>"
-                if sats_saved_by_pruning_now >= 100_000 else
-                f"<span style='color:#fff;font-weight:600;'>Sats saved by pruning now:</span> "
-                f"<span style='color:#0f0; font-size:1.35rem; font-weight:800; letter-spacing:1.2px; "
-                f"text-shadow:0 0 10px #0f0, 0 0 25px #0f0;'>+{sats_saved_by_pruning_now:,}</span>"
-                if sats_saved_by_pruning_now > 0 else ""
-            )}<br>
+            <!-- Band 2: Savings & Fee -->
+            {savings_line}<br>
+            <span style='color:#fff;font-weight:600;'>Current Fee:</span> 
+            <span style='color:#0f0;font-weight:800;'>{fee:,} sats @ {fee_rate} s/vB</span>{dao_line}<br>
+            <hr style="border:none;border-top:1px solid rgba(247,147,26,0.25);margin:20px 0;">
 
-            <span style='color:#fff;font-weight:600;'>Final Fee:</span> 
-            <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> 
-            <span style='color:#0f0;font-weight:600;'>@</span> 
-            <strong style='color:#0f0;font-weight:800;'>{fee_rate} s/vB</strong><br>
-            <span style='color:#fff;font-weight:600;'>Privacy Score:</span> 
-            <span style='color:{score_color};font-weight:800;font-size:1.6rem;text-shadow:0 0 20px {score_color};'>
-                {privacy_score}/100
-            </span>
-              <div style="margin-top:12px; margin-bottom:12px;">{cioh_warning}</div>
+            <!-- Band 3: Outputs & Change -->
             <span style='color:#fff;font-weight:600;'>Change:</span> 
             <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
             {f" <span style='color:#ff6600;'>(dust absorbed)</span>" if change_amt == 0 and econ.remaining > 0 else ""}
-
-            {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>" if dao_amt >= 546 else ""}
-        <br>
+            <br>
         </div>
 
-        <!-- PSBT + COPY BUTTON -->
+        <!-- PSBT + COPY + HINT -->
         <div style="margin:60px auto 20px;width:92%;max-width:880px;">
             <div style="position:relative;background:#000;border:6px solid #f7931a;border-radius:18px;
                         box-shadow:0 0 40px #0f0;overflow:hidden;">
@@ -1193,7 +1216,8 @@ def generate_psbt(
             </div>
             <div style="text-align:center;margin-top:12px;">
                 <span style="color:#00f0ff;font-weight:700;text-shadow:0 0 10px #0f0;">RBF enabled</span>
-                <span style="color:#888;"> • Raw PSBT • Tap COPY to clipboard</span>
+                <span style="color:#888;"> • Raw PSBT • </span>
+                <span style="color:#666;font-size:0.9rem;">Tip: Tap inside to select all • inspect before signing</span>
             </div>
         </div>
 
@@ -1204,22 +1228,20 @@ def generate_psbt(
                 Important: Wallet must support <strong style='color:#0f0;text-shadow:0 0 15px #0f0;'>PSBT</strong>
             </div>
             <div style='color:#0f8;margin-top:8px;opacity:0.9;'>
-                Sparrow • BlueWallet • Electrum • UniSat • OK
+                Sparrow • BlueWallet • Electrum • UniSat • Nunchuk • OKX
             </div>
         </div>
 
     </div>
     </div>
-            """, gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=True), gr.update(visible=True), json_filepath, snapshot
-
+    """, gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=True), gr.update(visible=True), json_filepath, snapshot
 # --------------------------
 # Gradio UI
 # --------------------------
-
 with gr.Blocks(
-    title="Ωmega Prunerv10.6 — BATCH NUCLEAR + OFFLINE MODE"
+    title="Ωmega Pruner v10.6 — BATCH NUCLEAR + OFFLINE MODE"
 ) as demo:
-    # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
+    # Social / OpenGraph Preview
     gr.HTML("""
     <meta property="og:title" content="Ωmega Pruner v10.6 — BATCH NUCLEAR + OFFLINE MODE">
     <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
@@ -1231,9 +1253,8 @@ with gr.Blocks(
     <meta name="twitter:card" content="summary_large_image">
     """, visible=False)
 
-    # Ωmega Background and Floating Banner
+    # Full-screen animated Ωmega background + Hero Banner
     gr.HTML("""
-   <!-- Ωmega Background — full-screen animated Ω -->
     <div id="omega-bg" style="
         position: fixed;
         inset: 0;
@@ -1269,97 +1290,74 @@ with gr.Blocks(
         </span>
     </div>
 
-    <!-- Hero Welcome Banner — Semi-Transparent for Ω Visibility -->
     <div style="text-align:center;margin:100px 0 60px 0;padding:60px 40px;
-                background:rgba(0,0,0,0.58);  /* ← Key: semi-transparent black */
-                backdrop-filter: blur(8px);    /* Optional: subtle blur for depth */
+                background:rgba(0,0,0,0.62);
+                backdrop-filter: blur(10px);
                 border:8px solid #f7931a;
                 border-radius:32px;
-                box-shadow:
-                    0 0 100px rgba(247,147,26,0.5),
-                    inset 0 0 80px rgba(247,147,26,0.1);
+                box-shadow:0 0 100px rgba(247,147,26,0.5), inset 0 0 80px rgba(247,147,26,0.1);
                 max-width:900px;margin-left:auto;margin-right:auto;
                 position:relative;z-index:1;">
         
-        <div style="color:#f7931a;
-                    font-size:4.8rem;
-                    font-weight:900;
-                    letter-spacing:12px;
-                    text-shadow:
-                        0 0 40px #f7931a,
-                        0 0 80px #ffaa00,
-                        0 0 120px rgba(247,147,26,0.9);
+        <div style="color:#f7931a;font-size:4.8rem;font-weight:900;letter-spacing:12px;
+                    text-shadow:0 0 40px #f7931a, 0 0 80px #ffaa00, 0 0 120px rgba(247,147,26,0.9);
                     margin-bottom:30px;">
             ΩMEGA PRUNER
         </div>
         
-        <div style="color:#0f0;
-                    font-size:2.2rem;
-                    font-weight:900;
-                    letter-spacing:4px;
-                    text-shadow:0 0 30px #0f0, 0 0 60px #0f0;
-                    margin:40px 0;">
+        <div style="color:#0f0;font-size:2.4rem;font-weight:900;letter-spacing:5px;
+                    text-shadow:0 0 30px #0f0, 0 0 60px #0f0;margin:40px 0;">
             NUCLEAR COIN CONTROL
         </div>
         
-    <div style="color:#ddd;
-            font-size:1.5rem;
-            line-height:1.8;
-            max-width:760px;
-            margin:0 auto 50px auto;">
-    Pruning isn't just about saving sats today — it's about <strong style="color:#0f0;">taking control</strong> of your coins for the long term.<br><br>
-    
-    By consolidating inefficient UTXOs, you:<br>
-    • <strong style="color:#00ff9d;">Save significantly on fees</strong> when the network gets busy<br>
-    • <strong style="color:#00ff9d;">Gain real coin control</strong> — know exactly what you're spending<br>
-    • <strong style="color:#00ff9d;">Improve privacy</strong> when done thoughtfully<br>
-    • <strong style="color:#00ff9d;">Future-proof your stack</strong> — stay spendable no matter what<br><br>
+        <div style="color:#ddd;font-size:1.5rem;line-height:1.8;max-width:760px;margin:0 auto 50px auto;">
+            Pruning isn't just about saving sats today — it's about <strong style="color:#0f0;">taking control</strong> of your coins for the long term.<br><br>
+            
+            By consolidating inefficient UTXOs, you:<br>
+            • <strong style="color:#00ff9d;">Save significantly on fees</strong> during high network congestion<br>
+            • <strong style="color:#00ff9d;">Gain true coin control</strong> — know exactly what you're spending<br>
+            • <strong style="color:#00ff9d;">Improve privacy</strong> when done thoughtfully<br>
+            • <strong style="color:#00ff9d;">Future-proof your stack</strong> — remain spendable forever<br><br>
 
-    <strong style="color:#f7931a;font-size:1.8rem;font-weight:900;letter-spacing:1px;">
-        Prune now. Win forever.
-    </strong><br><br>
-    
-    Paste one or more addresses (or xpubs) below and click 
-    <strong style="color:#f7931a;font-size:1.7rem;">ANALYZE</strong> 
-    to see your personalized pruning strategy.
-</div>
+            <strong style="color:#f7931a;font-size:1.8rem;font-weight:900;letter-spacing:1px;">
+                Prune now. Win forever.
+            </strong><br><br>
+            
+            Paste addresses or xpubs below and click 
+            <strong style="color:#f7931a;font-size:1.7rem;">ANALYZE</strong> 
+            to unlock your personalized strategy.
+        </div>
+        
         <div style="font-size:4rem;color:#f7931a;opacity:0.9;animation:pulse 2s infinite;">
             ↓
         </div>
     </div>
 
     <style>
-    /* Pulsing arrow animation */
     @keyframes pulse {
         0%, 100% { transform: translateY(0); opacity: 0.8; }
         50% { transform: translateY(20px); opacity: 1; }
     }
 
-    /* Ωmega Animations */
     @keyframes omega-breath {
         0%, 100% { opacity: 0.76; transform: scale(0.95) rotate(0deg); }
-        50%      { opacity: 1.0;  transform: scale(1.05) rotate(180deg); }
+        50% { opacity: 1.0; transform: scale(1.05) rotate(180deg); }
     }
 
     @keyframes gradient-pulse {
         0%, 100% { transform: scale(0.97); }
-        50%      { transform: scale(1.03); }
+        50% { transform: scale(1.03); }
     }
 
     @keyframes omega-spin {
-        0%   { transform: rotate(0deg); }
+        0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
 
-    /* Container & body tweaks */
     .gradio-container { 
         position: relative;
         z-index: 0;
         background: transparent;
-        overflow-y: auto;
-    }
-
-    body { 
         overflow-y: auto;
     }
 
@@ -1368,15 +1366,13 @@ with gr.Blocks(
         will-change: transform, opacity;
     }
 
-    /* Fee button glow */
-    .fee-btn button:not(:disabled),
-    .fee-btn [role="button"]:not(:disabled) {
+    /* Fee preset glow */
+    .fee-btn button:not(:disabled) {
         box-shadow: 0 0 20px rgba(247,147,26,0.6);
         animation: fee-glow 3s infinite alternate;
     }
 
-    .fee-btn button:disabled,
-    .fee-btn [role="button"]:disabled {
+    .fee-btn button:disabled {
         box-shadow: none;
         animation: none;
         opacity: 0.35;
@@ -1384,7 +1380,7 @@ with gr.Blocks(
 
     @keyframes fee-glow {
         from { box-shadow: 0 0 20px rgba(247,147,26,0.6); }
-        to   { box-shadow: 0 0 40px rgba(247,147,26,0.9); }
+        to { box-shadow: 0 0 40px rgba(247,147,26,0.9); }
     }
 
     /* Slider halo */
@@ -1405,84 +1401,79 @@ with gr.Blocks(
 
     @keyframes slider-halo {
         from { box-shadow: 0 0 25px rgba(247,147,26,0.7); }
-        to   { box-shadow: 0 0 45px rgba(247,147,26,1); }
+        to { box-shadow: 0 0 45px rgba(247,147,26,1); }
     }
 
-    /* Locked badge */
+    /* Locked badge — more dramatic */
     @keyframes badge-pulse {
-        0%   { transform: scale(1);   box-shadow: 0 0 60px rgba(0,255,0,0.7); }
-        50%  { transform: scale(1.1); box-shadow: 0 0 120px rgba(0,255,0,1); }
-        100% { transform: scale(1);   box-shadow: 0 0 60px rgba(0,255,0,0.7); }
+        0%   { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
+        50%  { transform: scale(1.15); box-shadow: 0 0 160px rgba(0,255,0,1); }
+        100% { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
     }
 
     @keyframes badge-entry {
-        0%   { opacity: 0; transform: scale(0.3) translateY(-30px); }
-        70%  { transform: scale(1.15); }
+        0%   { opacity: 0; transform: scale(0.4) translateY(-40px); }
+        70%  { transform: scale(1.2); }
         100% { opacity: 1; transform: scale(1) translateY(0); }
     }
 
     .locked-badge {
         position: fixed;
-        top: 20px;
-        right: 20px;
+        top: 24px;
+        right: 24px;
         z-index: 9999;
-        padding: 18px 48px;
+        padding: 20px 56px;
         background: #000;
-        border: 7px solid #f7931a;
-        border-radius: 28px;
-        box-shadow: 0 0 140px rgba(247,147,26,1);
+        border: 8px solid #f7931a;
+        border-radius: 32px;
+        box-shadow: 0 0 160px rgba(247,147,26,1);
         color: #ffaa00;
-        text-shadow: 
-            0 0 8px #ffaa00,
-            0 0 16px #ffaa00,
-            0 0 32px #ffaa00,
-            0 0 60px #ffaa00;
+        text-shadow: 0 0 10px #ffaa00, 0 0 20px #ffaa00, 0 0 40px #ffaa00, 0 0 80px #ffaa00;
         font-weight: 900;
-        font-size: 2.4rem;
-        letter-spacing: 12px;
+        font-size: 2.8rem;
+        letter-spacing: 14px;
         pointer-events: none;
         opacity: 0;
-        animation: badge-entry 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
-                   badge-pulse 2.5s infinite alternate 0.9s;
+        animation: badge-entry 1s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
+                   badge-pulse 2.8s infinite alternate 1s;
     }
     </style>
     """)
 
+    # Health badges + disabled textbox styling
     gr.HTML("""
     <style>
-/* Health badge styling — clean and beautiful */
-.health {
-    font-weight: 900;
-    text-align: center;
-    padding: 6px 10px;
-    border-radius: 4px;
-    min-width: 70px;
-    display: inline-block;
-}
-.health-dust     { color: #ff3366; background: rgba(255, 51, 102, 0.1); }
-.health-heavy    { color: #ff6600; background: rgba(255, 102, 0, 0.1); }
-.health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.1); }
-.health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.1); }
-.health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.1); }
-.health-manual   { color: #bb86fc; background: rgba(187, 134, 252, 0.1); }
+    .health {
+        font-weight: 900;
+        text-align: center;
+        padding: 6px 10px;
+        border-radius: 4px;
+        min-width: 70px;
+        display: inline-block;
+    }
+    .health-dust     { color: #ff3366; background: rgba(255, 51, 102, 0.12); }
+    .health-heavy    { color: #ff6600; background: rgba(255, 102, 0, 0.12); }
+    .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.12); }
+    .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
+    .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.12); }
+    .health-manual   { color: #bb86fc; background: rgba(187, 134, 252, 0.12); }
 
+    .health small {
+        display: block;
+        color: #aaa;
+        font-weight: normal;
+        font-size: 0.8em;
+        margin-top: 2px;
+    }
 
-.health small {
-    display: block;
-    color: #aaa;
-    font-weight: normal;
-    font-size: 0.8em;
-    margin-top: 2px;
-}
-/* Make disabled textboxes obviously grayed out */
-.gr-textbox input:disabled {
-    background-color: #111 !important;
-    color: #555 !important;
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-</style>
-        """)
+    .gr-textbox input:disabled {
+        background-color: #111 !important;
+        color: #555 !important;
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    </style>
+    """)
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
     # =============================
@@ -1575,7 +1566,7 @@ with gr.Blocks(
                 label="🔒 Offline mode — no internet / API calls (fully air-gapped)",
                 value=False,
                 interactive=True,
-                info="Disables all network requests. Safe for air-gapped or privacy-focused use.",
+                info="Disables all network requests. No data leaves your machine in offline mode. Safe for air-gapped or privacy-focused use.",
             )
 
         addr_input = gr.Textbox(
@@ -1739,7 +1730,15 @@ No API calls • Fully air-gapped safe""",
         column_widths=["90px", "160px", "200px", "70px", "140px", "160px", "130px", "90px", "100px"]
     )
 
-    reset_btn = gr.Button("NUCLEAR RESET · START OVER", variant="secondary")
+    with gr.Column():
+        reset_btn = gr.Button("NUCLEAR RESET · START OVER", variant="secondary")
+        gr.HTML("""
+    <div style="text-align:center;margin-top:8px;">
+        <small style="color:#888;font-style:italic;">
+            Clears everything • No funds affected • Safe to use anytime
+        </small>
+    </div>
+    """)
     # =============================
     # — FEE PRESET BUTTONS WIRING —
     # =============================
