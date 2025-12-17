@@ -1695,14 +1695,12 @@ No API calls • Fully air-gapped safe""",
         (hour_btn, "hour"),
         (halfhour_btn, "half_hour"),
         (fastest_btn, "fastest"),
-     
     ]:
         btn.click(
-            fn=partial(apply_fee_preset_locked, preset),
-            inputs=[df, enriched_state, future_fee, thank_you, locked,  strategy_state],
+            fn=partial(apply_fee_preset_locked, preset=preset),
+            inputs=[df, enriched_state, future_fee, thank_you, locked, strategy_state],
             outputs=[fee_rate, summary],
         )
-
     # =============================
     # — ANALYZE BUTTON —
     # =============================
