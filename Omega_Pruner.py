@@ -1460,9 +1460,9 @@ with gr.Blocks(
         preset: str
     ):
         if locked:
-            return gr.update(), gr.update()
+            return gr.update(), gr.update()  # No change to slider or summary when locked
 
-        # Safely get current slider values
+        # Safely extract current values (handles both direct value and component)
         future_fee = (
             future_fee_slider.value if hasattr(future_fee_slider, "value") else int(future_fee_slider or 60)
         )
@@ -1473,25 +1473,38 @@ with gr.Blocks(
         future_fee = max(5, min(500, future_fee))
         thank_you = max(0, min(5, thank_you))
 
-        # Get live fees from mempool.space (with fallback)
+        # Live fees with safe fallback
         fees = get_live_fees() or {
             "fastestFee": 10,
             "halfHourFee": 6,
             "hourFee": 3,
             "economyFee": 1,
+            "minimumFee": 1,
         }
 
+        # Correct keys + defensive .get()
         rate_map = {
-            "fastest": fees["fastestFee"],
-            "half_hour": fees["halfHourFee"],
-            "hour": fees["hourFee"],
-            "economy": fees["economyFee"],
+            "fastest": fees.get("fastestFee", 10),
+            "half_hour": fees.get("halfHourFee", 6),
+            "hour": fees.get("hourFee", 3),
+            "economy": fees.get("economyFee", 1),
         }
-    
+
         new_rate = rate_map.get(preset, 3)
 
-        # Generate updated summary (now passing ALL required args including current_strategy)
-        banner_html, button_vis, details_html
+        # Update summary with new rate
+        banner_html, button_vis, details_html = generate_summary_safe(
+            df_rows,
+            enriched_state,
+            new_rate,
+            future_fee,
+            thank_you,
+            locked,
+            current_strategy
+        )
+
+        # CRITICAL: Explicit slider update + details block
+        return gr.update(value=new_rate), details_html
    
 
     # =================================================================
