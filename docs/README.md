@@ -1,11 +1,11 @@
-# Ωmega Pruner v10.5 — PRIVACY SCORE + FEE ORACLE AWAKENED
+# Ωmega Pruner v10.6 — BATCH NUCLEAR + OFFLINE MODE
 
-**The last UTXO consolidator you’ll ever need. Now with real-time mempool oracle, Privacy Score, and full CIOH transparency.**
+**The last UTXO consolidator you’ll ever need. Now with batch analysis, fully offline/air-gapped mode, and unbreakable sovereignty.**
 
 **LIVE:** https://omega-pruner.onrender.com  
-**Launched:** 15 December 2025
+**Launched:** 17 December 2025
 
-| Property                              | Ωmega Pruner v10.5                                      | Everyone Else in 2025 |
+| Property                              | Ωmega Pruner v10.6                                      | Everyone Else in 2025 |
 | ------------------------------------- | --------------------------------------------------------- | --------------------- |
 | Private keys ever leave your browser? | Never                                                     | Some still do         |
 | Transaction encoding                  | Hand-rolled, bit-perfect, zero dependencies               | Usually broken        |
@@ -22,13 +22,17 @@
 | **Pre-prune vs post-prune vsize**     | **LIVE**                                                  | Never                 |
 | **Live % savings + NUCLEAR badge**    | **LIVE** — 70%+ = blinding radioactive NUCLEAR            | Never                 |
 | **“Pruning today saves you X sats”**  | **LIVE** — 100k+ = “NUCLEAR MOVE” in burning green        | Never                 |
+| **Batch mode (multiple addresses/xpubs)** | **LIVE — one screen, selective prune across sources** | Never                 |
+| **Fully offline / air-gapped mode**   | **LIVE — paste raw UTXOs, zero API calls**                | Never                 |
 | 100% match between preview & final PSBT| **LIVE**                                                 | Usually lies          |
 | Privacy + fee trade-off warnings      | Blood-red reactor alarm + green reassurance               | Sugar-coated or silent|
 | Zero blur, zero 900-weight text       | **EVERY PIXEL IS CRISP FOREVER**                          | Blurry garbage        |
 
-### What happens in 6 seconds now (deadlier and smarter than ever)
+### What happens in 6 seconds now (deadlier, smarter, and more sovereign than ever)
 
-1. Paste address / xpub  
+1. Toggle **🔒 Offline mode** → paste raw UTXOs (txid:vout:value) → fully air-gapped  
+   OR  
+   Paste multiple addresses / xpubs (one per line)  
 2. Click any live fee button → **instant fee + future-fee jump + summary refresh**  
 3. **1. ANALYZE** → see current vsize if you sent everything today  
 4. Check/uncheck UTXOs → **watch Privacy Score drop and CIOH warnings appear in real time**  
@@ -38,15 +42,24 @@
 Works flawlessly with **every wallet in 2025+**:  
 Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trezor • Specter • Fully Noded • UniSat • OKX • Xverse • Leather • Aqua • Keystone
 
-### v10.5 — The Privacy Score Update
+### v10.6 — BATCH NUCLEAR + OFFLINE MODE
 
-| New in v10.5                          | Status  | Effect                                           |
+| New in v10.6                          | Status  | Effect                                           |
+| ------------------------------------- | ------- | ------------------------------------------------ |
+| **Batch mode**                        | LIVE    | Multiple addresses/xpubs → one analysis → selective prune across sources |
+| **Offline / air-gapped mode**         | LIVE    | Paste raw UTXOs → zero internet → true cold wallet prep |
+| **Selection fingerprint + JSON export**| LIVE    | Audit-friendly snapshot of exact pruned inputs   |
+| Still full Privacy Score + CIOH warnings | LIVE | No compromises — honesty unchanged               |
+| Still live fee oracle + NUCLEAR savings| LIVE    | Fee intelligence unchanged                       |
+
+### v10.5 — The Privacy Score Update (still crushing)
+
+| Feature                               | Status  | Effect                                           |
 | ------------------------------------- | ------- | ------------------------------------------------ |
 | **Privacy Score (0–100)**             | LIVE    | Instant, honest measure of CIOH + merging risk    |
 | **CIOH warnings spelled out**         | LIVE    | "Common Input Ownership Heuristic" explained clearly |
 | **Tiered warnings (Extreme / High / Moderate / Low)** | LIVE | Color-coded, impossible to ignore                 |
 | Privacy Score on final PSBT page      | LIVE    | Last-chance reality check before signing         |
-| Still full fee oracle + NUCLEAR savings| LIVE    | No compromises — fee intelligence unchanged      |
 
 ### v10.4 — The Fee Oracle Update (still crushing)
 
@@ -75,4 +88,4 @@ By quote only — pay for exactly the build you want.
 **Baby Blue Viper:** https://babyblueviper.com
 
 **Prune today. Win forever. • Ω**  
-**babyblueviper & the swarm** • 15 December 2025
+**babyblueviper & the swarm** • 17 December 2025
