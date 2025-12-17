@@ -1451,52 +1451,47 @@ with gr.Blocks(
     # — LOCK-SAFE FEE PRESET FUNCTION —
     # =============================
     def apply_fee_preset_locked(
-        preset: str,
         df_rows,
         enriched_state,
         future_fee_slider,
         thank_you_slider,
         locked,
         current_strategy,
+        preset: str
     ):
         if locked:
-            return gr.update(), gr.update()  # No changes when locked
+            return gr.update(), gr.update()
 
+        # Safely get current slider values
         future_fee = (
-            future_fee_slider.value
-            if hasattr(future_fee_slider, "value")
-            else future_fee_slider
+            future_fee_slider.value if hasattr(future_fee_slider, "value") else int(future_fee_slider or 60)
         )
         thank_you = (
-            thank_you_slider.value
-            if hasattr(thank_you_slider, "value")
-            else thank_you_slider
+            thank_you_slider.value if hasattr(thank_you_slider, "value") else float(thank_you_slider or 0.5)
         )
 
-        future_fee = max(5, min(500, int(future_fee or 60)))
-        thank_you = max(0, min(5, float(thank_you or 0.5)))
+        future_fee = max(5, min(500, future_fee))
+        thank_you = max(0, min(5, thank_you))
 
-        # Fetch live fees with fallback to conservative defaults
+        # Get live fees from mempool.space (with fallback)
         fees = get_live_fees() or {
             "fastestFee": 10,
             "halfHourFee": 6,
             "hourFee": 3,
             "economyFee": 1,
         }
+
         rate_map = {
-            "fastest": fees.get("fastestFee", 10),
-            "half_hour": fees.get("halfHourFee", 6),
-            "hour": fees.get("hourFee", 3),
-            "economy": fees.get("economyFee", 1),
+            "fastest": fees["fastestFee"],
+            "half_hour": fees["halfHourFee"],
+            "hour": fees["hourFee"],
+            "economy": fees["economyFee"],
         }
-        new_rate = rate_map.get(preset, 3)  # Safe default
+    
+        new_rate = rate_map.get(preset, 3)
 
-        new_summary = generate_summary_safe(
-            df_rows, enriched_state, new_rate, future_fee, thank_you, locked
-        )
-        return new_rate, new_summary
-
-
+        # Generate updated summary (now passing ALL required args including current_strategy)
+        banner_html, button_vis, details_html
    
 
     # =================================================================
