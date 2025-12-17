@@ -6,6 +6,9 @@ from typing import List, Tuple, Dict, Any, Optional
 import warnings, logging
 from functools import partial
 import threading
+import hashlib
+import tempfile
+from datetime import datetime
 
 # Logging Setup
 # =========================
@@ -20,6 +23,23 @@ MEMPOOL_API = "https://mempool.space/api"
 BLOCKSTREAM_API = "https://blockstream.info/api/address/{addr}/utxo"
 BITCOINER_API = "https://bitcoiner.live/api/address/{addr}/utxo"
 MIN_KEEP_UTXOS = 1  # minimum UTXOs to keep regardless of strategy
+HEALTH_PRIORITY = {
+    "DUST": 0,
+    "HEAVY": 1,
+    "CAREFUL": 2,
+    "MEDIUM": 3,
+    "MANUAL": 3,     # Neutral position — doesn't push to prune or keep aggressively
+    "OPTIMAL": 4,
+}
+CHECKBOX_COL = 0
+SOURCE_COL   = 1
+TXID_COL     = 2
+VOUT_COL     = 3
+VALUE_COL    = 4
+ADDRESS_COL  = 5
+WEIGHT_COL   = 6
+TYPE_COL     = 7
+HEALTH_COL   = 8
 
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -33,6 +53,73 @@ session.headers.update({
     "Accept": "application/json",
     "Connection": "keep-alive",
 })
+
+
+# ===========================
+# Selection resolver
+# ===========================
+def _resolve_selected(df_rows: List[list], enriched_state: List[dict]) -> List[dict]:
+    """Robust, defensive resolution of selected UTXOs from UI state."""
+    # Build map only from valid UTXOs
+    utxo_map = {
+        (u["txid"], u["vout"]): u
+        for u in enriched_state
+        if isinstance(u, dict) and "txid" in u and "vout" in u
+    }
+
+    selected = []
+    for row in df_rows or []:
+        if not row:
+            continue
+        try:
+            if not row[CHECKBOX_COL]:
+                continue
+            # Be forgiving: convert to str/int if possible
+            txid = str(row[TXID_COL])
+            vout = int(row[VOUT_COL])
+            utxo = utxo_map.get((txid, vout))
+            if utxo:
+                selected.append(utxo)
+        except (IndexError, ValueError, TypeError, KeyError):
+            # Silently skip malformed rows — never crash
+            continue
+
+    return selected
+
+def _selection_snapshot(selected_utxos: List[dict]) -> dict:
+    """
+    Deterministic, audit-friendly snapshot of the current UTXO selection.
+    This is the canonical representation of user intent.
+    """
+    return {
+        "fingerprint": _selection_fingerprint(selected_utxos),
+        "count": len(selected_utxos),
+        "total_value": sum(u["value"] for u in selected_utxos),
+        "utxos": [
+            {
+                "txid": u["txid"],
+                "vout": u["vout"],
+                "value": u["value"],
+                "address": u.get("address"),
+                "script_type": u.get("script_type"),
+                "health": u.get("health"),
+                "source": u.get("source"),
+            }
+            for u in sorted(
+                selected_utxos,
+                key=lambda u: (u["txid"], u["vout"])
+            )
+        ]
+    }
+
+def _selection_fingerprint(selected_utxos: List[dict]) -> str:
+    """Deterministic short hash of selected inputs (sorted txid:vout)."""
+    if not selected_utxos:
+        return "none"
+    keys = sorted((u["txid"], u["vout"]) for u in selected_utxos)
+    data = ":".join(f"{txid}:{vout}" for txid, vout in keys).encode()
+    return hashlib.sha256(data).hexdigest()[:16]
+
 
 # =========================
 # Utility Functions
@@ -128,13 +215,13 @@ def calculate_privacy_score(selected_utxos: List[dict], total_utxos: int) -> int
 def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) -> str:
     if input_count <= 1:
         return ""
-    
+
     if privacy_score <= 30:
         return (
             "<div style='margin-top:14px;padding:14px;background:#440000;border:3px solid #ff3366;border-radius:12px;"
             "box-shadow:0 0 40px rgba(255,51,102,0.9);font-size:1.1rem;'>"
             "<strong style='color:#ff3366;font-size:1.3rem;'>EXTREME CIOH LINKAGE</strong><br>"
-            "<strong>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<strong style='color:#ff6688;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
             "This consolidation strongly proves common ownership of many inputs/addresses.<br>"
             "Privacy significantly reduced. Consider CoinJoin, PayJoin, or silent payments afterward."
             "</div>"
@@ -143,7 +230,7 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         return (
             "<div style='margin-top:12px;padding:12px;background:#331100;border:2px solid #ff8800;border-radius:10px;'>"
             "<strong style='color:#ff9900;'>High CIOH Risk</strong><br>"
-            "<strong>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<strong style='color:#ffaa44;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
             f"Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as yours.<br>"
             "Good fee savings, but real privacy trade-off."
             "</div>"
@@ -152,14 +239,14 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         return (
             "<div style='margin-top:10px;padding:10px;background:#113300;border:1px solid #00ff9d;border-radius:8px;color:#aaffaa;'>"
             "<strong style='color:#00ff9d;'>Moderate CIOH</strong><br>"
-            "<strong>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<strong style='color:#66ffaa;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
             "Some linkage created, but not extreme. Acceptable during low-fee periods."
             "</div>"
         )
     else:
         return (
             "<div style='margin-top:8px;color:#aaffaa;font-size:0.9rem;'>"
-            "Low CIOH impact <strong>(Common Input Ownership Heuristic)</strong> — minimal new linkage."
+            "Low CIOH impact <strong style='color:#00ffdd;'>(Common Input Ownership Heuristic)</strong> — minimal new linkage."
             "</div>"
         )
 
@@ -462,216 +549,171 @@ def scan_xpub(xpub: str, dust: int = 546, gap_limit: int = 20) -> Tuple[List[dic
         return [], f"Error: {str(e)[:120]}"
 
 
-def analyze(addr, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider):
-    # === SAFE INPUT CLAMPING (protects against manual text entry exploits) ===
-    fee_rate = max(1, min(500, int(float(fee_rate_slider or 15))))          # Wider than slider for flexibility, but safe
+def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider, offline_mode, manual_utxo_input):
+    # === SAFE INPUT CLAMPING ===
+    fee_rate = max(1, min(500, int(float(fee_rate_slider or 15))))
     future_fee_rate = max(1, min(1000, int(float(future_fee_slider or 60))))
-    dao_percent = max(0.0, min(10.0, float(dao_slider or 0.5)))             # Allow up to 10% if someone wants crazy donation
-    dust_threshold = max(0, min(10000, int(float(dust_threshold or 546))))  
+    dao_percent = max(0.0, min(10.0, float(dao_slider or 0.5)))
+    dust_threshold = max(0, min(10000, int(float(dust_threshold or 546))))
 
-    addr = (addr or "").strip()
-    if not addr:
-        return (
-            "",
-            [], [], "",
-            gr.update(visible=False),
-            gr.update(visible=False)
-        )
+    all_enriched = []
+    successful_sources = 0
+    info = ""
 
-    # ===============================
-    # FETCH UTXOS (IMPURE BY DESIGN)
-    # ===============================
-    is_xpub = addr[:4] in ("xpub", "ypub", "zpub", "tpub", "upub", "vpub")
+    if offline_mode:
+        if not manual_utxo_input.strip():
+            return "<div style='color:#ff3366;'>No manual UTXOs provided</div>", [], [], "", gr.update(visible=False), gr.update(visible=False)
 
-    if is_xpub:
-        utxos_raw, info = scan_xpub(addr, dust_threshold)
+        for line in manual_utxo_input.strip().splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.split(':')
+            if len(parts) < 3:
+                continue
+            txid, vout_str, value_str = parts[0], parts[1], parts[2]
+            addr = parts[3].strip() if len(parts) >= 4 else "unknown (manual)"
+            try:
+                vout = int(vout_str)
+                value = int(value_str)
+                if value <= dust_threshold:
+                    continue
+
+                # Estimate weight (fallback if no address)
+                spk, meta = address_to_script_pubkey(addr)
+                input_wu = meta["input_vb"] * 4
+
+                enriched = {
+                    "txid": txid,
+                    "vout": vout,
+                    "value": value,
+                    "address": addr,
+                    "input_weight": input_wu,
+                    "health": "MANUAL",           # Fixed: only once
+                    "recommend": "REVIEW",        # Fixed: only once
+                    "script_type": meta["type"] if addr != "unknown (manual)" else "Unknown",
+                    "source": "Manual Offline",
+                }
+                all_enriched.append(enriched)
+            except Exception:
+                continue
+
+        if not all_enriched:
+            return "<div style='color:#ff3366;'>No valid UTXOs parsed</div>", [], [], "", gr.update(visible=False), gr.update(visible=False)
+
+        info = f"Offline manual mode • No API calls • {len(all_enriched):,} UTXOs loaded"
+        successful_sources = 1
+
     else:
-        utxos_raw = get_utxos(addr, dust_threshold)
-        info = (
-            f"Single address • {len(utxos_raw)} UTXOs"
-            if utxos_raw
-            else "No UTXOs"
-        )
+        # Online batch/single mode
+        entries = [e.strip() for e in addr_input.strip().splitlines() if e.strip()]
+        if not entries:
+            return "<div style='color:#ff3366;'>No addresses provided</div>", [], [], "", gr.update(visible=False), gr.update(visible=False)
 
-    if not utxos_raw:
-        return (
-            f"<div style='color:#ff3366;'>No UTXOs above {dust_threshold} sats</div>",
-            [], [], "",
-            gr.update(visible=False),
-            gr.update(visible=False)
-        )
+        for entry in entries:
+            is_xpub = entry[:4] in ("xpub", "ypub", "zpub", "tpub", "upub", "vpub")
+            source_label = f"xpub ({entry[:12]}...{entry[-6:]})" if is_xpub else (entry if len(entry) <= 34 else f"{entry[:31]}...")
+
+            if is_xpub:
+                utxos_raw, _ = scan_xpub(entry, dust_threshold)
+            else:
+                utxos_raw = get_utxos(entry, dust_threshold)
+
+            if not utxos_raw:
+                continue
+
+            successful_sources += 1
+
+            for u in utxos_raw:
+                _, meta = address_to_script_pubkey(u["address"])
+                input_wu = meta["input_vb"] * 4
+                value = u["value"]
+
+                # Same health logic as above
+                if input_wu <= 228:
+                    script_type = "Taproot"
+                    health, recommend = "OPTIMAL", "KEEP"
+                elif input_wu <= 272:
+                    script_type = "Native SegWit"
+                    health, recommend = "OPTIMAL", "KEEP"
+                elif input_wu <= 364:
+                    script_type = "Nested SegWit"
+                    health, recommend = "MEDIUM", "OPTIONAL"
+                else:
+                    script_type = "Legacy"
+                    health, recommend = "HEAVY", "PRUNE"
+
+                if value < 10_000:
+                    health, recommend = "DUST", "PRUNE"
+                if value > 100_000_000 and script_type in ("Nested SegWit", "Legacy"):
+                    health, recommend = "CAREFUL", "OPTIONAL"
+
+                enriched = {
+                    **u,
+                    "input_weight": input_wu,
+                    "health": health,
+                    "recommend": recommend,
+                    "script_type": script_type,
+                    "source": source_label,
+                }
+                all_enriched.append(enriched)
+
+        if not all_enriched:
+            return f"No UTXOs found across {len(entries)} source(s)", [], [], "", gr.update(visible=False), gr.update(visible=False)
+
+        info = f"Batch mode • {successful_sources} sources • {len(all_enriched):,} UTXOs loaded" if successful_sources > 1 else f"Single source • {len(all_enriched):,} UTXOs"
 
     # ===============================
-    # CANONICAL ORDERING (DETERMINISM)
+    # CANONICAL ORDERING & PRUNING LOGIC
     # ===============================
-    utxos = sorted(
-        utxos_raw,
-        key=lambda u: (u["value"], u["txid"], u["vout"]),
-        reverse=True,
-    )
+    # Sort all enriched by value (largest first) for determinism
+    all_enriched.sort(key=lambda u: (u["value"], u["txid"], u["vout"]), reverse=True)
 
-    # ===============================
-    # PRE-PRUNE VSIZE ESTIMATE
-    # ===============================
-    all_input_weight = sum(
-        address_to_script_pubkey(u["address"])[1]["input_vb"] * 4
-        for u in utxos
-    )
-
+    # Pre-prune vsize estimate
+    all_input_weight = sum(u["input_weight"] for u in all_enriched)
     pre_vsize = max(
-        (all_input_weight + 43 * 4 + 31 * 4 + 10 * 4 + len(utxos)) // 4 + 10,
-        (all_input_weight + 150 + len(utxos) * 60) // 4,
+        (all_input_weight + 43*4 + 31*4 + 10*4 + len(all_enriched)) // 4 + 10,
+        (all_input_weight + 150 + len(all_enriched) * 60) // 4,
     )
 
-    # ===============================
-    # STRATEGY → PRUNE RATIO
-    # ===============================
-    PRUNE_RATIO = {
-        "Privacy First (30% pruned)": 0.30,
-        "Recommended (40% pruned)": 0.40,
-        "More Savings (50% pruned)": 0.50,
-        "NUCLEAR PRUNE (90% sacrificed)": 0.90,
-    }
+    # Pruning strategy
+    ratio = {
+        "Privacy First — ~30% pruned (lowest CIOH risk)": 0.30,
+        "Recommended — ~40% pruned (balanced savings & privacy)": 0.40,
+        "More Savings — ~50% pruned (stronger fee reduction)": 0.50,
+        "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)": 0.90,
+    }.get(strategy, 0.40)
+    keep_count = max(MIN_KEEP_UTXOS, int(len(all_enriched) * (1 - ratio)))
 
-    ratio = PRUNE_RATIO.get(strategy, 0.40)
+    # Sort by health: worst first (so worst appear at the top of the table)
+    enriched_sorted = sorted(all_enriched, key=lambda u: HEALTH_PRIORITY[u["health"]])
 
-    raw_keep = int(len(utxos) * (1 - ratio))
-    keep_count = min(
-        len(utxos),
-        max(MIN_KEEP_UTXOS, raw_keep)
-    )
+    # Number of UTXOs to pre-select for pruning (the worst ones)
+    prune_count = len(enriched_sorted) - keep_count
 
-    # ===============================
-    # HEALTH MODEL (PURE LOGIC)
-    # ===============================
-    HEALTH_PRIORITY = {
-        "DUST": 0,
-        "HEAVY": 1,
-        "CAREFUL": 2,
-        "MEDIUM": 3,
-        "OPTIMAL": 4,
-    }
-
-    enriched = []
-
-    for u in utxos:
-        _, meta = address_to_script_pubkey(u["address"])
-        input_wu = meta["input_vb"] * 4
-        value = u["value"]
-
-        # Script classification (heuristic)
-        if input_wu <= 228:
-            script_type = "Taproot"
-        elif input_wu <= 272:
-            script_type = "Native SegWit"
-        elif input_wu <= 364:
-            script_type = "Nested SegWit"
-        else:
-            script_type = "Legacy"
-
-        # Health decision tree — RELATIVE to actual script type
-        if script_type == "Taproot":          # 228 wu
-            health, recommend = "OPTIMAL", "KEEP"
-        elif script_type == "Native SegWit":  # 272 wu
-            health, recommend = "OPTIMAL", "KEEP"
-        elif script_type == "Nested SegWit":  # 364 wu
-            health, recommend = "MEDIUM", "OPTIONAL"
-        else:  # Legacy (592 wu) or unknown
-            health, recommend = "HEAVY", "PRUNE"
-
-        # Additional dust override (applies to all types)
-        if value < 10_000:
-            health, recommend = "DUST", "PRUNE"
-
-        # After the main classification
-        if value > 100_000_000 and script_type in ("Nested SegWit", "Legacy"):
-            health, recommend = "CAREFUL", "OPTIONAL"
-
-        enriched.append({
-            **u,
-            "input_weight": input_wu,
-            "health": health,
-            "recommend": recommend,
-            "script_type": script_type,
-        })
-
-    # ===============================
-    # SORT BY HEALTH (WORST FIRST)
-    # ===============================
-    enriched.sort(key=lambda u: HEALTH_PRIORITY[u["health"]], reverse=True)
-
-    # ===============================
-    # BUILD DATAFRAME (UI PROJECTION)
-    # ===============================
+    # Build dataframe rows
     df_rows = []
-
-    for idx, u in enumerate(enriched):
-        is_prune = idx >= keep_count
-
-        # Health styling — beautiful colored badge with recommendation
-        health_html = (
-            f'<div class="health health-{u["health"].lower()}">'
-            f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
-         )
-
-        # Type column — only the script type (no weight, since it's already shown)
-        type_text = u['script_type']   # e.g., "Taproot", "Native SegWit", "Legacy"
-
+    for idx, u in enumerate(enriched_sorted):
+        # Pre-check the first prune_count rows (the worst health)
+        is_prune = idx < prune_count
+        health_html = f'<div class="health health-{u["health"].lower()}">{u["health"]}<br><small>{u["recommend"]}</small></div>'
         df_rows.append([
-            is_prune,          # PRUNE checkbox
-            u["txid"],         # TXID
-            u["vout"],         # vout
-            u["value"],        # Value (sats)
-            u["address"],      # Address
-            u["input_weight"], # Weight (wu)
-            type_text,         # Type column (script type only)
-            health_html,       # Health column (last)
+            is_prune,
+            u.get("source", "Single"),
+            u["txid"],
+            u["vout"],
+            u["value"],
+            u["address"],
+            u["input_weight"],
+            u["script_type"],
+            health_html,
         ])
 
-    # ===============================
-    # BANNER
-    # ===============================
-    status = f"""
-<div style="text-align:center;margin:30px 0;padding:20px;background:#000;
-            border:3px solid #f7931a;border-radius:16px;
-           box-shadow:0 0 60px rgba(247,147,26,0.6);">
-  <div style="color:#0f0;font-size:2.4rem;font-weight:900;
-              letter-spacing:2px;text-shadow:0 0 30px #0f0;">
-    ANALYSIS COMPLETE
-  </div>
-  <div style="color:#f7931a;font-size:1.8rem;font-weight:900;
-              margin:12px 0;letter-spacing:1px;
-              text-shadow:0 0 25px #f7931a;">
-    FOUND <span style="color:#0f0;text-shadow:0 0 30px #0f0;">
-    {len(utxos):,}</span> UTXOs
-  </div>
-  <div style="color:#fff;font-size:1.3rem;font-weight:700;opacity:0.9;">
-    Current tx size if sent today:
-    <span style="color:#ff6600;font-weight:800;">
-    {pre_vsize:,}</span> vB
-  </div>
-  <div style="color:#0f8;font-size:1.1rem;margin-top:8px;opacity:0.88;">
-    {info}
-  </div>
-</div>
-"""
 
-    summary_html = generate_summary(
-        df_rows,
-        enriched,
-        fee_rate,
-        future_fee_rate,
-        dao_percent,
-    )
 
-    return (
-        status,
-        df_rows,
-        enriched,
-        summary_html,
-        gr.update(visible=True),
-        gr.update(visible=True),
-    )
+    summary_html = generate_summary(df_rows, enriched_sorted, fee_rate, future_fee_rate, dao_percent)
+
+    return "", gr.update(value=df_rows), enriched_sorted, summary_html, gr.update(visible=True), gr.update(visible=True)
     
 def generate_summary(
     df_rows: List[list],
@@ -679,164 +721,166 @@ def generate_summary(
     fee_rate: int = 15,
     future_fee_rate: int = 60,
     dao_percent: float = 0.5,
-) -> str:
-    # Resolve selected UTXOs deterministically from dataframe
-    selected_utxos = [
-        u
-        for row in df_rows
-        if row and len(row) >= 5 and row[0]  # checkbox checked
-        for u in enriched_state
-        if u["txid"] == row[1] and u["vout"] == row[2]
-    ]
+    current_strategy: str = "Recommended — ~40% pruned (balanced savings & privacy)",
+) -> Tuple[str, gr.update, str]:
 
+    total_utxos = len(enriched_state)
+
+    # === CRITICAL GUARD: No UTXOs loaded yet (pre-ANALYZE state) ===
+    if total_utxos == 0:
+        return "", gr.update(visible=False), ""
+
+    # === Resolve current selection ===
+    selected_utxos = _resolve_selected(df_rows, enriched_state)
+    pruned_count = len(selected_utxos)
+
+    # === Privacy score ===
+    privacy_score = (
+        calculate_privacy_score(selected_utxos, total_utxos)
+        if selected_utxos else 100
+    )
+    score_color = (
+        "#0f0" if privacy_score >= 70
+        else "#ff9900" if privacy_score >= 40
+        else "#ff3366"
+    )
+
+    # === Banner — always built when UTXOs exist ===
+    banner_html = f"""
+    <div style="text-align:center;margin:30px 0;padding:20px;background:#000;
+                border:3px solid #f7931a;border-radius:16px;
+                box-shadow:0 0 60px rgba(247,147,26,0.6);">
+      <div style="color:#0f0;font-size:2.4rem;font-weight:900;
+                  letter-spacing:2px;text-shadow:0 0 30px #0f0;">
+        READY TO PRUNE
+      </div>
+      <div style="color:#f7931a;font-size:1.8rem;font-weight:900;margin:16px 0;">
+        {total_utxos:,} UTXOs • Strategy:
+        <span style="color:#00ff9d;">{current_strategy}</span>
+      </div>
+      <div style="color:#fff;font-size:1.4rem;font-weight:700;">
+        Will prune <span style="color:#ff6600;font-weight:800;">
+        {pruned_count:,}</span> inputs
+      </div>
+      <div style="color:#fff;font-size:1.6rem;font-weight:800;margin:20px 0;">
+        Privacy Score:
+        <span style="color:{score_color};
+                     text-shadow:0 0 20px {score_color};">
+            {privacy_score}/100
+        </span>
+      </div>
+    </div>
+    """
+
+    # === Button visibility — single source of truth ===
+    button_visibility = gr.update(visible=bool(selected_utxos))
+
+    # === Case: UTXOs loaded, but none selected yet ===
     if not selected_utxos:
         return (
-            "<div style='color:#868686;font-size:0.96rem;text-align:center;"
-            "text-shadow:0 0 10px rgba(0,255,0,0.4);'>"
-            "No UTXOs selected for pruning."
+            banner_html,
+            button_visibility,  # False
+            "<div style='text-align:center;margin:60px 0;color:#888;font-size:1.1rem;'>"
+            "No UTXOs selected yet — check the boxes in the table to begin pruning"
             "</div>"
         )
 
-    distinct_addrs = len(set(u["address"] for u in selected_utxos))
-    privacy_score = calculate_privacy_score(selected_utxos, len(enriched_state))
-    cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
-    score_color = "#0f0" if privacy_score >= 70 else "#ff9900" if privacy_score >= 40 else "#ff3366"
+    # === Economics calculation ===
+    try:
+        econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
+    except ValueError:
+        # Shouldn't happen with valid selection, but safety
+        return banner_html, gr.update(visible=False), ""
 
-    econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
-
-    input_weight = sum(u["input_weight"] for u in selected_utxos)
-
+    # === Invalid transaction (fee too high) ===
     if econ.remaining <= 0:
-        return (
+        invalid_html = (
             "<div style='text-align:center;margin:20px;padding:20px;background:#330000;"
-            "border:2px solid #ff3366;border-radius:14px;"
-            "box-shadow:0 0 40px rgba(255,51,102,0.6);'>"
-            "<div style='color:#ff3366;font-size:1.25rem;font-weight:700;'>"
-            "Transaction Invalid"
-            "</div>"
+            "border:2px solid #ff3366;border-radius:14px;box-shadow:0 0 40px rgba(255,51,102,0.6);'>"
+            "<div style='color:#ff3366;font-size:1.25rem;font-weight:700;'>Transaction Invalid</div>"
             "<div style='color:#fff;margin-top:12px;line-height:1.7;'>"
             "Fee exceeds available balance after pruning.<br>"
             "<strong style='color:#ff9966;'>Reduce fee rate</strong> or "
             "<strong style='color:#ff9966;'>select more UTXOs</strong>."
-            "</div>"
-            "</div>"
+            "</div></div>"
         )
+        return banner_html, gr.update(visible=False), invalid_html
 
-    # Pre-prune vsize (full wallet)
+    # === Size & savings calculations ===
+    input_weight = sum(u["input_weight"] for u in selected_utxos)
     all_input_weight = sum(u["input_weight"] for u in enriched_state)
+
     pre_vsize = max(
-        (all_input_weight + 43 * 4 + 31 * 4 + 10 * 4 + len(enriched_state)) // 4 + 10,
-        (all_input_weight + 150 + len(enriched_state) * 60) // 4,
+        (all_input_weight + 172 + total_utxos) // 4 + 10,  # more accurate base
+        (all_input_weight + 150 + total_utxos * 60) // 4 + 10,
     )
 
-    savings_pct = round(100 * (1 - econ.vsize / pre_vsize), 1) if pre_vsize > 0 else 0
+    savings_pct = round(100 * (1 - econ.vsize / pre_vsize), 1) if pre_vsize > econ.vsize else 0
     savings_pct = max(0, min(100, savings_pct))
 
-    # Savings badge
-    if savings_pct >= 70:
-        savings_color, savings_label = "#0f0", "NUCLEAR"
-    elif savings_pct >= 50:
-        savings_color, savings_label = "#00ff9d", "EXCELLENT"
-    elif savings_pct >= 30:
-        savings_color, savings_label = "#ff9900", "GOOD"
-    else:
-        savings_color, savings_label = "#ff3366", "WEAK"
+    savings_color = "#0f0" if savings_pct >= 70 else "#00ff9d" if savings_pct >= 50 else "#ff9900" if savings_pct >= 30 else "#ff3366"
+    savings_label = "NUCLEAR" if savings_pct >= 70 else "EXCELLENT" if savings_pct >= 50 else "GOOD" if savings_pct >= 30 else "WEAK"
 
-    # Sats saved by pruning now
-    sats_saved_by_pruning_now = max(0, econ.vsize * future_fee_rate - econ.vsize * fee_rate)
-
-    # Selection-specific privacy warning
-    bad_selected = [u for u in selected_utxos if u.get("health") in ("DUST", "HEAVY")]
-    bad_ratio = len(bad_selected) / len(selected_utxos) if selected_utxos else 0
-
-    extra_warning = ""
-    if bad_ratio > 0.8:
-        extra_warning = (
-            "<div class='warning' style='margin-top:12px;color:#ae2029;font-weight:900;'>"
-            "CAUTION: This prune heavily consolidates dusty/heavy inputs — strong fee savings.<br>"
-            "Consider CoinJoin afterward to restore privacy."
-            "</div>"
-        )
-    elif bad_ratio > 0.6:
-        extra_warning = (
-            "<div class='warning' style='margin-top:12px;color:#fcf75e;'>"
-            "High proportion of dusty/heavy inputs selected — good savings, real privacy trade-off."
-            "</div>"
-        )
-
-    # Savings text for future fee comparison
+    # === Future savings ===
+    sats_saved = max(0, econ.vsize * (future_fee_rate - fee_rate))
     savings_text = ""
-    if sats_saved_by_pruning_now >= 100_000:
+    if sats_saved >= 100_000:
         savings_text = (
-            f"<span style='color:#0f0;font-size:1.18rem;font-weight:800;"
-            f"text-shadow:0 0 20px #0f0;'>+{sats_saved_by_pruning_now:,} sats saved</span> "
-            f"<span style='color:#0f0;font-weight:800;letter-spacing:3px;"
-            f"text-shadow:0 0 30px #0f0;text-transform:uppercase;'>NUCLEAR MOVE</span>"
+            f"<span style='color:#0f0;font-size:1.18rem;font-weight:800;text-shadow:0 0 20px #0f0;'>"
+            f"+{sats_saved:,} sats saved</span> "
+            f"<span style='color:#0f0;font-weight:800;letter-spacing:3px;text-transform:uppercase;"
+            f"text-shadow:0 0 30px #0f0;'>NUCLEAR MOVE</span>"
         )
-    elif sats_saved_by_pruning_now > 0:
-        savings_text = f"<span style='color:#0f0;font-weight:800;'>+{sats_saved_by_pruning_now:,} sats saved</span>"
+    elif sats_saved > 0:
+        savings_text = f"<span style='color:#0f0;font-weight:800;'>+{sats_saved:,} sats saved</span>"
 
-    return f"""
+    # === Privacy warnings ===
+    distinct_addrs = len({u["address"] for u in selected_utxos})
+    cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
+
+    bad_ratio = len([u for u in selected_utxos if u.get("health") in ("DUST", "HEAVY")]) / len(selected_utxos)
+    extra_warning = (
+        "<div style='margin-top:12px;color:#ae2029;font-weight:900;'>"
+        "CAUTION: Heavy consolidation — strong fee savings.<br>"
+        "Consider CoinJoin afterward.</div>"
+        if bad_ratio > 0.8 else
+        "<div style='margin-top:12px;color:#fcf75e;'>"
+        "High dusty/heavy ratio — good savings, privacy trade-off.</div>"
+        if bad_ratio > 0.6 else ""
+    )
+
+    # === Final details block ===
+    details_html = f"""
     <div style='text-align:center;margin:10px;padding:14px;background:#111;
-                border:2px solid #f7931a;border-radius:14px;max-width:95%;
+                border:2px solid #f7931a;border-radius:14px;max-width:100%;
                 font-size:1rem;line-height:2.1;'>
-      <span style='color:#fff;font-weight:600;'>Selected Inputs:</span> 
-      <span style='color:#0f0;font-weight:800;'>{len(selected_utxos):,}</span><br>
-
-      <span style='color:#fff;font-weight:600;'>Total Value Pruned:</span> 
-      <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.total_in)}</span><br>
-
-      <span style='color:#fff;font-weight:600;'>Selected Input Weight:</span> 
-        <span style='color:#0f0;font-weight:800;'>{input_weight:,} wu ({input_weight//4:,} vB)</span><br>
-
-      <span style='color:#fff;font-weight:600;'>Pre-prune tx size:</span> 
-      <span style='color:#888;font-weight:700;'>{pre_vsize:,} vB</span><br>
-
-      <span style='color:#fff;font-weight:600;'>Post-prune tx size:</span> 
+      <b style='color:#fff;'>Selected Inputs:</b> <span style='color:#0f0;font-weight:800;'>{len(selected_utxos):,}</span><br>
+      <b style='color:#fff;'>Total Value Pruned:</b> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.total_in)}</span><br>
+      <b style='color:#fff;'>Post-prune tx size:</b> 
       <span style='color:#0f0;font-weight:800;'>{econ.vsize:,} vB</span>
-      <span style='color:{savings_color};font-weight:800;
-                   text-shadow:0 0 20px {savings_color}, 0 0 40px {savings_color};'>
+      <span style='color:{savings_color};font-weight:800;text-shadow:0 0 20px {savings_color};'>
         {' ' + savings_label} (-{savings_pct}%)
       </span><br>
-        <small style='color:#ffaa55;font-size:0.85rem;opacity:0.9;'>Pre-prune = all UTXOs • Post-prune = selected for pruning</small><br>
-      {f"<span style='color:#fff;font-weight:600;'>Sats saved by pruning at today's fees →</span> {savings_text}<br>" if savings_text else ""}
-
-      <small style='color:#ffaa55;font-size:0.85rem;opacity:0.9;'>
-      Savings based on future fee of {future_fee_rate} s/vB
-    </small><br>
-      
-      <span style='color:#fff;font-weight:600;'> Current Fee:</span> 
-      <span style='color:#0f0;font-weight:800;'>{econ.fee:,} sats</span> 
-      <strong style='color:#0f0;'> @ {fee_rate} s/vB</strong><br>
-
-    <span style='color:#fff;font-weight:600;'>Privacy Score:</span> 
-    <span style='color:{score_color};font-weight:800;font-size:1.6rem;text-shadow:0 0 20px {score_color};'>
-    {privacy_score}/100
-    </span>
-    <small style='color:#bbb;display:block;margin:4px 0 8px;'>
-    Accounts for CIOH strength, address merging, and wealth reveal
-    </small>
-    {cioh_warning}
-    <br>
-
-      <span style='color:#fff;font-weight:600;'>Change:</span> 
-      <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.change_amt)}</span>
-      {f" <span style='color:#ff6600;font-size:0.9rem;'>(dust — absorbed into fee)</span>" 
-       if econ.change_amt == 0 and econ.remaining > 0 else ""}<br>
-
-      {f"• <span style='color:#ff6600;'>DAO:</span> "
-       f"<span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.dao_amt)}</span>" 
-       if econ.dao_amt >= 546 else ""}
-      {extra_warning}
+      {f"<b style='color:#fff;'>Sats saved →</b> {savings_text}<br>" if savings_text else ""}
+      <b style='color:#fff;'>Fee:</b> 
+      <span style='color:#0f0;font-weight:800;'>{econ.fee:,} sats @ {fee_rate} s/vB</span><br>
+      <b style='color:#fff;'>Privacy Score:</b> 
+      <span style='color:{score_color};font-weight:800;font-size:1.6rem;text-shadow:0 0 20px {score_color};'>
+        {privacy_score}/100
+      </span>
+      <div style='margin-top:12px;'>{cioh_warning}</div>
+      <div style='margin-top:6px;'>{extra_warning}</div>
     </div>
     """
 
+    # === Single return point ===
+    return banner_html, button_visibility, details_html
 
-def generate_summary_safe(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, locked):
+
+def generate_summary_safe(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, locked, current_strategy):
     if locked:
-        return gr.update()   # do nothing — frozen in time
-
-    return generate_summary(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent)
+        return None, None, None
+    return generate_summary(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, current_strategy)
 
 
 def generate_psbt(
@@ -848,19 +892,32 @@ def generate_psbt(
     enriched_state: list
 ):
     if not df_rows or not enriched_state:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Run Analyze first.</div>", gr.update(), gr.update(), ""
+        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Run Analyze first.</div>", gr.update(), gr.update(), "",gr.update(visible=False), gr.update(visible=False), None, []   
 
     # === SAFELY EXTRACT SELECTED UTXOs ===
-    selected_utxos = [
-        u
-        for row in df_rows
-        if row and len(row) >= 5 and row[0]  # checkbox checked
-        for u in enriched_state
-        if u["txid"] == row[1] and u["vout"] == row[2]
-    ]
+    selected_utxos = _resolve_selected(df_rows, enriched_state)
+    snapshot = _selection_snapshot(selected_utxos)
+    fingerprint = snapshot["fingerprint"]  # for display
+
+    # === CREATE TEMP JSON FILE FOR DOWNLOAD ===
+    json_str = json.dumps(snapshot, indent=2, ensure_ascii=False)
+    date_str = datetime.now().strftime("%Y%m%d")
+
+    prefix = f"omega_selection_{date_str}_{fingerprint[:8]}_" if fingerprint != "none" else f"omega_selection_{date_str}_"
+    tmp_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        suffix=".json",
+        prefix=prefix,
+        delete=False
+    )
+    tmp_file.write(json_str)
+    tmp_file.close()
+    json_filepath = tmp_file.name
+
 
     if not selected_utxos:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>No UTXOs selected for pruning!</div>", gr.update(), gr.update(), ""
+        return "<div style='color:#ff3366; text-align:center; padding:30px;'>No UTXOs selected for pruning!</div>", gr.update(), gr.update(), "",gr.update(visible=False), gr.update(visible=False), None, []    
 
     distinct_addrs = len(set(u["address"] for u in selected_utxos))
     privacy_score = calculate_privacy_score(selected_utxos, len(enriched_state))
@@ -872,7 +929,7 @@ def generate_psbt(
     try:
         econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
     except ValueError:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Invalid selection.</div>", gr.update(), gr.update(), ""
+        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Invalid selection.</div>", gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []    
 
     # Unpack for readability and UI
     total_in = econ.total_in
@@ -903,9 +960,17 @@ def generate_psbt(
     sats_saved_by_pruning_now = max(0, vsize * future_fee_rate - vsize * fee_rate)
 
     # === DESTINATION ADDRESS VALIDATION ===
-    dest = (dest_addr or "").strip() or selected_utxos[0]["address"]
-    if not dest.startswith(("1", "3", "bc1")):
-        return "<div style='color:#ff3366;text-align:center;'>Invalid destination address.</div>", gr.update(), gr.update(), ""
+    dest = (dest_addr or "").strip()
+    if not dest:
+        dest = selected_utxos[0]["address"]  # fallback
+
+    try:
+        dest_spk, _ = address_to_script_pubkey(dest)
+    except Exception:
+        return (
+            "<div style='color:#ff3366;text-align:center;padding:30px;'>Invalid or unsupported destination address.</div>",
+            gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
+        )                      
 
     dest_spk, _ = address_to_script_pubkey(dest)
     dao_spk, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
@@ -953,10 +1018,19 @@ def generate_psbt(
             If QR fails → tap <strong>COPY PSBT</strong> and paste directly.
         </div>
         """
-
-    # === FINAL NUCLEAR RESULT PAGE ===
+    
+     # OUTPUT CONTRACT (do not reorder without updating all .click() chains)
+    # 0: html_out              → full PSBT + QR + summary UI
+    # 1: gen_btn               → hide generate button (prevent re-click)
+    # 2: generate_row          → hide the row
+    # 3: summary               → clear old summary
+    # 4: export_title_row      → show download title
+    # 5: export_file_row       → show file download
+    # 6: export_file           → tempfile path
+    # 7: selection_snapshot_state → full snapshot dict for audit
+    
     return f"""
-   <div style="text-align:center;margin:80px auto;max-width:960px;">
+    <div style="text-align:center;margin:60px auto 0px;max-width:960px;">
     <div style="display:inline-block;padding:55px;background:#000;border:14px solid #f7931a;border-radius:36px;
                 box-shadow:0 0 140px rgba(247,147,26,0.95);
                 background:radial-gradient(circle at center,#0a0a0a 0%,#000 100%);">
@@ -969,6 +1043,22 @@ def generate_psbt(
                 RAW UNSIGNED TRANSACTION
             </button>
         </div>
+        <div style="margin:40px 0;padding:16px;background:#001100;border:2px solid #0f0;border-radius:12px;
+            box-shadow:0 0 40px rgba(0,255,0,0.6);font-family:monospace;">
+    <strong style="color:#0f0;font-size:1.1rem;">SELECTION FINGERPRINT</strong><br>
+<span style="color:#00ff9d;font-size:1.6rem;letter-spacing:4px;font-family:monospace;">{fingerprint.upper()}</span><br>
+<small style="color:#aaa;">Locked inputs • Verify this matches any exported selection</small>
+</div>
+<div style='text-align:center;margin:40px 0;padding:20px;background:#001133;border:3px solid #4488ff;border-radius:16px;
+            box-shadow:0 0 50px rgba(68,136,255,0.5);'>
+    <strong style='color:#44ccff;font-size:1.4rem;font-weight:800;text-shadow:0 0 15px #4488ff;'>
+        🧊 Frozen Selection Snapshot (JSON)
+    </strong><br><br>
+    <span style='color:#aaddff;font-size:1.1rem;'>
+        Your exact pruned inputs are locked below.<br>
+        Download for backup, audit, or future verification.
+    </span>
+</div>
 
         <div style="margin:0 auto 40px;width:520px;max-width:96vw;padding:20px;background:#000;
                     border:8px solid #0f0;border-radius:24px;box-shadow:0 0 60px #0f0,inset 0 0 40px #0f0;">
@@ -1016,20 +1106,16 @@ def generate_psbt(
             <span style='color:#0f0;font-weight:800;'>{fee:,} sats</span> 
             <span style='color:#0f0;font-weight:600;'>@</span> 
             <strong style='color:#0f0;font-weight:800;'>{fee_rate} s/vB</strong><br>
-            <br>
             <span style='color:#fff;font-weight:600;'>Privacy Score:</span> 
             <span style='color:{score_color};font-weight:800;font-size:1.6rem;text-shadow:0 0 20px {score_color};'>
                 {privacy_score}/100
             </span>
-            <br><br>
-            {cioh_warning}
-            <br>
+              <div style="margin-top:12px; margin-bottom:12px;">{cioh_warning}</div>
             <span style='color:#fff;font-weight:600;'>Change:</span> 
             <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
             {f" <span style='color:#ff6600;'>(dust absorbed)</span>" if change_amt == 0 and econ.remaining > 0 else ""}
 
             {f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>" if dao_amt >= 546 else ""}
-        <br>
         <br>
         </div>
 
@@ -1071,17 +1157,18 @@ def generate_psbt(
 
     </div>
     </div>
-    """, gr.update(visible=False), gr.update(visible=False), ""
+            """, gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=True), gr.update(visible=True), json_filepath, snapshot
+
 # --------------------------
 # Gradio UI
 # --------------------------
 
 with gr.Blocks(
-    title="Ωmega Pruner v10.5 — PRIVACY SCORE + FEE ORACLE"
+    title="Ωmega Prunerv10.6 — BATCH NUCLEAR + OFFLINE MODE"
 ) as demo:
     # NUCLEAR SOCIAL PREVIEW — THIS IS ALL YOU NEED NOW
     gr.HTML("""
-    <meta property="og:title" content="Ωmega Pruner v10.5 — PRIVACY SCORE + FEE ORACLE">
+    <meta property="og:title" content="Ωmega Pruner v10.6 — BATCH NUCLEAR + OFFLINE MODE">
     <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
     <meta property="og:image" content="https://omega-pruner.onrender.com/docs/omega_thumbnail.png">
     <meta property="og:image:width" content="1200">
@@ -1093,7 +1180,7 @@ with gr.Blocks(
 
     # Ωmega Background and Floating Banner
     gr.HTML("""
-    <!-- Ωmega Background — full-screen animated Ω -->
+   <!-- Ωmega Background — full-screen animated Ω -->
     <div id="omega-bg" style="
         position: fixed;
         inset: 0;
@@ -1129,39 +1216,72 @@ with gr.Blocks(
         </span>
     </div>
 
-    <!-- Floating Banner -->
-    <div id="banner-glow" style="text-align: center; margin: 40px 0; position: relative; z-index: 1;">
-        <h1 id="headline" style="
-            color: #f7931a;
-            font-size: 3rem;
-            font-weight: 900;
-            letter-spacing: 2px;
-            text-shadow: 0 0 20px #f7931a;
-            animation: headline-glow 2s infinite alternate;
-            display: inline-block;
-        ">
-            N U C L E A R  &nbsp; C O I N  &nbsp; C O N T R O L
-        </h1>
-        <p id="subtitle" style="
-            color: #0f0;
-            font-size: 1.3rem;
-            font-weight: 900;
-            letter-spacing: 0.6px;
-            text-shadow: 
-                0 0 12px #0f0,
-                0 0 24px #0f0,
-                0 0 40px #0f0,
-                0 2px 6px #000,
-                0 6px 16px #000000cc,
-                0 12px 32px #000000e6;
-            animation: subtitle-glow 2s infinite alternate;
-            margin-top: 12px;
-        ">
-            Prune dust. Consolidate UTXOs. Save money.
-        </p>
+    <!-- Hero Welcome Banner — Semi-Transparent for Ω Visibility -->
+    <div style="text-align:center;margin:100px 0 60px 0;padding:60px 40px;
+                background:rgba(0,0,0,0.58);  /* ← Key: semi-transparent black */
+                backdrop-filter: blur(8px);    /* Optional: subtle blur for depth */
+                border:8px solid #f7931a;
+                border-radius:32px;
+                box-shadow:
+                    0 0 100px rgba(247,147,26,0.5),
+                    inset 0 0 80px rgba(247,147,26,0.1);
+                max-width:900px;margin-left:auto;margin-right:auto;
+                position:relative;z-index:1;">
+        
+        <div style="color:#f7931a;
+                    font-size:4.8rem;
+                    font-weight:900;
+                    letter-spacing:12px;
+                    text-shadow:
+                        0 0 40px #f7931a,
+                        0 0 80px #ffaa00,
+                        0 0 120px rgba(247,147,26,0.9);
+                    margin-bottom:30px;">
+            ΩMEGA PRUNER
+        </div>
+        
+        <div style="color:#0f0;
+                    font-size:2.2rem;
+                    font-weight:900;
+                    letter-spacing:4px;
+                    text-shadow:0 0 30px #0f0, 0 0 60px #0f0;
+                    margin:40px 0;">
+            NUCLEAR COIN CONTROL
+        </div>
+        
+    <div style="color:#ddd;
+            font-size:1.5rem;
+            line-height:1.8;
+            max-width:760px;
+            margin:0 auto 50px auto;">
+    Pruning isn't just about saving sats today — it's about <strong style="color:#0f0;">taking control</strong> of your coins for the long term.<br><br>
+    
+    By consolidating inefficient UTXOs, you:<br>
+    • <strong style="color:#00ff9d;">Save significantly on fees</strong> when the network gets busy<br>
+    • <strong style="color:#00ff9d;">Gain real coin control</strong> — know exactly what you're spending<br>
+    • <strong style="color:#00ff9d;">Improve privacy</strong> when done thoughtfully<br>
+    • <strong style="color:#00ff9d;">Future-proof your stack</strong> — stay spendable no matter what<br><br>
+
+    <strong style="color:#f7931a;font-size:1.8rem;font-weight:900;letter-spacing:1px;">
+        Prune now. Win forever.
+    </strong><br><br>
+    
+    Paste one or more addresses (or xpubs) below and click 
+    <strong style="color:#f7931a;font-size:1.7rem;">ANALYZE</strong> 
+    to see your personalized pruning strategy.
+</div>
+        <div style="font-size:4rem;color:#f7931a;opacity:0.9;animation:pulse 2s infinite;">
+            ↓
+        </div>
     </div>
 
     <style>
+    /* Pulsing arrow animation */
+    @keyframes pulse {
+        0%, 100% { transform: translateY(0); opacity: 0.8; }
+        50% { transform: translateY(20px); opacity: 1; }
+    }
+
     /* Ωmega Animations */
     @keyframes omega-breath {
         0%, 100% { opacity: 0.76; transform: scale(0.95) rotate(0deg); }
@@ -1171,16 +1291,6 @@ with gr.Blocks(
     @keyframes gradient-pulse {
         0%, 100% { transform: scale(0.97); }
         50%      { transform: scale(1.03); }
-    }
-
-    @keyframes headline-glow {
-        0%   { text-shadow: 0 0 20px #f7931a, 0 0 40px #ffaa00, 0 0 60px #f7931a; }
-        100% { text-shadow: 0 0 50px #f7931a, 0 0 100px #ffaa00, 0 0 150px #f7931a; }
-    }
-
-    @keyframes subtitle-glow {
-        0%   { text-shadow: 0 0 12px black, 0 0 24px #00ff9d, 0 0 36px #0f0; }
-        100% { text-shadow: 0 0 30px black, 0 0 60px #00ff9d, 0 0 90px #0f0; }
     }
 
     @keyframes omega-spin {
@@ -1245,7 +1355,7 @@ with gr.Blocks(
         to   { box-shadow: 0 0 45px rgba(247,147,26,1); }
     }
 
-    /* Locked badge pulse */
+    /* Locked badge */
     @keyframes badge-pulse {
         0%   { transform: scale(1);   box-shadow: 0 0 60px rgba(0,255,0,0.7); }
         50%  { transform: scale(1.1); box-shadow: 0 0 120px rgba(0,255,0,1); }
@@ -1258,32 +1368,33 @@ with gr.Blocks(
         100% { opacity: 1; transform: scale(1) translateY(0); }
     }
 
-.locked-badge {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    padding: 18px 48px;
-    background: #000;
-    border: 7px solid #f7931a;
-    border-radius: 28px;
-    box-shadow: 0 0 140px rgba(247,147,26,1);
-    color: #ffaa00;                  /* Slightly brighter, more golden orange */
-    text-shadow: 
-        0 0 8px #ffaa00,             /* Tight core glow */
-        0 0 16px #ffaa00,
-        0 0 32px #ffaa00,
-        0 0 60px #ffaa00;          /* Deep outer fire — intense but controlled */
-    font-weight: 900;
-    font-size: 2.4rem;
-    letter-spacing: 12px;
-    pointer-events: none;
-    opacity: 0;
-    animation: badge-entry 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
-               badge-pulse 2.5s infinite alternate 0.9s;
-}
+    .locked-badge {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        padding: 18px 48px;
+        background: #000;
+        border: 7px solid #f7931a;
+        border-radius: 28px;
+        box-shadow: 0 0 140px rgba(247,147,26,1);
+        color: #ffaa00;
+        text-shadow: 
+            0 0 8px #ffaa00,
+            0 0 16px #ffaa00,
+            0 0 32px #ffaa00,
+            0 0 60px #ffaa00;
+        font-weight: 900;
+        font-size: 2.4rem;
+        letter-spacing: 12px;
+        pointer-events: none;
+        opacity: 0;
+        animation: badge-entry 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
+                   badge-pulse 2.5s infinite alternate 0.9s;
+    }
     </style>
     """)
+
     gr.HTML("""
     <style>
 /* Health badge styling — clean and beautiful */
@@ -1300,6 +1411,8 @@ with gr.Blocks(
 .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.1); }
 .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.1); }
 .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.1); }
+.health-manual   { color: #bb86fc; background: rgba(187, 134, 252, 0.1); }
+
 
 .health small {
     display: block;
@@ -1310,7 +1423,6 @@ with gr.Blocks(
 }
 </style>
         """)
-
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
     # =============================
@@ -1322,9 +1434,11 @@ with gr.Blocks(
             except Exception as e:
                 log.warning(f"Error during background fee refresh: {e}")
 
-    # Start the daemon thread immediately on import
-    fee_refresh_thread = threading.Thread(target=refresh_fees_periodically, daemon=True)
-    fee_refresh_thread.start()
+    # Start the daemon thread immediately on import — with guard against multiple starts (e.g., hot-reload)
+    if not hasattr(threading, "_fee_refresh_started"):
+        fee_refresh_thread = threading.Thread(target=refresh_fees_periodically, daemon=True)
+        fee_refresh_thread.start()
+        threading._fee_refresh_started = True
 
     # =============================
     # — LOCK-SAFE FEE PRESET FUNCTION —
@@ -1336,15 +1450,11 @@ with gr.Blocks(
         future_fee_slider,
         thank_you_slider,
         locked,
+        current_strategy,
     ):
         if locked:
             return gr.update(), gr.update()  # No changes when locked
 
-        # Clamp here too
-        future_fee = max(5, min(500, int(future_fee_slider or 60)))
-        thank_you = max(0, min(5, float(thank_you_slider or 0.5)))
-
-        # Safely extract slider values (handles both raw values and components)
         future_fee = (
             future_fee_slider.value
             if hasattr(future_fee_slider, "value")
@@ -1355,6 +1465,9 @@ with gr.Blocks(
             if hasattr(thank_you_slider, "value")
             else thank_you_slider
         )
+
+        future_fee = max(5, min(500, int(future_fee or 60)))
+        thank_you = max(0, min(5, float(thank_you or 0.5)))
 
         # Fetch live fees with fallback to conservative defaults
         fees = get_live_fees() or {
@@ -1376,27 +1489,62 @@ with gr.Blocks(
         )
         return new_rate, new_summary
 
+
+   
+
     # =================================================================
     # ========================= UI STARTS HERE ========================
     # =================================================================
+    with gr.Column():
+        addr_input = gr.Textbox(
+            label="Address or xpub (one per line for batch mode) — 100% non-custodial, keys never entered",
+            placeholder="Paste one or many addresses/xpubs (one per line)\nClick ANALYZE when ready",
+            lines=6,
+        )
 
+        strategy_state = gr.State("Recommended — ~40% pruned (balanced savings & privacy)")
+
+        with gr.Row():
+            strategy = gr.Dropdown(
+                choices=[
+                    "Privacy First — ~30% pruned (lowest CIOH risk)",
+                    "Recommended — ~40% pruned (balanced savings & privacy)",
+                    "More Savings — ~50% pruned (stronger fee reduction)",
+                    "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)",
+                ],
+                value="Recommended — ~40% pruned (balanced savings & privacy)",
+                label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
+            )
+    strategy.change(fn=lambda x: x, inputs=strategy, outputs=strategy_state)
     with gr.Row():
-        addr = gr.Textbox(
-            label="Address or xpub — 100% non-custodial, keys never entered",
-            placeholder="Paste address/xpub → press Enter or click ANALYZE",
-            lines=2,
-            scale=3,
+        offline_toggle = gr.Checkbox(
+            label="🔒 Offline mode — no internet / API calls (fully air-gapped)",
+            value=False,
+            interactive=True,
+            info="Disables all network requests. Safe for air-gapped or privacy-focused use.",
         )
-        strategy = gr.Dropdown(
-            choices=[
-                "Privacy First (30% pruned)",
-                "Recommended (40% pruned)",
-                "More Savings (50% pruned)",
-                "NUCLEAR PRUNE (90% sacrificed)",
-            ],
-            value="Recommended (40% pruned)",
-            label="Pruning Strategy",
+
+    with gr.Row(visible=False) as manual_box_row:
+        manual_utxo_input = gr.Textbox(
+            label="Paste raw UTXOs (one per line) • Format: txid:vout:value_in_sats  (address optional at end)",
+            placeholder="""Paste raw UTXOs — one per line
+
+            Format: txid:vout:value_in_sats[:address]
+            
+            Examples:
+            abc123...000:0:125000:bc1qexample...
+            def456...789:1:5000000          ← 0.05 BTC, address optional
+            txidhere:2:999999
+
+            No API calls • Fully air-gapped safe""",
+            lines=10,
         )
+
+    offline_toggle.change(
+        fn=lambda x: gr.update(visible=x),
+        inputs=offline_toggle,
+        outputs=manual_box_row,
+    )
 
     with gr.Row():
         dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)",)
@@ -1428,21 +1576,52 @@ with gr.Blocks(
         halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
         fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
         
-    # Outputs & State
     html_out = gr.HTML()
+
+    
+    with gr.Row(visible=False) as generate_row:
+        gen_btn = gr.Button("2. GENERATE NUCLEAR PSBT", variant="primary", elem_id="generate-btn")
+    
+
+    # Rest of outputs & State
+   
     summary = gr.HTML()
-    enriched_state = gr.State()
+    enriched_state = gr.State([])
     locked = gr.State(False)
     locked_badge = gr.HTML("")  # Starts hidden
+    selection_snapshot_state = gr.State({})   # dict
+
 
     analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
 
-    with gr.Row(visible=False) as generate_row:
-        gen_btn = gr.Button("2. GENERATE NUCLEAR PSBT", variant="primary")
+  
+
+    # Export button and file output
+    # First row: the title — centered and prominent
+    with gr.Row(visible=False) as export_title_row:
+        gr.HTML("""
+        <div style='text-align:center;padding:0 0 20px 0;'>
+            <strong style='color:#44ccff;font-size:1.8rem;font-weight:900;
+                          text-shadow: 0 3px 8px #000000ee, 0 0 20px #000000aa;'>
+                📄 Your Frozen Selection
+                </strong><br>
+            <span style='color:#aaddff;font-size:1.1rem;text-shadow: 0 3px 8px #000000ee, 0 0 20px #000000aa;'>
+                Download the JSON below for backup or audit
+                </span>
+            </div>
+        """)
+
+    # Second row: the actual file download
+    with gr.Row(visible=False) as export_file_row:
+        export_file = gr.File(
+            label="",                     # no duplicate label
+            interactive=False
+        )
 
     df = gr.DataFrame(
         headers=[
             "PRUNE",
+            "Source",
             "TXID",
             "vout",
             "Value (sats)",
@@ -1451,25 +1630,16 @@ with gr.Blocks(
             "Type",
             "Health",
         ],
-        datatype=["bool", "str", "number", "number", "str", "number", "str", "html"],
+        datatype=["bool", "str", "str", "number", "number", "str", "number", "str", "html"],
         type="array",
         interactive=True,
         wrap=True,
         row_count=(50, "dynamic"),
         max_height=500,
         max_chars=None,
-        label="CHECK TO PRUNE • Pre-checked = recommended to prune (worst health at bottom)  •  Health is relative to address type: OPTIMAL = ideal • DUST/HEAVY = prune",
+        label="CHECK TO PRUNE • Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = prune",
         static_columns=[1, 2, 3, 4, 5, 6, 7],
-        column_widths=[
-        "90px",    # PRUNE (checkboxes)
-        "200px",   # TXID — smaller to force more wrapping
-        "70px",    # vout
-        "140px",   # Value (sats) — more room for large numbers
-        "133px",   # Address — wider for full display
-        "130px",   # Weight (wu)
-        "82px",   # Type
-        "93px",   # Health — room for badge
-    ]
+        column_widths=["90px", "160px", "200px", "70px", "140px", "160px", "130px", "90px", "100px"]
     )
 
     reset_btn = gr.Button("NUCLEAR RESET · START OVER", variant="secondary")
@@ -1485,7 +1655,7 @@ with gr.Blocks(
     ]:
         btn.click(
             fn=partial(apply_fee_preset_locked, preset),
-            inputs=[df, enriched_state, future_fee, thank_you, locked],
+            inputs=[df, enriched_state, future_fee, thank_you, locked,  strategy_state],
             outputs=[fee_rate, summary],
         )
 
@@ -1494,7 +1664,16 @@ with gr.Blocks(
     # =============================
     analyze_btn.click(
         fn=analyze,
-        inputs=[addr, strategy, dust, dest, fee_rate, thank_you, future_fee],
+        inputs=[
+            addr_input,          # renamed from addr
+            strategy,
+            dust,
+            dest,
+            fee_rate,
+            thank_you,           # dao_slider
+            future_fee,
+            offline_toggle,      # new
+            manual_utxo_input],        # new
         outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
     ).then(lambda: gr.update(visible=False), outputs=analyze_btn)
 
@@ -1504,36 +1683,40 @@ with gr.Blocks(
     gen_btn.click(
         fn=generate_psbt,
         inputs=[dest, fee_rate, future_fee, thank_you, df, enriched_state],
-        outputs=[html_out, gen_btn, generate_row, summary],
+        outputs=[html_out, gen_btn, generate_row, summary, export_title_row, export_file_row, export_file, selection_snapshot_state],
     ).then(
-        lambda: gr.update(interactive=False),  # Grays out checkboxes in df
+        lambda: gr.update(interactive=False),  # Gray out dataframe checkboxes
         outputs=df,
     ).then(
-        lambda: True,
+        lambda: True,  # Set locked = True
         outputs=locked,
     ).then(
         lambda: [
-            gr.update(interactive=False),  # addr
+            gr.update(interactive=False),  # addr_input (main address box)
             gr.update(interactive=False),  # strategy
             gr.update(interactive=False),  # dust
             gr.update(interactive=False),  # dest
             gr.update(interactive=False),  # fee_rate
             gr.update(interactive=False),  # future_fee
             gr.update(interactive=False),  # thank_you
+            gr.update(interactive=False),  # offline_toggle
+            gr.update(interactive=False),  # manual_utxo_input (disable even if visible)
             gr.update(interactive=False),  # fastest_btn
             gr.update(interactive=False),  # halfhour_btn
             gr.update(interactive=False),  # hour_btn
             gr.update(interactive=False),  # economy_btn
-            "<div class='locked-badge'>LOCKED</div>",  # Pure HTML badge — pops in with animation
+            "<div class='locked-badge'>LOCKED</div>",
         ],
         outputs=[
-            addr,
+            addr_input,          # ← updated
             strategy,
             dust,
             dest,
             fee_rate,
             future_fee,
             thank_you,
+            offline_toggle,      # ← new: lock the toggle
+            manual_utxo_input,        # ← new: lock the manual box
             fastest_btn,
             halfhour_btn,
             hour_btn,
@@ -1551,21 +1734,27 @@ with gr.Blocks(
             [],                                          # df
             [],                                          # enriched_state
             "",                                          # summary
-            gr.update(visible=True),                     # ANALYZE button
-            gr.update(visible=False),                    # GENERATE row
-            gr.update(value="", interactive=True),       # addr
-            gr.update(value="Recommended (40% pruned)", interactive=True),  # strategy
+            gr.update(visible=True),                     # ANALYZE button visible
+            gr.update(visible=False),                    # GENERATE row hidden
+            gr.update(value="", interactive=True),       # addr_input (main address box)
+            gr.update(value="Recommended — ~40% pruned (balanced savings & privacy)", interactive=True),  # strategy
             gr.update(value=546, interactive=True),      # dust
             gr.update(value="", interactive=True),       # dest
             gr.update(value=15, interactive=True),       # fee_rate
             gr.update(value=60, interactive=True),       # future_fee
             gr.update(value=0.5, interactive=True),      # thank_you
+            gr.update(value=False, interactive=True),    # offline_toggle = unchecked
+            gr.update(value="", visible=False, interactive=True),  # manual_utxo_input = cleared + hidden
             False,                                       # locked state
             "",                                          # clear locked badge
             gr.update(interactive=True),                 # fastest_btn
             gr.update(interactive=True),                 # halfhour_btn
             gr.update(interactive=True),                 # hour_btn
             gr.update(interactive=True),                 # economy_btn
+            gr.update(visible=False),                       # export_title_row
+            gr.update(visible=False),                      # export_file_row
+            None,                                          # export_file
+            {}                                         # selection_snapshot_state
         )
 
     reset_btn.click(
@@ -1578,19 +1767,25 @@ with gr.Blocks(
             summary,
             analyze_btn,
             generate_row,
-            addr,
+            addr_input,            
             strategy,
             dust,
             dest,
             fee_rate,
             future_fee,
             thank_you,
+            offline_toggle,         
+            manual_utxo_input,        
             locked,
             locked_badge,
             fastest_btn,
             halfhour_btn,
             hour_btn,
             economy_btn,
+            export_title_row,
+            export_file_row,             
+            export_file,
+            selection_snapshot_state
         ],
     )
 
@@ -1599,35 +1794,38 @@ with gr.Blocks(
     # =============================
     df.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked],
-        outputs=summary,
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy_state],
+        outputs=[html_out, generate_row, summary],
     )
     fee_rate.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked],
-        outputs=summary,
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy_state],
+        outputs=[html_out, generate_row, summary],
     )
     future_fee.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked],
-        outputs=summary,
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy_state],
+        outputs=[html_out, generate_row, summary],
     )
     thank_you.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked],
-        outputs=summary,
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy_state],
+        outputs=[html_out, generate_row, summary],
     )
+    strategy.change(fn=lambda x: x, inputs=strategy, outputs=strategy_state)
+
     strategy.change(
         fn=analyze,
-        inputs=[addr, strategy, dust, dest, fee_rate, thank_you, future_fee],
+        inputs=[addr_input, strategy, dust, dest, fee_rate, thank_you, future_fee, offline_toggle, manual_utxo_input],
         outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
     )
     dust.change(
         fn=analyze,
-        inputs=[addr, strategy, dust, dest, fee_rate, thank_you, future_fee],
+        inputs=[addr_input, strategy, dust, dest, fee_rate, thank_you, future_fee, offline_toggle, manual_utxo_input],
         outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
     )
-    
+
+
     # CRITICAL: DO NOT use .change() on fee_rate/future_fee for anything else
     # 5. FOOTER
     gr.HTML(
@@ -1650,7 +1848,7 @@ with gr.Blocks(
             letter-spacing: 0.5px;
             text-shadow: 0 0 12px rgba(247,147,26,0.65);
         ">
-            Ωmega Pruner v10.5 — PRIVACY SCORE + FEE ORACLE
+            Ωmega Pruner v10.6 — BATCH NUCLEAR + OFFLINE MODE
         </strong><br>
 
         <!-- GITHUB LINK -->
