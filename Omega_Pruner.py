@@ -1276,10 +1276,10 @@ def generate_psbt(psbt_snapshot: dict):
                             0 4px 8px #000, 0 8px 20px #000000ee;">
         {fingerprint}
     </div>
-    <div style="margin-top:20px;color:#aaffaa;font-size:1.1rem;line-height:1.6;
-                text-shadow:0 2px 4px #000, 0 4px 12px #000000cc;">
-        <strong>Provable Intent</strong> • Cryptographic proof of your pruning selection<br>
-        Audit-proof • Deterministic • Never changes
+ <div style="margin-top:20px;color:#aaffaa;font-size:1.1rem;line-height:1.6;
+            text-shadow:0 2px 4px #000, 0 4px 12px #000000cc;">
+    <span style="font-weight:900;">Provable Intent</span> • Cryptographic proof of your pruning selection<br>
+    Audit-proof • Deterministic • Never changes
     </div>
     <button onclick="navigator.clipboard.writeText('{fingerprint}').then(() => {{this.innerText='COPIED'; setTimeout(() => this.innerText='COPY', 1500);}})"
         style="margin-top:16px;padding:8px 20px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:12px;
@@ -1800,12 +1800,13 @@ No API calls • Fully air-gapped safe""",
     # First row: the title — centered and prominent
     with gr.Row(visible=False) as export_title_row:
         gr.HTML("""
-  <div style='text-align:center;padding:40px 0 30px 0;'>
+       <div style='text-align:center;padding:40px 0 30px 0;'>
         <!-- Main Header — matches your LOCKED badge energy -->
         <div style='color:#0f0;font-size:2.6rem;font-weight:900;
                     letter-spacing:8px;
                     text-shadow:0 0 40px #0f0, 0 0 80px #0f0,
-                                0 4px 8px #000, 0 8px 20px #000000ee;
+                                0 4px 8px #000, 0 8px 20px #000000ee,
+                                0 12px 32px #000000cc;
                     margin-bottom:20px;'>
             🔒 SELECTION FROZEN
         </div>
@@ -1813,7 +1814,8 @@ No API calls • Fully air-gapped safe""",
         <!-- Core message — clear intent -->
         <div style='color:#aaffaa;font-size:1.4rem;font-weight:700;
                     text-shadow:0 0 20px #0f0,
-                                0 3px 6px #000, 0 6px 16px #000000dd;
+                                0 3px 6px #000, 0 6px 16px #000000dd,
+                                0 10px 24px #000000bb;
                     max-width:720px;margin:0 auto 16px auto;
                     line-height:1.6;'>
             Your pruning intent is now immutable • Permanent audit trail secured
@@ -1821,7 +1823,8 @@ No API calls • Fully air-gapped safe""",
         
         <!-- Extra reassurance — exactly what you wanted -->
         <div style='color:#00ff9d;font-size:1.1rem;opacity:0.9;
-                    text-shadow:0 2px 4px #000, 0 4px 12px #000000cc;
+                    text-shadow:0 2px 4px #000, 0 4px 12px #000000cc,
+                                0 8px 20px #000000aa;
                     max-width:640px;margin:0 auto;'>
             The file below includes:<br>
             • Full selection fingerprint • All selected UTXOs • Transaction parameters<br>
