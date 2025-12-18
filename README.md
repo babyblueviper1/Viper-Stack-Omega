@@ -12,7 +12,8 @@ The last UTXO consolidator you’ll ever need.
 - Live pre/post-prune vsize + % savings  
 - Blinding uppercase **NUCLEAR** badge with double plasma glow  
 - Blood-red **EXTREME CIOH** + orange **HIGH RISK** warnings when needed  
-- **Selection fingerprint + JSON export** — audit-friendly snapshot of your exact pruned inputs  
+- **Selection fingerprint + JSON export** — deterministic cryptographic proof of your exact pruned inputs  
+- **Canonical state architecture** — immutable enriched_state tuple → single source of truth → zero stale data → instant checkbox/slider sync → unbreakable locking  
 - 100% preview-to-PSBT match (Privacy Score shown one last time before signing)  
 - Zero blur, laser-etched typography on every device  
 - Zero custody • Full coin-control • RBF • Taproot • Dust-proof  
