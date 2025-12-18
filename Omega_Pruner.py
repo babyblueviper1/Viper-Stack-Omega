@@ -1267,14 +1267,17 @@ def generate_psbt(psbt_snapshot: dict):
     box-shadow:0 0 80px rgba(0,255,0,0.8);font-family:monospace;"
     title="This deterministic hash proves your exact input selection. Identical selection = identical hash. Verify against exported JSON.">
     <div style="color:#0f0;font-size:1.4rem;font-weight:900;letter-spacing:3px;
-                text-shadow:0 0 20px #0f0;margin-bottom:16px;">
+                text-shadow:0 0 20px #0f0, 0 3px 6px #000, 0 6px 16px #000000dd;
+                margin-bottom:16px;">
         FINGERPRINT
     </div>
     <div style="color:#00ff9d;font-size:2.2rem;font-weight:900;letter-spacing:8px;
-                text-shadow:0 0 30px #00ff9d, 0 0 60px #00ff9d;">
+                text-shadow:0 0 30px #00ff9d, 0 0 60px #00ff9d,
+                            0 4px 8px #000, 0 8px 20px #000000ee;">
         {fingerprint}
     </div>
-    <div style="margin-top:20px;color:#aaffaa;font-size:1.1rem;line-height:1.6;">
+    <div style="margin-top:20px;color:#aaffaa;font-size:1.1rem;line-height:1.6;
+                text-shadow:0 2px 4px #000, 0 4px 12px #000000cc;">
         <strong>Provable Intent</strong> • Cryptographic proof of your pruning selection<br>
         Audit-proof • Deterministic • Never changes
     </div>
@@ -1797,23 +1800,29 @@ No API calls • Fully air-gapped safe""",
     # First row: the title — centered and prominent
     with gr.Row(visible=False) as export_title_row:
         gr.HTML("""
-   <div style='text-align:center;padding:40px 0 30px 0;'>
+  <div style='text-align:center;padding:40px 0 30px 0;'>
         <!-- Main Header — matches your LOCKED badge energy -->
         <div style='color:#0f0;font-size:2.6rem;font-weight:900;
-                    letter-spacing:8px;text-shadow:0 0 40px #0f0, 0 0 80px #0f0;
+                    letter-spacing:8px;
+                    text-shadow:0 0 40px #0f0, 0 0 80px #0f0,
+                                0 4px 8px #000, 0 8px 20px #000000ee;
                     margin-bottom:20px;'>
             🔒 SELECTION FROZEN
         </div>
         
-         <!-- Core message — clear intent -->
+        <!-- Core message — clear intent -->
         <div style='color:#aaffaa;font-size:1.4rem;font-weight:700;
-                    text-shadow:0 0 20px #0f0;max-width:720px;margin:0 auto 16px auto;
+                    text-shadow:0 0 20px #0f0,
+                                0 3px 6px #000, 0 6px 16px #000000dd;
+                    max-width:720px;margin:0 auto 16px auto;
                     line-height:1.6;'>
             Your pruning intent is now immutable • Permanent audit trail secured
         </div>
         
         <!-- Extra reassurance — exactly what you wanted -->
-        <div style='color:#00ff9d;font-size:1.1rem;opacity:0.9;max-width:640px;margin:0 auto;'>
+        <div style='color:#00ff9d;font-size:1.1rem;opacity:0.9;
+                    text-shadow:0 2px 4px #000, 0 4px 12px #000000cc;
+                    max-width:640px;margin:0 auto;'>
             The file below includes:<br>
             • Full selection fingerprint • All selected UTXOs • Transaction parameters<br>
             Provable • Deterministic • Never changes<br><br>
