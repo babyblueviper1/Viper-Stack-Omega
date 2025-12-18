@@ -1276,7 +1276,7 @@ def generate_psbt(psbt_snapshot: dict):
                             0 4px 8px #000, 0 8px 20px #000000ee;">
         {fingerprint}
     </div>
-    <div style="margin-top:20px;color:#00ffaa;font-size:1.1rem;line-height:1.6;
+    <div style="margin-top:20px;color:#00ffaa;font-size:1.1rem;line-height:1.6;font-weight:800;
             text-shadow:0 0 16px #0f0,
                         0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;">
     Provable Intent • Cryptographic proof of your pruning selection<br>
@@ -1828,8 +1828,7 @@ No API calls • Fully air-gapped safe""",
                                 0 8px 20px #000000aa;
                     max-width:640px;margin:0 auto;'>
             The file below includes:<br>
-            • Full selection fingerprint • All selected UTXOs • Transaction parameters<br>
-            Provable • Deterministic • Never changes<br><br>
+            • Full selection fingerprint • All selected UTXOs • Transaction parameters<br><br>
             Download for backup, offline verification, or future reference
         </div>
     </div>
