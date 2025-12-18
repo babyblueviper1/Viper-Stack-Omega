@@ -1279,8 +1279,8 @@ def generate_psbt(psbt_snapshot: dict):
     <div style="margin-top:20px;color:#00ffaa;font-size:1.1rem;line-height:1.6;font-weight:800;
             text-shadow:0 0 16px #0f0,
                         0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;">
-    Provable Intent • Cryptographic proof of your pruning selection<br>
-    Audit-proof • Deterministic • Never changes
+    Cryptographic proof of your pruning selection<br>
+    Deterministic • Audit-proof • Never changes
 </div>
     <button onclick="navigator.clipboard.writeText('{fingerprint}').then(() => {{this.innerText='COPIED'; setTimeout(() => this.innerText='COPY', 1500);}})"
         style="margin-top:16px;padding:8px 20px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:12px;
@@ -1823,7 +1823,7 @@ No API calls • Fully air-gapped safe""",
         </div>
         
         <!-- Extra reassurance — bright cyan for clarity -->
-        <div style='color:#00ffdd;font-size:1.1rem;opacity:0.9;font-weight:600;
+        <div style='color:#00ffdd;font-size:1.1rem;opacity:0.9;font-weight:700;
                     text-shadow:0 2px 4px #000, 0 4px 12px #000000cc,
                                 0 8px 20px #000000aa;
                     max-width:640px;margin:0 auto;'>
