@@ -70,6 +70,20 @@ Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trez
 | “Pruning today saves you X sats”      | LIVE    | 100k+ → “NUCLEAR MOVE” in pure green plasma     |
 | Zero-blur nuclear typography          | LIVE    | Every character is laser-etched, forever crisp  |
 
+### Under the Hood — Canonical State Model
+
+| Engineering Principle                 | Ωmega Pruner Implementation                               | Why It Matters                                   |
+| ------------------------------------- | --------------------------------------------------------- | ------------------------------------------------ |
+| **Single Source of Truth**            | Immutable `enriched_state` tuple — written once in `analyze()`, never mutated | No stale summaries • Instant checkbox/slider updates • Perfect locking |
+| **Derived UI & Economics**            | All summary, privacy score, CIOH warnings, savings % derived live from canonical state | Zero inconsistencies • Audit-proof • Feels like precision machinery |
+| **Selection Fingerprint**             | Deterministic hash of exact pruned inputs • Proven in exported JSON | Provable intent • Cryptographic proof of what you signed |
+| **Lock = Irreversible**               | Post-generate: state frozen forever • No economic recomputation | True finality • No second-guessing • Pure commitment |
+
+Most consolidators are held together with duct tape and hope.  
+Ωmega Pruner is built on immutable truth.
+
+Prune with confidence. Win with certainty.
+
 ### Ωmega Pruner — Custom Builds
 
 Your treasury. Your rules. Built by the Ω.
