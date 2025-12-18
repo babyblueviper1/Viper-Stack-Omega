@@ -1,3 +1,41 @@
+"""
+CANONICAL STATE MODEL (AUTHORITATIVE — DO NOT VIOLATE)
+
+User Inputs (mutable via UI):
+- addr_input
+- strategy (pruning strategy dropdown)
+- dust_threshold
+- dest_addr
+- fee_rate_slider
+- dao_slider
+- future_fee_slider
+- offline_mode
+- manual_utxo_input
+
+Derived State (write-once per analyze()):
+- enriched_state: List[dict] — full UTXO set with health, weights, script_type, source
+  → ONLY written by analyze()
+  → NEVER mutated after creation
+  → Single source of truth for all downstream logic
+
+Selection (user intent):
+- df_rows: checkbox state from Dataframe
+  → Resolved via _resolve_selected(df_rows, enriched_state)
+
+Phase (derived — do not store):
+- "init": no enriched_state
+- "analyzed": enriched_state present, locked = False
+- "locked": locked = True (after generate_psbt)
+
+RULES:
+1. Only analyze() may assign enriched_state
+2. No function may mutate enriched_state contents
+3. Strategy changes require re-running analyze()
+4. After lock, no economic recomputation — use frozen values only
+5. All summary/economics must derive from enriched_state + current sliders (pre-lock) or frozen (post-lock)
+
+Violations will be treated as bugs.
+"""
 # Omega_Pruner.py
 import gradio as gr
 import requests, time, base64, io, qrcode, json, os
@@ -9,6 +47,7 @@ import threading
 import hashlib
 import tempfile
 from datetime import datetime
+import copy
 
 # Logging Setup
 # =========================
@@ -188,6 +227,44 @@ def get_live_fees() -> Optional[Dict[str, int]]:
         "minimum": 1,
     }
 
+def build_psbt_snapshot(
+    enriched_state: tuple,
+    fee_rate: int,
+    future_fee_rate: int,
+    dao_percent: float,
+    dest_addr: str,
+):
+    """
+    Create immutable transaction snapshot — point of no return.
+    This is the canonical intent that will be signed.
+    """
+    # Extract selected inputs
+    selected_utxos = [u for u in enriched_state if u.get("selected", False)]
+
+    if not selected_utxos:
+        raise ValueError("No UTXOs selected for pruning")
+
+    # Deep copy to break any references
+    snapshot = {
+        "version": 1,
+        "timestamp": int(time.time()),
+        "dest_addr": dest_addr.strip() or selected_utxos[0]["address"],
+        "fee_rate": fee_rate,
+        "future_fee_rate": future_fee_rate,
+        "dao_percent": dao_percent,
+        "inputs": copy.deepcopy(selected_utxos),
+    }
+
+    # Deterministic fingerprint over entire snapshot
+    canonical = json.dumps(snapshot, sort_keys=True, separators=(',', ':'))
+    fingerprint = hashlib.sha256(canonical.encode()).hexdigest()
+    fingerprint_short = fingerprint[:16].upper()
+
+    snapshot["fingerprint"] = fingerprint
+    snapshot["fingerprint_short"] = fingerprint_short
+
+    return snapshot
+
 def _coerce_int(value, default: int) -> int:
     """
     Safely coerce a value to int, falling back to default on failure.
@@ -214,6 +291,66 @@ def clamp_dao(percent) -> float:
         return max(0.0, min(10.0, float(percent)))
     except (TypeError, ValueError, OverflowError):
         return 0.5
+
+def render_with_strategy_banner(
+    banner_html: str,
+    details_html: str,
+    strategy_label: str,
+) -> str:
+    """
+    Pure presentation helper: injects the live strategy name into the banner.
+    Keeps computation (generate_summary) completely separate from display state.
+    """
+    strategy_line = f"""
+    <div style="color:#f7931a;font-size:1.6rem;font-weight:700;margin:16px 0;">
+        Current Strategy: <span style="color:#00ff9d;font-weight:900;">{strategy_label}</span>
+    </div>
+    """
+
+    # More robust: insert after the "READY TO PRUNE" closing div
+    insertion_marker = '</div>'  # after READY TO PRUNE
+    if insertion_marker in banner_html:
+        parts = banner_html.split(insertion_marker, 1)
+        banner_html = parts[0] + insertion_marker + strategy_line + parts[1]
+
+    return banner_html + details_html
+
+def sync_selection(df_rows, enriched_state, locked):
+    """Sync checkbox changes back to canonical enriched_state — disabled when locked."""
+    if locked:
+        return enriched_state  # ignore all checkbox changes post-lock
+
+    if not enriched_state or not df_rows:
+        return enriched_state
+
+    if len(df_rows) != len(enriched_state):
+        log.warning("Row count mismatch during sync — ignoring")
+        return enriched_state
+
+    updated = []
+    for row, u in zip(df_rows, enriched_state):
+        new_u = dict(u)
+        new_u["selected"] = bool(row[CHECKBOX_COL])
+        updated.append(new_u)
+
+    return tuple(updated)
+
+def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: bool) -> tuple:
+    """
+    Live-sync checkbox changes into enriched_state.
+    Returns a new immutable tuple (preserves your frozen model).
+    Ignores changes if locked.
+    """
+    if locked or not enriched_state:
+        return enriched_state
+    
+    if len(df_rows) != len(enriched_state):
+        log.warning("Row count mismatch in live selection sync — ignoring update")
+        return enriched_state
+    
+    # Use your existing battle-tested sync_selection
+    updated_list = sync_selection(df_rows, list(enriched_state), locked=False)  # locked already checked above
+    return tuple(updated_list)
         
 def sats_to_btc_str(sats: int) -> str:
     btc = sats / 100_000_000
@@ -630,22 +767,38 @@ def scan_xpub(xpub: str, dust: int = 546, gap_limit: int = 20) -> Tuple[List[dic
         return [], f"Error: {str(e)[:120]}"
 
 
-def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider, offline_mode, manual_utxo_input):
-   # === SAFE INPUT CLAMPING ===
+def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider, offline_mode, manual_utxo_input, locked):
+    # === SAFE INPUT CLAMPING ===
     fee_rate        = max(1,   min(500,  _coerce_int(fee_rate_slider, 15)))
     future_fee_rate = max(1,   min(1000, _coerce_int(future_fee_slider, 60)))
     dust_threshold  = max(0,   min(10000, _coerce_int(dust_threshold, 546)))
-
-    # DAO percent: use the dedicated clamp function (coerces + enforces range + specific default)
     dao_percent     = clamp_dao(dao_slider)
 
     all_enriched = []
-    successful_sources = 0
-    info = ""
+
+    # === LOCK GUARD — irreversible after PSBT generation ===
+    if locked:
+        return (
+            "<div style='color:#ff3366;text-align:center;padding:30px;font-weight:700;'>"
+            "Selection is locked. Use NUCLEAR RESET to start over."
+            "</div>",
+            gr.update(),           # df unchanged
+            gr.update(),           # enriched_state unchanged
+            gr.update(),           # summary unchanged
+            gr.update(visible=False),
+            gr.update(visible=False),
+        )
 
     if offline_mode:
         if not manual_utxo_input.strip():
-            return "<div style='color:#ff3366;'>No manual UTXOs provided</div>", [], [], "", gr.update(visible=False), gr.update(visible=False)
+            return (
+                "<div style='color:#ff3366;text-align:center;padding:30px;'>No manual UTXOs provided</div>",
+                gr.update(value=[]),
+                tuple(),
+                "",
+                gr.update(visible=False),
+                gr.update(visible=False),
+            )
 
         for line in manual_utxo_input.strip().splitlines():
             line = line.strip()
@@ -662,7 +815,6 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                 if value <= dust_threshold:
                     continue
 
-                # Estimate weight (fallback if no address)
                 spk, meta = address_to_script_pubkey(addr)
                 input_wu = meta["input_vb"] * 4
 
@@ -672,26 +824,37 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                     "value": value,
                     "address": addr,
                     "input_weight": input_wu,
-                    "health": "MANUAL",           # Fixed: only once
-                    "recommend": "REVIEW",        # Fixed: only once
+                    "health": "MANUAL",
+                    "recommend": "REVIEW",
                     "script_type": "Manual" if addr == "unknown (manual)" else meta["type"],
                     "source": "Manual Offline",
+                    "selected": False,
                 }
                 all_enriched.append(enriched)
             except Exception:
                 continue
 
         if not all_enriched:
-            return "<div style='color:#ff3366;'>No valid UTXOs parsed</div>", [], [], "", gr.update(visible=False), gr.update(visible=False)
-
-        info = f"Offline manual mode • No API calls • {len(all_enriched):,} UTXOs loaded"
-        successful_sources = 1
+            return (
+                "<div style='color:#ff3366;text-align:center;padding:30px;'>No valid UTXOs parsed</div>",
+                gr.update(value=[]),
+                tuple(),
+                "",
+                gr.update(visible=False),
+                gr.update(visible=False),
+            )
 
     else:
-        # Online batch/single mode
         entries = [e.strip() for e in addr_input.strip().splitlines() if e.strip()]
         if not entries:
-            return "<div style='color:#ff3366;'>No addresses provided</div>", [], [], "", gr.update(visible=False), gr.update(visible=False)
+            return (
+                "<div style='color:#ff3366;text-align:center;padding:30px;'>No addresses provided</div>",
+                gr.update(value=[]),
+                tuple(),
+                "",
+                gr.update(visible=False),
+                gr.update(visible=False),
+            )
 
         for entry in entries:
             is_xpub = entry[:4] in ("xpub", "ypub", "zpub", "tpub", "upub", "vpub")
@@ -705,14 +868,11 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
             if not utxos_raw:
                 continue
 
-            successful_sources += 1
-
             for u in utxos_raw:
                 _, meta = address_to_script_pubkey(u["address"])
                 input_wu = meta["input_vb"] * 4
                 value = u["value"]
 
-                # Same health logic as above
                 if input_wu <= 228:
                     script_type = "Taproot"
                     health, recommend = "OPTIMAL", "KEEP"
@@ -738,26 +898,25 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                     "recommend": recommend,
                     "script_type": script_type,
                     "source": source_label,
+                    "selected": False,
                 }
                 all_enriched.append(enriched)
 
         if not all_enriched:
-            return f"No UTXOs found across {len(entries)} source(s)", [], [], "", gr.update(visible=False), gr.update(visible=False)
-
-        info = f"Batch mode • {successful_sources} sources • {len(all_enriched):,} UTXOs loaded" if successful_sources > 1 else f"Single source • {len(all_enriched):,} UTXOs"
+            return (
+                f"No UTXOs found across {len(entries)} source(s)",
+                gr.update(value=[]),
+                tuple(),
+                "",
+                gr.update(visible=False),
+                gr.update(visible=False),
+            )
 
     # ===============================
     # CANONICAL ORDERING & PRUNING LOGIC
     # ===============================
-    # Deterministic ordering: ensures stable table rows + consistent fingerprint across runs
+    # Deterministic ordering: stable table rows + consistent fingerprint
     all_enriched.sort(key=lambda u: (u["value"], u["txid"], u["vout"]), reverse=True)
-
-    # Pre-prune vsize estimate
-    all_input_weight = sum(u["input_weight"] for u in all_enriched)
-    pre_vsize = max(
-        (all_input_weight + 43*4 + 31*4 + 10*4 + len(all_enriched)) // 4 + 10,
-        (all_input_weight + 150 + len(all_enriched) * 60) // 4,
-    )
 
     # Pruning strategy
     ratio = {
@@ -768,20 +927,20 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
     }.get(strategy, 0.40)
     keep_count = max(MIN_KEEP_UTXOS, int(len(all_enriched) * (1 - ratio)))
 
-    # Sort by health: worst first (so worst appear at the top of the table)
+    # Sort by health (worst first for display)
     enriched_sorted = sorted(all_enriched, key=lambda u: HEALTH_PRIORITY[u["health"]])
 
-    # Number of UTXOs to pre-select for pruning (the worst ones)
+    # Apply pre-selection based on strategy (canonical state)
     prune_count = len(enriched_sorted) - keep_count
-
-    # Build dataframe rows
-    df_rows = []
     for idx, u in enumerate(enriched_sorted):
-        # Pre-check the first prune_count rows (the worst health)
-        is_prune = idx < prune_count
+        u["selected"] = idx < prune_count
+
+    # Build DataFrame rows — pure view of canonical state
+    df_rows = []
+    for u in enriched_sorted:
         health_html = f'<div class="health health-{u["health"].lower()}">{u["health"]}<br><small>{u["recommend"]}</small></div>'
         df_rows.append([
-            is_prune,
+            u["selected"],
             u.get("source", "Single"),
             u["txid"],
             u["vout"],
@@ -792,21 +951,18 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
             health_html,
         ])
 
+    # Freeze enriched_state: deeply immutable
+    import copy
+    frozen_enriched = tuple(copy.deepcopy(u) for u in enriched_sorted)
 
-
-    summary_html = generate_summary(df_rows, enriched_sorted, fee_rate, future_fee_rate, dao_percent)
-
-    return "", gr.update(value=df_rows), enriched_sorted, summary_html, gr.update(visible=True), gr.update(visible=True)
+    return "", gr.update(value=df_rows), frozen_enriched, "", gr.update(visible=True), gr.update(visible=True)
     
 def generate_summary(
-    df_rows: List[list],
-    enriched_state: List[dict],
-    fee_rate: int = 15,
-    future_fee_rate: int = 60,
-    dao_percent: float = 0.5,
-    current_strategy: str = "Recommended — ~40% pruned (balanced savings & privacy)",
+    enriched_state: tuple,
+    fee_rate: int,
+    future_fee_rate: int,
+    dao_percent: float,
 ) -> Tuple[str, gr.update, str]:
-
     """
     SINGLE SOURCE OF TRUTH for:
     - Privacy score
@@ -814,6 +970,7 @@ def generate_summary(
     - CIOH warnings
     - Button visibility logic
     All other functions (including generate_psbt) must derive from this.
+    NOTE: Strategy label is injected via render_with_strategy_banner — this function is pure computation.
     """
 
     total_utxos = len(enriched_state)
@@ -821,23 +978,24 @@ def generate_summary(
     if total_utxos == 0:
         return "", gr.update(visible=False), ""
 
-    selected_utxos = _resolve_selected(df_rows, enriched_state)
-    pruned_count = len(selected_utxos)
+    # UTXOs marked for pruning (to be spent in consolidation)
+    pruned_utxos = [u for u in enriched_state if u.get("selected", False)]
+    pruned_count = len(pruned_utxos)
 
-    privacy_score = calculate_privacy_score(selected_utxos, total_utxos) if selected_utxos else 100
+    privacy_score = calculate_privacy_score(pruned_utxos, total_utxos) if pruned_utxos else 100
     score_color = "#0f0" if privacy_score >= 70 else "#ff9900" if privacy_score >= 40 else "#ff3366"
 
+    # Banner — neutral, no live strategy (injected later via wrapper)
     banner_html = f"""
     <div style="text-align:center;margin:30px 0;padding:20px;background:#000;
                 border:3px solid #f7931a;border-radius:16px;
                 box-shadow:0 0 60px rgba(247,147,26,0.6);">
       <div style="color:#0f0;font-size:2.4rem;font-weight:900;
                   letter-spacing:2px;text-shadow:0 0 30px #0f0;">
-        READY TO PRUNE
+        ANALYSIS COMPLETE
       </div>
       <div style="color:#f7931a;font-size:1.8rem;font-weight:900;margin:16px 0;">
-        {total_utxos:,} UTXOs • Strategy:
-        <span style="color:#00ff9d;">{current_strategy}</span>
+        {total_utxos:,} UTXOs • Pruning Strategy Active
       </div>
       <div style="color:#fff;font-size:1.4rem;font-weight:700;">
         Will prune <span style="color:#ff6600;font-weight:800;">
@@ -853,9 +1011,9 @@ def generate_summary(
     </div>
     """
 
-    button_visibility = gr.update(visible=bool(selected_utxos))
+    button_visibility = gr.update(visible=bool(pruned_utxos))
 
-    if not selected_utxos:
+    if not pruned_utxos:
         return (
             banner_html,
             button_visibility,
@@ -865,7 +1023,7 @@ def generate_summary(
         )
 
     try:
-        econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
+        econ = estimate_tx_economics(pruned_utxos, fee_rate, dao_percent)
     except ValueError:
         return banner_html, gr.update(visible=False), ""
 
@@ -882,7 +1040,7 @@ def generate_summary(
         )
         return banner_html, gr.update(visible=False), invalid_html
 
-    # Pre-prune size
+    # Pre-prune size (includes ALL inputs — intentional baseline)
     all_input_weight = sum(u["input_weight"] for u in enriched_state)
     pre_vsize = max(
         (all_input_weight + 172 + total_utxos) // 4 + 10,
@@ -895,7 +1053,7 @@ def generate_summary(
     savings_color = "#0f0" if savings_pct >= 70 else "#00ff9d" if savings_pct >= 50 else "#ff9900" if savings_pct >= 30 else "#ff3366"
     savings_label = "NUCLEAR" if savings_pct >= 70 else "EXCELLENT" if savings_pct >= 50 else "GOOD" if savings_pct >= 30 else "WEAK"
 
-    # Future savings with context
+    # Future savings with emotional reframe
     sats_saved = max(0, econ.vsize * (future_fee_rate - fee_rate))
     savings_line = ""
     if sats_saved >= 100_000:
@@ -926,10 +1084,10 @@ def generate_summary(
         dao_line = f" • <span style='color:#666;font-size:0.9rem;' title='Below dust threshold — absorbed into fee'>DAO: {sats_to_btc_str(dao_raw)} (dust)</span>"
 
     # Privacy warnings
-    distinct_addrs = len({u["address"] for u in selected_utxos})
-    cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
+    distinct_addrs = len({u["address"] for u in pruned_utxos})
+    cioh_warning = get_cioh_warning(len(pruned_utxos), distinct_addrs, privacy_score)
 
-    bad_ratio = len([u for u in selected_utxos if u.get("health") in ("DUST", "HEAVY")]) / len(selected_utxos) if selected_utxos else 0
+    bad_ratio = len([u for u in pruned_utxos if u.get("health") in ("DUST", "HEAVY")]) / len(pruned_utxos) if pruned_utxos else 0
     extra_warning = (
         "<div style='margin-top:12px;color:#ae2029;font-weight:900;'>"
         "CAUTION: Heavy consolidation — strong fee savings.<br>"
@@ -940,14 +1098,14 @@ def generate_summary(
         if bad_ratio > 0.6 else ""
     )
 
-    # === Final details block with visual grouping ===
+    # Final details block with visual grouping
     details_html = f"""
     <div style='text-align:center;margin:10px;padding:18px;background:#111;
                 border:2px solid #f7931a;border-radius:14px;max-width:100%;
                 font-size:1rem;line-height:2.1;'>
       <!-- Band 1: Inputs & Size -->
-      <b style='color:#fff;'>Selected Inputs:</b> 
-      <span style='color:#0f0;font-weight:800;'>{len(selected_utxos):,}</span><br>
+      <b style='color:#fff;'>Inputs to Prune:</b> 
+      <span style='color:#0f0;font-weight:800;'>{pruned_count:,}</span><br>
       <b style='color:#fff;'>Total Value Pruned:</b> 
       <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(econ.total_in)}</span><br>
       <b style='color:#fff;'>Post-prune tx size:</b> 
@@ -975,111 +1133,90 @@ def generate_summary(
 
     return banner_html, button_visibility, details_html
 
-
-def generate_summary_safe(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, locked, current_strategy):
-    if locked:
-        return gr.update(), gr.update(), gr.update()
-    return generate_summary(df_rows, enriched_state, fee_rate, future_fee_rate, dao_percent, current_strategy)
-
-
-def generate_psbt(
-    dest_addr: str,
-    fee_rate: int,
-    future_fee_rate: int,
-    dao_percent: float,
-    df_rows: list,
-    enriched_state: list
+def generate_summary_safe(
+    df,
+    enriched_state,
+    fee_rate,
+    future_fee_rate,
+    dao_percent,
+    locked,
+    strategy_label: str,
 ):
-    dao_percent = clamp_dao(dao_percent)  # re-clamp for safety
+    """Final summary renderer — single output, handles locked state."""
+    if locked:
+        return (
+            "<div style='text-align:center;padding:40px;color:#888;font-size:1.2rem;'>"
+            "SELECTION LOCKED — Ready to sign PSBT"
+            "</div>",
+            gr.update(visible=False)
+        )
 
-    if not df_rows or not enriched_state:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Run Analyze first.</div>", gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
-
-    selected_utxos = _resolve_selected(df_rows, enriched_state)
-    snapshot = _selection_snapshot(selected_utxos)
-    fingerprint = snapshot["fingerprint"]
-
-    # Temp JSON download
-    json_str = json.dumps(snapshot, indent=2, ensure_ascii=False)
-    date_str = datetime.now().strftime("%Y%m%d")
-    prefix = f"omega_selection_{date_str}_{fingerprint[:8]}_" if fingerprint != "none" else f"omega_selection_{date_str}_"
-    tmp_file = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", prefix=prefix, delete=False)
-    tmp_file.write(json_str)
-    tmp_file.close()
-    json_filepath = tmp_file.name
-
-    if not selected_utxos:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>No UTXOs selected for pruning!</div>", gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
-
-    # Economics
-    try:
-        econ = estimate_tx_economics(selected_utxos, fee_rate, dao_percent)
-    except ValueError:
-        return "<div style='color:#ff3366; text-align:center; padding:30px;'>Invalid selection.</div>", gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
-
-    total_in = econ.total_in
-    vsize = econ.vsize
-    fee = econ.fee
-    change_amt = econ.change_amt
-    dao_amt = econ.dao_amt
-    input_count = len(selected_utxos)
-    input_weight = sum(u["input_weight"] for u in selected_utxos)
-
-    # Pre-prune size
-    all_input_weight = sum(u["input_weight"] for u in enriched_state)
-    pre_vsize = max(
-        (all_input_weight + 43*4 + 31*4 + 10*4 + len(enriched_state)) // 4 + 10,
-        (all_input_weight + 150 + len(enriched_state) * 60) // 4,
+    banner_html, button_vis, details_html = generate_summary(
+        enriched_state, fee_rate, future_fee_rate, dao_percent
     )
-    savings_pct = round(100 * (1 - vsize / pre_vsize), 1) if pre_vsize > 0 else 0
 
-    savings_color = "#0f0" if savings_pct >= 70 else "#00ff9d" if savings_pct >= 50 else "#ff9900" if savings_pct >= 30 else "#ff3366"
-    savings_label = "NUCLEAR" if savings_pct >= 70 else "EXCELLENT" if savings_pct >= 50 else "GOOD" if savings_pct >= 30 else "WEAK"
+    full_summary = render_with_strategy_banner(banner_html, details_html, strategy_label)
 
-    # Future savings with emotional peak
-    sats_saved = max(0, vsize * (future_fee_rate - fee_rate))
-    savings_line = ""
-    if sats_saved >= 100_000:
-        savings_line = (
-            f"<span style='color:#fff;font-weight:600;'>Unlocking now saves:</span> "
-            f"<span style='color:#0f0;font-size:1.45rem;font-weight:800;letter-spacing:1.8px;"
-            f"text-shadow:0 0 12px #0f0, 0 0 30px #0f0;'>"
-            f"+{sats_saved:,} sats</span> "
-            f"<span style='color:#0f0;font-weight:800;letter-spacing:3.5px;text-transform:uppercase;"
-            f"text-shadow:0 0 20px #0f0, 0 0 50px #0f0;'>NUCLEAR MOVE</span>"
-            f"<br><span style='color:#888;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
-        )
-    elif sats_saved > 0:
-        savings_line = (
-            f"<span style='color:#fff;font-weight:600;'>Pruning now saves:</span> "
-            f"<span style='color:#0f0;font-weight:800;'>+{sats_saved:,} sats</span>"
-            f"<br><span style='color:#888;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
+    return full_summary, button_vis
+  
+def generate_psbt(psbt_snapshot: dict):
+    """Generate PSBT from frozen snapshot — no live reads."""
+    if not psbt_snapshot:
+        return (
+            "<div style='color:#ff3366;text-align:center;padding:30px;'>"
+            "No snapshot — run Generate first."
+            "</div>",
+            gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), []
         )
 
-    # DAO visibility
-    dao_raw = int((econ.total_in - econ.fee) * (dao_percent / 100.0)) if dao_percent > 0 else 0
-    dao_line = ""
-    if dao_amt >= 546:
-        dao_line = f" • <span style='color:#ff6600;'>DAO:</span> <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(dao_amt)}</span>"
-    elif dao_raw > 0:
-        dao_line = f" • <span style='color:#666;font-size:0.9rem;' title='Below dust threshold — absorbed into fee'>DAO: {sats_to_btc_str(dao_raw)} (dust)</span>"
+    # Extract from frozen snapshot
+    pruned_utxos = psbt_snapshot["inputs"]
+    pruned_count = len(pruned_utxos)
+    fingerprint = psbt_snapshot["fingerprint_short"]
+    dest_addr = psbt_snapshot["dest_addr"]
+    fee_rate = psbt_snapshot["fee_rate"]
+    dao_percent = psbt_snapshot["dao_percent"]
+
+    if not pruned_utxos:
+        return (
+            "<div style='color:#ff3366;text-align:center;padding:30px;'>"
+            "No UTXOs selected for pruning!"
+            "</div>",
+            gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), []
+        )
+
+    # Economics from snapshot values
+    try:
+        econ = estimate_tx_economics(pruned_utxos, fee_rate, dao_percent)
+    except ValueError:
+        return (
+            "<div style='color:#ff3366;text-align:center;padding:30px;'>"
+            "Invalid snapshot economics."
+            "</div>",
+            gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), []
+        )
 
     # Destination
-    dest = (dest_addr or "").strip() or selected_utxos[0]["address"]
+    dest = dest_addr or pruned_utxos[0]["address"]
     try:
         dest_spk, _ = address_to_script_pubkey(dest)
     except Exception:
         return (
-            "<div style='color:#ff3366;text-align:center;padding:30px;'>Invalid or unsupported destination address.</div>",
-            gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), None, []
+            "<div style='color:#ff3366;text-align:center;padding:30px;'>"
+            "Invalid destination address in snapshot."
+            "</div>",
+            gr.update(), gr.update(), "", gr.update(visible=False), gr.update(visible=False), []
         )
 
     dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
 
-    # Build transaction
+    # Build transaction — deterministic order already in snapshot
     tx = Tx()
-    for u in selected_utxos:
+    for u in pruned_utxos:
         tx.tx_ins.append(TxIn(bytes.fromhex(u["txid"]), int(u["vout"])))
+
+    dao_amt = econ.dao_amt
+    change_amt = econ.change_amt
 
     if dao_amt >= 546:
         tx.tx_outs.append(TxOut(dao_amt, dao_spk))
@@ -1098,7 +1235,7 @@ def generate_psbt(
 
     psbt_b64 = create_psbt(raw_tx.hex())
 
-    # QR
+    # QR generation
     error_correction = qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2800 else qrcode.constants.ERROR_CORRECT_M
     qr = qrcode.QRCode(version=None, error_correction=error_correction, box_size=6, border=4)
     qr.add_data(f"bitcoin:?psbt={psbt_b64}")
@@ -1125,75 +1262,35 @@ def generate_psbt(
                 box-shadow:0 0 140px rgba(247,147,26,0.95);
                 background:radial-gradient(circle at center,#0a0a0a 0%,#000 100%);">
 
-        <div style="margin:40px 0 60px;">
-            <button disabled style="padding:30px 100px;font-size:2.4rem;font-weight:800;
-                                    background:#000;color:#0f0;letter-spacing:8px;
-                                    border:8px solid #0f0;border-radius:34px;
-                                    box-shadow:0 0 100px #0f0;text-shadow:0 0 20px #0f0;cursor:not-allowed;">
-                RAW UNSIGNED TRANSACTION
-            </button>
-        </div>
-
-        <!-- Fingerprint with tooltip + copy -->
-        <div style="margin:40px 0;padding:16px;background:#001100;border:2px solid #0f0;border-radius:12px;
-            box-shadow:0 0 40px rgba(0,255,0,0.6);font-family:monospace;"
-            title="This hash uniquely identifies your exact input selection. Export and verify later — if it matches, inputs are identical.">
-            <strong style="color:#0f0;font-size:1.1rem;">SELECTION FINGERPRINT</strong><br>
-            <span style="color:#00ff9d;font-size:1.6rem;letter-spacing:4px;font-family:monospace;">{fingerprint.upper()}</span>
-            <button onclick="navigator.clipboard.writeText('{fingerprint.upper()}').then(() => {{this.innerText='COPIED'; setTimeout(() => this.innerText='COPY', 1500);}})"
-                style="margin-left:12px;padding:4px 10px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:8px;
-                       font-size:0.9rem;font-weight:800;cursor:pointer;">
-                COPY
-            </button><br>
-            <small style="color:#aaa;">Locked inputs • Verify against exported JSON</small>
-        </div>
-
-        <div style='text-align:center;margin:40px 0;padding:20px;background:#001133;border:3px solid #4488ff;border-radius:16px;
-                    box-shadow:0 0 50px rgba(68,136,255,0.5);'>
-            <strong style='color:#44ccff;font-size:1.4rem;font-weight:800;text-shadow:0 0 15px #4488ff;'>
-                🧊 Frozen Selection Snapshot (JSON)
-            </strong><br><br>
-            <span style='color:#aaddff;font-size:1.1rem;'>
-                Your exact pruned inputs are locked below.<br>
-                Download for backup, audit, or future verification.
-            </span>
-        </div>
-
-        <div style="margin:0 auto 40px;width:520px;max-width:96vw;padding:20px;background:#000;
+      <!-- Selection Fingerprint — Provable Intent -->
+<div style="margin:40px 0;padding:24px;background:#001100;border:4px solid #0f0;border-radius:18px;
+    box-shadow:0 0 80px rgba(0,255,0,0.8);font-family:monospace;"
+    title="This deterministic hash proves your exact input selection. Identical selection = identical hash. Verify against exported JSON.">
+    <div style="color:#0f0;font-size:1.4rem;font-weight:900;letter-spacing:3px;
+                text-shadow:0 0 20px #0f0;margin-bottom:16px;">
+        FINGERPRINT
+    </div>
+    <div style="color:#00ff9d;font-size:2.2rem;font-weight:900;letter-spacing:8px;
+                text-shadow:0 0 30px #00ff9d, 0 0 60px #00ff9d;">
+        {fingerprint}
+    </div>
+    <div style="margin-top:20px;color:#aaffaa;font-size:1.1rem;line-height:1.6;">
+        <strong>Provable Intent</strong> • Cryptographic proof of your pruning selection<br>
+        Audit-proof • Deterministic • Never changes
+    </div>
+    <button onclick="navigator.clipboard.writeText('{fingerprint}').then(() => {{this.innerText='COPIED'; setTimeout(() => this.innerText='COPY', 1500);}})"
+        style="margin-top:16px;padding:8px 20px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:12px;
+               font-size:1.1rem;font-weight:800;cursor:pointer;box-shadow:0 0 20px #0f0;">
+        COPY
+    </button>
+</div>
+        <!-- QR -->
+        <div style="margin:40px auto;width:520px;max-width:96vw;padding:20px;background:#000;
                     border:8px solid #0f0;border-radius:24px;box-shadow:0 0 60px #0f0,inset 0 0 40px #0f0;">
             {qr_img_html}
         </div>
 
         {qr_warning_html}
-
-        <!-- NUCLEAR SUMMARY BLOCK (grouped) -->
-        <div style='text-align:center;margin:40px 0;padding:18px;background:#111;border:2px solid #f7931a;
-                    border-radius:14px;max-width:95%;font-size:1.4rem;line-height:2.1;'>
-            <!-- Band 1: Inputs & Size -->
-            <span style='color:#fff;font-weight:600;'>Inputs:</span> 
-            <span style='color:#0f0;font-weight:800;'>{input_count:,}</span><br>
-            <span style='color:#fff;font-weight:600;'>Total Value Pruned:</span> 
-            <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(total_in)}</span><br>
-            <span style='color:#fff;font-weight:600;'>Post-prune tx size:</span> 
-            <span style='color:#0f0;font-weight:800;'>{vsize:,} vB</span>
-            <span style='color:{savings_color};font-weight:800;font-size:1.2rem;letter-spacing:1.5px;
-                        text-transform:uppercase;text-shadow:0 0 20px {savings_color}, 0 0 50px {savings_color};'>
-                {' ' + savings_label} (-{savings_pct}%)
-            </span><br>
-            <hr style="border:none;border-top:1px solid rgba(247,147,26,0.25);margin:20px 0;">
-
-            <!-- Band 2: Savings & Fee -->
-            {savings_line}<br>
-            <span style='color:#fff;font-weight:600;'>Current Fee:</span> 
-            <span style='color:#0f0;font-weight:800;'>{fee:,} sats @ {fee_rate} s/vB</span>{dao_line}<br>
-            <hr style="border:none;border-top:1px solid rgba(247,147,26,0.25);margin:20px 0;">
-
-            <!-- Band 3: Outputs & Change -->
-            <span style='color:#fff;font-weight:600;'>Change:</span> 
-            <span style='color:#0f0;font-weight:800;'>{sats_to_btc_str(change_amt)}</span>
-            {f" <span style='color:#ff6600;'>(dust absorbed)</span>" if change_amt == 0 and econ.remaining > 0 else ""}
-            <br>
-        </div>
 
         <!-- PSBT + COPY + HINT -->
         <div style="margin:60px auto 20px;width:92%;max-width:880px;">
@@ -1221,6 +1318,7 @@ def generate_psbt(
             </div>
         </div>
 
+        <!-- Wallet support -->
         <div style='color:#ff9900;font-size:1rem;text-align:center;margin:40px 0 20px;padding:16px;
                     background:#220000;border:2px solid #f7931a;border-radius:12px;
                     box-shadow:0 0 40px rgba(247,147,26,0.4);'>
@@ -1234,7 +1332,39 @@ def generate_psbt(
 
     </div>
     </div>
-    """, gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=True), gr.update(visible=True), json_filepath, snapshot
+    """, gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=True), gr.update(visible=True), psbt_snapshot
+  
+# Define functions at top level (outside any with blocks)
+def on_generate(
+    dest_addr,
+    fee_rate,
+    future_fee_rate,
+    dao_percent,
+    enriched_state,
+):
+    try:
+        snapshot = build_psbt_snapshot(
+            enriched_state,
+            fee_rate,
+            future_fee_rate,
+            dao_percent,
+            dest_addr,
+        )
+
+        # Create temp JSON file for download
+        json_str = json.dumps(snapshot, indent=2, ensure_ascii=False)
+        date_str = datetime.now().strftime("%Y%m%d")
+        fingerprint_short = snapshot.get("fingerprint_short", "none")
+        prefix = f"omega_selection_{date_str}_{fingerprint_short[:8]}_" if fingerprint_short != "none" else f"omega_selection_{date_str}_"
+        tmp_file = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", prefix=prefix, delete=False)
+        tmp_file.write(json_str)
+        tmp_file.close()
+        json_filepath = tmp_file.name
+      
+        return snapshot, gr.update(value=True), json_filepath
+    except ValueError:
+        return None, gr.update(value=False), None
+
 # --------------------------
 # Gradio UI
 # --------------------------
@@ -1495,18 +1625,14 @@ with gr.Blocks(
     # — LOCK-SAFE FEE PRESET FUNCTION —
     # =============================
     def apply_fee_preset_locked(
-        df_rows,
-        enriched_state,
         future_fee_slider,
         thank_you_slider,
         locked,
-        current_strategy,
         preset: str
     ):
         if locked:
-            return gr.update(), gr.update()  # No change to slider or summary when locked
+            return gr.update(), gr.update()
 
-        # Safely extract current values (handles both direct value and component)
         future_fee = (
             future_fee_slider.value if hasattr(future_fee_slider, "value") else int(future_fee_slider or 60)
         )
@@ -1517,16 +1643,13 @@ with gr.Blocks(
         future_fee = max(5, min(500, future_fee))
         thank_you = max(0, min(5, thank_you))
 
-        # Live fees with safe fallback
         fees = get_live_fees() or {
             "fastestFee": 10,
             "halfHourFee": 6,
             "hourFee": 3,
             "economyFee": 1,
-            "minimumFee": 1,
         }
 
-        # Correct keys + defensive .get()
         rate_map = {
             "fastest": fees.get("fastestFee", 10),
             "half_hour": fees.get("halfHourFee", 6),
@@ -1536,19 +1659,8 @@ with gr.Blocks(
 
         new_rate = rate_map.get(preset, 3)
 
-        # Update summary with new rate
-        banner_html, button_vis, details_html = generate_summary_safe(
-            df_rows,
-            enriched_state,
-            new_rate,
-            future_fee,
-            thank_you,
-            locked,
-            current_strategy
-        )
-
-        # CRITICAL: Explicit slider update + details block
-        return gr.update(value=new_rate), details_html
+        # Only update fee slider — summary will refresh via fee_rate.change chain
+        return gr.update(value=new_rate), gr.update()
    
 
     # =================================================================
@@ -1593,7 +1705,7 @@ No API calls • Fully air-gapped safe""",
 
         # === Seamless mode switching with guidance ===
         offline_toggle.change(
-            fn=lambda x: gr.update(visible=x, value="" if not x else gr.update()),
+            fn=lambda x: gr.update(visible=x),
             inputs=offline_toggle,
             outputs=manual_box_row,
         ).then(
@@ -1619,9 +1731,6 @@ No API calls • Fully air-gapped safe""",
             outputs=mode_status,
         )
 
-    # === Now outside the Column — back to base indentation ===
-    strategy_state = gr.State("Recommended — ~40% pruned (balanced savings & privacy)")
-
     with gr.Row():
         strategy = gr.Dropdown(
             choices=[
@@ -1633,8 +1742,6 @@ No API calls • Fully air-gapped safe""",
             value="Recommended — ~40% pruned (balanced savings & privacy)",
             label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
         )
-
-    strategy.change(fn=lambda x: x, inputs=strategy, outputs=strategy_state)
 
     with gr.Row():
         dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
@@ -1666,6 +1773,7 @@ No API calls • Fully air-gapped safe""",
         halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
         fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
         
+ 
     html_out = gr.HTML()
 
     
@@ -1678,6 +1786,7 @@ No API calls • Fully air-gapped safe""",
     summary = gr.HTML()
     enriched_state = gr.State([])
     locked = gr.State(False)
+    psbt_snapshot = gr.State(None)
     locked_badge = gr.HTML("")  # Starts hidden
     selection_snapshot_state = gr.State({})   # dict
 
@@ -1688,16 +1797,28 @@ No API calls • Fully air-gapped safe""",
     # First row: the title — centered and prominent
     with gr.Row(visible=False) as export_title_row:
         gr.HTML("""
-        <div style='text-align:center;padding:0 0 20px 0;'>
-            <strong style='color:#44ccff;font-size:1.8rem;font-weight:900;
-                          text-shadow: 0 3px 8px #000000ee, 0 0 20px #000000aa;'>
-                📄 Your Frozen Selection
-                </strong><br>
-            <span style='color:#aaddff;font-size:1.1rem;text-shadow: 0 3px 8px #000000ee, 0 0 20px #000000aa;'>
-                Download the JSON below for backup or audit
-                </span>
-            </div>
-        """)
+   <div style='text-align:center;padding:40px 0 30px 0;'>
+        <!-- Main Header — matches your LOCKED badge energy -->
+        <div style='color:#0f0;font-size:2.6rem;font-weight:900;
+                    letter-spacing:8px;text-shadow:0 0 40px #0f0, 0 0 80px #0f0;
+                    margin-bottom:20px;'>
+            🔒 SELECTION FROZEN
+        </div>
+        
+        <!-- Subtext — trust + audit focus -->
+        <div style='color:#aaffaa;font-size:1.4rem;font-weight:700;
+                    text-shadow:0 0 20px #0f0;max-width:720px;margin:0 auto 16px auto;
+                    line-height:1.6;'>
+            Your pruning intent is now immutable • Permanent audit trail secured
+        </div>
+        
+        <!-- Extra reassurance -->
+        <div style='color:#00ff9d;font-size:1.1rem;opacity:0.9;max-width:640px;margin:0 auto;'>
+            Includes full selection fingerprint • Provable • Never changes<br>
+            Download for backup, verification, or future reference
+        </div>
+    </div>
+    """)
 
     # Second row: the actual file download
     with gr.Row(visible=False) as export_file_row:
@@ -1750,7 +1871,7 @@ No API calls • Fully air-gapped safe""",
     ]:
         btn.click(
             fn=partial(apply_fee_preset_locked, preset=preset),
-            inputs=[df, enriched_state, future_fee, thank_you, locked, strategy_state],
+            inputs=[future_fee, thank_you, locked],
             outputs=[fee_rate, summary],
         )
     # =============================
@@ -1771,13 +1892,15 @@ No API calls • Fully air-gapped safe""",
         outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
     ).then(lambda: gr.update(visible=False), outputs=analyze_btn)
 
-    # =============================
     # — GENERATE BUTTON (NUCLEAR LOCK + ANIMATED BADGE) —
-    # =============================
     gen_btn.click(
+        fn=on_generate,
+        inputs=[dest, fee_rate, future_fee, thank_you, enriched_state],
+        outputs=[psbt_snapshot, locked, export_file],
+    ).then(
         fn=generate_psbt,
-        inputs=[dest, fee_rate, future_fee, thank_you, df, enriched_state],
-        outputs=[html_out, gen_btn, generate_row, summary, export_title_row, export_file_row, export_file, selection_snapshot_state],
+        inputs=[psbt_snapshot],
+        outputs=[html_out, gen_btn, generate_row, summary, export_title_row, export_file_row, psbt_snapshot],
     ).then(
         lambda: gr.update(interactive=False),  # Gray out dataframe checkboxes
         outputs=df,
@@ -1786,7 +1909,7 @@ No API calls • Fully air-gapped safe""",
         outputs=locked,
     ).then(
         lambda: [
-            gr.update(interactive=False),  # addr_input (main address box)
+            gr.update(interactive=False),  # addr_input
             gr.update(interactive=False),  # strategy
             gr.update(interactive=False),  # dust
             gr.update(interactive=False),  # dest
@@ -1794,7 +1917,7 @@ No API calls • Fully air-gapped safe""",
             gr.update(interactive=False),  # future_fee
             gr.update(interactive=False),  # thank_you
             gr.update(interactive=False),  # offline_toggle
-            gr.update(interactive=False),  # manual_utxo_input (disable even if visible)
+            gr.update(interactive=False),  # manual_utxo_input
             gr.update(interactive=False),  # fastest_btn
             gr.update(interactive=False),  # halfhour_btn
             gr.update(interactive=False),  # hour_btn
@@ -1802,15 +1925,15 @@ No API calls • Fully air-gapped safe""",
             "<div class='locked-badge'>LOCKED</div>",
         ],
         outputs=[
-            addr_input,          # ← updated
+            addr_input,
             strategy,
             dust,
             dest,
             fee_rate,
             future_fee,
             thank_you,
-            offline_toggle,      # ← new: lock the toggle
-            manual_utxo_input,        # ← new: lock the manual box
+            offline_toggle,
+            manual_utxo_input,
             fastest_btn,
             halfhour_btn,
             hour_btn,
@@ -1818,37 +1941,42 @@ No API calls • Fully air-gapped safe""",
             locked_badge,
         ],
     )
-
     # =============================
     # — NUCLEAR RESET BUTTON —
     # =============================
     def nuclear_reset():
+        """
+        NUCLEAR RESET — full wipe.
+        Returns the app to pristine initial state.
+        No transaction is ever sent. Completely safe.
+        """
         return (
-            "",                                          # html_out
-            [],                                          # df
-            [],                                          # enriched_state
-            "",                                          # summary
-            gr.update(visible=True),                     # ANALYZE button visible
-            gr.update(visible=False),                    # GENERATE row hidden
-            gr.update(value="", interactive=True),       # addr_input (main address box)
-            gr.update(value="Recommended — ~40% pruned (balanced savings & privacy)", interactive=True),  # strategy
-            gr.update(value=546, interactive=True),      # dust
-            gr.update(value="", interactive=True),       # dest
-            gr.update(value=15, interactive=True),       # fee_rate
-            gr.update(value=60, interactive=True),       # future_fee
-            gr.update(value=0.5, interactive=True),      # thank_you
-            gr.update(value=False, interactive=True),    # offline_toggle = unchecked
-            gr.update(value="", visible=False, interactive=True),  # manual_utxo_input = cleared + hidden
-            False,                                       # locked state
-            "",                                          # clear locked badge
+            "",                                          # html_out (clear any alerts)
+            gr.update(value=[]),                         # df — clear table
+            tuple(),                                     # enriched_state — empty frozen tuple
+            "",                                          # summary — clear details
+            gr.update(visible=True),                     # analyze_btn — show again
+            gr.update(visible=False),                    # generate_row — hide PSBT UI
+            gr.update(value=[]),                         # df_rows (if separate)
+            None,                                        # psbt_snapshot — wipe snapshot
+            False,                                       # locked — unlock
+            "",                                          # locked_badge — clear
+            gr.update(value="", interactive=True),        # addr_input
+            gr.update(interactive=True),                 # strategy
+            gr.update(interactive=True),                 # dust
+            gr.update(interactive=True),                 # dest
+            gr.update(interactive=True),                 # fee_rate
+            gr.update(interactive=True),                 # future_fee
+            gr.update(interactive=True),                 # thank_you
+            gr.update(value=False, interactive=True),     # offline_toggle
+            gr.update(value="", visible=False, interactive=True),  # manual_utxo_input
             gr.update(interactive=True),                 # fastest_btn
             gr.update(interactive=True),                 # halfhour_btn
             gr.update(interactive=True),                 # hour_btn
             gr.update(interactive=True),                 # economy_btn
-            gr.update(visible=False),                       # export_title_row
-            gr.update(visible=False),                      # export_file_row
-            None,                                          # export_file
-            {}                                         # selection_snapshot_state
+            gr.update(visible=False),                    # export_title_row
+            gr.update(visible=False),                    # export_file_row
+            None,                                        # export_file
         )
 
     reset_btn.click(
@@ -1861,64 +1989,76 @@ No API calls • Fully air-gapped safe""",
             summary,
             analyze_btn,
             generate_row,
-            addr_input,            
+            df,  # if you have separate df_rows
+            psbt_snapshot,
+            locked,
+            locked_badge,
+            addr_input,
             strategy,
             dust,
             dest,
             fee_rate,
             future_fee,
             thank_you,
-            offline_toggle,         
-            manual_utxo_input,        
-            locked,
-            locked_badge,
+            offline_toggle,
+            manual_utxo_input,
             fastest_btn,
             halfhour_btn,
             hour_btn,
             economy_btn,
             export_title_row,
-            export_file_row,             
+            export_file_row,
             export_file,
-            selection_snapshot_state
         ],
     )
 
+    # — LIVE SUMMARY UPDATES (FIXED) —
     # =============================
-    # — LIVE SUMMARY UPDATES —
-    # =============================
+
     df.change(
+        fn=update_enriched_from_df,
+        inputs=[df, enriched_state, locked],
+        outputs=enriched_state,
+    ).then(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy_state],
-        outputs=[html_out, generate_row, summary],
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        outputs=[summary, gen_btn],
     )
+
     fee_rate.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy_state],
-        outputs=[html_out, generate_row, summary],
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        outputs=[summary, gen_btn],
     )
     future_fee.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy_state],
-        outputs=[html_out, generate_row, summary],
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        outputs=[summary, gen_btn],
     )
     thank_you.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy_state],
-        outputs=[html_out, generate_row, summary],
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        outputs=[summary, gen_btn],
+    
     )
-    strategy.change(fn=lambda x: x, inputs=strategy, outputs=strategy_state)
+
+    demo.load(
+        fn=generate_summary_safe,
+        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        outputs=[summary, gen_btn]
+    )
 
     strategy.change(
         fn=analyze,
         inputs=[addr_input, strategy, dust, dest, fee_rate, thank_you, future_fee, offline_toggle, manual_utxo_input],
         outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
     )
+
     dust.change(
         fn=analyze,
         inputs=[addr_input, strategy, dust, dest, fee_rate, thank_you, future_fee, offline_toggle, manual_utxo_input],
         outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
     )
-
 
     # CRITICAL: DO NOT use .change() on fee_rate/future_fee for anything else
     # 5. FOOTER
