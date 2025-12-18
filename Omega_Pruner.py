@@ -1279,7 +1279,7 @@ def generate_psbt(psbt_snapshot: dict):
     <div style="margin-top:20px;color:#00ffaa;font-size:1.1rem;line-height:1.6;
             text-shadow:0 0 16px #0f0,
                         0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;">
-    <span style="font-weight:900;">Provable Intent</span> • Cryptographic proof of your pruning selection<br>
+    Provable Intent • Cryptographic proof of your pruning selection<br>
     Audit-proof • Deterministic • Never changes
 </div>
     <button onclick="navigator.clipboard.writeText('{fingerprint}').then(() => {{this.innerText='COPIED'; setTimeout(() => this.innerText='COPY', 1500);}})"
@@ -1318,7 +1318,7 @@ def generate_psbt(psbt_snapshot: dict):
             <div style="text-align:center;margin-top:12px;">
                 <span style="color:#00f0ff;font-weight:700;text-shadow:0 0 10px #0f0;">RBF enabled</span>
                 <span style="color:#888;"> • Raw PSBT • </span>
-                <span style="color:#666;font-size:0.9rem;">Tip: Tap inside to select all • inspect before signing</span>
+                <span style="color:#666;font-size:0.9rem;">Inspect before signing</span>
             </div>
         </div>
 
@@ -1823,7 +1823,7 @@ No API calls • Fully air-gapped safe""",
         </div>
         
         <!-- Extra reassurance — bright cyan for clarity -->
-        <div style='color:#00ffdd;font-size:1.1rem;opacity:0.9;
+        <div style='color:#00ffdd;font-size:1.1rem;opacity:0.9;font-weight:600;
                     text-shadow:0 2px 4px #000, 0 4px 12px #000000cc,
                                 0 8px 20px #000000aa;
                     max-width:640px;margin:0 auto;'>
