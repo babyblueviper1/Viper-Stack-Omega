@@ -1276,11 +1276,12 @@ def generate_psbt(psbt_snapshot: dict):
                             0 4px 8px #000, 0 8px 20px #000000ee;">
         {fingerprint}
     </div>
- <div style="margin-top:20px;color:#aaffaa;font-size:1.1rem;line-height:1.6;
-            text-shadow:0 2px 4px #000, 0 4px 12px #000000cc;">
+<div style="margin-top:20px;color:#00ffdd;font-size:1.1rem;line-height:1.6;
+            text-shadow:0 0 12px #00ffdd,
+                        0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;">
     <span style="font-weight:900;">Provable Intent</span> • Cryptographic proof of your pruning selection<br>
     Audit-proof • Deterministic • Never changes
-    </div>
+</div>
     <button onclick="navigator.clipboard.writeText('{fingerprint}').then(() => {{this.innerText='COPIED'; setTimeout(() => this.innerText='COPY', 1500);}})"
         style="margin-top:16px;padding:8px 20px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:12px;
                font-size:1.1rem;font-weight:800;cursor:pointer;box-shadow:0 0 20px #0f0;">
