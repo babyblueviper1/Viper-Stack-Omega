@@ -1805,17 +1805,19 @@ No API calls • Fully air-gapped safe""",
             🔒 SELECTION FROZEN
         </div>
         
-        <!-- Subtext — trust + audit focus -->
+         <!-- Core message — clear intent -->
         <div style='color:#aaffaa;font-size:1.4rem;font-weight:700;
                     text-shadow:0 0 20px #0f0;max-width:720px;margin:0 auto 16px auto;
                     line-height:1.6;'>
             Your pruning intent is now immutable • Permanent audit trail secured
         </div>
         
-        <!-- Extra reassurance -->
+        <!-- Extra reassurance — exactly what you wanted -->
         <div style='color:#00ff9d;font-size:1.1rem;opacity:0.9;max-width:640px;margin:0 auto;'>
-            Includes full selection fingerprint • Provable • Never changes<br>
-            Download for backup, verification, or future reference
+            The file below includes:<br>
+            • Full selection fingerprint • All selected UTXOs • Transaction parameters<br>
+            Provable • Deterministic • Never changes<br><br>
+            Download for backup, offline verification, or future reference
         </div>
     </div>
     """)
