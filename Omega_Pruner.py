@@ -863,8 +863,8 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                 tuple(),
                 "",
                 gr.update(visible=False),
-                gr.update(),
-				gr.update(visible=False)
+                gr.update(visible=False),
+				gr.update(visible=False),
             )
 
         for line in manual_str.splitlines():
@@ -908,8 +908,8 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                 tuple(),
                 "",
                 gr.update(visible=False),
-                gr.update(),
-				gr.update(visible=False)
+                gr.update(visible=False),
+				gr.update(visible=False),
             )
 
     else:  # online mode
@@ -923,7 +923,7 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                 tuple(),
                 "",
                 gr.update(visible=False),
-                gr.update(),
+                gr.update(visible=False),
 				gr.update(visible=False),
             )
 
@@ -982,8 +982,8 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                 tuple(),
                 "",
                 gr.update(visible=False),
-                gr.update(),
-				gr.update(visible=False)
+                gr.update(visible=False),
+				gr.update(visible=False),
             )
 
     # ===============================
@@ -1029,7 +1029,7 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
     import copy
     frozen_enriched = tuple(copy.deepcopy(u) for u in enriched_sorted)
 
-    return "", gr.update(value=df_rows), frozen_enriched, "", gr.update(visible=True), gr.update(), gr.update(visible=True)
+    return "", gr.update(value=df_rows), frozen_enriched, "", gr.update(visible=True), gr.update(visible=True), gr.update(visible=True)
     
 def generate_summary(
     enriched_state: tuple,
@@ -1061,28 +1061,42 @@ def generate_summary(
 
     # Banner — neutral, no live strategy (injected later via wrapper)
     banner_html = f"""
-    <div style="text-align:center;margin:30px 0;padding:20px;background:#000;
-                border:3px solid #f7931a;border-radius:16px;
-                box-shadow:0 0 60px rgba(247,147,26,0.6);">
-      <div style="color:#0f0;font-size:2.4rem;font-weight:900;
-                  letter-spacing:2px;text-shadow:0 0 30px #0f0;">
-        ANALYSIS COMPLETE
-      </div>
-      <div style="color:#f7931a;font-size:1.8rem;font-weight:900;margin:16px 0;">
-        {total_utxos:,} UTXOs • Pruning Strategy Active
-      </div>
-      <div style="color:#fff;font-size:1.4rem;font-weight:700;">
-        Will prune <span style="color:#ff6600;font-weight:800;">
-        {pruned_count:,}</span> inputs
-      </div>
-      <div style="color:#fff;font-size:1.6rem;font-weight:800;margin:20px 0;">
-        Privacy Score:
-        <span style="color:{score_color};
-                     text-shadow:0 0 20px {score_color};">
-            {privacy_score}/100
-        </span>
-      </div>
-    </div>
+   <div style="text-align:center;margin:40px 0 30px 0;padding:24px;background:#000;
+            border:3px solid #f7931a;border-radius:18px;
+            box-shadow:0 0 70px rgba(247,147,26,0.5);">
+
+  <div style="color:#0f0;font-size:2.6rem;font-weight:900;
+              letter-spacing:3px;text-shadow:0 0 35px #0f0, 0 0 70px #0f0;">
+    ANALYSIS COMPLETE
+  </div>
+
+  <div style="color:#f7931a;font-size:1.9rem;font-weight:800;margin:20px 0 16px 0;">
+    {total_utxos:,} UTXOs Analyzed
+  </div>
+
+  <div style="color:#fff;font-size:1.5rem;font-weight:700;margin:12px 0;">
+    Ready to prune <span style="color:#ff6600;font-weight:900;">{pruned_count:,}</span> inputs
+  </div>
+
+  <div style="color:#fff;font-size:1.7rem;font-weight:800;margin:24px 0 8px 0;">
+    Privacy Impact:
+    <span style="color:{score_color};font-size:2.2rem;margin-left:12px;
+                 text-shadow:0 0 25px {score_color};">
+      {privacy_score}/100
+    </span>
+  </div>
+
+  <div style="color:#aaffaa;font-size:1.15rem;margin-top:28px;opacity:0.92;line-height:1.7;">
+    <strong>Full coin control:</strong> Scroll down to review table<br>
+    Check/uncheck UTXOs manually • Adjust selection as needed
+    <br><br>
+    When ready → Click <strong>GENERATE NUCLEAR PSBT</strong>
+    <br>
+    <span style="font-size:0.95rem;opacity:0.8;">
+      Have a previous selection? Upload .json below to restore exact checkboxes
+    </span>
+  </div>
+</div>
     """
 
     button_visibility = gr.update(visible=bool(pruned_utxos))
@@ -1224,6 +1238,14 @@ def generate_summary_safe(
             "</div>",
             gr.update(visible=False)
         )
+
+    # Safely extract short strategy name
+    strategy_value = getattr(strategy, "value", "Recommended")
+    strategy_label = (
+        strategy_value.split(" — ")[0]
+        if isinstance(strategy_value, str) and " — " in strategy_value
+        else "Recommended"
+    )
 
     banner_html, button_vis, details_html = generate_summary(
         enriched_state, fee_rate, future_fee_rate, dao_percent
@@ -1960,13 +1982,13 @@ No API calls • Fully air-gapped safe""",
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
 
-        # ALWAYS define generate row here (between banner and analyze)
-        with gr.Row() as generate_row:  # No visible=False
+        # Generate row — hidden until analysis complete
+        with gr.Row(visible=False) as generate_row:
             gen_btn = gr.Button(
                 "2. GENERATE NUCLEAR PSBT",
                 variant="primary",
-                elem_id="generate-btn",
-                visible=False  # ← Hide the button itself initially
+                elem_id="generate-btn"
+                # No visible=False here — the whole row controls it
             )
 
         # PSBT output — placed right below the generate row
@@ -2175,7 +2197,7 @@ No API calls • Fully air-gapped safe""",
             tuple(),                                     # enriched_state — empty frozen tuple
             "",                                          # summary — clear details
             gr.update(visible=True),                     # analyze_btn — show again
-            gr.update(),                    			# generate_row — hide PSBT UI
+            gr.update(visible=False),                    # generate_row — hide PSBT UI
             gr.update(value=[]),                         # df_rows (if separate)
             None,                                        # psbt_snapshot — wipe snapshot
             False,                                       # locked — unlock
