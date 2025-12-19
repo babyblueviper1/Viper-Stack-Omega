@@ -352,6 +352,82 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
     updated_list = sync_selection(df_rows, list(enriched_state), locked=False)  # locked already checked above
     return tuple(updated_list)
         
+def load_selection(json_file, current_enriched):
+    if not json_file:
+        return current_enriched, "No file selected"
+    
+    try:
+        with open(json_file.name, "r") as f:
+            snapshot = json.load(f)
+        
+        if not isinstance(snapshot, dict) or "inputs" not in snapshot:
+            return current_enriched, "Invalid Ωmega Pruner selection file"
+        
+        selected_keys = {
+            (u["txid"], u["vout"]) 
+            for u in snapshot.get("inputs", []) 
+            if isinstance(u, dict) and "txid" in u and "vout" in u
+        }
+        
+        if not current_enriched:
+            return current_enriched, (
+                "<div style='color:#00ff9d;padding:20px;background:#002200;border-radius:12px;text-align:center;'>"
+                "<strong>Selection file loaded!</strong><br><br>"
+                "Now paste the same addresses/xpubs → click <strong>ANALYZE</strong><br>"
+                "Then upload this file again to restore your exact checkboxes."
+                "</div>"
+            )
+        
+        updated = []
+        matched_count = 0
+        for u in current_enriched:
+            new_u = dict(u)
+            is_selected = (u["txid"], u["vout"]) in selected_keys
+            new_u["selected"] = is_selected
+            if is_selected:
+                matched_count += 1
+            updated.append(new_u)
+        
+        if matched_count == 0:
+            message = (
+                "<div style='color:#ff9900;padding:20px;background:#331100;border-radius:12px;text-align:center;'>"
+                "<strong>Selection loaded — no matching UTXOs found</strong><br><br>"
+                f"File contains {len(selected_keys)} UTXOs.<br>"
+                "They don't match current analysis (different addresses?).<br>"
+                "Checkboxes not restored."
+                "</div>"
+            )
+        else:
+            message = f"Selection loaded — {matched_count}/{len(selected_keys)} UTXOs restored"
+        
+        return tuple(updated), message
+    
+    except Exception as e:
+        return current_enriched, f"Failed to load: {str(e)}"
+
+def rebuild_df_rows(enriched_state):
+    if not enriched_state:
+        return []
+    
+    # Sort same as in analyze() for consistency
+    enriched_sorted = sorted(enriched_state, key=lambda u: HEALTH_PRIORITY[u["health"]])
+    
+    df_rows = []
+    for u in enriched_sorted:
+        health_html = f'<div class="health health-{u["health"].lower()}">{u["health"]}<br><small>{u["recommend"]}</small></div>'
+        df_rows.append([
+            u.get("selected", False),
+            u.get("source", "Single"),
+            u["txid"],
+            u["vout"],
+            u["value"],
+            u["address"],
+            u["input_weight"],
+            u["script_type"],
+            health_html,
+        ])
+    return df_rows
+
 def sats_to_btc_str(sats: int) -> str:
     btc = sats / 100_000_000
     if btc >= 1:
@@ -767,7 +843,7 @@ def scan_xpub(xpub: str, dust: int = 546, gap_limit: int = 20) -> Tuple[List[dic
         return [], f"Error: {str(e)[:120]}"
 
 
-def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider, offline_mode, manual_utxo_input, locked):
+def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, dao_slider, future_fee_slider, offline_mode, manual_utxo_input, import_file_visible=False):
     # === SAFE INPUT CLAMPING ===
     fee_rate        = max(1,   min(500,  _coerce_int(fee_rate_slider, 15)))
     future_fee_rate = max(1,   min(1000, _coerce_int(future_fee_slider, 60)))
@@ -776,31 +852,22 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
 
     all_enriched = []
 
-    # === LOCK GUARD — irreversible after PSBT generation ===
-    if locked:
-        return (
-            "<div style='color:#ff3366;text-align:center;padding:30px;font-weight:700;'>"
-            "Selection is locked. Use NUCLEAR RESET to start over."
-            "</div>",
-            gr.update(),           # df unchanged
-            gr.update(),           # enriched_state unchanged
-            gr.update(),           # summary unchanged
-            gr.update(visible=False),
-            gr.update(visible=False),
-        )
-
     if offline_mode:
-        if not manual_utxo_input.strip():
+        manual_str = (manual_utxo_input or "").strip()
+        if not manual_str:
             return (
-                "<div style='color:#ff3366;text-align:center;padding:30px;'>No manual UTXOs provided</div>",
+                "<div style='color:#ff3366;text-align:center;padding:30px;font-weight:700;'>"
+                "No manual UTXOs provided"
+                "</div>",
                 gr.update(value=[]),
                 tuple(),
                 "",
                 gr.update(visible=False),
-                gr.update(visible=False),
+                gr.update(),
+				gr.update(visible=False)
             )
 
-        for line in manual_utxo_input.strip().splitlines():
+        for line in manual_str.splitlines():
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
@@ -841,20 +908,26 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                 tuple(),
                 "",
                 gr.update(visible=False),
-                gr.update(visible=False),
+                gr.update(),
+				gr.update(visible=False)
             )
 
-    else:
-        entries = [e.strip() for e in addr_input.strip().splitlines() if e.strip()]
-        if not entries:
+    else:  # online mode
+        addr_str = (addr_input or "").strip()
+        if not addr_str:
             return (
-                "<div style='color:#ff3366;text-align:center;padding:30px;'>No addresses provided</div>",
+                "<div style='color:#ff3366;text-align:center;padding:30px;font-weight:700;'>"
+                "No addresses provided"
+                "</div>",
                 gr.update(value=[]),
                 tuple(),
                 "",
                 gr.update(visible=False),
-                gr.update(visible=False),
+                gr.update(),
+				gr.update(visible=False),
             )
+
+        entries = [e.strip() for e in addr_str.splitlines() if e.strip()]
 
         for entry in entries:
             is_xpub = entry[:4] in ("xpub", "ypub", "zpub", "tpub", "upub", "vpub")
@@ -909,7 +982,8 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
                 tuple(),
                 "",
                 gr.update(visible=False),
-                gr.update(visible=False),
+                gr.update(),
+				gr.update(visible=False)
             )
 
     # ===============================
@@ -955,7 +1029,7 @@ def analyze(addr_input, strategy, dust_threshold, dest_addr, fee_rate_slider, da
     import copy
     frozen_enriched = tuple(copy.deepcopy(u) for u in enriched_sorted)
 
-    return "", gr.update(value=df_rows), frozen_enriched, "", gr.update(visible=True), gr.update(visible=True)
+    return "", gr.update(value=df_rows), frozen_enriched, "", gr.update(visible=True), gr.update(), gr.update(visible=True)
     
 def generate_summary(
     enriched_state: tuple,
@@ -1256,7 +1330,8 @@ def generate_psbt(psbt_snapshot: dict):
         </div>
         """
 
-    return f"""
+    psbt_html = f"""
+	<div style="height: 100px;"></div>
     <div style="text-align:center;margin:60px auto 0px;max-width:960px;">
     <div style="display:inline-block;padding:55px;background:#000;border:14px solid #f7931a;border-radius:36px;
                 box-shadow:0 0 140px rgba(247,147,26,0.95);
@@ -1336,7 +1411,23 @@ def generate_psbt(psbt_snapshot: dict):
 
     </div>
     </div>
-    """, gr.update(visible=False), gr.update(visible=False), "", gr.update(visible=True), gr.update(visible=True), psbt_snapshot
+<script>
+    window.location.href = "#psbt-section";
+</script>
+
+    """
+
+    return (
+        psbt_html,
+        gr.update(visible=False),
+        gr.update(visible=False),
+        "",
+        gr.update(visible=True),
+        gr.update(visible=True),
+        psbt_snapshot
+    )
+
+
   
 # Define functions at top level (outside any with blocks)
 def on_generate(
@@ -1608,6 +1699,74 @@ with gr.Blocks(
     }
     </style>
     """)
+
+  # Global CSS for dark mode (pure black)
+    gr.HTML("""
+<style>
+    .dark-mode {
+        background: #000 !important;
+    }
+    .dark-mode .gradio-container,
+    .dark-mode .gr-panel,
+    .dark-mode .gr-form,
+    .dark-mode .gr-box,
+    .dark-mode textarea,
+    .dark-mode input,
+    .dark-mode .gr-button {
+        background: #000 !important;
+        color: #0f0 !important;
+        border-color: #f7931a !important;
+    }
+    .dark-mode .gr-button:hover {
+        background: #f7931a !important;
+        color: #000 !important;
+    }
+        /* Visible, glowing checkbox tick in dark mode */
+      /* Nuclear checkbox — visible tick + green fill from the start */
+    input[type="checkbox"] {
+        width: 28px !important;
+        height: 28px !important;
+        accent-color: #0f0 !important;
+        background: #000 !important;
+        border: 3px solid #f7931a !important;
+        border-radius: 8px !important;
+        cursor: pointer;
+        box-shadow: 0 0 20px rgba(247,147,26,0.6) !important;
+        appearance: none;                    /* Remove native look */
+        position: relative;
+    }
+
+    /* Green fill when checked — works immediately */
+    input[type="checkbox"]:checked {
+        background: #0f0 !important;
+        box-shadow: 0 0 30px #0f0 !important;
+    }
+
+    /* Custom black checkmark */
+    input[type="checkbox"]:checked::after {
+        content: '✓';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #000;
+        font-size: 20px;
+        font-weight: 900;
+        pointer-events: none;
+    }
+
+    /* Light mode fallback */
+    :not(.dark-mode) input[type="checkbox"] {
+        accent-color: #f7931a !important;
+        background: #fff !important;
+        border-color: #0f0 !important;
+    }
+    :not(.dark-mode) input[type="checkbox"]:checked {
+        background: #f7931a !important;
+    }
+</style>
+""")
+  
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
     # =============================
@@ -1671,19 +1830,26 @@ with gr.Blocks(
     # ========================= UI STARTS HERE ========================
     # =================================================================
     with gr.Column():
-        # Mode status — big, bold, impossible to miss
+        # Live status banner
         mode_status = gr.Markdown(
-            value="**Online mode** • API calls enabled",
-            elem_classes="mode-status"  # optional: for extra styling
+            value="**🌙 Dark • Online mode** • API calls enabled"
         )
 
         with gr.Row():
-            offline_toggle = gr.Checkbox(
-                label="🔒 Offline mode — no internet / API calls (fully air-gapped)",
-                value=False,
-                interactive=True,
-                info="Disables all network requests. No data leaves your machine in offline mode. Safe for air-gapped or privacy-focused use.",
-            )
+            with gr.Column(scale=1, min_width=220):
+                offline_toggle = gr.Checkbox(
+                    label="🔒 Offline / Air-Gapped Mode",
+                    value=False,
+                    interactive=True,
+                    info="No API calls • Paste raw UTXOs below • True cold wallet prep",
+                )
+            with gr.Column(scale=1, min_width=220):
+                theme_toggle = gr.Checkbox(
+                    label="🌙 Dark Mode (pure black)",
+                    value=True,
+                    interactive=True,
+                    info="Retinal protection • Nuclear glow preserved • Recommended",
+                )
 
         addr_input = gr.Textbox(
             label="Address or xpub (one per line for batch mode) — 100% non-custodial, keys never entered",
@@ -1707,18 +1873,22 @@ No API calls • Fully air-gapped safe""",
                 lines=10,
             )
 
-        # === Seamless mode switching with guidance ===
+        # === Seamless mode switching + dark mode + live status ===
+        def update_status_and_ui(offline, dark):
+            theme_icon = "🌙 Dark" if dark else "☀️ Light"
+            mode = "Offline 🔒" if offline else "Online"
+            api_note = "No API calls • Fully air-gapped" if offline else "API calls enabled"
+            return f"**{theme_icon} • {mode}** • {api_note}"
+
         offline_toggle.change(
             fn=lambda x: gr.update(visible=x),
             inputs=offline_toggle,
             outputs=manual_box_row,
         ).then(
-            # Clear main address box when entering offline
             fn=lambda x: gr.update(value="") if x else gr.update(),
             inputs=offline_toggle,
             outputs=addr_input,
         ).then(
-            # Gray out + change placeholder to guide user to the correct box
             fn=lambda x: gr.update(
                 interactive=not x,
                 placeholder="🔒 Offline mode active — paste raw UTXOs in the box below 👇" if x
@@ -1727,153 +1897,166 @@ No API calls • Fully air-gapped safe""",
             inputs=offline_toggle,
             outputs=addr_input,
         ).then(
-            # Update mode status banner
-            fn=lambda x: 
-                "**🔒 Offline mode** • No API calls • Fully air-gapped" if x 
-                else "**Online mode** • API calls enabled",
-            inputs=offline_toggle,
-            outputs=mode_status,
+            fn=update_status_and_ui,
+            inputs=[offline_toggle, theme_toggle],
+            outputs=mode_status
         )
 
-    with gr.Row():
-        strategy = gr.Dropdown(
-            choices=[
-                "Privacy First — ~30% pruned (lowest CIOH risk)",
-                "Recommended — ~40% pruned (balanced savings & privacy)",
-                "More Savings — ~50% pruned (stronger fee reduction)",
-                "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)",
+        theme_toggle.change(
+            fn=update_status_and_ui,
+            inputs=[offline_toggle, theme_toggle],
+            outputs=mode_status
+        )
+
+        # Strategy dropdown
+        with gr.Row():
+            strategy = gr.Dropdown(
+                choices=[
+                    "Privacy First — ~30% pruned (lowest CIOH risk)",
+                    "Recommended — ~40% pruned (balanced savings & privacy)",
+                    "More Savings — ~50% pruned (stronger fee reduction)",
+                    "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)",
+                ],
+                value="Recommended — ~40% pruned (balanced savings & privacy)",
+                label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
+            )
+
+        # Dust + Destination
+        with gr.Row():
+            dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
+            dest = gr.Textbox(
+                label="Change Address (optional)",
+                placeholder="Leave blank → reuse first input",
+            )
+
+        # Fee sliders
+        with gr.Row():
+            fee_rate = gr.Slider(
+                1, 300, 15, step=1, label="Fee Rate now (sat/vB)", scale=3,
+            )
+            future_fee = gr.Slider(
+                5, 500, 60, step=1, label="Future fee rate in 3–6 months (sat/vB)", scale=3,
+            )
+            thank_you = gr.Slider(
+                0, 5, 0.5, step=0.1, label="Thank-You / DAO Donation (%)", scale=2,
+            )
+
+        # Fee preset buttons
+        with gr.Row():
+            economy_btn = gr.Button("Economy", size="sm", elem_classes="fee-btn")
+            hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn")
+            halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
+            fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
+       
+        html_out = gr.HTML()  # Banner
+
+        analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
+
+        summary = gr.HTML()
+        # States (invisible)
+        enriched_state = gr.State([])
+        locked = gr.State(False)
+        psbt_snapshot = gr.State(None)
+        locked_badge = gr.HTML("")  # Starts hidden
+        selection_snapshot_state = gr.State({})
+
+        # ALWAYS define generate row here (between banner and analyze)
+        with gr.Row() as generate_row:  # No visible=False
+            gen_btn = gr.Button(
+                "2. GENERATE NUCLEAR PSBT",
+                variant="primary",
+                elem_id="generate-btn",
+                visible=False  # ← Hide the button itself initially
+            )
+
+        # PSBT output — placed right below the generate row
+        psbt_output = gr.HTML("")
+
+        # Import file last
+        import_file = gr.File(
+            label="Restore Previous Ωmega Selection: Upload your saved .json file",
+            file_types=[".json"],
+            type="filepath",
+            visible=False,
+        )
+
+
+        # Export sections
+        with gr.Row(visible=False) as export_title_row:
+            gr.HTML("""
+            <div style='text-align:center;padding:40px 0 30px 0;'>
+                <!-- Main Header — FROZEN = icy blue theme -->
+                <div style='color:#00ddff;font-size:2.6rem;font-weight:900;
+                            letter-spacing:8px;
+                            text-shadow:0 0 40px #00ddff, 0 0 80px #00ddff,
+                                        0 4px 8px #000, 0 8px 20px #000000ee,
+                                        0 12px 32px #000000cc;
+                            margin-bottom:20px;'>
+                    🔒 SELECTION FROZEN
+                </div>
+                
+                <!-- Core message — back to signature green -->
+                <div style='color:#aaffaa;font-size:1.4rem;font-weight:700;
+                            text-shadow:0 0 20px #0f0,
+                                        0 3px 6px #000, 0 6px 16px #000000dd,
+                                        0 10px 24px #000000bb;
+                            max-width:720px;margin:0 auto 16px auto;
+                            line-height:1.6;'>
+                    Your pruning intent is now immutable • Permanent audit trail secured
+                </div>
+                
+                <!-- Extra reassurance — bright cyan for clarity -->
+                <div style='color:#00ffdd;font-size:1.1rem;opacity:0.9;font-weight:700;
+                            text-shadow:0 2px 4px #000, 0 4px 12px #000000cc,
+                                        0 8px 20px #000000aa;
+                            max-width:640px;margin:0 auto;'>
+                    The file below includes:<br>
+                    • Full selection fingerprint • All selected UTXOs • Transaction parameters<br><br>
+                    Download for backup, offline verification, or future reference
+                </div>
+            </div>
+            """)
+
+        with gr.Row(visible=False) as export_file_row:
+            export_file = gr.File(
+                label="",
+                interactive=False
+            )
+
+
+        df = gr.DataFrame(
+            headers=[
+                "PRUNE",
+                "Source",
+                "TXID",
+                "vout",
+                "Value (sats)",
+                "Address",
+                "Weight (wu)",
+                "Type",
+                "Health",
             ],
-            value="Recommended — ~40% pruned (balanced savings & privacy)",
-            label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
+            datatype=["bool", "str", "str", "number", "number", "str", "number", "str", "html"],
+            type="array",
+            interactive=True,
+            wrap=True,
+            row_count=(5, "dynamic"),
+            max_height=500,
+            max_chars=None,
+            label="CHECK TO PRUNE • Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = prune",
+            static_columns=[1, 2, 3, 4, 5, 6, 7],
+            column_widths=["90px", "160px", "200px", "70px", "140px", "160px", "130px", "90px", "100px"]
         )
 
-    with gr.Row():
-        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
-        dest = gr.Textbox(
-            label="Change Address (optional)",
-            placeholder="Leave blank → reuse first input",
-        )
-
-    with gr.Row():
-        fee_rate = gr.Slider(
-            1, 300, 15, step=1, label="Fee Rate now (sat/vB)", scale=3,
-        )
-        future_fee = gr.Slider(
-            5,
-            500,
-            60,
-            step=1,
-            label="Future fee rate in 3–6 months (sat/vB)",
-            scale=3,
-        )
-        thank_you = gr.Slider(
-            0, 5, 0.5, step=0.1, label="Thank-You / DAO Donation (%)", scale=2,
-        )
-
-    # Fee preset buttons
-    with gr.Row():
-        economy_btn = gr.Button("Economy", size="sm", elem_classes="fee-btn")
-        hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn")
-        halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
-        fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
-        
- 
-    html_out = gr.HTML()
-
-    
-    with gr.Row(visible=False) as generate_row:
-        gen_btn = gr.Button("2. GENERATE NUCLEAR PSBT", variant="primary", elem_id="generate-btn")
-    
-
-    # Rest of outputs & State
-   
-    summary = gr.HTML()
-    enriched_state = gr.State([])
-    locked = gr.State(False)
-    psbt_snapshot = gr.State(None)
-    locked_badge = gr.HTML("")  # Starts hidden
-    selection_snapshot_state = gr.State({})   # dict
-
-
-    analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
-
-    # Export button and file output
-    # First row: the title — centered and prominent
-    with gr.Row(visible=False) as export_title_row:
-        gr.HTML("""
-       <div style='text-align:center;padding:40px 0 30px 0;'>
-        <!-- Main Header — FROZEN = icy blue theme -->
-        <div style='color:#00ddff;font-size:2.6rem;font-weight:900;
-                    letter-spacing:8px;
-                    text-shadow:0 0 40px #00ddff, 0 0 80px #00ddff,
-                                0 4px 8px #000, 0 8px 20px #000000ee,
-                                0 12px 32px #000000cc;
-                    margin-bottom:20px;'>
-            🔒 SELECTION FROZEN
-        </div>
-        
-        <!-- Core message — back to signature green -->
-        <div style='color:#aaffaa;font-size:1.4rem;font-weight:700;
-                    text-shadow:0 0 20px #0f0,
-                                0 3px 6px #000, 0 6px 16px #000000dd,
-                                0 10px 24px #000000bb;
-                    max-width:720px;margin:0 auto 16px auto;
-                    line-height:1.6;'>
-            Your pruning intent is now immutable • Permanent audit trail secured
-        </div>
-        
-        <!-- Extra reassurance — bright cyan for clarity -->
-        <div style='color:#00ffdd;font-size:1.1rem;opacity:0.9;font-weight:700;
-                    text-shadow:0 2px 4px #000, 0 4px 12px #000000cc,
-                                0 8px 20px #000000aa;
-                    max-width:640px;margin:0 auto;'>
-            The file below includes:<br>
-            • Full selection fingerprint • All selected UTXOs • Transaction parameters<br><br>
-            Download for backup, offline verification, or future reference
-        </div>
-    </div>
-    """)
-
-    # Second row: the actual file download
-    with gr.Row(visible=False) as export_file_row:
-        export_file = gr.File(
-            label="",                     # no duplicate label
-            interactive=False
-        )
-
-    df = gr.DataFrame(
-        headers=[
-            "PRUNE",
-            "Source",
-            "TXID",
-            "vout",
-            "Value (sats)",
-            "Address",
-            "Weight (wu)",
-            "Type",
-            "Health",
-        ],
-        datatype=["bool", "str", "str", "number", "number", "str", "number", "str", "html"],
-        type="array",
-        interactive=True,
-        wrap=True,
-        row_count=(50, "dynamic"),
-        max_height=500,
-        max_chars=None,
-        label="CHECK TO PRUNE • Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = prune",
-        static_columns=[1, 2, 3, 4, 5, 6, 7],
-        column_widths=["90px", "160px", "200px", "70px", "140px", "160px", "130px", "90px", "100px"]
-    )
-
-    with gr.Column():
-        reset_btn = gr.Button("NUCLEAR RESET · START OVER", variant="secondary")
-        gr.HTML("""
-    <div style="text-align:center;margin-top:8px;">
-        <small style="color:#888;font-style:italic;">
-            Clears everything • No funds affected • Safe to use anytime
-        </small>
-    </div>
-    """)
+        with gr.Column():
+            reset_btn = gr.Button("NUCLEAR RESET · START OVER", variant="secondary")
+            gr.HTML("""
+            <div style="text-align:center;margin-top:8px;">
+                <small style="color:#888;font-style:italic;">
+                    Clears everything • No funds affected • Safe to use anytime
+                </small>
+            </div>
+            """)
     # =============================
     # — FEE PRESET BUTTONS WIRING —
     # =============================
@@ -1888,6 +2071,26 @@ No API calls • Fully air-gapped safe""",
             inputs=[future_fee, thank_you, locked],
             outputs=[fee_rate, summary],
         )
+
+	# =============================
+    # — Import File wiring
+    # =============================
+
+    import_file.change(
+        fn=load_selection,
+        inputs=[import_file, enriched_state],
+        outputs=[enriched_state, html_out]
+    ).then(
+    	fn=rebuild_df_rows,
+    	inputs=enriched_state,
+  	  	outputs=df
+	).then(
+    	fn=generate_summary_safe,
+    	inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+   		outputs=[summary, gen_btn]
+	)
+
+
     # =============================
     # — ANALYZE BUTTON —
     # =============================
@@ -1903,7 +2106,7 @@ No API calls • Fully air-gapped safe""",
             future_fee,
             offline_toggle,      # new
             manual_utxo_input],        # new
-        outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row],
+        outputs=[html_out, df, enriched_state, summary, gen_btn, generate_row, import_file],
     ).then(lambda: gr.update(visible=False), outputs=analyze_btn)
 
     # — GENERATE BUTTON (NUCLEAR LOCK + ANIMATED BADGE) —
@@ -1914,7 +2117,7 @@ No API calls • Fully air-gapped safe""",
     ).then(
         fn=generate_psbt,
         inputs=[psbt_snapshot],
-        outputs=[html_out, gen_btn, generate_row, summary, export_title_row, export_file_row, psbt_snapshot],
+        outputs=[psbt_output, gen_btn, generate_row, summary, export_title_row, export_file_row, psbt_snapshot],
     ).then(
         lambda: gr.update(interactive=False),  # Gray out dataframe checkboxes
         outputs=df,
@@ -1937,6 +2140,7 @@ No API calls • Fully air-gapped safe""",
             gr.update(interactive=False),  # hour_btn
             gr.update(interactive=False),  # economy_btn
             "<div class='locked-badge'>LOCKED</div>",
+			gr.update(visible=False, interactive=False),	#import_file
         ],
         outputs=[
             addr_input,
@@ -1953,6 +2157,7 @@ No API calls • Fully air-gapped safe""",
             hour_btn,
             economy_btn,
             locked_badge,
+			import_file,
         ],
     )
     # =============================
@@ -1970,7 +2175,7 @@ No API calls • Fully air-gapped safe""",
             tuple(),                                     # enriched_state — empty frozen tuple
             "",                                          # summary — clear details
             gr.update(visible=True),                     # analyze_btn — show again
-            gr.update(visible=False),                    # generate_row — hide PSBT UI
+            gr.update(),                    			# generate_row — hide PSBT UI
             gr.update(value=[]),                         # df_rows (if separate)
             None,                                        # psbt_snapshot — wipe snapshot
             False,                                       # locked — unlock
@@ -1991,6 +2196,9 @@ No API calls • Fully air-gapped safe""",
             gr.update(visible=False),                    # export_title_row
             gr.update(visible=False),                    # export_file_row
             None,                                        # export_file
+			gr.update(value=None,visible=False, interactive=True),  # import_file
+			gr.update(visible=False),                    # gen_btn ← Hide button again
+			"",
         )
 
     reset_btn.click(
@@ -2023,6 +2231,9 @@ No API calls • Fully air-gapped safe""",
             export_title_row,
             export_file_row,
             export_file,
+			import_file,
+			gen_btn,
+			psbt_output,
         ],
     )
 
@@ -2096,7 +2307,7 @@ No API calls • Fully air-gapped safe""",
             letter-spacing: 0.5px;
             text-shadow: 0 0 12px rgba(247,147,26,0.65);
         ">
-            Ωmega Pruner v10.6 — BATCH NUCLEAR + OFFLINE MODE
+            Ωmega Pruner v10.7 — Flow State
         </strong><br>
 
         <!-- GITHUB LINK -->
@@ -2147,6 +2358,38 @@ No API calls • Fully air-gapped safe""",
     </div>
     """,
     elem_id="omega_footer",
+)
+
+    # === DARK MODE PERSISTENCE JS — MUST BE INSIDE BLOCKS ===
+    demo.load(
+        fn=None,
+        js="""
+    () => {
+        const key = 'omega_dark_mode';
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        const themeCheckbox = checkboxes.length >= 2 ? checkboxes[1] : checkboxes[0];
+        
+        // Force dark mode on initial load
+        document.body.classList.add('dark-mode');
+        localStorage.setItem(key, 'true');
+        
+        const saved = localStorage.getItem(key);
+        let isDark = saved === 'true';
+        if (saved === null) isDark = true;
+        
+        themeCheckbox.checked = isDark;
+        
+        themeCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.body.classList.add('dark-mode');
+                localStorage.setItem(key, 'true');
+            } else {
+                document.body.classList.remove('dark-mode');
+                localStorage.setItem(key, 'false');
+            }
+        });
+    }
+    """
 )
 
 if __name__ == "__main__":
