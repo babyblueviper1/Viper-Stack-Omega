@@ -645,19 +645,24 @@ def estimate_tx_economics(
     fee = max(600, int(vsize * fee_rate))  # Minimum effective 1 sat/vB
     remaining = total_in - fee
 
-    # DAO contribution (dust-proof)
+    # DAO contribution
     dao_raw = int(remaining * (dao_percent / 100.0)) if dao_percent > 0 else 0
-    dao_amt = dao_raw if dao_raw >= 546 else 0
-    if 0 < dao_raw < 546:
-        fee += dao_raw
 
-    remaining -= dao_amt
+    if dao_raw >= 546:
+        dao_amt = dao_raw
+    else:
+        dao_amt = 0
+        remaining -= dao_raw   # ← CRITICAL: subtract absorbed dust from remaining
+        fee += dao_raw         # absorb into fee
 
-    # Change output (dust-safe)
+    remaining -= dao_amt       # subtract successful donation (if any)
+
+    # Change output — dust-safe
     change_amt = remaining if remaining >= 546 else 0
-    if 0 < remaining < 546:
-        fee += remaining
+    if remaining > 0 and change_amt == 0:
+        fee += remaining       # absorb dust change
         remaining = 0
+        change_amt = 0
 
     return TxEconomics(
         total_in=total_in,
@@ -1280,14 +1285,12 @@ def generate_psbt(psbt_snapshot: dict):
         tx.tx_ins.append(TxIn(bytes.fromhex(u["txid"]), int(u["vout"])))
 
     # Dust-safe amounts
-    dao_amt = econ.dao_amt if econ.dao_amt >= 546 else 0
-    change_amt = econ.change_amt if econ.change_amt >= 546 else 0
 
-    if dao_amt > 0:
-        tx.tx_outs.append(TxOut(dao_amt, dao_spk))
-    if change_amt > 0:
-        tx.tx_outs.append(TxOut(change_amt, dest_spk))
-
+    if econ.dao_amt > 0:
+        tx.tx_outs.append(TxOut(econ.dao_amt, dao_spk))
+    if econ.change_amt > 0:
+        tx.tx_outs.append(TxOut(econ.change_amt, dest_spk))
+		
     # === CRITICAL FIX: Legacy serialization (no SegWit marker, no witness) ===
     raw_tx = (
         tx.version.to_bytes(4, 'little') +
