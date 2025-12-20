@@ -1,11 +1,11 @@
-# Ωmega Pruner v10.6 — BATCH NUCLEAR + OFFLINE MODE
+# **Ωmega Pruner v10.7 — Flow State**
 
-**The last UTXO consolidator you’ll ever need. Now with batch analysis, fully offline/air-gapped mode, and unbreakable sovereignty.**
+**The last UTXO consolidator you’ll ever need. Batch analysis, fully offline/air-gapped mode, selection JSON export, dark mode toggle, and unbreakable sovereignty.**
 
 **LIVE:** https://omega-pruner.onrender.com  
-**Launched:** 17 December 2025
+**Launched:** 19 December 2025
 
-| Property                              | Ωmega Pruner v10.6                                      | Everyone Else in 2025 |
+| Property                              | Ωmega Pruner v10.7                                      | Everyone Else in 2025 |
 | ------------------------------------- | --------------------------------------------------------- | --------------------- |
 | Private keys ever leave your browser? | Never                                                     | Some still do         |
 | Transaction encoding                  | Hand-rolled, bit-perfect, zero dependencies               | Usually broken        |
@@ -20,10 +20,12 @@
 | Dust creation                         | Literally impossible — <546 sats absorbed with warning    | Still happens         |
 | **Per-input weight column in wu**     | **LIVE**                                                  | Never                 |
 | **Pre-prune vs post-prune vsize**     | **LIVE**                                                  | Never                 |
-| **Live % savings + NUCLEAR badge**    | **LIVE** — 70%+ = blinding radioactive NUCLEAR            | Never                 |
-| **“Pruning today saves you X sats”**  | **LIVE** — 100k+ = “NUCLEAR MOVE” in burning green        | Never                 |
+| **Live % savings + NUCLEAR badge**    | **LIVE — 70%+ = blinding radioactive NUCLEAR**            | Never                 |
+| **“Pruning today saves you X sats”**  | **LIVE — 100k+ = “NUCLEAR MOVE” in burning green**        | Never                 |
 | **Batch mode (multiple addresses/xpubs)** | **LIVE — one screen, selective prune across sources** | Never                 |
 | **Fully offline / air-gapped mode**   | **LIVE — paste raw UTXOs, zero API calls**                | Never                 |
+| **Selection JSON export + fingerprint**| **LIVE — audit-proof snapshot of exact pruned inputs**   | Never                 |
+| **Dark mode toggle**                  | **LIVE — pure black with nuclear glow**                   | Rarely                |
 | 100% match between preview & final PSBT| **LIVE**                                                 | Usually lies          |
 | Privacy + fee trade-off warnings      | Blood-red reactor alarm + green reassurance               | Sugar-coated or silent|
 | Zero blur, zero 900-weight text       | **EVERY PIXEL IS CRISP FOREVER**                          | Blurry garbage        |
@@ -33,42 +35,30 @@
 1. Toggle **🔒 Offline mode** → paste raw UTXOs (txid:vout:value) → fully air-gapped  
    OR  
    Paste multiple addresses / xpubs (one per line)  
-2. Click any live fee button → **instant fee + future-fee jump + summary refresh**  
-3. **1. ANALYZE** → see current vsize if you sent everything today  
-4. Check/uncheck UTXOs → **watch Privacy Score drop and CIOH warnings appear in real time**  
-5. **2. GENERATE NUCLEAR PSBT** → see final Privacy Score + CIOH warning one last time, then watch the vsize collapse and the **NUCLEAR** badge ignite  
-6. Scan the giant QR or tap **COPY PSBT** → sign → broadcast → win forever
+2. Toggle **🌙 Dark mode** for pure black nuclear glow  
+3. Click any live fee button → **instant fee + future-fee jump + summary refresh**  
+4. **1. ANALYZE** → see current vsize if you sent everything today  
+5. Check/uncheck UTXOs → **watch Privacy Score drop and CIOH warnings appear in real time**  
+6. **2. GENERATE NUCLEAR PSBT** → export selection JSON + fingerprint → see final Privacy Score one last time, then watch the vsize collapse and the **NUCLEAR** badge ignite  
+7. Scan the giant QR or tap **COPY PSBT** → sign → broadcast → win forever
 
 Works flawlessly with **every wallet in 2025+**:  
 Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trezor • Specter • Fully Noded • UniSat • OKX • Xverse • Leather • Aqua • Keystone
 
-### v10.6 — BATCH NUCLEAR + OFFLINE MODE
+### v10.7 — Flow State (dark toggle + JSON export)
+
+| New in v10.7                          | Status  | Effect                                           |
+| ------------------------------------- | ------- | ------------------------------------------------ |
+| **Pure dark mode toggle**             | LIVE    | Instant switch to pure black with preserved nuclear glow |
+| **Selection JSON export**             | LIVE    | Download exact pruned inputs + deterministic fingerprint for audit |
+| Batch + offline unchanged             | LIVE    | Still the most sovereign consolidator            |
+
+### v10.6 — BATCH NUCLEAR + OFFLINE MODE (still crushing)
 
 | New in v10.6                          | Status  | Effect                                           |
 | ------------------------------------- | ------- | ------------------------------------------------ |
 | **Batch mode**                        | LIVE    | Multiple addresses/xpubs → one analysis → selective prune across sources |
 | **Offline / air-gapped mode**         | LIVE    | Paste raw UTXOs → zero internet → true cold wallet prep |
-| **Selection fingerprint + JSON export**| LIVE    | Audit-friendly snapshot of exact pruned inputs   |
-| Still full Privacy Score + CIOH warnings | LIVE | No compromises — honesty unchanged               |
-| Still live fee oracle + NUCLEAR savings| LIVE    | Fee intelligence unchanged                       |
-
-### v10.5 — The Privacy Score Update (still crushing)
-
-| Feature                               | Status  | Effect                                           |
-| ------------------------------------- | ------- | ------------------------------------------------ |
-| **Privacy Score (0–100)**             | LIVE    | Instant, honest measure of CIOH + merging risk    |
-| **CIOH warnings spelled out**         | LIVE    | "Common Input Ownership Heuristic" explained clearly |
-| **Tiered warnings (Extreme / High / Moderate / Low)** | LIVE | Color-coded, impossible to ignore                 |
-| Privacy Score on final PSBT page      | LIVE    | Last-chance reality check before signing         |
-
-### v10.4 — The Fee Oracle Update (still crushing)
-
-| Feature                               | Status  | Effect                                           |
-| ------------------------------------- | ------- | ------------------------------------------------ |
-| Live mempool fee buttons              | LIVE    | One click = perfect fee every time               |
-| Instant summary refresh on fee change | LIVE    | No stale numbers, ever                           |
-| “Pruning today saves you X sats”      | LIVE    | 100k+ → “NUCLEAR MOVE” in pure green plasma     |
-| Zero-blur nuclear typography          | LIVE    | Every character is laser-etched, forever crisp  |
 
 ### Under the Hood — Canonical State Model
 
@@ -102,4 +92,4 @@ By quote only — pay for exactly the build you want.
 **Baby Blue Viper:** https://babyblueviper.com
 
 **Prune today. Win forever. • Ω**  
-**babyblueviper & the swarm** • 17 December 2025
+**babyblueviper & the swarm** • 19 December 2025
