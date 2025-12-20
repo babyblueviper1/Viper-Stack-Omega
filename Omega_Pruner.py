@@ -1923,7 +1923,7 @@ No API calls • Fully air-gapped safe""",
             outputs=mode_status
         )
 
-        # Strategy dropdown + Destination
+        # Strategy dropdown + Dust
         with gr.Row():
             strategy = gr.Dropdown(
                 choices=[
@@ -1935,7 +1935,7 @@ No API calls • Fully air-gapped safe""",
                 value="Recommended — ~40% pruned (balanced savings & privacy)",
                 label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
             )
-			dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
+            dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
 
         # Fee sliders
         with gr.Row():
