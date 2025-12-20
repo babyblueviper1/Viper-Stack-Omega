@@ -682,14 +682,13 @@ def encode_varint(i: int) -> bytes:
 class TxIn:
     prev_tx: bytes
     prev_index: int
-    script_sig: bytes = b''
     sequence: int = 0xfffffffd   # Enable RBF
 
     def serialize(self) -> bytes:
         return (
             self.prev_tx[::-1] +
             self.prev_index.to_bytes(4, 'little') +
-            encode_varint(len(self.script_sig)) + self.script_sig +
+            b'\x00' +                      # scriptSig length = 0
             self.sequence.to_bytes(4, 'little')
         )
 
@@ -711,31 +710,32 @@ class Tx:
 def create_psbt(tx_hex: str) -> str:
     tx = bytes.fromhex(tx_hex)
 
-    # Parse input and output counts
-    pos = 4  # skip version
+    # Parse input count
+    pos = 4
     input_count, shift = _read_varint(tx, pos)
     pos += shift
 
-    # Skip inputs to reach outputs
+    # Skip inputs
     for _ in range(input_count):
-        pos += 36  # prevout hash + index
+        pos += 36
         script_len, shift = _read_varint(tx, pos)
-        pos += shift + script_len + 4  # scriptSig + sequence
+        pos += shift + script_len + 4
 
+    # Parse output count
     output_count, _ = _read_varint(tx, pos)
 
     psbt = b'psbt\xff'
 
-    # Global unsigned transaction — correct key
+    # Global unsigned tx
     psbt += b'\x01\x00' + encode_varint(len(tx)) + tx + b'\x00'
 
-    # Empty input maps (required)
+    # Empty input maps
     psbt += b'\x00' * input_count
 
-    # Empty output maps (required)
+    # Empty output maps
     psbt += b'\x00' * output_count
 
-    psbt += b'\xff'
+    # ❌ NO trailing 0xff
 
     return base64.b64encode(psbt).decode()
 
