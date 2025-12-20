@@ -710,13 +710,48 @@ class Tx:
 
 def create_psbt(tx_hex: str) -> str:
     tx = bytes.fromhex(tx_hex)
-    psbt = (
-        b'psbt\xff' +
-        b'\x01\x00' + encode_varint(len(tx)) + tx +
-        b'\x00' +
-        b'\xff'
-    )
+
+    # Parse number of inputs and outputs from raw tx
+    pos = 4  # skip version (4 bytes)
+    input_count, shift = _read_varint(tx, pos)
+    pos += shift
+
+    # Skip inputs to reach output count
+    for _ in range(input_count):
+        pos += 36  # prev_hash (32) + prev_index (4)
+        script_len, shift = _read_varint(tx, pos)
+        pos += shift + script_len  # scriptSig
+        pos += 4  # sequence
+
+    output_count, shift = _read_varint(tx, pos)
+
+    psbt = b'psbt\xff'
+
+    # Global unsigned transaction
+    psbt += b'\x01\x00' + encode_varint(len(tx)) + tx + b'\x00'
+
+    # Empty input maps (one per input)
+    psbt += b'\x00' * input_count
+
+    # Empty output maps (one per output)
+    psbt += b'\x00' * output_count
+
+    psbt += b'\xff'
+
     return base64.b64encode(psbt).decode()
+
+
+def _read_varint(data: bytes, pos: int) -> tuple[int, int]:
+    """Read varint and return (value, bytes read)"""
+    val = data[pos]
+    if val < 0xfd:
+        return val, 1
+    elif val == 0xfd:
+        return int.from_bytes(data[pos+1:pos+3], 'little'), 3
+    elif val == 0xfe:
+        return int.from_bytes(data[pos+1:pos+5], 'little'), 5
+    else:
+        return int.from_bytes(data[pos+1:pos+9], 'little'), 9
 
 
 
