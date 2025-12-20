@@ -882,6 +882,9 @@ def analyze(
 
     all_enriched = []
 
+    # Capture the original user input — this is the scan source
+    scan_source_out = addr_input.strip()
+
     if offline_mode:
         manual_str = (manual_utxo_input or "").strip()
         if not manual_str:
@@ -1003,16 +1006,16 @@ def analyze(
     for u in enriched_sorted:
         health_html = f'<div class="health health-{u["health"].lower()}">{u["health"]}<br><small>{u["recommend"]}</small></div>'
         df_rows.append([
-   		 	u["selected"],            # PRUNE
-    		u.get("source", "Single"),# Source
-    		u["txid"],                # TXID
-    		health_html,              # Health
-    		u["value"],               # Value
-    		u["address"],             # Address
-    		u["input_weight"],        # Weight
-   		 	u["script_type"],         # Type
-    		u["vout"],                # vout
-		])
+            u["selected"],            # PRUNE
+            u.get("source", "Single"),# Source
+            u["txid"],                # TXID
+            health_html,              # Health
+            u["value"],               # Value
+            u["address"],             # Address
+            u["input_weight"],        # Weight
+            u["script_type"],         # Type
+            u["vout"],                # vout
+        ])
 
     import copy
     frozen_enriched = tuple(copy.deepcopy(u) for u in enriched_sorted)
@@ -1021,7 +1024,8 @@ def analyze(
         gr.update(value=df_rows),
         frozen_enriched,
         gr.update(visible=True),   # generate_row
-        gr.update(visible=True)    # import_file
+        gr.update(visible=True),   # import_file
+        scan_source_out,           # pass the original scan source forward
     )
     
 def _analyze_empty():
@@ -1232,7 +1236,7 @@ def generate_summary_safe(
 
     return status_box_html, gr.update(visible=pruned_count > 0)
   
-def generate_psbt(psbt_snapshot: dict):
+def generate_psbt(psbt_snapshot: dict, scan_source: str):
     """Generate PSBT from frozen snapshot — no live reads."""
     if not psbt_snapshot:
         return (
@@ -1266,32 +1270,46 @@ def generate_psbt(psbt_snapshot: dict):
             "</div>"
         )
 
-    # Destination
-    dest = dest_addr or pruned_utxos[0]["address"]
-    try:
-        dest_spk, _ = address_to_script_pubkey(dest)
-    except Exception:
+    dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
+
+    # Destination resolution — explicit override or fallback to scan source
+    if dest_addr and dest_addr.strip():
+        final_dest = dest_addr.strip()
+    else:
+        final_dest = scan_source  # original user input
+
+    # Guardrail: xpub cannot be used directly as destination (yet)
+    if final_dest.startswith(("xpub", "ypub", "zpub", "tpub", "upub", "vpub")):
         return (
-            "<div style='color:#ff3366;text-align:center;padding:30px;'>"
-            "Invalid destination address in snapshot."
+            "<div style='color:#ffcc00;text-align:center;padding:40px;background:#332200;border-radius:16px;"
+            "box-shadow:0 0 40px rgba(255,204,0,0.4);font-size:1.3rem;'>"
+            "<strong>xpub detected as scan source.</strong><br><br>"
+            "Please specify a destination address for change output.<br>"
+            "Automatic xpub derivation coming in future version."
             "</div>"
         )
 
-    dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
+    try:
+        dest_spk, _ = address_to_script_pubkey(final_dest)
+    except Exception:
+        return (
+            "<div style='color:#ff3366;text-align:center;padding:30px;'>"
+            "Invalid destination address."
+            "</div>"
+        )
 
     # Build transaction — deterministic order already in snapshot
     tx = Tx()
     for u in pruned_utxos:
         tx.tx_ins.append(TxIn(bytes.fromhex(u["txid"]), int(u["vout"])))
 
-    # Dust-safe amounts
-
+    # Add outputs — dust-safe (already enforced in economics)
     if econ.dao_amt > 0:
         tx.tx_outs.append(TxOut(econ.dao_amt, dao_spk))
     if econ.change_amt > 0:
         tx.tx_outs.append(TxOut(econ.change_amt, dest_spk))
-		
-    # === CRITICAL FIX: Legacy serialization (no SegWit marker, no witness) ===
+
+    # Legacy serialization (no SegWit marker, no witness)
     raw_tx = (
         tx.version.to_bytes(4, 'little') +
         encode_varint(len(tx.tx_ins)) +
@@ -1840,11 +1858,19 @@ with gr.Blocks(
                     info="Retinal protection • Nuclear glow preserved • Recommended",
                 )
 
-        addr_input = gr.Textbox(
-            label="Address or xpub (one per line for batch mode) — 100% non-custodial, keys never entered",
-            placeholder="Paste one or many addresses/xpubs (one per line)\nClick ANALYZE when ready",
-            lines=6,
-        )
+        with gr.Row():
+            addr_input = gr.Textbox(
+                label="Scan Address / xpub (one per line)",
+                placeholder="Paste address(es) or xpub — 100% non-custodial",
+                lines=6,
+                scale=2,
+            )
+            dest = gr.Textbox(
+                label="Destination (optional)",
+                placeholder="Blank = back to scanned address",
+                info="Your pruned coins return here. Default = original scan source. Required for xpub scans.",
+                scale=1,
+            )
 
         with gr.Row(visible=False) as manual_box_row:
             manual_utxo_input = gr.Textbox(
@@ -1897,7 +1923,7 @@ No API calls • Fully air-gapped safe""",
             outputs=mode_status
         )
 
-        # Strategy dropdown
+        # Strategy dropdown + Destination
         with gr.Row():
             strategy = gr.Dropdown(
                 choices=[
@@ -1909,14 +1935,7 @@ No API calls • Fully air-gapped safe""",
                 value="Recommended — ~40% pruned (balanced savings & privacy)",
                 label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
             )
-
-        # Dust + Destination
-        with gr.Row():
-            dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
-            dest = gr.Textbox(
-                label="Change Address (optional)",
-                placeholder="Leave blank → reuse first input",
-            )
+			dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
 
         # Fee sliders
         with gr.Row():
@@ -1943,6 +1962,7 @@ No API calls • Fully air-gapped safe""",
         status_output = gr.HTML("")
         
         # States (invisible)
+		scan_source = gr.State("")
         enriched_state = gr.State([])
         locked = gr.State(False)
         psbt_snapshot = gr.State(None)
@@ -2098,7 +2118,8 @@ No API calls • Fully air-gapped safe""",
             df,
             enriched_state,
             generate_row,
-            import_file
+            import_file,
+			scan_source,
         ],
     ).then(lambda: gr.update(visible=False), outputs=analyze_btn)
 
@@ -2107,7 +2128,7 @@ No API calls • Fully air-gapped safe""",
     # =============================
     gen_btn.click(
         fn=on_generate,
-        inputs=[dest, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state],
+        inputs=[dest, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state, scan_source],
         outputs=[psbt_snapshot, locked, export_file],
     ).then(
         fn=generate_psbt,
@@ -2144,6 +2165,7 @@ No API calls • Fully air-gapped safe""",
             False,                                                   # locked — unlock
             "",                                                      # locked_badge — clear
             gr.update(value="", interactive=True),                   # addr_input
+			gr.update(value="", interactive=True),				     # dest — clear destination
             gr.update(interactive=True),                             # strategy
             gr.update(interactive=True),                             # dust
             gr.update(interactive=True),                             # dest
@@ -2175,6 +2197,7 @@ No API calls • Fully air-gapped safe""",
             locked,
             locked_badge,
             addr_input,
+			dest,
             strategy,
             dust,
             dest,
