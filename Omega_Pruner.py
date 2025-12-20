@@ -676,8 +676,6 @@ def encode_varint(i: int) -> bytes:
     if i < 0x100000000: return b'\xfe' + i.to_bytes(4, 'little')
     return b'\xff' + i.to_bytes(8, 'little')
 
-
-
 @dataclass
 class TxIn:
     prev_tx: bytes
@@ -688,7 +686,7 @@ class TxIn:
         return (
             self.prev_tx[::-1] +
             self.prev_index.to_bytes(4, 'little') +
-            b'\x00' +                      # scriptSig length = 0
+            b'\x00' +  # empty scriptSig length — critical for unsigned tx
             self.sequence.to_bytes(4, 'little')
         )
 
@@ -698,7 +696,11 @@ class TxOut:
     script_pubkey: bytes
 
     def serialize(self) -> bytes:
-        return self.amount.to_bytes(8, 'little') + encode_varint(len(self.script_pubkey)) + self.script_pubkey
+        return (
+            self.amount.to_bytes(8, 'little') +
+            encode_varint(len(self.script_pubkey)) +
+            self.script_pubkey
+        )
 
 @dataclass
 class Tx:
@@ -707,40 +709,51 @@ class Tx:
     tx_outs: List[TxOut] = field(default_factory=list)
     locktime: int = 0
 
-def create_psbt(tx_hex: str) -> str:
-    tx = bytes.fromhex(tx_hex)
+    def serialize_unsigned(self) -> bytes:
+        """Serialize in legacy format (no witness marker, no scriptSig/witness) for PSBT"""
+        return (
+            self.version.to_bytes(4, 'little') +
+            encode_varint(len(self.tx_ins)) +
+            b''.join(tx_in.serialize() for tx_in in self.tx_ins) +
+            encode_varint(len(self.tx_outs)) +
+            b''.join(tx_out.serialize() for tx_out in self.tx_outs) +
+            self.locktime.to_bytes(4, 'little')
+        )
 
-    # Parse input count
+
+def create_psbt(tx: Tx) -> str:
+    raw_tx = tx.serialize_unsigned()
+
+    # Parse input and output counts from raw tx
     pos = 4
-    input_count, shift = _read_varint(tx, pos)
+    input_count, shift = _read_varint(raw_tx, pos)
     pos += shift
 
     # Skip inputs
     for _ in range(input_count):
         pos += 36
-        script_len, shift = _read_varint(tx, pos)
+        script_len, shift = _read_varint(raw_tx, pos)
         pos += shift + script_len + 4
 
-    # Parse output count
-    output_count, _ = _read_varint(tx, pos)
+    output_count, _ = _read_varint(raw_tx, pos)
 
     psbt = b'psbt\xff'
 
-    # Global unsigned tx
-    psbt += b'\x01\x00' + encode_varint(len(tx)) + tx + b'\x00'
+    # Global unsigned transaction — correct key
+    psbt += b'\x01\x00' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
 
-    # Empty input maps
+    # Empty input maps — one per input
     psbt += b'\x00' * input_count
 
-    # Empty output maps
+    # Empty output maps — one per output
     psbt += b'\x00' * output_count
 
-    # ❌ NO trailing 0xff
+    # No trailing 0xff — PSBT ends at EOF
 
     return base64.b64encode(psbt).decode()
 
 
-def _read_varint(data: bytes, pos: int) -> tuple[int, int]:
+def _read_varint(data: bytes, pos: int = 0) -> tuple[int, int]:
     val = data[pos]
     if val < 0xfd:
         return val, 1
@@ -750,7 +763,6 @@ def _read_varint(data: bytes, pos: int) -> tuple[int, int]:
         return int.from_bytes(data[pos+1:pos+5], 'little'), 5
     else:
         return int.from_bytes(data[pos+1:pos+9], 'little'), 9
-
 
 # =========================
 # UTXO Fetching Functions
@@ -1221,8 +1233,8 @@ def generate_psbt(psbt_snapshot: dict):
         return (
             "<div style='color:#ff3366;text-align:center;padding:30px;'>"
             "No snapshot — run Generate first."
-			"</div>"
-		)
+            "</div>"
+        )
 
     # Extract from frozen snapshot
     pruned_utxos = psbt_snapshot["inputs"]
@@ -1237,8 +1249,8 @@ def generate_psbt(psbt_snapshot: dict):
             "<div style='color:#ff3366;text-align:center;padding:30px;'>"
             "No UTXOs selected for pruning!"
             "</div>"
-	)
-	
+        )
+    
     # Economics from snapshot values
     try:
         econ = estimate_tx_economics(pruned_utxos, fee_rate, dao_percent)
@@ -1247,7 +1259,7 @@ def generate_psbt(psbt_snapshot: dict):
             "<div style='color:#ff3366;text-align:center;padding:30px;'>"
             "Invalid snapshot economics."
             "</div>"
-		)
+        )
 
     # Destination
     dest = dest_addr or pruned_utxos[0]["address"]
@@ -1258,7 +1270,7 @@ def generate_psbt(psbt_snapshot: dict):
             "<div style='color:#ff3366;text-align:center;padding:30px;'>"
             "Invalid destination address in snapshot."
             "</div>"
-		)
+        )
 
     dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
 
@@ -1275,9 +1287,9 @@ def generate_psbt(psbt_snapshot: dict):
     if change_amt >= 546:
         tx.tx_outs.append(TxOut(change_amt, dest_spk))
 
+    # === CRITICAL FIX: Legacy serialization (no SegWit marker, no witness) ===
     raw_tx = (
         tx.version.to_bytes(4, 'little') +
-        b'\x00\x01' +
         encode_varint(len(tx.tx_ins)) +
         b''.join(i.serialize() for i in tx.tx_ins) +
         encode_varint(len(tx.tx_outs)) +
