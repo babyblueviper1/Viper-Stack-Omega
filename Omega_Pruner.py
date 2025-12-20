@@ -283,15 +283,6 @@ def _coerce_float(value, default: float) -> float:
     except (TypeError, ValueError, OverflowError):
         return default
 
-def clamp_dao(percent) -> float:
-    """
-    Clamp DAO donation percentage to valid range [0.0, 10.0].
-    Returns 0.5 on invalid input (default user-visible value).
-    """
-    try:
-        return max(0.0, min(10.0, float(percent)))
-    except (TypeError, ValueError, OverflowError):
-        return 0.5
 
 def sync_selection(df_rows, enriched_state, locked):
     """Sync checkbox changes back to canonical enriched_state — disabled when locked."""
@@ -455,35 +446,37 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
 
     if privacy_score <= 30:
         return (
-            "<div style='margin-top:14px;padding:14px;background:#440000;border:3px solid #ff3366;border-radius:12px;"
-            "box-shadow:0 0 40px rgba(255,51,102,0.9);font-size:1.1rem;'>"
-            "<strong style='color:#ff3366;font-size:1.3rem;'>EXTREME CIOH LINKAGE</strong><br>"
-            "<strong style='color:#ff6688;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<div style='margin-top:16px;padding:16px;background:#440000;border:3px solid #ff3366;border-radius:14px;"
+            "box-shadow:0 0 50px rgba(255,51,102,0.9);font-size:1.22rem;line-height:1.7;'>"
+            "<strong style='color:#ff3366;font-size:1.45rem;font-weight:900;'>EXTREME CIOH LINKAGE</strong><br>"
+            "<strong style='color:#ff6688;font-size:1.15rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
             "This consolidation strongly proves common ownership of many inputs/addresses.<br>"
             "Privacy significantly reduced. Consider CoinJoin, PayJoin, or silent payments afterward."
             "</div>"
         )
     elif privacy_score <= 50:
         return (
-            "<div style='margin-top:12px;padding:12px;background:#331100;border:2px solid #ff8800;border-radius:10px;'>"
-            "<strong style='color:#ff9900;'>High CIOH Risk</strong><br>"
-            "<strong style='color:#ffaa44;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<div style='margin-top:14px;padding:14px;background:#331100;border:2px solid #ff8800;border-radius:12px;"
+            "font-size:1.18rem;line-height:1.6;'>"
+            "<strong style='color:#ff9900;font-size:1.35rem;font-weight:900;'>High CIOH Risk</strong><br>"
+            "<strong style='color:#ffaa44;font-size:1.12rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
             f"Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as yours.<br>"
             "Good fee savings, but real privacy trade-off."
             "</div>"
         )
     elif privacy_score <= 70:
         return (
-            "<div style='margin-top:10px;padding:10px;background:#113300;border:1px solid #00ff9d;border-radius:8px;color:#aaffaa;'>"
-            "<strong style='color:#00ff9d;'>Moderate CIOH</strong><br>"
-            "<strong style='color:#66ffaa;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<div style='margin-top:12px;padding:12px;background:#113300;border:1px solid #00ff9d;border-radius:10px;"
+            "color:#aaffaa;font-size:1.15rem;line-height:1.6;'>"
+            "<strong style='color:#00ff9d;font-size:1.3rem;font-weight:900;'>Moderate CIOH</strong><br>"
+            "<strong style='color:#66ffaa;font-size:1.1rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
             "Some linkage created, but not extreme. Acceptable during low-fee periods."
             "</div>"
         )
     else:
         return (
-            "<div style='margin-top:8px;color:#aaffaa;font-size:0.9rem;'>"
-            "Low CIOH impact <strong style='color:#00ffdd;'>(Common Input Ownership Heuristic)</strong> — minimal new linkage."
+            "<div style='margin-top:10px;color:#aaffaa;font-size:1.05rem;line-height:1.5;'>"
+            "Low CIOH impact <strong style='color:#00ffdd;font-size:1.1rem;'>(Common Input Ownership Heuristic)</strong> — minimal new linkage."
             "</div>"
         )
 
@@ -828,16 +821,16 @@ def analyze(
     dust_threshold,
     dest_addr,
     fee_rate_slider,
-    dao_slider,
+    thank_you_slider,
     future_fee_slider,
     offline_mode,
     manual_utxo_input,
 ):
     # === SAFE INPUT CLAMPING ===
-    fee_rate        = max(1,   min(500,  _coerce_int(fee_rate_slider, 15)))
-    future_fee_rate = max(1,   min(1000, _coerce_int(future_fee_slider, 60)))
+    fee_rate        = max(1,   min(300,  _coerce_int(fee_rate_slider, 15)))      # matches slider max
+    future_fee_rate = max(5,   min(500,  _coerce_int(future_fee_slider, 60)))   # matches slider max
     dust_threshold  = max(0,   min(10000, _coerce_int(dust_threshold, 546)))
-    dao_percent     = clamp_dao(dao_slider)
+    dao_percent     = max(0.0, min(100.0, float(thank_you_slider or 5.0)))      # direct clamp
 
     all_enriched = []
 
@@ -1043,10 +1036,21 @@ def generate_summary_safe(
     except ValueError:
         econ = None
 
-    if not selected_utxos or econ is None or econ.remaining <= 0:
+    if not selected_utxos:
         return (
             "<div style='text-align:center;padding:60px;color:#ff9900;font-size:1.4rem;'>"
-            "Select UTXOs in the table to see full economics and generate PSBT"
+            "Select UTXOs in the table to begin"
+            "</div>",
+            gr.update(visible=False)
+        )
+
+    if econ.remaining <= 0:
+        return (
+            "<div style='text-align:center;padding:40px;background:#330000;border:2px solid #ff3366;border-radius:16px;"
+            "box-shadow:0 0 40px rgba(255,51,102,0.5);font-size:1.3rem;color:#ffaa88;'>"
+            "<strong style='color:#ff3366;font-size:1.5rem;'>Transaction Invalid</strong><br><br>"
+            f"Current fee ({econ.fee:,} sats @ {fee_rate} s/vB) exceeds available balance.<br><br>"
+            "<strong>Lower the fee rate</strong> or select more UTXOs."
             "</div>",
             gr.update(visible=False)
         )
@@ -1083,28 +1087,29 @@ def generate_summary_safe(
             f"<br><span style='color:#00ff88;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
         )
 
-    # DAO line
+    # DAO line — clear visual feedback
     dao_raw = int((econ.total_in - econ.fee) * (dao_percent / 100.0)) if dao_percent > 0 else 0
     dao_line = ""
-    if econ.dao_amt >= 546:
-        dao_line = f" • <span style='color:#ff6600;font-weight:800;'>DAO: {sats_to_btc_str(econ.dao_amt)}</span>"
-    elif dao_raw > 0:
-        dao_line = f" • <span style='color:#ff6600;font-weight:800;'>DAO: {sats_to_btc_str(dao_raw)} (dust)</span>"
 
+    if dao_percent > 0:
+        if econ.dao_amt >= 546:
+            # Successful donation — green glow + thank you
+            dao_line = (
+                f" • <span style='color:#00ff88;font-weight:800;text-shadow:0 0 20px #00ff88;'>"
+                f"DAO: {sats_to_btc_str(econ.dao_amt)}</span><br>"
+                f"<span style='color:#00ffaa;font-size:0.95rem;font-style:italic;'>"
+                f"Thank you. Your support keeps Ωmega Pruner free, sovereign, and evolving. • Ω</span>"
+            )
+        elif dao_raw > 0:
+            # Too small → absorbed — red alert + clear explanation
+            dao_line = (
+                f" • <span style='color:#ff3366;font-weight:800;text-shadow:0 0 20px #ff3366;'>"
+                f"DAO: {sats_to_btc_str(dao_raw)} → absorbed into fee</span><br>"
+                f"<span style='color:#ff6688;font-size:0.9rem;font-style:italic;'>(below 546 sat dust threshold)</span>"
+            )
     # Warnings
     distinct_addrs = len({u["address"] for u in selected_utxos})
     cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
-
-    bad_ratio = len([u for u in selected_utxos if u.get("health") in ("DUST", "HEAVY")]) / len(selected_utxos) if selected_utxos else 0
-    extra_warning = (
-        "<div style='margin-top:12px;color:#ae2029;font-weight:900;'>"
-        "CAUTION: Heavy consolidation — strong savings, privacy trade-off.<br>"
-        "Consider CoinJoin afterward.</div>"
-        if bad_ratio > 0.8 else
-        "<div style='margin-top:12px;color:#fcf75e;'>"
-        "High dusty/heavy ratio — good savings.</div>"
-        if bad_ratio > 0.6 else ""
-    )
 
     # Final unified status box
     status_box_html = f"""
@@ -1117,8 +1122,8 @@ def generate_summary_safe(
         SELECTION READY
       </div>
 
-      <div style="color:#f7931a;font-size:1.8rem;font-weight:800;margin:20px 0;">
-        {total_utxos:,} UTXOs • {strategy_label} Active
+	<div style="color:#f7931a;font-size:1.8rem;font-weight:800;margin:20px 0;">
+        {total_utxos:,} UTXOs • <span style="color:#00ff9d;">{strategy_label}</span> Strategy Active
       </div>
 
       <div style="color:#fff;font-size:1.5rem;font-weight:700;margin:16px 0;">
@@ -1135,10 +1140,14 @@ def generate_summary_safe(
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
-      <div style="font-size:1.1rem;line-height:2.1;">
+         <div style="font-size:1.1rem;line-height:2.1;">
         <div style="margin:12px 0;">
           <b style="color:#fff;">Value Pruned:</b> 
           <span style="color:#0f0;font-weight:800;">{sats_to_btc_str(econ.total_in)}</span>
+        </div>
+        <div style="margin:12px 0;">
+          <b style="color:#fff;">Pre-Prune Size (if sent today):</b> 
+          <span style="color:#ff9900;font-weight:800;">{pre_vsize:,} vB</span>
         </div>
         <div style="margin:12px 0;">
           <b style="color:#fff;">Post-Prune Size:</b> 
@@ -1161,11 +1170,7 @@ def generate_summary_safe(
       <div style="margin:32px 0 40px 0;line-height:1.7;">
         {cioh_warning}
       </div>
-
-      <div style="margin-top:20px;line-height:1.7;">
-        {extra_warning}
-      </div>
-
+	  
       <div style="color:#aaffaa;font-size:1.15rem;margin-top:32px;line-height:1.8;">
         <span style="color:#00ff9d;font-weight:900;">Full coin control:</span> Review table below<br>
         Check/uncheck UTXOs • Adjust as needed
@@ -1730,24 +1735,9 @@ with gr.Blocks(
     # =============================
     # — LOCK-SAFE FEE PRESET FUNCTION —
     # =============================
-    def apply_fee_preset_locked(
-        future_fee_slider,
-        thank_you_slider,
-        locked,
-        preset: str
-    ):
+    def apply_fee_preset_locked(locked: bool, preset: str):
         if locked:
             return gr.update(), gr.update()
-
-        future_fee = (
-            future_fee_slider.value if hasattr(future_fee_slider, "value") else int(future_fee_slider or 60)
-        )
-        thank_you = (
-            thank_you_slider.value if hasattr(thank_you_slider, "value") else float(thank_you_slider or 0.5)
-        )
-
-        future_fee = max(5, min(500, future_fee))
-        thank_you = max(0, min(5, thank_you))
 
         fees = get_live_fees() or {
             "fastestFee": 10,
@@ -1765,7 +1755,6 @@ with gr.Blocks(
 
         new_rate = rate_map.get(preset, 3)
 
-        # Only update fee slider — summary will refresh via fee_rate.change chain
         return gr.update(value=new_rate), gr.update()
 
     def finalize_generate_ui():
@@ -1884,14 +1873,14 @@ No API calls • Fully air-gapped safe""",
 
         # Fee sliders
         with gr.Row():
-            fee_rate = gr.Slider(
+            fee_rate_slider = gr.Slider(
                 1, 300, 15, step=1, label="Fee Rate now (sat/vB)", scale=3,
             )
-            future_fee = gr.Slider(
-                5, 500, 60, step=1, label="Future fee rate in 3–6 months (sat/vB)", scale=3,
+            future_fee_slider = gr.Slider(
+                5, 500, value=60, step=1, label="Future fee rate in 3–6 months (sat/vB)", scale=3,
             )
-            thank_you = gr.Slider(
-                0, 5, 0.5, step=0.1, label="Thank-You / DAO Donation (%)", scale=2,
+            thank_you_slider = gr.Slider(
+                0, 100, value=5.0, step=0.1, label="Thank You / DAO Donation (%)", info="Applied to amount remaining after miner fee. 100% = full donation (no change output). Below ~546 sats will be absorbed into fee.", scale=2,
             )
 
         # Fee preset buttons
@@ -2010,7 +1999,7 @@ No API calls • Fully air-gapped safe""",
                 </small>
             </div>
             """)
-    # =============================
+  # =============================
     # — FEE PRESET BUTTONS (pure parameter change) —
     # =============================
     for btn, preset in [
@@ -2021,8 +2010,8 @@ No API calls • Fully air-gapped safe""",
     ]:
         btn.click(
             fn=partial(apply_fee_preset_locked, preset=preset),
-            inputs=[future_fee, thank_you, locked],
-            outputs=[fee_rate],  # ← ONLY fee_rate
+            inputs=[locked],
+            outputs=[fee_rate_slider],  # ← current fee rate slider
         )
 
     # =============================
@@ -2031,14 +2020,14 @@ No API calls • Fully air-gapped safe""",
     import_file.change(
         fn=load_selection,
         inputs=[import_file, enriched_state],
-        outputs=[enriched_state],  # ← ONLY enriched_state
+        outputs=[enriched_state],
     ).then(
         fn=rebuild_df_rows,
-        inputs=enriched_state,
-        outputs=df
+        inputs=[enriched_state],
+        outputs=[df]
     ).then(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
         outputs=[status_output, generate_row]
     )
 
@@ -2052,17 +2041,17 @@ No API calls • Fully air-gapped safe""",
             strategy,
             dust,
             dest,
-            fee_rate,
-            thank_you,
-            future_fee,
+            fee_rate_slider,
+            thank_you_slider,
+            future_fee_slider,
             offline_toggle,
             manual_utxo_input,
         ],
         outputs=[
             df,
             enriched_state,
-            generate_row,      # show Generate affordance
-            import_file        # show restore affordance
+            generate_row,
+            import_file
         ],
     ).then(lambda: gr.update(visible=False), outputs=analyze_btn)
 
@@ -2071,12 +2060,12 @@ No API calls • Fully air-gapped safe""",
     # =============================
     gen_btn.click(
         fn=on_generate,
-        inputs=[dest, fee_rate, future_fee, thank_you, enriched_state],
+        inputs=[dest, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state],
         outputs=[psbt_snapshot, locked, export_file],
     ).then(
         fn=generate_psbt,
         inputs=[psbt_snapshot],
-        outputs=[psbt_output],  # ← ONLY PSBT render
+        outputs=[psbt_output],
     ).then(
         fn=finalize_generate_ui,
         outputs=[
@@ -2111,9 +2100,9 @@ No API calls • Fully air-gapped safe""",
             gr.update(interactive=True),                             # strategy
             gr.update(interactive=True),                             # dust
             gr.update(interactive=True),                             # dest
-            gr.update(interactive=True),                             # fee_rate
-            gr.update(interactive=True),                             # future_fee
-            gr.update(interactive=True),                             # thank_you
+            gr.update(interactive=True),                             # fee_rate_slider
+            gr.update(interactive=True),                             # future_fee_slider
+            gr.update(interactive=True),                             # thank_you_slider
             gr.update(value=False, interactive=True),                # offline_toggle
             gr.update(value="", visible=False, interactive=True),    # manual_utxo_input
             gr.update(interactive=True),                             # fastest_btn
@@ -2142,9 +2131,9 @@ No API calls • Fully air-gapped safe""",
             strategy,
             dust,
             dest,
-            fee_rate,
-            future_fee,
-            thank_you,
+            fee_rate_slider,
+            future_fee_slider,
+            thank_you_slider,
             offline_toggle,
             manual_utxo_input,
             fastest_btn,
@@ -2159,7 +2148,7 @@ No API calls • Fully air-gapped safe""",
         ],
     ).then(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
         outputs=[status_output, generate_row]
     )
 
@@ -2172,44 +2161,44 @@ No API calls • Fully air-gapped safe""",
         outputs=enriched_state,
     ).then(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
         outputs=[status_output, generate_row],
     )
 
-    fee_rate.change(
+    fee_rate_slider.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
         outputs=[status_output, generate_row],
     )
 
-    future_fee.change(
+    future_fee_slider.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
         outputs=[status_output, generate_row],
     )
 
-    thank_you.change(
+    thank_you_slider.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
         outputs=[status_output, generate_row],
     )
 
     demo.load(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate, future_fee, thank_you, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
         outputs=[status_output, generate_row]
     )
 
     # Re-analyze on strategy/dust change (hard reset)
     strategy.change(
         fn=analyze,
-        inputs=[addr_input, strategy, dust, dest, fee_rate, thank_you, future_fee, offline_toggle, manual_utxo_input],
+        inputs=[addr_input, strategy, dust, dest, fee_rate_slider, thank_you_slider, future_fee_slider, offline_toggle, manual_utxo_input],
         outputs=[df, enriched_state, generate_row, import_file],
     )
 
     dust.change(
         fn=analyze,
-        inputs=[addr_input, strategy, dust, dest, fee_rate, thank_you, future_fee, offline_toggle, manual_utxo_input],
+        inputs=[addr_input, strategy, dust, dest, fee_rate_slider, thank_you_slider, future_fee_slider, offline_toggle, manual_utxo_input],
         outputs=[df, enriched_state, generate_row, import_file],
     )
 
