@@ -712,7 +712,8 @@ def create_psbt(tx_hex: str) -> str:
     tx = bytes.fromhex(tx_hex)
     psbt = (
         b'psbt\xff' +
-        b'\x00\x00' + encode_varint(len(tx)) + tx + b'\x00' +
+        b'\x01\x00' + encode_varint(len(tx)) + tx +
+        b'\x00' +
         b'\xff'
     )
     return base64.b64encode(psbt).decode()
