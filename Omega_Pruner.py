@@ -233,36 +233,33 @@ def build_psbt_snapshot(
     fee_rate: int,
     future_fee_rate: int,
     dao_percent: float,
-    dest_addr: str,
+    dest_addr_override: str,
+    scan_source: str,
 ):
     """
     Create immutable transaction snapshot — point of no return.
-    This is the canonical intent that will be signed.
+    Records user intent only. No resolution or fallbacks here.
     """
-    # Extract selected inputs
     selected_utxos = [u for u in enriched_state if u.get("selected", False)]
-
     if not selected_utxos:
         raise ValueError("No UTXOs selected for pruning")
 
-    # Deep copy to break any references
     snapshot = {
         "version": 1,
         "timestamp": int(time.time()),
-        "dest_addr": dest_addr.strip() or selected_utxos[0]["address"],
+        "scan_source": scan_source,                           # original user input
+        "dest_addr_override": dest_addr_override.strip() if dest_addr_override and dest_addr_override.strip() else None,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
         "dao_percent": dao_percent,
         "inputs": copy.deepcopy(selected_utxos),
     }
 
-    # Deterministic fingerprint over entire snapshot
-    canonical = json.dumps(snapshot, sort_keys=True, separators=(',', ':'))
+    # Deterministic fingerprint — excludes itself
+    canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
     fingerprint = hashlib.sha256(canonical.encode()).hexdigest()
-    fingerprint_short = fingerprint[:16].upper()
-
     snapshot["fingerprint"] = fingerprint
-    snapshot["fingerprint_short"] = fingerprint_short
+    snapshot["fingerprint_short"] = fingerprint[:16].upper()
 
     return snapshot
 
@@ -1236,6 +1233,8 @@ def generate_summary_safe(
 
     return status_box_html, gr.update(visible=pruned_count > 0)
   
+
+
 def generate_psbt(psbt_snapshot: dict, scan_source: str):
     """Generate PSBT from frozen snapshot — no live reads."""
     if not psbt_snapshot:
@@ -1272,29 +1271,32 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
 
     dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
 
-    # Destination resolution — explicit override or fallback to scan source
-    if dest_addr and dest_addr.strip():
-        final_dest = dest_addr.strip()
+    # Resolve destination — explicit override or original scan source
+    if snapshot.get("dest_addr_override"):
+        final_dest = snapshot["dest_addr_override"]
     else:
-        final_dest = scan_source  # original user input
+        final_dest = snapshot["scan_source"]
 
-    # Guardrail: xpub cannot be used directly as destination (yet)
+    # Guardrail for xpub (future-proof) — first
     if final_dest.startswith(("xpub", "ypub", "zpub", "tpub", "upub", "vpub")):
         return (
             "<div style='color:#ffcc00;text-align:center;padding:40px;background:#332200;border-radius:16px;"
             "box-shadow:0 0 40px rgba(255,204,0,0.4);font-size:1.3rem;'>"
-            "<strong>xpub detected as scan source.</strong><br><br>"
-            "Please specify a destination address for change output.<br>"
-            "Automatic xpub derivation coming in future version."
+            "<strong>xpub detected.</strong><br><br>"
+            "Please specify a destination address.<br>"
+            "Automatic derivation coming soon."
             "</div>"
         )
 
+    # Validate address — only after guardrail
     try:
         dest_spk, _ = address_to_script_pubkey(final_dest)
     except Exception:
         return (
-            "<div style='color:#ff3366;text-align:center;padding:30px;'>"
-            "Invalid destination address."
+            "<div style='color:#ff3366;text-align:center;padding:40px;background:#440000;border-radius:16px;"
+            "box-shadow:0 0 40px rgba(255,51,102,0.4);font-size:1.3rem;'>"
+            "<strong>Invalid destination address.</strong><br><br>"
+            "Please check your explicit destination or scan source."
             "</div>"
         )
 
@@ -1449,6 +1451,7 @@ def on_generate(
     future_fee_rate,
     dao_percent,
     enriched_state,
+	scan_source,
 ):
     try:
         snapshot = build_psbt_snapshot(
@@ -1457,6 +1460,7 @@ def on_generate(
             future_fee_rate,
             dao_percent,
             dest_addr,
+			scan_source,
         )
 
         # Create temp JSON file for download
