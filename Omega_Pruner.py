@@ -711,11 +711,11 @@ class Tx:
 def create_psbt(tx_hex: str) -> str:
     tx = bytes.fromhex(tx_hex)
     psbt = (
-        b'psbt\xff' +
-        b'\x00' +                                    # global unsigned tx
-        encode_varint(len(tx)) + tx +
-        b'\x00' +                                    # separator
-        b'\xff'                                      # end of global
+        b'psbt\xff' +                               # magic
+        b'\x01\x00' +                               # global type 0 (unsigned tx), key length 0
+        encode_varint(len(tx)) + tx +               # value: full raw tx
+        b'\x00' +                                   # separator
+        b'\xff'                                     # end of record
     )
     return base64.b64encode(psbt).decode()
 
