@@ -1248,7 +1248,7 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
     pruned_utxos = psbt_snapshot["inputs"]
     pruned_count = len(pruned_utxos)
     fingerprint = psbt_snapshot["fingerprint_short"]
-    dest_addr = psbt_snapshot["dest_addr"]
+    dest_addr_override = psbt_snapshot.get("dest_addr_override")  # may be None
     fee_rate = psbt_snapshot["fee_rate"]
     dao_percent = psbt_snapshot["dao_percent"]
 
@@ -1272,19 +1272,19 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
     dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
 
     # Resolve destination — explicit override or original scan source
-    if snapshot.get("dest_addr_override"):
-        final_dest = snapshot["dest_addr_override"]
+    if dest_addr_override:
+        final_dest = dest_addr_override
     else:
-        final_dest = snapshot["scan_source"]
+        final_dest = scan_source
 
-    # Guardrail for xpub (future-proof) — first
+    # Guardrail: xpub cannot be used directly as destination (yet)
     if final_dest.startswith(("xpub", "ypub", "zpub", "tpub", "upub", "vpub")):
         return (
             "<div style='color:#ffcc00;text-align:center;padding:40px;background:#332200;border-radius:16px;"
-            "box-shadow:0 0 40px rgba(255,204,0,0.4);font-size:1.3rem;'>"
-            "<strong>xpub detected.</strong><br><br>"
-            "Please specify a destination address.<br>"
-            "Automatic derivation coming soon."
+            "box-shadow:0 0 40px rgba(255,204,0,0.4);font-size:1.3rem;line-height:1.7;'>"
+            "<strong>xpub detected as destination source.</strong><br><br>"
+            "Please enter a specific receive address for the pruned coins.<br>"
+            "Automatic change derivation from xpub is coming in a future version."
             "</div>"
         )
 
@@ -2267,13 +2267,13 @@ No API calls • Fully air-gapped safe""",
     strategy.change(
         fn=analyze,
         inputs=[addr_input, strategy, dust, dest, fee_rate_slider, thank_you_slider, future_fee_slider, offline_toggle, manual_utxo_input],
-        outputs=[df, enriched_state, generate_row, import_file],
+        outputs=[df, enriched_state, generate_row, import_file, scan_source],
     )
 
     dust.change(
         fn=analyze,
         inputs=[addr_input, strategy, dust, dest, fee_rate_slider, thank_you_slider, future_fee_slider, offline_toggle, manual_utxo_input],
-        outputs=[df, enriched_state, generate_row, import_file],
+        outputs=[df, enriched_state, generate_row, import_file, scan_source],
     )
 
     # CRITICAL: DO NOT use .change() on fee_rate/future_fee for anything else
