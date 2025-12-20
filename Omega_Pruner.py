@@ -1960,9 +1960,9 @@ No API calls • Fully air-gapped safe""",
 
         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
         status_output = gr.HTML("")
-        
+
         # States (invisible)
-		scan_source = gr.State("")
+        scan_source = gr.State("")
         enriched_state = gr.State([])
         locked = gr.State(False)
         psbt_snapshot = gr.State(None)
