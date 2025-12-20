@@ -711,29 +711,28 @@ class Tx:
 def create_psbt(tx_hex: str) -> str:
     tx = bytes.fromhex(tx_hex)
 
-    # Parse number of inputs and outputs from raw tx
-    pos = 4  # skip version (4 bytes)
+    # Parse input and output counts
+    pos = 4  # skip version
     input_count, shift = _read_varint(tx, pos)
     pos += shift
 
-    # Skip inputs to reach output count
+    # Skip inputs to reach outputs
     for _ in range(input_count):
-        pos += 36  # prev_hash (32) + prev_index (4)
+        pos += 36  # prevout hash + index
         script_len, shift = _read_varint(tx, pos)
-        pos += shift + script_len  # scriptSig
-        pos += 4  # sequence
+        pos += shift + script_len + 4  # scriptSig + sequence
 
-    output_count, shift = _read_varint(tx, pos)
+    output_count, _ = _read_varint(tx, pos)
 
     psbt = b'psbt\xff'
 
-    # Global unsigned transaction
+    # Global unsigned transaction — correct key
     psbt += b'\x01\x00' + encode_varint(len(tx)) + tx + b'\x00'
 
-    # Empty input maps (one per input)
+    # Empty input maps (required)
     psbt += b'\x00' * input_count
 
-    # Empty output maps (one per output)
+    # Empty output maps (required)
     psbt += b'\x00' * output_count
 
     psbt += b'\xff'
@@ -742,7 +741,6 @@ def create_psbt(tx_hex: str) -> str:
 
 
 def _read_varint(data: bytes, pos: int) -> tuple[int, int]:
-    """Read varint and return (value, bytes read)"""
     val = data[pos]
     if val < 0xfd:
         return val, 1
@@ -752,7 +750,6 @@ def _read_varint(data: bytes, pos: int) -> tuple[int, int]:
         return int.from_bytes(data[pos+1:pos+5], 'little'), 5
     else:
         return int.from_bytes(data[pos+1:pos+9], 'little'), 9
-
 
 
 # =========================
