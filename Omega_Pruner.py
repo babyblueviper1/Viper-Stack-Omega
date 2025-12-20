@@ -1297,7 +1297,7 @@ def generate_psbt(psbt_snapshot: dict):
         tx.locktime.to_bytes(4, 'little')
     )
 
-    psbt_b64 = create_psbt(raw_tx.hex())
+    psbt_b64 = create_psbt(tx)
 
     # QR generation
     error_correction = qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2800 else qrcode.constants.ERROR_CORRECT_M
