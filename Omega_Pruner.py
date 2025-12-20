@@ -1279,7 +1279,7 @@ def generate_psbt(psbt_snapshot: dict):
             box-shadow:0 0 140px rgba(247,147,26,0.95);
             background:radial-gradient(circle at center,#0a0a0a 0%,#000 100%);">
 
-    <!-- Selection Fingerprint — Provable Intent -->
+     <!-- Selection Fingerprint — Provable Intent -->
     <div style="margin:40px 0;padding:24px;background:#001100;border:4px solid #0f0;border-radius:18px;
         box-shadow:0 0 80px rgba(0,255,0,0.8);font-family:monospace;"
         title="This deterministic hash proves your exact input selection. Identical selection = identical hash. Verify against exported JSON.">
@@ -1299,13 +1299,19 @@ def generate_psbt(psbt_snapshot: dict):
             Cryptographic proof of your pruning selection<br>
             Deterministic • Audit-proof • Never changes
         </div>
-        <button onclick="viperCopy('{fingerprint}', this)"
+    <button onclick="
+            navigator.clipboard.writeText('{fingerprint}')
+                .then(() => {{ 
+                    this.innerText = 'COPIED'; 
+                    setTimeout(() => this.innerText = 'COPY FINGERPRINT', 1500); 
+                }})
+                .catch(() => alert('Copy failed — select manually'));
+        "
             style="margin-top:16px;padding:8px 20px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:12px;
                    font-size:1.1rem;font-weight:800;cursor:pointer;box-shadow:0 0 20px #0f0;">
             COPY FINGERPRINT
         </button>
-    </div>
-
+	
     <!-- QR -->
     <div style="margin:40px auto;width:520px;max-width:96vw;padding:20px;background:#000;
                 border:8px solid #0f0;border-radius:24px;box-shadow:0 0 60px #0f0,inset 0 0 40px #0f0;">
@@ -1314,7 +1320,7 @@ def generate_psbt(psbt_snapshot: dict):
 
     {qr_warning_html}
 
-    <!-- PSBT + COPY + HINT -->
+  <!-- PSBT + COPY + HINT -->
     <div style="margin:60px auto 20px;width:92%;max-width:880px;">
         <div style="position:relative;background:#000;border:6px solid #f7931a;border-radius:18px;
                     box-shadow:0 0 40px #0f0;overflow:hidden;">
@@ -1323,7 +1329,14 @@ def generate_psbt(psbt_snapshot: dict):
                        padding:24px;padding-right:140px;border:none;outline:none;resize:none;
                        font-family:monospace;font-weight:700;box-sizing:border-box;">
 {psbt_b64}</textarea>
-            <button onclick="viperCopy(document.getElementById('psbt-output').value, this)"
+                       <button onclick="
+                navigator.clipboard.writeText(document.getElementById('psbt-output').value)
+                    .then(() => {{ 
+                        this.innerText = 'COPIED'; 
+                        setTimeout(() => this.innerText = 'COPY PSBT', 1500); 
+                    }})
+                    .catch(() => alert('Copy failed — select and copy manually'));
+            "
                 style="position:absolute;top:14px;right:14px;padding:12px 30px;background:#f7931a;
                        color:#000;border:none;border-radius:14px;font-weight:800;letter-spacing:1.5px;
                        font-size:1.12rem;text-transform:uppercase;cursor:pointer;
@@ -1337,7 +1350,7 @@ def generate_psbt(psbt_snapshot: dict):
             <span style="color:#666;font-size:0.9rem;">Inspect before signing</span>
         </div>
     </div>
-
+								 
     <!-- Wallet support -->
     <div style='color:#ff9900;font-size:1rem;text-align:center;margin:40px 0 20px;padding:16px;
                 background:#220000;border:2px solid #f7931a;border-radius:12px;
@@ -1349,10 +1362,10 @@ def generate_psbt(psbt_snapshot: dict):
             Sparrow • BlueWallet • Electrum • UniSat • Nunchuk • OKX
         </div>
     </div>
-
-</div>
+	</div>
 </div>
 """
+
 
 
     return psbt_html
@@ -1696,24 +1709,6 @@ with gr.Blocks(
     }
 </style>
 """)
-    gr.HTML("""
-<script>
-window.viperCopy = function(text, btn) {
-    if (!text || !navigator.clipboard) {
-        alert("Copy failed — manual selection required");
-        return;
-    }
-    navigator.clipboard.writeText(text).then(() => {
-        if (!btn) return;
-        const original = btn.innerText;
-        btn.innerText = "COPIED";
-        setTimeout(() => btn.innerText = original, 1500);
-    }).catch(() => {
-        alert("Copy failed — manual copy required");
-    });
-};
-</script>
-""", visible=False)
   
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
