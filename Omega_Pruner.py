@@ -1279,14 +1279,14 @@ def generate_psbt(psbt_snapshot: dict):
     for u in pruned_utxos:
         tx.tx_ins.append(TxIn(bytes.fromhex(u["txid"]), int(u["vout"])))
 
-	# Dust-safe amounts
-	dao_amt = econ.dao_amt if econ.dao_amt >= 546 else 0
-	change_amt = econ.change_amt if econ.change_amt >= 546 else 0
+    # Dust-safe amounts
+    dao_amt = econ.dao_amt if econ.dao_amt >= 546 else 0
+    change_amt = econ.change_amt if econ.change_amt >= 546 else 0
 
-	if dao_amt > 0:
-    	tx.tx_outs.append(TxOut(dao_amt, dao_spk))
-	if change_amt > 0:
-    	tx.tx_outs.append(TxOut(change_amt, dest_spk))
+    if dao_amt > 0:
+        tx.tx_outs.append(TxOut(dao_amt, dao_spk))
+    if change_amt > 0:
+        tx.tx_outs.append(TxOut(change_amt, dest_spk))
 
     # === CRITICAL FIX: Legacy serialization (no SegWit marker, no witness) ===
     raw_tx = (
