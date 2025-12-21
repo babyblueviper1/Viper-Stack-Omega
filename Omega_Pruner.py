@@ -646,33 +646,34 @@ def estimate_tx_economics(
     fee = max(600, int(vsize * fee_rate))  # Minimum effective 1 sat/vB
     remaining = total_in - fee
 
-    dao_amt = 0
-    change_amt = remaining  # Default: everything goes to change
+     dao_amt = 0
+    change_amt = remaining
 
     if dao_percent > 0 and remaining > 0:
         dao_raw = int(remaining * (dao_percent / 100.0))
 
-        # PRIORITIZE CHANGE: Only donate if we can leave enough for a non-dust change output
-        min_for_change = 546
-        max_possible_dao = max(0, remaining - min_for_change)
-        dao_capped = min(dao_raw, max_possible_dao)
+        # Special case: 100% donation → user explicitly wants full amount to DAO
+        if dao_percent >= 99.9:  # Handles 100.0 and minor float rounding
+            dao_amt = dao_raw if dao_raw >= 546 else 0
+            if dao_amt == 0 and dao_raw > 0:
+                fee += dao_raw
+                remaining -= dao_raw
+        else:
+            # Normal safe mode: only allow DAO if room for BOTH non-dust outputs
+            if remaining >= 1092 and dao_raw >= 546 and (remaining - dao_raw) >= 546:
+                dao_amt = dao_raw
+            else:
+                fee += dao_raw
+                remaining -= dao_raw
 
-        # Only create DAO output if it's non-dust
-        dao_amt = dao_capped if dao_capped >= 546 else 0
+        remaining -= dao_amt
 
-        # If intended donation is too small → absorb into fee (no output created)
-        if dao_amt == 0 and dao_raw > 0:
-            fee += dao_raw
-            remaining -= dao_raw
-
-    # Subtract successful (non-dust) donation
-    remaining -= dao_amt
-
-    # Change output — dust-safe (gets whatever is left)
+    # Final change dust handling
     change_amt = remaining if remaining >= 546 else 0
     if remaining > 0 and change_amt == 0:
-        fee += remaining       # absorb dust change
+        fee += remaining
         remaining = 0
+        change_amt = 0
 
     return TxEconomics(
         total_in=total_in,
@@ -735,36 +736,53 @@ class Tx:
         )
 
 
-def create_psbt(tx: Tx) -> str:
+def create_psbt(tx: Tx, include_witness_utxo: bool = False) -> str:
+    """
+    Create a minimal, standards-compliant PSBT.
+    
+    Args:
+        tx: Unsigned transaction object (Tx).
+        include_witness_utxo: If True, attach dummy witness UTXOs for hardware wallets.
+        
+    Returns:
+        Base64-encoded PSBT string.
+    """
     raw_tx = tx.serialize_unsigned()
 
-    # Parse input and output counts from raw tx
+    # Parse input/output counts from raw tx (for reference)
     pos = 4
     input_count, shift = _read_varint(raw_tx, pos)
     pos += shift
-
-    # Skip inputs
     for _ in range(input_count):
-        pos += 36
+        pos += 36  # prev txid + vout
         script_len, shift = _read_varint(raw_tx, pos)
-        pos += shift + script_len + 4
-
+        pos += shift + script_len + 4  # script + sequence
     output_count, _ = _read_varint(raw_tx, pos)
 
+    # PSBT header
     psbt = b'psbt\xff'
 
-    # Global unsigned transaction — correct key
+    # Global unsigned tx (key 0x01)
     psbt += b'\x01\x00' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
 
-    # Empty input maps — one per input
-    psbt += b'\x00' * input_count
+    # Input maps
+    for txin in tx.tx_ins:
+        if include_witness_utxo:
+            # Placeholder witness UTXO for hardware wallets
+            # Real values can be filled later by scanning the blockchain
+            dummy_value = (0).to_bytes(8, 'little')
+            dummy_script = b''
+            # Key type 0x01 = non-witness utxo, 0x02 = witness utxo
+            psbt += b'\x02' + encode_varint(len(dummy_value + dummy_script)) + dummy_value + dummy_script + b'\x00'
+        else:
+            psbt += b'\x00'
 
-    # Empty output maps — one per output
-    psbt += b'\x00' * output_count
-
-    # No trailing 0xff — PSBT ends at EOF
+    # Output maps
+    for _ in tx.tx_outs:
+        psbt += b'\x00'
 
     return base64.b64encode(psbt).decode()
+
 
 
 def _read_varint(data: bytes, pos: int = 0) -> tuple[int, int]:
@@ -1077,14 +1095,14 @@ def generate_summary_safe(
             gr.update(visible=False)
         )
 
-    # Extract strategy label (safe for string value)
+    # Extract strategy label
     strategy_label = (
         strategy.split(" — ")[0]
         if isinstance(strategy, str) and " — " in strategy
         else "Recommended"
     )
 
-    # Safe df data access
+    # Resolve selected UTXOs
     df_data = df if isinstance(df, list) else (df.value if hasattr(df, "value") else [])
     selected_utxos = _resolve_selected(df_data, enriched_state)
     pruned_count = len(selected_utxos)
@@ -1118,7 +1136,7 @@ def generate_summary_safe(
             gr.update(visible=False)
         )
 
-    # Pre-prune size
+    # Pre-prune size estimate
     all_input_weight = sum(u["input_weight"] for u in enriched_state)
     pre_vsize = max(
         (all_input_weight + 172 + total_utxos) // 4 + 10,
@@ -1150,13 +1168,11 @@ def generate_summary_safe(
             f"<br><span style='color:#00ff88;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
         )
 
-    # DAO line — clear visual feedback
+    # DAO visual feedback
     dao_raw = int((econ.total_in - econ.fee) * (dao_percent / 100.0)) if dao_percent > 0 else 0
     dao_line = ""
-
     if dao_percent > 0:
         if econ.dao_amt >= 546:
-            # Successful donation — green glow + thank you
             dao_line = (
                 f" • <span style='color:#00ff88;font-weight:800;text-shadow:0 0 20px #00ff88;'>"
                 f"DAO: {sats_to_btc_str(econ.dao_amt)}</span><br>"
@@ -1164,17 +1180,86 @@ def generate_summary_safe(
                 f"Thank you. Your support keeps Ωmega Pruner free, sovereign, and evolving. • Ω</span>"
             )
         elif dao_raw > 0:
-            # Too small → absorbed — red alert + clear explanation
             dao_line = (
                 f" • <span style='color:#ff3366;font-weight:800;text-shadow:0 0 20px #ff3366;'>"
                 f"DAO: {sats_to_btc_str(dao_raw)} → absorbed into fee</span><br>"
                 f"<span style='color:#ff6688;font-size:0.9rem;font-style:italic;'>(below 546 sat dust threshold)</span>"
             )
-    # Warnings
+
+    # === NEW EDUCATIONAL & WARNING BLOCKS ===
+    total_in = econ.total_in
+    current_fee = econ.fee
+    remainder_after_fee = total_in - current_fee
+    remaining_utxos_after_prune = total_utxos - pruned_count
+
+    # Always show pruning explanation
+    pruning_explanation_html = f"""
+    <!-- === PRUNING SUMMARY === -->
+    <div style="margin:32px 0;padding:24px;background:#001100;border:3px solid #00ff9d;border-radius:16px;
+                box-shadow:0 0 50px rgba(0,255,157,0.6);font-size:1.2rem;line-height:1.8;">
+      <strong style="color:#00ff9d;font-size:1.5rem;">🧹 WHAT PRUNING ACTUALLY DOES</strong><br><br>
+      Pruning <strong>removes inefficient UTXOs</strong> (dust, legacy, or heavy) from your address.<br><br>
+      • You pay a fee now to delete <strong>{pruned_count}</strong> bad inputs.<br>
+      • The <strong>{remaining_utxos_after_prune}</strong> remaining UTXOs are now easier and cheaper to spend later.<br>
+      • <strong>If no change output is created:</strong> the pruned value is absorbed into fees — but your wallet is <strong>cleaner forever</strong>.<br><br>
+      <strong>Goal:</strong> Healthier address → lower future fees. Pruning is often worth it during low-fee periods, even if you don’t get change back.<br>
+      <small style="color:#00ff9d;">💡 Tip: Only prune when total value > ~10–20× the expected fee if your goal is to recover change.</small>
+    </div>
+    """
+
+    # Conditional small prune warning
+    small_prune_warning_html = ""
+    if remainder_after_fee < 15000:
+        risk_level = "EXTREME" if remainder_after_fee < 8000 else "HIGH"
+        warning_color = "#ff3366" if remainder_after_fee < 8000 else "#ff8800"
+        warning_bg = "#440000" if remainder_after_fee < 8000 else "#331100"
+        warning_border = "#ff3366" if remainder_after_fee < 8000 else "#ff8800"
+
+        small_prune_warning_html = f"""
+        <!-- === SMALL PRUNE WARNING === -->
+        <div style="margin:24px 0;padding:20px;background:{warning_bg};border:4px solid {warning_border};border-radius:14px;
+                    box-shadow:0 0 40px rgba(255,68,68,0.8);font-size:1.25rem;line-height:1.7;color:#ffcccc;">
+          <strong style="color:{warning_color};font-size:1.45rem;">⚠️ {risk_level} RISK: Likely NO change output</strong><br><br>
+          Post-fee remainder (~{remainder_after_fee:,} sats) is small.<br>
+          The pruned value will probably be fully absorbed into miner fees.<br><br>
+          <strong>Only proceed if your goal is cleaning up bad UTXOs</strong> — not recovering the value.<br><br>
+          <small style="color:#ffaaaa;">
+            💡 For a safe change output back to you, Value Pruned should be ≥ 10–20× Current Fee 
+            (here: ≥ {10 * current_fee:,}–{20 * current_fee:,} sats).
+          </small><br>
+          <small style="color:#ff8888;text-decoration:underline;cursor:help;"
+                title="A change output adds ~30–40 vbytes → increases fee slightly. If the remainder falls below ~546 sats (dust threshold), no change is created to avoid unspendable dust.">
+            Why this happens
+          </small>
+        </div>
+        """
+
+    # Conditional DAO info
+    dao_info_html = ""
+    extra_note = ""
+    if dao_percent > 0:
+        intended_dao = int(remainder_after_fee * (dao_percent / 100.0))
+
+        # Special highlight for full donation
+        if dao_percent >= 99.9:
+            extra_note = "<br><strong style='color:#ffaa00;font-size:1.15rem;'>☢️ 100% mode active → no change output (full donation to DAO)</strong>"
+
+        dao_info_html = f"""
+        <!-- === DAO/CHANGE INFO === -->
+        <div style="margin:16px 0;padding:16px;background:#111100;border:2px solid #ffaa00;border-radius:12px;
+                    box-shadow:0 0 25px rgba(255,170,0,0.5);font-size:1.1rem;line-height:1.6;color:#ffffcc;">
+          🔹 DAO Donation set to {dao_percent}% (~{sats_to_btc_str(intended_dao)} intended){extra_note}<br><br>
+          • Final DAO output: <strong>{sats_to_btc_str(econ.dao_amt)}</strong><br>
+          • Expected change back to you: <strong>{sats_to_btc_str(econ.change_amt)}</strong><br><br>
+          <small>If the remainder is too small for non-dust outputs, tiny donations and/or change are absorbed into fees automatically.</small>
+        </div>
+        """
+
+    # CIOH warning
     distinct_addrs = len({u["address"] for u in selected_utxos})
     cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
 
-    # Final unified status box
+    # Final status box assembly
     status_box_html = f"""
     <div style="text-align:center;margin:40px auto 30px auto;padding:28px;background:#000;
                 border:3px solid #f7931a;border-radius:20px;max-width:960px;
@@ -1185,7 +1270,7 @@ def generate_summary_safe(
         SELECTION READY
       </div>
 
-	<div style="color:#f7931a;font-size:1.8rem;font-weight:800;margin:20px 0;">
+      <div style="color:#f7931a;font-size:1.8rem;font-weight:800;margin:20px 0;">
         {total_utxos:,} UTXOs • <span style="color:#00ff9d;">{strategy_label}</span> Strategy Active
       </div>
 
@@ -1203,7 +1288,7 @@ def generate_summary_safe(
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
-         <div style="font-size:1.1rem;line-height:2.1;">
+      <div style="font-size:1.1rem;line-height:2.1;">
         <div style="margin:12px 0;">
           <b style="color:#fff;">Value Pruned:</b> 
           <span style="color:#0f0;font-weight:800;">{sats_to_btc_str(econ.total_in)}</span>
@@ -1233,7 +1318,17 @@ def generate_summary_safe(
       <div style="margin:32px 0 40px 0;line-height:1.7;">
         {cioh_warning}
       </div>
-	  
+
+      <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
+
+      {pruning_explanation_html}
+
+      {small_prune_warning_html}
+
+      {dao_info_html}
+
+      <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
+
       <div style="color:#aaffaa;font-size:1.15rem;margin-top:32px;line-height:1.8;">
         <span style="color:#00ff9d;font-weight:900;">Full coin control:</span> Review table below<br>
         Check/uncheck UTXOs • Adjust as needed
