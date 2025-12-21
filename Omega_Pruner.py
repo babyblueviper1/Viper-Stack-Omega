@@ -1018,15 +1018,10 @@ def analyze(
     import copy
     frozen_enriched = tuple(copy.deepcopy(u) for u in enriched_sorted)
 
-	# Wrap with metadata (including scan_source)
-    frozen_state = {
-        "utxos": frozen_enriched,
-        "scan_source": scan_source_out,
-    }
-
+	
     return (
         gr.update(value=df_rows),
-        frozen_state,
+        frozen_enriched,
         gr.update(visible=True),   # generate_row
         gr.update(visible=True),   # import_file
         scan_source_out,           # pass the original scan source forward
@@ -1258,8 +1253,8 @@ def on_generate(
 
     try:
         snapshot = build_psbt_snapshot(
-            enriched_state=enriched_state["utxos"],
-            scan_source=enriched_state["scan_source"],
+            enriched_state=enriched_state,      
+            scan_source=scan_source,        
             fee_rate=fee_rate,
             future_fee_rate=future_fee_rate,
             dao_percent=dao_percent,
@@ -2168,7 +2163,7 @@ No API calls • Fully air-gapped safe""",
     # =============================
     gen_btn.click(
         fn=on_generate,
-        inputs=[dest, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state],
+        inputs=[dest, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state, scan_source],
         outputs=[psbt_snapshot, locked, export_file],
     ).then(
         fn=generate_psbt,
