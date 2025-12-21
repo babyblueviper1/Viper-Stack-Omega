@@ -646,7 +646,7 @@ def estimate_tx_economics(
     fee = max(600, int(vsize * fee_rate))  # Minimum effective 1 sat/vB
     remaining = total_in - fee
 
-     dao_amt = 0
+    dao_amt = 0
     change_amt = remaining
 
     if dao_percent > 0 and remaining > 0:
