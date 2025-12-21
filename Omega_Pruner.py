@@ -1329,30 +1329,29 @@ def generate_summary_safe(
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
-      <div style="font-size:1.1rem;line-height:2.1;">
-        <div style="margin:12px 0;">
-          <b style="color:#fff;">Value Pruned:</b> 
-          <span style="color:#0f0;font-weight:800;">{sats_to_btc_str(econ.total_in)}</span>
-        </div>
-        <div style="margin:12px 0;">
-          <b style="color:#fff;">Pre-Prune Size (if sent today):</b> 
-          <span style="color:#ff9900;font-weight:800;">{pre_vsize:,} vB</span>
-        </div>
-        <div style="margin:12px 0;">
-          <b style="color:#fff;">Post-Prune Size:</b> 
-          <span style="color:#0f0;font-weight:800;">{econ.vsize:,} vB</span>
-          <span style="color:{savings_color};font-weight:900;margin-left:12px;">
-            {savings_label} (-{savings_pct}%)
-          </span>
-        </div>
-        <div style="margin:16px 0;">
-          {savings_line}
-        </div>
-        <div style="margin:12px 0;">
-          <b style="color:#fff;">Current Fee:</b> 
-          <span style="color:#0f0;font-weight:800;">{econ.fee:,} sats @ {fee_rate} s/vB</span>{dao_line}
-        </div>
-      </div>
+     <div style="font-size:1.1rem;line-height:2.1;">
+  <div style="margin:14px 0;">
+    <b style="color:#fff;">If spending your full wallet today (no pruning):</b> 
+    <span style="color:#ff9900;font-weight:800;">~{pre_vsize:,} vB</span>
+  </div>
+
+  <div style="margin:14px 0;">
+    <b style="color:#fff;">Cost of this pruning cleanup transaction:</b> 
+    <span style="color:#0f0;font-weight:800;">~{econ.vsize:,} vB</span>
+    <span style="color:{savings_color};font-weight:900;margin-left:12px;">
+      {savings_label} smaller than full spend
+    </span>
+  </div>
+
+  <div style="margin:20px 0;color:#88ffcc;font-size:1.05rem;">
+    💡 Pruning now saves you <strong style="color:#0f0;">+{sats_saved:,} sats</strong> versus pruning in the future if fees reach {future_fee_rate} s/vB
+  </div>
+
+  <div style="margin:14px 0;">
+    <b style="color:#fff;">Current Fee (paid now):</b> 
+    <span style="color:#0f0;font-weight:800;">{econ.fee:,} sats @ {fee_rate} s/vB</span>{dao_line}
+  </div>
+</div>
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
