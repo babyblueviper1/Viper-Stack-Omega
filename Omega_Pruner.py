@@ -1237,59 +1237,66 @@ def generate_summary_safe(
     return status_box_html, gr.update(visible=pruned_count > 0)
   
 def on_generate(
-    dest_addr,
-    fee_rate,
-    future_fee_rate,
-    dao_percent,
-    enriched_state,
+    dest_addr: str,
+    fee_rate: int,
+    future_fee_rate: int,
+    dao_percent: float,
+    enriched_state: tuple,
+    scan_source: str,
 ):
     """
     Freeze user intent into an immutable PSBT snapshot.
     No destination resolution or PSBT construction happens here.
+    Called when user clicks "GENERATE NUCLEAR PSBT" after final review.
     """
 
+    # 1. No analysis performed yet
     if not enriched_state:
         return None, gr.update(value=False), None
 
+    # 2. Resolve selected UTXOs — this is the canonical user intent
+    selected_utxos = [u for u in enriched_state if u.get("selected", False)]
+
+    # 3. Must have at least one input to prune/consolidate
+    if not selected_utxos:
+        log.info("Generate attempted with no UTXOs selected")
+        return None, gr.update(value=False), None
+
     try:
+        # Freeze everything needed for full deterministic replay
         snapshot = build_psbt_snapshot(
-            enriched_state=enriched_state,      
-            scan_source=scan_source,        
+            enriched_state=selected_utxos,           # only pruned inputs
+            scan_source=scan_source.strip(),         # frozen fallback destination
+            dest_addr_override=dest_addr.strip() or None,
             fee_rate=fee_rate,
             future_fee_rate=future_fee_rate,
             dao_percent=dao_percent,
-            dest_addr=dest_addr,
         )
 
-        # Serialize snapshot to JSON (exportable, offline-safe)
+        # Export as human-readable, offline-safe JSON
         json_str = json.dumps(snapshot, indent=2, ensure_ascii=False)
 
         date_str = datetime.now().strftime("%Y%m%d")
-        fingerprint_short = snapshot.get("fingerprint_short", "none")
+        fingerprint_short = snapshot["fingerprint_short"]
 
-        prefix = (
-            f"omega_selection_{date_str}_{fingerprint_short[:8]}_"
-            if fingerprint_short != "none"
-            else f"omega_selection_{date_str}_"
-        )
+        filename_prefix = f"omega_selection_{date_str}_{fingerprint_short[:8]}_"
 
         tmp_file = tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
             suffix=".json",
-            prefix=prefix,
+            prefix=filename_prefix,
             delete=False,
         )
         tmp_file.write(json_str)
         tmp_file.close()
 
-        # Lock UI + expose export
+        # Success: lock UI and provide immutable export
         return snapshot, gr.update(value=True), tmp_file.name
 
-    except ValueError as e:
-        log.warning(f"Snapshot generation failed: {e}")
+    except Exception as e:
+        log.warning(f"Failed to generate snapshot: {e}")
         return None, gr.update(value=False), None
-
 
 def generate_psbt(psbt_snapshot: dict):
     """Generate PSBT from frozen snapshot — no live reads."""
