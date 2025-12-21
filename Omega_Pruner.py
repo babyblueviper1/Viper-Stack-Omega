@@ -1262,7 +1262,7 @@ def generate_summary_safe(
         # Dynamic recommendation — updated to 5× for consistency with HTML
         min_recommended = max(5 * current_fee, 100000)
 
-        small_prune_warning_html = f"""
+      small_prune_warning_html = f"""
         <!-- === SMALL PRUNE WARNING === -->
         <div style="margin:26px 0;padding:24px;background:{warning_bg};border:4px solid {warning_border};border-radius:16px;
                     box-shadow:0 0 50px rgba(255,100,100,0.8);font-size:1.28rem;line-height:1.8;color:#ffeeee;">
@@ -1279,27 +1279,29 @@ def generate_summary_safe(
           </div>
           <div style="color:#ffdd88;font-size:1.1rem;margin-top:8px;">
             — not expecting significant change back.
-          </div><br>
+          </div><br><br>
           
           <div style="color:#ffaaaa;font-size:1.05rem;line-height:1.6;">
-  		💡 For a <span style="color:#ffffff;font-size:1.1rem;">reliable change output</span>, aim for:<br>
-  		• Value Pruned > ~<span style="color:#ffffff;">5× Current Fee</span> (good change back)<br>
-  		• Value Pruned > ~<span style="color:#ffffff;">10× Current Fee</span> (very comfortable)<br><br>
+            💡 For a <span style="color:#ffffff;font-size:1.1rem;">reliable change output</span>, aim for:<br>
+            • Value Pruned > ~<span style="color:#ffffff;">5× Current Fee</span> (good change back)<br>
+            • Value Pruned > ~<span style="color:#ffffff;">10× Current Fee</span> (very comfortable)<br><br>
   
-  		This prune: <span style="color:#ffffff;font-weight:800;">{sats_to_btc_str(econ.total_in)}</span> value and <span style="color:#ffffff;font-weight:800;">{current_fee:,} sats</span> fee<br>
- 		 Ratio: <span style="color:#ffffff;font-weight:800;">{round(econ.total_in / current_fee, 1)}×</span> current fee
-		</div><br>
+            This prune: <span style="color:#ffffff;font-weight:800;">{sats_to_btc_str(econ.total_in)}</span> value and <span style="color:#ffffff;font-weight:800;">{current_fee:,} sats</span> fee<br>
+            Ratio: <span style="color:#ffffff;font-weight:800;">{round(econ.total_in / current_fee, 1)}×</span> current fee
+          </div><br>
 
-<small style="color:#88ffcc;">
-  💡 Pro tip: The bigger the prune (relative to fee), the more you get back as change. Small prunes = cleanup only.
-</small>
+          <small style="color:#88ffcc;">
+            💡 Pro tip: The bigger the prune (relative to fee), the more you get back as change. Small prunes = cleanup only.
+          </small>
+        </div>
+        """
 
     # CIOH warning
     distinct_addrs = len({u["address"] for u in selected_utxos})
     cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
 
     # Final status box
-    status_box_html = f"""
+status_box_html = f"""
     <div style="text-align:center;margin:40px auto 30px auto;padding:28px;background:#000;
                 border:3px solid #f7931a;border-radius:20px;max-width:960px;
                 box-shadow:0 0 80px rgba(247,147,26,0.5);">
@@ -1366,7 +1368,7 @@ def generate_summary_safe(
 
       {small_prune_warning_html}
 
-       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:40px 0 60px 0;">
+      <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:40px 0 60px 0;">
 
       <div style="color:#aaffaa;font-size:1.15rem;line-height:1.8;padding-bottom:40px;">
         <span style="color:#00ff9d;font-weight:900;">Full coin control:</span> Review table below<br>
