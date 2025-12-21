@@ -1387,10 +1387,10 @@ def generate_summary_safe(
       <div style="margin:40px 0 60px 0;">
         <div style="color:#0f0;font-size:2.8rem;font-weight:900;
                     letter-spacing:4px;text-shadow:0 0 40px #0f0, 0 0 80px #0f0;">
-          READY TO PRUNE?
+          ARE YOU READY TO PRUNE?
         </div>
 
-        <div style="margin-top:50px;font-size:5.5rem;color:#f7931a;opacity:0.95;
+        <div style="margin-top:35px;font-size:5.5rem;color:#f7931a;opacity:0.95;
                     animation:pulse 2.2s infinite ease-in-out;text-align:center;">
           ↓
         </div>
