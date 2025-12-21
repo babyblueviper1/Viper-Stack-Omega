@@ -1277,6 +1277,18 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
     else:
         final_dest = scan_source
 
+	# Safety: if final_dest is empty or None, show clear error
+    if not final_dest or not final_dest.strip():
+        return (
+            "<div style='color:#ff3366;text-align:center;padding:40px;background:#440000;border-radius:16px;"
+            "box-shadow:0 0 40px rgba(255,51,102,0.4);font-size:1.3rem;line-height:1.7;'>"
+            "<strong>No destination address available.</strong><br><br>"
+            "Please provide a destination address or ensure your scan source contains a valid address."
+            "</div>"
+        )
+
+    final_dest = final_dest.strip()
+
     # Guardrail: xpub cannot be used directly as destination (yet)
     if final_dest.startswith(("xpub", "ypub", "zpub", "tpub", "upub", "vpub")):
         return (
