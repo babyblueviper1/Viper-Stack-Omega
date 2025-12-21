@@ -247,12 +247,13 @@ def build_psbt_snapshot(
     snapshot = {
         "version": 1,
         "timestamp": int(time.time()),
-        "scan_source": scan_source,                           # original user input
+        "scan_source": scan_source.strip(),                          # original user input
         "dest_addr_override": dest_addr_override.strip() if dest_addr_override and dest_addr_override.strip() else None,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
         "dao_percent": dao_percent,
         "inputs": copy.deepcopy(selected_utxos),
+		"fingerprint_short": fingerprint_short,
     }
 
     # Deterministic fingerprint — excludes itself
@@ -885,7 +886,7 @@ def analyze(
     if offline_mode:
         manual_str = (manual_utxo_input or "").strip()
         if not manual_str:
-            return _analyze_empty()
+            return _analyze_empty(scan_source_out)
 
         for line in manual_str.splitlines():
             line = line.strip()
@@ -922,12 +923,12 @@ def analyze(
                 continue
 
         if not all_enriched:
-            return _analyze_empty()
+            return _analyze_empty(scan_source_out)
 
     else:  # online mode
         addr_str = (addr_input or "").strip()
         if not addr_str:
-            return _analyze_empty()
+            return _analyze_empty(scan_source_out)
 
         entries = [e.strip() for e in addr_str.splitlines() if e.strip()]
 
@@ -978,7 +979,7 @@ def analyze(
                 all_enriched.append(enriched)
 
         if not all_enriched:
-            return _analyze_empty()
+            return _analyze_empty(scan_source_out)
 
     # ===============================
     # CANONICAL ORDERING & PRUNING LOGIC
@@ -1017,22 +1018,28 @@ def analyze(
     import copy
     frozen_enriched = tuple(copy.deepcopy(u) for u in enriched_sorted)
 
+	# Wrap with metadata (including scan_source)
+    frozen_state = {
+        "utxos": frozen_enriched,
+        "scan_source": scan_source_out,
+    }
+
     return (
         gr.update(value=df_rows),
-        frozen_enriched,
+        frozen_state,
         gr.update(visible=True),   # generate_row
         gr.update(visible=True),   # import_file
         scan_source_out,           # pass the original scan source forward
     )
     
-def _analyze_empty():
+def _analyze_empty(scan_source: str = ""):
 	"""Common return for all empty/failure states in analyze()."""
 	return (
     	gr.update(value=[]),              # df — empty table
         tuple(),                          # enriched_state — empty
         gr.update(visible=False),         # generate_row — hide
         gr.update(visible=False),          # import_file — hide
-		"",
+		scan_source,
     )
 
 
@@ -1234,10 +1241,67 @@ def generate_summary_safe(
 
     return status_box_html, gr.update(visible=pruned_count > 0)
   
+def on_generate(
+    dest_addr,
+    fee_rate,
+    future_fee_rate,
+    dao_percent,
+    enriched_state,
+):
+    """
+    Freeze user intent into an immutable PSBT snapshot.
+    No destination resolution or PSBT construction happens here.
+    """
+
+    if not enriched_state:
+        return None, gr.update(value=False), None
+
+    try:
+        snapshot = build_psbt_snapshot(
+            enriched_state=enriched_state["utxos"],
+            scan_source=enriched_state["scan_source"],
+            fee_rate=fee_rate,
+            future_fee_rate=future_fee_rate,
+            dao_percent=dao_percent,
+            dest_addr=dest_addr,
+        )
+
+        # Serialize snapshot to JSON (exportable, offline-safe)
+        json_str = json.dumps(snapshot, indent=2, ensure_ascii=False)
+
+        date_str = datetime.now().strftime("%Y%m%d")
+        fingerprint_short = snapshot.get("fingerprint_short", "none")
+
+        prefix = (
+            f"omega_selection_{date_str}_{fingerprint_short[:8]}_"
+            if fingerprint_short != "none"
+            else f"omega_selection_{date_str}_"
+        )
+
+        tmp_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=".json",
+            prefix=prefix,
+            delete=False,
+        )
+        tmp_file.write(json_str)
+        tmp_file.close()
+
+        # Lock UI + expose export
+        return snapshot, gr.update(value=True), tmp_file.name
+
+    except ValueError as e:
+        log.warning(f"Snapshot generation failed: {e}")
+        return None, gr.update(value=False), None
 
 
-def generate_psbt(psbt_snapshot: dict, scan_source: str):
+def generate_psbt(psbt_snapshot: dict):
     """Generate PSBT from frozen snapshot — no live reads."""
+    pruned_utxos = psbt_snapshot["inputs"]
+    scan_source = psbt_snapshot["scan_source"]
+    dest_addr_override = psbt_snapshot.get("dest_addr_override")
+    
     if not psbt_snapshot:
         return (
             "<div style='color:#ff3366;text-align:center;padding:30px;'>"
@@ -1245,11 +1309,8 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
             "</div>"
         )
 
-    # Extract from frozen snapshot
-    pruned_utxos = psbt_snapshot["inputs"]
     pruned_count = len(pruned_utxos)
     fingerprint = psbt_snapshot["fingerprint_short"]
-    dest_addr_override = psbt_snapshot.get("dest_addr_override")  # may be None
     fee_rate = psbt_snapshot["fee_rate"]
     dao_percent = psbt_snapshot["dao_percent"]
 
@@ -1272,35 +1333,34 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
 
     dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
 
-       # Resolve destination — explicit override or original scan source
-    if dest_addr and dest_addr.strip():
-        final_dest = dest_addr.strip()
+    # Resolve destination — explicit override or original scan source
+    if dest_addr_override:
+        final_dest = dest_addr_override
     else:
         final_dest = scan_source.strip() if scan_source else ""
 
-    # Early error if no destination at all — especially important in offline mode
+    # Early error if no destination at all
     if not final_dest:
         return (
             "<div style='color:#ff3366;text-align:center;padding:40px;background:#440000;border-radius:16px;"
             "box-shadow:0 0 40px rgba(255,51,102,0.4);font-size:1.3rem;line-height:1.7;'>"
             "<strong>No destination address available.</strong><br><br>"
-            "Please enter a destination address.<br>"
-            "In offline mode, destination cannot be derived from manual UTXOs."
+            "Please enter a destination address or ensure your scan source is valid."
             "</div>"
         )
 
-    # Now check for xpub — only if we have a string
+    # Guardrail for xpub (future-proof)
     if final_dest.startswith(("xpub", "ypub", "zpub", "tpub", "upub", "vpub")):
         return (
             "<div style='color:#ffcc00;text-align:center;padding:40px;background:#332200;border-radius:16px;"
             "box-shadow:0 0 40px rgba(255,204,0,0.4);font-size:1.3rem;line-height:1.7;'>"
             "<strong>xpub detected as scan source.</strong><br><br>"
-            "Please specify a destination address for change output.<br>"
-            "Automatic xpub derivation coming in future version."
+            "Please specify a destination address.<br>"
+            "Automatic derivation coming soon."
             "</div>"
         )
 
-    # Validate as normal address
+    # Validate address
     try:
         dest_spk, _ = address_to_script_pubkey(final_dest)
     except Exception:
@@ -1311,8 +1371,8 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
             "Please check the address format."
             "</div>"
         )
-		
-    # Build transaction — deterministic order already in snapshot
+
+    # Build transaction
     tx = Tx()
     for u in pruned_utxos:
         tx.tx_ins.append(TxIn(bytes.fromhex(u["txid"]), int(u["vout"])))
@@ -1323,7 +1383,7 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
     if econ.change_amt > 0:
         tx.tx_outs.append(TxOut(econ.change_amt, dest_spk))
 
-    # Legacy serialization (no SegWit marker, no witness)
+    # Legacy serialization
     raw_tx = (
         tx.version.to_bytes(4, 'little') +
         encode_varint(len(tx.tx_ins)) +
@@ -1334,7 +1394,6 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
     )
 
     psbt_b64 = create_psbt(tx)
-
     # QR generation
     error_correction = qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2800 else qrcode.constants.ERROR_CORRECT_M
     qr = qrcode.QRCode(version=None, error_correction=error_correction, box_size=6, border=4)
@@ -1453,41 +1512,6 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
 
 
     return psbt_html
-
-
-  
-# Define functions at top level (outside any with blocks)
-def on_generate(
-    dest_addr,
-    fee_rate,
-    future_fee_rate,
-    dao_percent,
-    enriched_state,
-	scan_source,
-):
-    try:
-        snapshot = build_psbt_snapshot(
-            enriched_state,
-            fee_rate,
-            future_fee_rate,
-            dao_percent,
-            dest_addr,
-			scan_source,
-        )
-
-        # Create temp JSON file for download
-        json_str = json.dumps(snapshot, indent=2, ensure_ascii=False)
-        date_str = datetime.now().strftime("%Y%m%d")
-        fingerprint_short = snapshot.get("fingerprint_short", "none")
-        prefix = f"omega_selection_{date_str}_{fingerprint_short[:8]}_" if fingerprint_short != "none" else f"omega_selection_{date_str}_"
-        tmp_file = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", prefix=prefix, delete=False)
-        tmp_file.write(json_str)
-        tmp_file.close()
-        json_filepath = tmp_file.name
-      
-        return snapshot, gr.update(value=True), json_filepath
-    except ValueError:
-        return None, gr.update(value=False), None
 
 # --------------------------
 # Gradio UI
@@ -2144,7 +2168,7 @@ No API calls • Fully air-gapped safe""",
     # =============================
     gen_btn.click(
         fn=on_generate,
-        inputs=[dest, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state, scan_source],
+        inputs=[dest, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state],
         outputs=[psbt_snapshot, locked, export_file],
     ).then(
         fn=generate_psbt,
