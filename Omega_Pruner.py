@@ -630,7 +630,7 @@ def estimate_tx_economics(
     fee_rate: int,
     dao_percent: float,
 ) -> TxEconomics:
-    """Estimate transaction economics based on selected UTXOs and fee rate."""
+    """Estimate transaction economics — now prioritizes user change output."""
     if not selected_utxos:
         raise ValueError("No UTXOs selected")
 
@@ -646,24 +646,33 @@ def estimate_tx_economics(
     fee = max(600, int(vsize * fee_rate))  # Minimum effective 1 sat/vB
     remaining = total_in - fee
 
-    # DAO contribution
-    dao_raw = int(remaining * (dao_percent / 100.0)) if dao_percent > 0 else 0
+    dao_amt = 0
+    change_amt = remaining  # Default: everything goes to change
 
-    if dao_raw >= 546:
-        dao_amt = dao_raw
-    else:
-        dao_amt = 0
-        remaining -= dao_raw   # ← CRITICAL: subtract absorbed dust from remaining
-        fee += dao_raw         # absorb into fee
+    if dao_percent > 0 and remaining > 0:
+        dao_raw = int(remaining * (dao_percent / 100.0))
 
-    remaining -= dao_amt       # subtract successful donation (if any)
+        # PRIORITIZE CHANGE: Only donate if we can leave enough for a non-dust change output
+        min_for_change = 546
+        max_possible_dao = max(0, remaining - min_for_change)
+        dao_capped = min(dao_raw, max_possible_dao)
 
-    # Change output — dust-safe
+        # Only create DAO output if it's non-dust
+        dao_amt = dao_capped if dao_capped >= 546 else 0
+
+        # If intended donation is too small → absorb into fee (no output created)
+        if dao_amt == 0 and dao_raw > 0:
+            fee += dao_raw
+            remaining -= dao_raw
+
+    # Subtract successful (non-dust) donation
+    remaining -= dao_amt
+
+    # Change output — dust-safe (gets whatever is left)
     change_amt = remaining if remaining >= 546 else 0
     if remaining > 0 and change_amt == 0:
         fee += remaining       # absorb dust change
         remaining = 0
-        change_amt = 0
 
     return TxEconomics(
         total_in=total_in,
@@ -673,7 +682,6 @@ def estimate_tx_economics(
         dao_amt=dao_amt,
         change_amt=change_amt,
     )
-
 
 
 def encode_varint(i: int) -> bytes:
