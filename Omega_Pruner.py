@@ -1259,10 +1259,10 @@ def generate_summary_safe(
             warning_bg = "#331100"
             warning_border = "#ff8800"
 
-        # Dynamic recommendation — updated to 5× for consistency with HTML
+        # Dynamic recommendation — 5× base, min 100k sats floor
         min_recommended = max(5 * current_fee, 100000)
 
-      small_prune_warning_html = f"""
+        small_prune_warning_html = f"""
         <!-- === SMALL PRUNE WARNING === -->
         <div style="margin:26px 0;padding:24px;background:{warning_bg};border:4px solid {warning_border};border-radius:16px;
                     box-shadow:0 0 50px rgba(255,100,100,0.8);font-size:1.28rem;line-height:1.8;color:#ffeeee;">
@@ -1301,7 +1301,7 @@ def generate_summary_safe(
     cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
 
     # Final status box
-status_box_html = f"""
+    status_box_html = f"""
     <div style="text-align:center;margin:40px auto 30px auto;padding:28px;background:#000;
                 border:3px solid #f7931a;border-radius:20px;max-width:960px;
                 box-shadow:0 0 80px rgba(247,147,26,0.5);">
