@@ -1279,7 +1279,7 @@ def generate_summary_safe(
           </div>
           <div style="color:#ffdd88;font-size:1.1rem;margin-top:8px;">
             — not expecting significant change back.
-          </div><br><br>
+          </div><br>
           
           <div style="color:#ffaaaa;font-size:1.05rem;line-height:1.6;">
             💡 For a <span style="color:#ffffff;font-size:1.1rem;">reliable change output</span>, aim for:<br>
@@ -1380,7 +1380,7 @@ def generate_summary_safe(
       </div>
 
       <!-- SEPARATOR LINE BEFORE FINAL CALL TO ACTION -->
-      <hr style="border:none;border-top:2px solid #f7931a;margin:40px auto 80px auto;width:60%;
+      <hr style="border:none;border-top:2px solid #f7931a;margin:20px auto 80px auto;width:60%;
                   box-shadow:0 0 15px rgba(247,147,26,0.8);">
 
       <!-- FINAL CALL TO ACTION -->
@@ -2200,38 +2200,44 @@ No API calls • Fully air-gapped safe""",
         # Export sections
         with gr.Row(visible=False) as export_title_row:
             gr.HTML("""
-            <div style='text-align:center;padding:40px 0 30px 0;'>
-                <!-- Main Header — FROZEN = icy blue theme -->
-                <div style='color:#00ddff;font-size:2.6rem;font-weight:900;
-                            letter-spacing:8px;
-                            text-shadow:0 0 40px #00ddff, 0 0 80px #00ddff,
-                                        0 4px 8px #000, 0 8px 20px #000000ee,
-                                        0 12px 32px #000000cc;
-                            margin-bottom:20px;'>
-                    🔒 SELECTION FROZEN
-                </div>
-                
-                <!-- Core message — back to signature green -->
-                <div style='color:#aaffaa;font-size:1.4rem;font-weight:700;
-                            text-shadow:0 0 20px #0f0,
-                                        0 3px 6px #000, 0 6px 16px #000000dd,
-                                        0 10px 24px #000000bb;
-                            max-width:720px;margin:0 auto 16px auto;
-                            line-height:1.6;'>
-                    Your pruning intent is now immutable • Permanent audit trail secured
-                </div>
-                
-                <!-- Extra reassurance — bright cyan for clarity -->
-                <div style='color:#00ffdd;font-size:1.1rem;opacity:0.9;font-weight:700;
-                            text-shadow:0 2px 4px #000, 0 4px 12px #000000cc,
-                                        0 8px 20px #000000aa;
-                            max-width:640px;margin:0 auto;'>
-                    The file below includes:<br>
-                    • Full selection fingerprint • All selected UTXOs • Transaction parameters<br><br>
-                    Download for backup, offline verification, or future reference
-                </div>
-            </div>
-            """)
+            <div style="text-align:center;padding:40px 0 30px 0;">
+
+  <!-- Main Header — FROZEN = icy blue theme -->
+  <div style="color:#00ddff;font-size:2.6rem;font-weight:900;
+              letter-spacing:8px;
+              text-shadow:0 0 40px #00ddff, 0 0 80px #00ddff,
+                          0 4px 8px #000, 0 8px 20px #000000ee,
+                          0 12px 32px #000000cc;
+              margin-bottom:20px;">
+    🔒 SELECTION FROZEN
+  </div>
+  
+  <!-- Core message — signature green -->
+  <div style="color:#aaffaa;font-size:1.4rem;font-weight:700;
+              text-shadow:0 0 20px #0f0,
+                          0 3px 6px #000, 0 6px 16px #000000dd,
+                          0 10px 24px #000000bb;
+              max-width:720px;margin:0 auto 16px auto;
+              line-height:1.6;">
+    Your pruning intent is now immutable • Permanent audit trail secured
+  </div>
+  
+  <!-- Extra reassurance — bright cyan -->
+  <div style="color:#00ffdd;font-size:1.1rem;opacity:0.9;font-weight:700;
+              text-shadow:0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;
+              max-width:640px;margin:20px auto 10px auto;line-height:1.7;">
+    The file below includes:<br>
+    • Full selection fingerprint • All selected UTXOs • Transaction parameters
+  </div>
+  
+  <div style="color:#aaffaa;font-size:1.1rem;opacity:0.9;font-weight:700;
+              text-shadow:0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;
+              max-width:640px;margin:0 auto 40px auto;line-height:1.7;">
+    Download for backup, offline verification, or future reference
+  </div>
+
+</div>
+""")
 
         with gr.Row(visible=False) as export_file_row:
             export_file = gr.File(
