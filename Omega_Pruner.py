@@ -1259,30 +1259,33 @@ def generate_summary_safe(
             warning_bg = "#331100"
             warning_border = "#ff8800"
 
-        # Dynamic recommendation
-        min_recommended = max(2 * current_fee, 50000)
+        # Dynamic recommendation — updated to 5× for consistency with HTML
+        min_recommended = max(5 * current_fee, 100000)
 
         small_prune_warning_html = f"""
         <!-- === SMALL PRUNE WARNING === -->
         <div style="margin:26px 0;padding:24px;background:{warning_bg};border:4px solid {warning_border};border-radius:16px;
                     box-shadow:0 0 50px rgba(255,100,100,0.8);font-size:1.28rem;line-height:1.8;color:#ffeeee;">
-          
-          <strong style="color:{warning_color};font-size:1.55rem;text-shadow:0 0 15px {warning_color}, 0 0 30px {warning_color};">
+
+          <div style="color:{warning_color};font-size:1.55rem;text-shadow:0 0 15px {warning_color}, 0 0 30px {warning_color};margin-bottom:20px;">
             {warning_title}
-          </strong><br><br>
+          </div>
           
           Post-fee remainder (~{remainder_after_fee:,} sats) is small.<br>
-          The pruned value will likely be <strong style="color:#ffffff;">fully or partially absorbed into miner fees</strong>.<br><br>
+          The pruned value will likely be fully or partially absorbed into miner fees.<br><br>
           
-          <strong style="color:#ffff99;text-shadow:0 0 10px #ffff99;">
-            Only proceed if your main goal is cleaning up inefficient UTXOs
-          </strong> — not recovering the full value.<br><br>
+          <div style="color:#ffff88;font-size:1.35rem;text-shadow:0 0 12px #ffff99, 0 0 25px #ffaa00;line-height:1.8;">
+            Only proceed if your goal is wallet cleanup
+          </div>
+          <div style="color:#ffdd88;font-size:1.1rem;margin-top:8px;">
+            — not expecting significant change back.
+          </div><br><br>
           
           <div style="color:#ffaaaa;font-size:1.05rem;line-height:1.6;">
-            💡 For a <strong>reliable change output</strong> (and net gain), aim for:<br>
-            • Value Pruned > ~<strong>2× Current Fee</strong> (minimum viable)<br>
-            • Value Pruned > ~<strong>10× Current Fee</strong> (comfortable change)<br><br>
-            Current fee: {current_fee:,} sats → recommended: <strong>{min_recommended:,}+ sats</strong>
+            💡 For a <span style="color:#ffffff;font-size:1.1rem;">reliable change output</span>, aim for:<br>
+            • Value Pruned > ~<span style="color:#ffffff;">5× Current Fee</span> (good change back)<br>
+            • Value Pruned > ~<span style="color:#ffffff;">10× Current Fee</span> (very comfortable)<br><br>
+            Current fee: {current_fee:,} sats → recommended: <span style="color:#ffffff;">{min_recommended:,}+ sats</span>
           </div><br>
           
           <small style="color:#88ffcc;">
@@ -1375,7 +1378,7 @@ def generate_summary_safe(
       </div>
 
       <!-- SEPARATOR LINE BEFORE FINAL CALL TO ACTION -->
-      <hr style="border:none;border-top:2px solid #f7931a;margin:60px auto 80px auto;width:60%;
+      <hr style="border:none;border-top:2px solid #f7931a;margin:40px auto 80px auto;width:60%;
                   box-shadow:0 0 15px rgba(247,147,26,0.8);">
 
       <!-- FINAL CALL TO ACTION -->
