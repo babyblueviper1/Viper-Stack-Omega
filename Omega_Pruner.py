@@ -1212,7 +1212,7 @@ def generate_summary_safe(
       Pruning is often worth it during low-fee periods, even if you don’t get change back.<br><br>
       
       <small style="color:#88ffcc;font-style:italic;">
-        💡 Tip: If your goal is to get change, only prune when total value > ~10–20× the current expected fee.
+        💡 Tip: If your goal is to get change, only prune when total value pruned > ~10–20× the current expected fee.
       </small>
     </div>
     """
@@ -1279,20 +1279,20 @@ def generate_summary_safe(
           </div>
           <div style="color:#ffdd88;font-size:1.1rem;margin-top:8px;">
             — not expecting significant change back.
-          </div><br><br>
-          
-          <div style="color:#ffaaaa;font-size:1.05rem;line-height:1.6;">
-            💡 For a <span style="color:#ffffff;font-size:1.1rem;">reliable change output</span>, aim for:<br>
-            • Value Pruned > ~<span style="color:#ffffff;">5× Current Fee</span> (good change back)<br>
-            • Value Pruned > ~<span style="color:#ffffff;">10× Current Fee</span> (very comfortable)<br><br>
-            Current fee: {current_fee:,} sats → recommended: <span style="color:#ffffff;">{min_recommended:,}+ sats</span>
           </div><br>
           
-          <small style="color:#88ffcc;">
-            💡 Pro tip: The bigger the prune (relative to fee), the more you get back as change. Small prunes = cleanup only.
-          </small>
-        </div>
-        """
+          <div style="color:#ffaaaa;font-size:1.05rem;line-height:1.6;">
+  		💡 For a <span style="color:#ffffff;font-size:1.1rem;">reliable change output</span>, aim for:<br>
+  		• Value Pruned > ~<span style="color:#ffffff;">5× Current Fee</span> (good change back)<br>
+  		• Value Pruned > ~<span style="color:#ffffff;">10× Current Fee</span> (very comfortable)<br><br>
+  
+  		This prune: <span style="color:#ffffff;font-weight:800;">{sats_to_btc_str(econ.total_in)}</span> value and <span style="color:#ffffff;font-weight:800;">{current_fee:,} sats</span> fee<br>
+ 		 Ratio: <span style="color:#ffffff;font-weight:800;">{round(econ.total_in / current_fee, 1)}×</span> current fee
+		</div><br>
+
+<small style="color:#88ffcc;">
+  💡 Pro tip: The bigger the prune (relative to fee), the more you get back as change. Small prunes = cleanup only.
+</small>
 
     # CIOH warning
     distinct_addrs = len({u["address"] for u in selected_utxos})
