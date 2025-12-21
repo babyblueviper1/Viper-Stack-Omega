@@ -233,30 +233,33 @@ def build_psbt_snapshot(
     fee_rate: int,
     future_fee_rate: int,
     dao_percent: float,
-    dest_addr_override: str,
+    dest_addr_override: str | None,
     scan_source: str,
-):
+) -> dict:
     """
-    Create immutable transaction snapshot — point of no return.
-    Records user intent only. No resolution or fallbacks here.
+    Create an immutable transaction snapshot — point of no return.
+    Records user intent only. No destination resolution or PSBT construction here.
+    
+    Canonical-compliant: does not mutate inputs.
     """
+    # Select only UTXOs that were marked by the user
     selected_utxos = [u for u in enriched_state if u.get("selected", False)]
     if not selected_utxos:
         raise ValueError("No UTXOs selected for pruning")
 
+    # Build snapshot dict
     snapshot = {
         "version": 1,
         "timestamp": int(time.time()),
-        "scan_source": scan_source.strip(),                          # original user input
+        "scan_source": scan_source.strip(),  # original user input
         "dest_addr_override": dest_addr_override.strip() if dest_addr_override and dest_addr_override.strip() else None,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
         "dao_percent": dao_percent,
-        "inputs": copy.deepcopy(selected_utxos),
-		"fingerprint_short": fingerprint_short,
+        "inputs": copy.deepcopy(selected_utxos),  # prevent external mutation
     }
 
-    # Deterministic fingerprint — excludes itself
+	# Deterministic fingerprint — computed over snapshot excluding fingerprint fields
     canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
     fingerprint = hashlib.sha256(canonical.encode()).hexdigest()
     snapshot["fingerprint"] = fingerprint
