@@ -1259,6 +1259,9 @@ def generate_summary_safe(
             warning_bg = "#331100"
             warning_border = "#ff8800"
 
+        # Dynamic recommendation
+        min_recommended = max(2 * current_fee, 50000)
+
         small_prune_warning_html = f"""
         <!-- === SMALL PRUNE WARNING === -->
         <div style="margin:26px 0;padding:24px;background:{warning_bg};border:4px solid {warning_border};border-radius:16px;
@@ -1275,14 +1278,15 @@ def generate_summary_safe(
             Only proceed if your main goal is cleaning up inefficient UTXOs
           </strong> — not recovering the full value.<br><br>
           
-          <div style="color:#ffaaaa;font-size:1.05rem;">
-            💡 For a reliable change output, Value Pruned should be ≥ 10–20× Current Fee<br>
-            (recommended: ≥ <strong style="color:#ffffff;">{10 * current_fee:,}</strong>–<strong style="color:#ffffff;">{20 * current_fee:,}</strong> sats).
+          <div style="color:#ffaaaa;font-size:1.05rem;line-height:1.6;">
+            💡 For a <strong>reliable change output</strong> (and net gain), aim for:<br>
+            • Value Pruned > ~<strong>2× Current Fee</strong> (minimum viable)<br>
+            • Value Pruned > ~<strong>10× Current Fee</strong> (comfortable change)<br><br>
+            Current fee: {current_fee:,} sats → recommended: <strong>{min_recommended:,}+ sats</strong>
           </div><br>
           
-          <small style="color:#ff9999;text-decoration:underline;cursor:pointer;"
-                title="Adding a change output increases transaction size by ~30–40 vbytes, raising the fee slightly. If the remaining amount falls below ~546 sats (dust threshold), no change is created to avoid producing unspendable dust that would cost more to spend later than it's worth.">
-            ➤ Why this happens
+          <small style="color:#88ffcc;">
+            💡 Pro tip: The bigger the prune (relative to fee), the more you get back as change. Small prunes = cleanup only.
           </small>
         </div>
         """
@@ -1359,9 +1363,9 @@ def generate_summary_safe(
 
       {small_prune_warning_html}
 
-      <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
+       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:40px 0 60px 0;">
 
-      <div style="color:#aaffaa;font-size:1.15rem;margin-top:32px;line-height:1.8;">
+      <div style="color:#aaffaa;font-size:1.15rem;line-height:1.8;padding-bottom:40px;">
         <span style="color:#00ff9d;font-weight:900;">Full coin control:</span> Review table below<br>
         Check/uncheck UTXOs • Adjust as needed
         <br><br>
@@ -1369,6 +1373,24 @@ def generate_summary_safe(
           Previous selection? Upload .json to restore
         </span>
       </div>
+
+      <!-- SEPARATOR LINE BEFORE FINAL CALL TO ACTION -->
+      <hr style="border:none;border-top:2px solid #f7931a;margin:60px auto 80px auto;width:60%;
+                  box-shadow:0 0 15px rgba(247,147,26,0.8);">
+
+      <!-- FINAL CALL TO ACTION -->
+      <div style="margin:40px 0 60px 0;">
+        <div style="color:#0f0;font-size:2.8rem;font-weight:900;
+                    letter-spacing:4px;text-shadow:0 0 40px #0f0, 0 0 80px #0f0;">
+          READY TO PRUNE?
+        </div>
+
+        <div style="margin-top:50px;font-size:5.5rem;color:#f7931a;opacity:0.95;
+                    animation:pulse 2.2s infinite ease-in-out;text-align:center;">
+          ↓
+        </div>
+      </div>
+
     </div>
     """
 
