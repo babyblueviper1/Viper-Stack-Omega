@@ -1031,7 +1031,8 @@ def _analyze_empty():
     	gr.update(value=[]),              # df — empty table
         tuple(),                          # enriched_state — empty
         gr.update(visible=False),         # generate_row — hide
-        gr.update(visible=False)          # import_file — hide
+        gr.update(visible=False),          # import_file — hide
+		"",
     )
 
 
@@ -1271,47 +1272,46 @@ def generate_psbt(psbt_snapshot: dict, scan_source: str):
 
     dao_spk = DEFAULT_DAO_SCRIPT_PUBKEY
 
-    # Resolve destination — explicit override or original scan source
-    if dest_addr_override:
-        final_dest = dest_addr_override
+       # Resolve destination — explicit override or original scan source
+    if dest_addr and dest_addr.strip():
+        final_dest = dest_addr.strip()
     else:
-        final_dest = scan_source
+        final_dest = scan_source.strip() if scan_source else ""
 
-	# Safety: if final_dest is empty or None, show clear error
-    if not final_dest or not final_dest.strip():
+    # Early error if no destination at all — especially important in offline mode
+    if not final_dest:
         return (
             "<div style='color:#ff3366;text-align:center;padding:40px;background:#440000;border-radius:16px;"
             "box-shadow:0 0 40px rgba(255,51,102,0.4);font-size:1.3rem;line-height:1.7;'>"
             "<strong>No destination address available.</strong><br><br>"
-            "Please provide a destination address or ensure your scan source contains a valid address."
+            "Please enter a destination address.<br>"
+            "In offline mode, destination cannot be derived from manual UTXOs."
             "</div>"
         )
 
-    final_dest = final_dest.strip()
-
-    # Guardrail: xpub cannot be used directly as destination (yet)
+    # Now check for xpub — only if we have a string
     if final_dest.startswith(("xpub", "ypub", "zpub", "tpub", "upub", "vpub")):
         return (
             "<div style='color:#ffcc00;text-align:center;padding:40px;background:#332200;border-radius:16px;"
             "box-shadow:0 0 40px rgba(255,204,0,0.4);font-size:1.3rem;line-height:1.7;'>"
-            "<strong>xpub detected as destination source.</strong><br><br>"
-            "Please enter a specific receive address for the pruned coins.<br>"
-            "Automatic change derivation from xpub is coming in a future version."
+            "<strong>xpub detected as scan source.</strong><br><br>"
+            "Please specify a destination address for change output.<br>"
+            "Automatic xpub derivation coming in future version."
             "</div>"
         )
 
-    # Validate address — only after guardrail
+    # Validate as normal address
     try:
         dest_spk, _ = address_to_script_pubkey(final_dest)
     except Exception:
         return (
             "<div style='color:#ff3366;text-align:center;padding:40px;background:#440000;border-radius:16px;"
-            "box-shadow:0 0 40px rgba(255,51,102,0.4);font-size:1.3rem;'>"
+            "box-shadow:0 0 40px rgba(255,51,102,0.4);font-size:1.3rem;line-height:1.7;'>"
             "<strong>Invalid destination address.</strong><br><br>"
-            "Please check your explicit destination or scan source."
+            "Please check the address format."
             "</div>"
         )
-
+		
     # Build transaction — deterministic order already in snapshot
     tx = Tx()
     for u in pruned_utxos:
