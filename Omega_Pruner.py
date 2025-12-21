@@ -1168,7 +1168,7 @@ def generate_summary_safe(
             f"<br><span style='color:#00ff88;font-size:0.9rem;'>(at {future_fee_rate} s/vB future rate)</span>"
         )
 
-    # DAO visual feedback
+    # DAO visual feedback (in current fee line)
     dao_raw = int((econ.total_in - econ.fee) * (dao_percent / 100.0)) if dao_percent > 0 else 0
     dao_line = ""
     if dao_percent > 0:
@@ -1186,72 +1186,104 @@ def generate_summary_safe(
                 f"<span style='color:#ff6688;font-size:0.9rem;font-style:italic;'>(below 546 sat dust threshold)</span>"
             )
 
-    # === NEW EDUCATIONAL & WARNING BLOCKS ===
+    # === CALCULATIONS FOR NEW BLOCKS ===
     total_in = econ.total_in
     current_fee = econ.fee
     remainder_after_fee = total_in - current_fee
     remaining_utxos_after_prune = total_utxos - pruned_count
 
-    # Always show pruning explanation
+    # === PRUNING EXPLANATION (always shown) ===
     pruning_explanation_html = f"""
     <!-- === PRUNING SUMMARY === -->
-    <div style="margin:32px 0;padding:24px;background:#001100;border:3px solid #00ff9d;border-radius:16px;
-                box-shadow:0 0 50px rgba(0,255,157,0.6);font-size:1.2rem;line-height:1.8;">
-      <strong style="color:#00ff9d;font-size:1.5rem;">🧹 WHAT PRUNING ACTUALLY DOES</strong><br><br>
-      Pruning <strong>removes inefficient UTXOs</strong> (dust, legacy, or heavy) from your address.<br><br>
-      • You pay a fee now to delete <strong>{pruned_count}</strong> bad inputs.<br>
-      • The <strong>{remaining_utxos_after_prune}</strong> remaining UTXOs are now easier and cheaper to spend later.<br>
-      • <strong>If no change output is created:</strong> the pruned value is absorbed into fees — but your wallet is <strong>cleaner forever</strong>.<br><br>
-      <strong>Goal:</strong> Healthier address → lower future fees. Pruning is often worth it during low-fee periods, even if you don’t get change back.<br>
-      <small style="color:#00ff9d;">💡 Tip: Only prune when total value > ~10–20× the expected fee if your goal is to recover change.</small>
+    <div style="margin:32px 0;padding:28px;background:#001a00;border:4px solid #00ff9d;border-radius:18px;
+                box-shadow:0 0 60px rgba(0,255,157,0.7), inset 0 0 40px rgba(0,255,157,0.1);
+                font-size:1.25rem;line-height:1.9;color:#ccffe6;">
+      <strong style="color:#00ff9d;font-size:1.65rem;text-shadow:0 0 20px #00ff9d, 0 0 40px #00ff9d;">
+        🧹 WHAT PRUNING ACTUALLY DOES
+      </strong><br><br>
+      
+      Pruning <strong style="color:#aaffff;">removes inefficient UTXOs</strong> (dust, legacy, or heavy) from your address.<br><br>
+      
+      • You pay a fee now to delete <strong style="color:#00ffff;">{pruned_count}</strong> bad inputs.<br>
+      • The <strong style="color:#00ffff;">{remaining_utxos_after_prune}</strong> remaining UTXOs are now easier and cheaper to spend later.<br>
+      • <strong style="color:#ffff88;">If no change output is created:</strong> the pruned value is absorbed into fees — but your wallet is <strong style="color:#aaffff;">cleaner forever</strong>.<br><br>
+      
+      <strong style="color:#00ffaa;">Goal:</strong> Healthier address → lower future fees.<br>
+      Pruning is often worth it during low-fee periods, even if you don’t get change back.<br><br>
+      
+      <small style="color:#88ffcc;font-style:italic;">
+        💡 Tip: If your goal is to get change, only prune when total value > ~10–20× the current expected fee.
+      </small>
     </div>
     """
 
-    # Conditional small prune warning
-    small_prune_warning_html = ""
-    if remainder_after_fee < 15000:
-        risk_level = "EXTREME" if remainder_after_fee < 8000 else "HIGH"
-        warning_color = "#ff3366" if remainder_after_fee < 8000 else "#ff8800"
-        warning_bg = "#440000" if remainder_after_fee < 8000 else "#331100"
-        warning_border = "#ff3366" if remainder_after_fee < 8000 else "#ff8800"
+    # === DAO/CHANGE INFO (shown only if DAO % > 0, placed BEFORE warning) ===
+    dao_info_html = ""
+    if dao_percent > 0:
+        intended_dao = int(remainder_after_fee * (dao_percent / 100.0))
 
-        small_prune_warning_html = f"""
-        <!-- === SMALL PRUNE WARNING === -->
-        <div style="margin:24px 0;padding:20px;background:{warning_bg};border:4px solid {warning_border};border-radius:14px;
-                    box-shadow:0 0 40px rgba(255,68,68,0.8);font-size:1.25rem;line-height:1.7;color:#ffcccc;">
-          <strong style="color:{warning_color};font-size:1.45rem;">⚠️ {risk_level} RISK: Likely NO change output</strong><br><br>
-          Post-fee remainder (~{remainder_after_fee:,} sats) is small.<br>
-          The pruned value will probably be fully absorbed into miner fees.<br><br>
-          <strong>Only proceed if your goal is cleaning up bad UTXOs</strong> — not recovering the value.<br><br>
-          <small style="color:#ffaaaa;">
-            💡 For a safe change output back to you, Value Pruned should be ≥ 10–20× Current Fee 
-            (here: ≥ {10 * current_fee:,}–{20 * current_fee:,} sats).
-          </small><br>
-          <small style="color:#ff8888;text-decoration:underline;cursor:help;"
-                title="A change output adds ~30–40 vbytes → increases fee slightly. If the remainder falls below ~546 sats (dust threshold), no change is created to avoid unspendable dust.">
-            Why this happens
+        full_donation_note = ""
+        if dao_percent >= 99.9:
+            full_donation_note = f"<br><strong style='color:#ffcc00;font-size:1.2rem;text-shadow:0 0 15px #ffaa00, 0 0 30px #ff8800;'>☢️ 100% mode active → no change output (full donation to DAO)</strong>"
+
+        change_note = ""
+        if econ.change_amt == 0 and remainder_after_fee > 0:
+            change_note = " <span style='color:#ff8888;font-style:italic;'>(likely absorbed — see warning below)</span>"
+
+        dao_info_html = f"""
+        <!-- === DAO/CHANGE INFO === -->
+        <div style="margin:18px 0;padding:18px;background:#112200;border:3px solid #ffaa00;border-radius:14px;
+                    box-shadow:0 0 40px rgba(255,170,0,0.6);font-size:1.12rem;line-height:1.7;color:#ffffee;">
+          🔹 DAO Donation set to {dao_percent}% (~{sats_to_btc_str(intended_dao)} intended){full_donation_note}<br><br>
+          
+          • Final DAO output: <strong style="color:#ffffff;text-shadow:0 0 10px #aaffaa;">{sats_to_btc_str(econ.dao_amt)}</strong><br>
+          • Expected change back to you: <strong style="color:#ffffff;text-shadow:0 0 10px #aaffff;">{sats_to_btc_str(econ.change_amt)}</strong>{change_note}<br><br>
+          
+          <small style="color:#ddddaa;">
+            Values depend on current fee rate and dust rules. Tiny amounts may be absorbed into fees.
           </small>
         </div>
         """
 
-    # Conditional DAO info
-    dao_info_html = ""
-    extra_note = ""
-    if dao_percent > 0:
-        intended_dao = int(remainder_after_fee * (dao_percent / 100.0))
+    # === SMALL PRUNE WARNING (shown only when needed) ===
+    small_prune_warning_html = ""
+    if remainder_after_fee < 15000:
+        if remainder_after_fee < 8000:
+            warning_title = "⚠️ Warning: No change output expected"
+            warning_color = "#ff3366"
+            warning_bg = "#330000"
+            warning_border = "#ff3366"
+        else:
+            warning_title = "⚠️ Caution: Change output may be absorbed"
+            warning_color = "#ff8800"
+            warning_bg = "#331100"
+            warning_border = "#ff8800"
 
-        # Special highlight for full donation
-        if dao_percent >= 99.9:
-            extra_note = "<br><strong style='color:#ffaa00;font-size:1.15rem;'>☢️ 100% mode active → no change output (full donation to DAO)</strong>"
-
-        dao_info_html = f"""
-        <!-- === DAO/CHANGE INFO === -->
-        <div style="margin:16px 0;padding:16px;background:#111100;border:2px solid #ffaa00;border-radius:12px;
-                    box-shadow:0 0 25px rgba(255,170,0,0.5);font-size:1.1rem;line-height:1.6;color:#ffffcc;">
-          🔹 DAO Donation set to {dao_percent}% (~{sats_to_btc_str(intended_dao)} intended){extra_note}<br><br>
-          • Final DAO output: <strong>{sats_to_btc_str(econ.dao_amt)}</strong><br>
-          • Expected change back to you: <strong>{sats_to_btc_str(econ.change_amt)}</strong><br><br>
-          <small>If the remainder is too small for non-dust outputs, tiny donations and/or change are absorbed into fees automatically.</small>
+        small_prune_warning_html = f"""
+        <!-- === SMALL PRUNE WARNING === -->
+        <div style="margin:26px 0;padding:24px;background:{warning_bg};border:4px solid {warning_border};border-radius:16px;
+                    box-shadow:0 0 50px rgba(255,100,100,0.8);font-size:1.28rem;line-height:1.8;color:#ffeeee;">
+          
+          <strong style="color:{warning_color};font-size:1.55rem;text-shadow:0 0 15px {warning_color}, 0 0 30px {warning_color};">
+            {warning_title}
+          </strong><br><br>
+          
+          Post-fee remainder (~{remainder_after_fee:,} sats) is small.<br>
+          The pruned value will likely be <strong style="color:#ffffff;">fully or partially absorbed into miner fees</strong>.<br><br>
+          
+          <strong style="color:#ffff99;text-shadow:0 0 10px #ffff99;">
+            Only proceed if your main goal is cleaning up inefficient UTXOs
+          </strong> — not recovering the full value.<br><br>
+          
+          <div style="color:#ffaaaa;font-size:1.05rem;">
+            💡 For a reliable change output, Value Pruned should be ≥ 10–20× Current Fee<br>
+            (recommended: ≥ <strong style="color:#ffffff;">{10 * current_fee:,}</strong>–<strong style="color:#ffffff;">{20 * current_fee:,}</strong> sats).
+          </div><br>
+          
+          <small style="color:#ff9999;text-decoration:underline;cursor:pointer;"
+                title="Adding a change output increases transaction size by ~30–40 vbytes, raising the fee slightly. If the remaining amount falls below ~546 sats (dust threshold), no change is created to avoid producing unspendable dust that would cost more to spend later than it's worth.">
+            ➤ Why this happens
+          </small>
         </div>
         """
 
@@ -1259,7 +1291,7 @@ def generate_summary_safe(
     distinct_addrs = len({u["address"] for u in selected_utxos})
     cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
 
-    # Final status box assembly
+    # Final status box
     status_box_html = f"""
     <div style="text-align:center;margin:40px auto 30px auto;padding:28px;background:#000;
                 border:3px solid #f7931a;border-radius:20px;max-width:960px;
@@ -1323,9 +1355,9 @@ def generate_summary_safe(
 
       {pruning_explanation_html}
 
-      {small_prune_warning_html}
-
       {dao_info_html}
+
+      {small_prune_warning_html}
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
