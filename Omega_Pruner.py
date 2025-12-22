@@ -1329,26 +1329,28 @@ def generate_summary_safe(
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
-     <div style="font-size:1.1rem;line-height:2.1;">
-  <div style="margin:14px 0;">
-    <b style="color:#fff;">If spending your full wallet today (no pruning):</b> 
+     div style="font-size:1.1rem;line-height:2.1;">
+
+  <div style="margin:16px 0;">
+    <b style="color:#fff;">Full wallet spend size today (before pruning):</b> 
     <span style="color:#ff9900;font-weight:800;">~{pre_vsize:,} vB</span>
   </div>
 
-  <div style="margin:14px 0;">
-    <b style="color:#fff;">Cost of this pruning cleanup transaction:</b> 
+  <div style="margin:16px 0;">
+    <b style="color:#fff;">This one-time pruning cleanup transaction:</b> 
     <span style="color:#0f0;font-weight:800;">~{econ.vsize:,} vB</span>
-    <span style="color:{savings_color};font-weight:900;margin-left:12px;">
-      {savings_label} smaller than full spend
-    </span>
   </div>
 
-  <div style="margin:20px 0;color:#88ffcc;font-size:1.05rem;">
-    💡 Pruning now saves you <strong style="color:#0f0;">+{sats_saved:,} sats</strong> versus pruning in the future if fees reach {future_fee_rate} s/vB
+  <div style="margin:24px 0;color:#0f0;font-size:1.35rem;font-weight:900;text-shadow:0 0 25px #0f0;line-height:1.6;">
+    {savings_label.upper()} WALLET CLEANUP!
   </div>
 
-  <div style="margin:14px 0;">
-    <b style="color:#fff;">Current Fee (paid now):</b> 
+  <div style="margin:20px 0;color:#88ffcc;font-size:1.05rem;line-height:1.7;">
+    💡 Pruning now saves you <span style="color:#0f0;font-weight:800;">+{sats_saved:,} sats</span> versus pruning later if fees reach {future_fee_rate} s/vB
+  </div>
+
+  <div style="margin:16px 0;">
+    <b style="color:#fff;">Current fee (paid now):</b> 
     <span style="color:#0f0;font-weight:800;">{econ.fee:,} sats @ {fee_rate} s/vB</span>{dao_line}
   </div>
 </div>
@@ -1386,7 +1388,7 @@ def generate_summary_safe(
       <div style="margin:40px 0 60px 0;">
         <div style="color:#0f0;font-size:2.8rem;font-weight:900;
                     letter-spacing:4px;text-shadow:0 0 40px #0f0, 0 0 80px #0f0;">
-          ARE YOU READY TO PRUNE?
+          READY TO PRUNE?
         </div>
 
         <div style="margin-top:35px;font-size:5.5rem;color:#f7931a;opacity:0.95;
