@@ -2171,7 +2171,7 @@ No API calls • Fully air-gapped safe""",
         
 
         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
-        status_output = gr.HTML("")
+       
 
         # States (invisible)
         scan_source = gr.State("")
@@ -2180,6 +2180,33 @@ No API calls • Fully air-gapped safe""",
         psbt_snapshot = gr.State(None)
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
+
+
+		 df = gr.DataFrame(
+            headers=[
+                "PRUNE",
+                "Source",
+                "TXID",
+                "Health",
+                "Value (sats)",
+                "Address",
+                "Weight (wu)",
+                "Type",
+                "vout",
+            ],
+            datatype=["bool", "str", "str", "html", "number", "str", "number", "str", "number"],
+            type="array",
+            interactive=True,
+            wrap=True,
+            row_count=(5, "dynamic"),
+            max_height=500,
+            max_chars=None,
+            label="CHECK TO PRUNE • Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = prune",
+            static_columns=[1, 2, 3, 4, 5, 6, 7],
+            column_widths=["90px", "160px", "200px", "120px", "140px", "160px", "130px", "90px", "80px"]
+        )
+		
+		 status_output = gr.HTML("")
 
         # Generate row — hidden until analysis complete
         with gr.Row(visible=False) as generate_row:
@@ -2251,30 +2278,7 @@ No API calls • Fully air-gapped safe""",
             )
 
 
-        df = gr.DataFrame(
-            headers=[
-                "PRUNE",
-                "Source",
-                "TXID",
-                "Health",
-                "Value (sats)",
-                "Address",
-                "Weight (wu)",
-                "Type",
-                "vout",
-            ],
-            datatype=["bool", "str", "str", "html", "number", "str", "number", "str", "number"],
-            type="array",
-            interactive=True,
-            wrap=True,
-            row_count=(5, "dynamic"),
-            max_height=500,
-            max_chars=None,
-            label="CHECK TO PRUNE • Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = prune",
-            static_columns=[1, 2, 3, 4, 5, 6, 7],
-            column_widths=["90px", "160px", "200px", "120px", "140px", "160px", "130px", "90px", "80px"]
-        )
-
+       
         with gr.Column():
             reset_btn = gr.Button("NUCLEAR RESET · START OVER", variant="secondary")
             gr.HTML("""
