@@ -48,6 +48,7 @@ import hashlib
 import tempfile
 from datetime import datetime
 import copy
+import urllib.parse
 
 # Logging Setup
 # =========================
@@ -449,10 +450,12 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         return (
             "<div style='margin-top:16px;padding:16px;background:#440000;border:3px solid #ff3366;border-radius:14px;"
             "box-shadow:0 0 50px rgba(255,51,102,0.9);font-size:1.22rem;line-height:1.7;color:#ffcccc;'>"
-            "<strong style='color:#ff3366;font-size:1.45rem;font-weight:900;'>EXTREME CIOH LINKAGE</strong><br><br>"
-            "<strong style='color:#ff6688;font-size:1.15rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<div style='color:#ff3366;font-size:1.6rem;font-weight:900;text-shadow:0 0 30px #ff3366;'>"
+            "EXTREME CIOH LINKAGE"
+            "</div><br>"
+            "<div style='color:#ff6688;font-size:1.15rem;'>Common Input Ownership Heuristic (CIOH)</div><br>"
             "This consolidation strongly proves common ownership of many inputs/addresses.<br><br>"
-            "<strong style='color:#ffaaaa;'>Privacy state: Severely compromised</strong><br>"
+            "<div style='color:#ffaaaa;'>Privacy state: Severely compromised</div><br>"
             "Maximum fee savings, but analysts will confidently cluster these addresses as yours.<br>"
             "Consider CoinJoin, PayJoin, or silent payments afterward to restore privacy."
             "</div>"
@@ -461,10 +464,12 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         return (
             "<div style='margin-top:14px;padding:14px;background:#331100;border:2px solid #ff8800;border-radius:12px;"
             "font-size:1.18rem;line-height:1.6;color:#ffddaa;'>"
-            "<strong style='color:#ff9900;font-size:1.35rem;font-weight:900;'>High CIOH Risk</strong><br><br>"
-            "<strong style='color:#ffaa44;font-size:1.12rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<div style='color:#ff9900;font-size:1.6rem;font-weight:900;text-shadow:0 0 30px #ff9900;'>"
+            "HIGH CIOH RISK"
+            "</div><br>"
+            "<div style='color:#ffaa44;font-size:1.12rem;'>Common Input Ownership Heuristic (CIOH)</div><br>"
             f"Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as yours.<br><br>"
-            "<strong style='color:#ffcc88;'>Privacy state: Significantly reduced</strong><br>"
+            "<div style='color:#ffcc88;'>Privacy state: Significantly reduced</div><br>"
             "Good fee savings, but real privacy trade-off."
             "</div>"
         )
@@ -472,8 +477,10 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         return (
             "<div style='margin-top:12px;padding:12px;background:#113300;border:1px solid #00ff9d;border-radius:10px;"
             "color:#aaffaa;font-size:1.15rem;line-height:1.6;'>"
-            "<strong style='color:#00ff9d;font-size:1.3rem;font-weight:900;'>Moderate CIOH</strong><br><br>"
-            "<strong style='color:#66ffaa;font-size:1.1rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
+            "<div style='color:#00ff9d;font-size:1.6rem;font-weight:900;text-shadow:0 0 30px #00ff9d;'>"
+            "MODERATE CIOH"
+            "</div><br>"
+            "<div style='color:#66ffaa;font-size:1.1rem;'>Common Input Ownership Heuristic (CIOH)</div><br>"
             "Spending multiple inputs together creates some on-chain linkage between them.<br>"
             "Analysts may assume they belong to the same person — but it's not definitive.<br><br>"
             "Privacy impact is moderate. Acceptable trade-off during low-fee periods when saving sats matters most."
@@ -482,13 +489,64 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
     else:
         return (
             "<div style='margin-top:10px;color:#aaffaa;font-size:1.05rem;line-height:1.5;'>"
-            "Low CIOH impact <span style='color:#00ffdd;font-size:1.1rem;'>(Common Input Ownership Heuristic)</span><br><br>"
+            "<div style='color:#00ffdd;font-size:1.6rem;font-weight:900;text-shadow:0 0 30px #00ffdd;'>"
+            "LOW CIOH IMPACT"
+            "</div><br>"
+            "<span style='color:#00ffdd;font-size:1.1rem;'>(Common Input Ownership Heuristic)</span><br><br>"
             "Few inputs spent together — minimal new linkage created.<br>"
             "Your addresses remain well-separated on-chain.<br>"
             "Privacy preserved."
             "</div>"
         )
 
+def estimate_coinjoin_mixes_needed(input_count: int, distinct_addrs: int, privacy_score: int) -> tuple[int, int]:
+    """
+    Estimate Whirlpool-style mixes needed to reasonably break CIOH linkage.
+    Returns (min_mixes, max_mixes). Conservative and practical.
+    """
+    # Low impact — suggest optional hardening, not zero
+    if privacy_score > 70:
+        return 1, 1  # "Optional: 1 mix for extra caution"
+
+    # Base from privacy score
+    base = max(1, round(60 / privacy_score))
+
+    # Input count penalty
+    if input_count >= 30:
+        base += 3
+    elif input_count >= 15:
+        base += 2
+    elif input_count >= 8:
+        base += 1
+
+    # Distinct addresses penalty
+    if distinct_addrs >= 10:
+        base += 2
+    elif distinct_addrs >= 5:
+        base += 1
+
+    min_mixes = max(1, base - 1)
+    max_mixes = base + 1
+
+    return min_mixes, max_mixes
+
+def detect_payjoin_support(dest_input: str) -> tuple[bool, str | None]:
+    """
+    Check if destination supports PayJoin (BIP78).
+    Returns (supports_payjoin: bool, payjoin_url: str | None)
+    """
+    dest_input = dest_input.strip().lower()
+    
+    if dest_input.startswith("bitcoin:"):
+        parsed = urllib.parse.urlparse(dest_input)
+        query = urllib.parse.parse_qs(parsed.query)
+        pj_urls = query.get("pj", [])
+        if pj_urls:
+            pj_url = pj_urls[0]
+            if pj_url.startswith("https://") and len(pj_url) > 10:
+                return True, pj_url
+    
+    return False, None
 # =========================
 # Helper Functions for Bitcoin Addresses
 # =========================
@@ -1082,7 +1140,8 @@ def generate_summary_safe(
     future_fee_rate,
     dao_percent,
     locked,
-    strategy,  # selected strategy string (value)
+    strategy,        # selected strategy string (value)
+    dest_value: str,
 ):
     """Builds the single unified status box after analysis."""
     if locked:
@@ -1308,6 +1367,71 @@ def generate_summary_safe(
     distinct_addrs = len({u["address"] for u in selected_utxos})
     cioh_warning = get_cioh_warning(len(selected_utxos), distinct_addrs, privacy_score)
 
+	    # === PRIVACY RECOVERY PLAN ===
+    cj_recovery_html = ""
+    if pruned_count > 1:  # Only if meaningful linkage possible
+        min_mixes, max_mixes = estimate_coinjoin_mixes_needed(pruned_count, distinct_addrs, privacy_score)
+
+        if min_mixes == 1 and privacy_score > 70:
+            suggestion = "Optional for this prune: 1 CoinJoin round for extra hardening"
+        else:
+            suggestion = f"Recommended for this prune: ~{min_mixes}–{max_mixes} Whirlpool mixes (or equivalent CoinJoin rounds)"
+
+        cj_recovery_html = f"""
+        <div style="margin:24px 0;padding:18px;background:#001133;border:2px solid #00aaff;border-radius:14px;
+                    box-shadow:0 0 35px rgba(0,170,255,0.6);font-size:1.05rem;line-height:1.7;color:#bbffdd;">
+          💧 <div style="color:#00ffff;font-size:1.2rem;font-weight:900;text-shadow:0 0 15px #00ffff;">Privacy Recovery Plan</div><br>
+          {suggestion}<br><br>
+          <div style="font-size:0.95rem;color:#88ddff;">
+            After sufficient mixing, these inputs become practically unlinkable under standard chain analysis heuristics.
+          </div>
+        </div>
+        """
+
+    # === PAYJOIN BADGE ===
+    payjoin_badge_html = ""
+    dest_addr = dest_value.strip()
+    if dest_addr:
+        supports_pj, _ = detect_payjoin_support(dest_addr)
+        if supports_pj:
+            payjoin_badge_html = f"""
+            <div style="margin:24px 0;padding:20px;background:#001100;border:3px solid #00ff88;border-radius:16px;
+                    box-shadow:0 0 60px rgba(0,255,136,0.8);font-size:1.3rem;line-height:1.8;color:#ccffcc;">
+  <div style="color:#00ff88;font-size:1.6rem;font-weight:900;text-shadow:0 0 30px #00ff88;">
+    🟢 CIOH-PROTECTED SEND AVAILABLE
+  </div><br>
+  
+  This destination supports <span style="color:#00ffdd;font-weight:900;">PayJoin (BIP78)</span>.<br><br>
+  
+  PayJoin breaks the Common Input Ownership Heuristic by including receiver inputs — 
+  preventing new address clustering from this transaction.<br><br>
+  
+  <div style="color:#aaffff;font-size:1.25rem;font-weight:900;">
+    To complete a CIOH-free send:
+  </div>
+  <div style="color:#ffffff;font-size:1.1rem;margin-top:8px;line-height:1.6;">
+    • Sign and broadcast with a PayJoin-compatible wallet<br>
+    • Receiver must support PayJoin (e.g., BTCPay Server)<br>
+    • Works great with: Sparrow ↔ BTCPay, JoinMarket, etc.
+  </div><br>
+  
+  <div style="font-size:0.95rem;color:#88ffaa;">
+    Standard send = new CIOH created<br>
+    PayJoin send = no new CIOH from this transaction
+  </div>
+</div>
+"""
+
+    raw_addr_hint_html = ""
+    if dest_addr and not supports_pj and privacy_score <= 70:
+        raw_addr_hint_html = f"""
+        <div style="margin:16px 0;padding:14px;background:#111100;border:1px solid #ffaa00;border-radius:10px;
+                    font-size:0.98rem;line-height:1.6;color:#ffddaa;">
+          ℹ️ This appears to be a standard address (no PayJoin detected).<br>
+          For better privacy, ask the receiver for a PayJoin-enabled invoice if possible.
+        </div>
+        """
+
     # Final status box
     status_box_html = f"""
        <div style="text-align:center;margin:40px auto 30px auto;padding:28px;background:#000;
@@ -1367,6 +1491,10 @@ def generate_summary_safe(
         </div>
       </div>
 
+		{payjoin_badge_html}
+
+      {raw_addr_hint_html}
+
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
       <div style="margin:32px 0 40px 0;line-height:1.7;">
@@ -1374,6 +1502,8 @@ def generate_summary_safe(
       </div>
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
+	  
+	  {cj_recovery_html}
 
       {pruning_explanation_html}
 
@@ -1387,7 +1517,7 @@ def generate_summary_safe(
     return status_box_html, gr.update(visible=pruned_count > 0)
   
 def on_generate(
-    dest_addr: str,
+    dest_value: str,
     fee_rate: int,
     future_fee_rate: int,
     dao_percent: float,
@@ -1417,7 +1547,7 @@ def on_generate(
         snapshot = build_psbt_snapshot(
             enriched_state=selected_utxos,           # only pruned inputs
             scan_source=scan_source.strip(),         # frozen fallback destination
-            dest_addr_override=dest_addr.strip() or None,
+            dest_addr_override=dest_value, 
             fee_rate=fee_rate,
             future_fee_rate=future_fee_rate,
             dao_percent=dao_percent,
@@ -1669,11 +1799,11 @@ def generate_psbt(psbt_snapshot: dict):
 # Gradio UI
 # --------------------------
 with gr.Blocks(
-    title="Ωmega Pruner v10.7 — FLOW STATE"
+    title="Ωmega Pruner v10.8 — Clarity State"
 ) as demo:
     # Social / OpenGraph Preview
     gr.HTML("""
-    <meta property="og:title" content="Ωmega Pruner v10.6 — BATCH NUCLEAR + OFFLINE MODE">
+    <meta property="og:title" content="Ωmega Pruner v10.8 — Clarity State">
     <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
     <meta property="og:image" content="https://omega-pruner.onrender.com/docs/omega_thumbnail.png">
     <meta property="og:image:width" content="1200">
@@ -2058,12 +2188,26 @@ with gr.Blocks(
                 scale=2,
             )
             dest = gr.Textbox(
-                label="Destination (optional)",
-                placeholder="Blank = back to scanned address",
-                info="Your pruned coins return here. Default = original scan source. Required for xpub scans.",
+                label="Destination (optional • Payjoin invoice recommended for privacy)",
+                placeholder="Paste address or full invoice",
+                info=(
+                    "Your pruned coins return here.<br>"
+                    "• Blank = back to original scanned address<br>"
+                    "• Paste a <strong>full invoice</strong> to enable PayJoin detection → zero new CIOH linkage<br>"
+                    "• Required for xpub scans"
+                ),
                 scale=1,
             )
 
+        # State for destination value (must be defined before .change uses it)
+        dest_value = gr.State("")
+
+        # Capture every change to the destination box
+        dest.change(
+            fn=lambda x: x,
+            inputs=dest,
+            outputs=dest_value
+        )
         with gr.Row(visible=False) as manual_box_row:
             manual_utxo_input = gr.Textbox(
                 label="🔒 OFFLINE MODE • ACTIVE INPUT • Paste raw UTXOs (one per line) • Format: txid:vout:value_in_sats  (address optional at end)",
@@ -2147,8 +2291,6 @@ No API calls • Fully air-gapped safe""",
             hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn")
             halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
             fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
-       
-        
 
         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
 
@@ -2206,7 +2348,6 @@ No API calls • Fully air-gapped safe""",
         psbt_output = gr.HTML("")
 
 
-
         # Export sections
         with gr.Row(visible=False) as export_title_row:
             gr.HTML("""
@@ -2255,8 +2396,6 @@ No API calls • Fully air-gapped safe""",
                 interactive=False
             )
 
-
-       
         with gr.Column():
             reset_btn = gr.Button("NUCLEAR RESET · START OVER", variant="secondary")
             gr.HTML("""
@@ -2294,7 +2433,7 @@ No API calls • Fully air-gapped safe""",
         outputs=[df]
     ).then(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy, dest_value],
         outputs=[status_output, generate_row]
     )
 
@@ -2307,7 +2446,7 @@ No API calls • Fully air-gapped safe""",
             addr_input,
             strategy,
             dust,
-            dest,
+            dest_value,
             fee_rate_slider,
             thank_you_slider,
             future_fee_slider,
@@ -2328,7 +2467,7 @@ No API calls • Fully air-gapped safe""",
     # =============================
     gen_btn.click(
         fn=on_generate,
-        inputs=[dest, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state, scan_source],
+        inputs=[dest_value, fee_rate_slider, future_fee_slider, thank_you_slider, enriched_state, scan_source],
         outputs=[psbt_snapshot, locked, export_file],
     ).then(
         fn=generate_psbt,
@@ -2365,10 +2504,9 @@ No API calls • Fully air-gapped safe""",
             False,                                                   # locked — unlock
             "",                                                      # locked_badge — clear
             gr.update(value="", interactive=True),                   # addr_input
-			gr.update(value="", interactive=True),				     # dest — clear destination
+			gr.update(value=""),				                     # dest_value
             gr.update(interactive=True),                             # strategy
             gr.update(interactive=True),                             # dust
-            gr.update(interactive=True),                             # dest
             gr.update(interactive=True),                             # fee_rate_slider
             gr.update(interactive=True),                             # future_fee_slider
             gr.update(interactive=True),                             # thank_you_slider
@@ -2397,10 +2535,9 @@ No API calls • Fully air-gapped safe""",
             locked,
             locked_badge,
             addr_input,
-			dest,
+			dest_value,
             strategy,
             dust,
-            dest,
             fee_rate_slider,
             future_fee_slider,
             thank_you_slider,
@@ -2418,7 +2555,7 @@ No API calls • Fully air-gapped safe""",
         ],
     ).then(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy, dest_value],
         outputs=[status_output, generate_row]
     )
 
@@ -2431,44 +2568,44 @@ No API calls • Fully air-gapped safe""",
         outputs=enriched_state,
     ).then(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy, dest_value],
         outputs=[status_output, generate_row],
     )
 
     fee_rate_slider.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy, dest_value],
         outputs=[status_output, generate_row],
     )
 
     future_fee_slider.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy, dest_value],
         outputs=[status_output, generate_row],
     )
 
     thank_you_slider.change(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy, dest_value],
         outputs=[status_output, generate_row],
     )
 
     demo.load(
         fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy],
+        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy, dest_value],
         outputs=[status_output, generate_row]
     )
 
     # Re-analyze on strategy/dust change (hard reset)
     strategy.change(
         fn=analyze,
-        inputs=[addr_input, strategy, dust, dest, fee_rate_slider, thank_you_slider, future_fee_slider, offline_toggle, manual_utxo_input],
+        inputs=[addr_input, strategy, dust, dest_value, fee_rate_slider, thank_you_slider, future_fee_slider, offline_toggle, manual_utxo_input],
         outputs=[df, enriched_state, generate_row, import_file, scan_source],
     )
 
     dust.change(
         fn=analyze,
-        inputs=[addr_input, strategy, dust, dest, fee_rate_slider, thank_you_slider, future_fee_slider, offline_toggle, manual_utxo_input],
+        inputs=[addr_input, strategy, dust, dest_value, fee_rate_slider, thank_you_slider, future_fee_slider, offline_toggle, manual_utxo_input],
         outputs=[df, enriched_state, generate_row, import_file, scan_source],
     )
 
@@ -2494,7 +2631,7 @@ No API calls • Fully air-gapped safe""",
             letter-spacing: 0.5px;
             text-shadow: 0 0 12px rgba(247,147,26,0.65);
         ">
-            Ωmega Pruner v10.7 — Flow State
+            Ωmega Pruner v10.8 — Clarity State
         </strong><br>
 
         <!-- GITHUB LINK -->
