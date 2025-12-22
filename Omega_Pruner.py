@@ -1302,7 +1302,7 @@ def generate_summary_safe(
 
     # Final status box
     status_box_html = f"""
-    <div style="text-align:center;margin:40px auto 30px auto;padding:28px;background:#000;
+       <div style="text-align:center;margin:40px auto 30px auto;padding:28px;background:#000;
                 border:3px solid #f7931a;border-radius:20px;max-width:960px;
                 box-shadow:0 0 80px rgba(247,147,26,0.5);">
 
@@ -1372,34 +1372,6 @@ def generate_summary_safe(
       {dao_info_html}
 
       {small_prune_warning_html}
-
-      <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:40px 0 60px 0;">
-
-      <div style="color:#aaffaa;font-size:1.15rem;line-height:1.8;padding-bottom:40px;">
-        <span style="color:#00ff9d;font-weight:900;">Full coin control:</span> Review table below<br>
-        Check/uncheck UTXOs • Adjust as needed
-        <br><br>
-        <span style="color:#00ffff;font-weight:700;">
-          Previous selection? Upload .json to restore
-        </span>
-      </div>
-
-      <!-- SEPARATOR LINE BEFORE FINAL CALL TO ACTION -->
-      <hr style="border:none;border-top:2px solid #f7931a;margin:40px auto 80px auto;width:60%;
-                  box-shadow:0 0 15px rgba(247,147,26,0.8);">
-
-      <!-- FINAL CALL TO ACTION -->
-      <div style="margin:40px 0 60px 0;">
-        <div style="color:#0f0;font-size:2.8rem;font-weight:900;
-                    letter-spacing:4px;text-shadow:0 0 40px #0f0, 0 0 80px #0f0;">
-          READY TO PRUNE?
-        </div>
-
-        <div style="margin-top:35px;font-size:5.5rem;color:#f7931a;opacity:0.95;
-                    animation:pulse 2.2s infinite ease-in-out;text-align:center;">
-          ↓
-        </div>
-      </div>
 
     </div>
     """
