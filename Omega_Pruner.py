@@ -2170,7 +2170,7 @@ No API calls • Fully air-gapped safe""",
        
         
 
-         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
+        analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
 
         # States (invisible)
         scan_source = gr.State("")
