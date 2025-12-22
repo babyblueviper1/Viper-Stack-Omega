@@ -2171,7 +2171,6 @@ No API calls • Fully air-gapped safe""",
         
 
         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
-       
 
         # States (invisible)
         scan_source = gr.State("")
@@ -2181,8 +2180,7 @@ No API calls • Fully air-gapped safe""",
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
 
-
-		 df = gr.DataFrame(
+        df = gr.DataFrame(
             headers=[
                 "PRUNE",
                 "Source",
@@ -2205,9 +2203,8 @@ No API calls • Fully air-gapped safe""",
             static_columns=[1, 2, 3, 4, 5, 6, 7],
             column_widths=["90px", "160px", "200px", "120px", "140px", "160px", "130px", "90px", "80px"]
         )
-		
-		 status_output = gr.HTML("")
 
+        status_output = gr.HTML("")
         # Generate row — hidden until analysis complete
         with gr.Row(visible=False) as generate_row:
             gen_btn = gr.Button(
