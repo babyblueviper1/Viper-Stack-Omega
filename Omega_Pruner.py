@@ -1329,31 +1329,35 @@ def generate_summary_safe(
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
-     div style="font-size:1.1rem;line-height:2.1;">
+      <div style="font-size:1.1rem;line-height:2.1;">
+        <div style="margin:16px 0;">
+          <b style="color:#fff;">Full wallet spend size today (before pruning):</b> 
+          <span style="color:#ff9900;font-weight:800;">~{pre_vsize:,} vB</span>
+        </div>
 
-  <div style="margin:16px 0;">
-    <b style="color:#fff;">Full wallet spend size today (before pruning):</b> 
-    <span style="color:#ff9900;font-weight:800;">~{pre_vsize:,} vB</span>
-  </div>
+        <div style="margin:16px 0;">
+          <b style="color:#fff;">Size of this one-time pruning cleanup transaction:</b> 
+          <span style="color:#0f0;font-weight:800;">~{econ.vsize:,} vB</span>
+        </div>
 
-  <div style="margin:16px 0;">
-    <b style="color:#fff;">This one-time pruning cleanup transaction:</b> 
-    <span style="color:#0f0;font-weight:800;">~{econ.vsize:,} vB</span>
-  </div>
+        <!-- NEW: Estimated wallet size AFTER this pruning confirms -->
+        <div style="margin:18px 0;color:#88ffcc;font-size:1.05rem;line-height:1.6;">
+          💡 After pruning: your full wallet spend size drops to roughly <span style="color:#0f0;font-weight:800;">~{pre_vsize - econ.vsize + 200:,} vB</span><br>
+        </div>
 
-  <div style="margin:24px 0;color:#0f0;font-size:1.35rem;font-weight:900;text-shadow:0 0 25px #0f0;line-height:1.6;">
-    {savings_label.upper()} WALLET CLEANUP!
-  </div>
+        <div style="margin:24px 0;color:#0f0;font-size:1.35rem;font-weight:900;text-shadow:0 0 25px #0f0;line-height:1.6;">
+          {savings_label.upper()} WALLET CLEANUP!
+        </div>
 
-  <div style="margin:20px 0;color:#88ffcc;font-size:1.05rem;line-height:1.7;">
-    💡 Pruning now saves you <span style="color:#0f0;font-weight:800;">+{sats_saved:,} sats</span> versus pruning later if fees reach {future_fee_rate} s/vB
-  </div>
+        <div style="margin:16px 0;">
+          <b style="color:#fff;">Current fee (paid now):</b> 
+          <span style="color:#0f0;font-weight:800;">{econ.fee:,} sats @ {fee_rate} s/vB</span>{dao_line}
+        </div>
 
-  <div style="margin:16px 0;">
-    <b style="color:#fff;">Current fee (paid now):</b> 
-    <span style="color:#0f0;font-weight:800;">{econ.fee:,} sats @ {fee_rate} s/vB</span>{dao_line}
-  </div>
-</div>
+        <div style="margin:20px 0;color:#88ffcc;font-size:1.05rem;line-height:1.7;">
+          💡 Pruning now saves you <span style="color:#0f0;font-weight:800;">+{sats_saved:,} sats</span> versus pruning later if fees reach {future_fee_rate} s/vB
+        </div>
+      </div>
 
       <hr style="border:none;border-top:1px solid rgba(247,147,26,0.3);margin:32px 0;">
 
@@ -1381,7 +1385,7 @@ def generate_summary_safe(
       </div>
 
       <!-- SEPARATOR LINE BEFORE FINAL CALL TO ACTION -->
-      <hr style="border:none;border-top:2px solid #f7931a;margin:20px auto 80px auto;width:60%;
+      <hr style="border:none;border-top:2px solid #f7931a;margin:40px auto 80px auto;width:60%;
                   box-shadow:0 0 15px rgba(247,147,26,0.8);">
 
       <!-- FINAL CALL TO ACTION -->
