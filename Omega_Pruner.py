@@ -2170,7 +2170,7 @@ No API calls • Fully air-gapped safe""",
        
         
 
-        analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
+         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
 
         # States (invisible)
         scan_source = gr.State("")
@@ -2179,6 +2179,14 @@ No API calls • Fully air-gapped safe""",
         psbt_snapshot = gr.State(None)
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
+
+        # Import file last
+        import_file = gr.File(
+            label="Restore Previous Ωmega Selection: Upload your saved .json file",
+            file_types=[".json"],
+            type="filepath",
+            visible=False,
+        )
 
         df = gr.DataFrame(
             headers=[
@@ -2217,13 +2225,6 @@ No API calls • Fully air-gapped safe""",
         # PSBT output — placed right below the generate row
         psbt_output = gr.HTML("")
 
-        # Import file last
-        import_file = gr.File(
-            label="Restore Previous Ωmega Selection: Upload your saved .json file",
-            file_types=[".json"],
-            type="filepath",
-            visible=False,
-        )
 
 
         # Export sections
