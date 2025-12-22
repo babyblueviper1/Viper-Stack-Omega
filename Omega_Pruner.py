@@ -448,20 +448,23 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
     if privacy_score <= 30:
         return (
             "<div style='margin-top:16px;padding:16px;background:#440000;border:3px solid #ff3366;border-radius:14px;"
-            "box-shadow:0 0 50px rgba(255,51,102,0.9);font-size:1.22rem;line-height:1.7;'>"
-            "<strong style='color:#ff3366;font-size:1.45rem;font-weight:900;'>EXTREME CIOH LINKAGE</strong><br>"
+            "box-shadow:0 0 50px rgba(255,51,102,0.9);font-size:1.22rem;line-height:1.7;color:#ffcccc;'>"
+            "<strong style='color:#ff3366;font-size:1.45rem;font-weight:900;'>EXTREME CIOH LINKAGE</strong><br><br>"
             "<strong style='color:#ff6688;font-size:1.15rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
-            "This consolidation strongly proves common ownership of many inputs/addresses.<br>"
-            "Privacy significantly reduced. Consider CoinJoin, PayJoin, or silent payments afterward."
+            "This consolidation strongly proves common ownership of many inputs/addresses.<br><br>"
+            "<strong style='color:#ffaaaa;'>Privacy state: Severely compromised</strong><br>"
+            "Maximum fee savings, but analysts will confidently cluster these addresses as yours.<br>"
+            "Consider CoinJoin, PayJoin, or silent payments afterward to restore privacy."
             "</div>"
         )
     elif privacy_score <= 50:
         return (
             "<div style='margin-top:14px;padding:14px;background:#331100;border:2px solid #ff8800;border-radius:12px;"
-            "font-size:1.18rem;line-height:1.6;'>"
-            "<strong style='color:#ff9900;font-size:1.35rem;font-weight:900;'>High CIOH Risk</strong><br>"
+            "font-size:1.18rem;line-height:1.6;color:#ffddaa;'>"
+            "<strong style='color:#ff9900;font-size:1.35rem;font-weight:900;'>High CIOH Risk</strong><br><br>"
             "<strong style='color:#ffaa44;font-size:1.12rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
-            f"Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as yours.<br>"
+            f"Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as yours.<br><br>"
+            "<strong style='color:#ffcc88;'>Privacy state: Significantly reduced</strong><br>"
             "Good fee savings, but real privacy trade-off."
             "</div>"
         )
@@ -469,15 +472,20 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         return (
             "<div style='margin-top:12px;padding:12px;background:#113300;border:1px solid #00ff9d;border-radius:10px;"
             "color:#aaffaa;font-size:1.15rem;line-height:1.6;'>"
-            "<strong style='color:#00ff9d;font-size:1.3rem;font-weight:900;'>Moderate CIOH</strong><br>"
+            "<strong style='color:#00ff9d;font-size:1.3rem;font-weight:900;'>Moderate CIOH</strong><br><br>"
             "<strong style='color:#66ffaa;font-size:1.1rem;'>Common Input Ownership Heuristic (CIOH)</strong><br>"
-            "Some linkage created, but not extreme. Acceptable during low-fee periods."
+            "Spending multiple inputs together creates some on-chain linkage between them.<br>"
+            "Analysts may assume they belong to the same person — but it's not definitive.<br><br>"
+            "Privacy impact is moderate. Acceptable trade-off during low-fee periods when saving sats matters most."
             "</div>"
         )
     else:
         return (
             "<div style='margin-top:10px;color:#aaffaa;font-size:1.05rem;line-height:1.5;'>"
-            "Low CIOH impact <strong style='color:#00ffdd;font-size:1.1rem;'>(Common Input Ownership Heuristic)</strong> — minimal new linkage."
+            "Low CIOH impact <span style='color:#00ffdd;font-size:1.1rem;'>(Common Input Ownership Heuristic)</span><br><br>"
+            "Few inputs spent together — minimal new linkage created.<br>"
+            "Your addresses remain well-separated on-chain.<br>"
+            "Privacy preserved."
             "</div>"
         )
 
