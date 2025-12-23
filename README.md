@@ -5,6 +5,7 @@ The last UTXO consolidator you’ll ever need.
 - **Table-first layout** — data appears instantly, interact before reading walls of text  
 - **Crystal-clear labeling** — no more confusion about pre/post-prune sizes  
 - **PayJoin detection** — paste full invoice → glowing CIOH-protected badge + zero new linkage  
+- **CoinJoin Recovery Plan** — turns CIOH warnings into actionable steps (“~3–5 Whirlpool mixes needed”)  
 - **Batch mode** — paste multiple addresses or xpubs (one per line) → analyze all → prune selectively across sources  
 - **Fully offline / air-gapped mode** — toggle 🔒 → paste raw UTXOs → zero API calls → true cold wallet prep  
 - **Dark mode toggle** — instant pure-black nuclear glow with preserved neon intensity  
