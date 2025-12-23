@@ -1,6 +1,6 @@
 # **Ωmega Pruner v10.8 — Clarity State**
 
-**The last UTXO consolidator you’ll ever need. Table-first flow, crystal-clear warnings, PayJoin detection, and unbreakable sovereignty.**
+**The last UTXO consolidator you’ll ever need. Table-first flow, crystal-clear warnings, PayJoin detection, CoinJoin recovery plan, and unbreakable sovereignty.**
 
 **LIVE:** https://omega-pruner.onrender.com  
 **Launched:** 22 December 2025
@@ -15,6 +15,7 @@
 | **Instant slider + summary update**   | **Zero lag, zero stale numbers**                          | Never                 |
 | **Privacy Score (0–100)**             | **LIVE — CIOH strength, address merging, wealth reveal**  | Never                 |
 | **PayJoin detection**                 | **LIVE — glowing badge when invoice supports BIP78**      | Never                 |
+| **CoinJoin Recovery Plan**            | **LIVE — turns CIOH warnings into “~3–5 Whirlpool mixes needed”** | Never                 |
 | **CIOH warnings with full explanation**| **LIVE — spelled out, impossible to miss**               | Silent or vague       |
 | Giant perfectly centered QR           | Nuclear glow, pixel-perfect on every screen               | Usually ugly          |
 | Copy PSBT + mobile toast              | One-tap paste into Sparrow / Electrum / Coldcard          | Nobody                |
@@ -40,7 +41,8 @@
 4. **1. ANALYZE** → table appears instantly with health colors and checkboxes  
 5. Check/uncheck UTXOs → **watch Privacy Score, warnings, and savings update live**  
 6. Paste a PayJoin-enabled invoice → **glowing CIOH-PROTECTED badge appears**  
-7. **2. GENERATE NUCLEAR PSBT** → export selection JSON + fingerprint → broadcast → win forever
+7. See **CoinJoin Recovery Plan** → know exactly how many mixes to run  
+8. **2. GENERATE NUCLEAR PSBT** → export selection JSON + fingerprint → broadcast → win forever
 
 Works flawlessly with **every wallet in 2025+**:  
 Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trezor • Specter • Fully Noded • UniSat • OKX • Xverse • Leather • Aqua • Keystone
@@ -52,6 +54,7 @@ Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trez
 | **Table-first layout**                | LIVE    | Data appears instantly — interact before reading walls of text |
 | **Honest size labeling**              | LIVE    | No more confusion about pre/post-prune meaning |
 | **PayJoin detection & badge**         | LIVE    | Paste full invoice → glowing CIOH-protected send notification |
+| **CoinJoin Recovery Plan**            | LIVE    | Turns CIOH warnings into actionable “~X mixes needed” steps |
 | **Clearer warnings & guidance**       | LIVE    | Users understand exactly what pruning does and when it's worth it |
 | **Refined future savings message**    | LIVE    | "Pruning now saves you X sats versus pruning later" |
 
