@@ -1711,7 +1711,7 @@ def generate_psbt(psbt_snapshot: dict):
         <div style="color:#0f0;font-size:1.4rem;font-weight:900;letter-spacing:3px;
                     text-shadow:0 0 20px #0f0, 0 3px 6px #000, 0 6px 16px #000000dd;
                     margin-bottom:16px;">
-            FINGERPRINT
+            Ω FINGERPRINT
         </div>
         <div style="color:#00ff9d;font-size:2.2rem;font-weight:900;letter-spacing:8px;
                     text-shadow:0 0 30px #00ff9d, 0 0 60px #00ff9d,
