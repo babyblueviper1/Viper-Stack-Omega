@@ -2614,7 +2614,7 @@ No API calls • Fully air-gapped safe""",
     gr.HTML(
     """
     <div style="
-        margin: 60px auto 6px auto !important;
+        margin: 40px auto 6px auto !important;
         padding: 16px 0 12px 0 !important;
         text-align: center;
         font-size: 0.94rem;
