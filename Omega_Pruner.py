@@ -2309,7 +2309,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         fingerprint=params.fingerprint_short,
         qr_html=qr_html,
         qr_warning=qr_warning,
-        psbt_b64=psbt_b64
+        psbt_b64=psbt_b64,
         payjoin_note=payjoin_note,
     )
 
