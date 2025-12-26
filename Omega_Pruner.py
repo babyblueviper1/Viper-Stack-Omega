@@ -2092,7 +2092,6 @@ def _compose_psbt_html(
     qr_html: str,
     qr_warning: str,
     psbt_b64: str,
-    change_note: str,
     payjoin_note: str,
 ) -> str:
     return f"""
@@ -2164,7 +2163,14 @@ def _compose_psbt_html(
         </button>
     </div>
 
-    {change_note}
+    <div style="
+    color:#aaffaa !important;
+    font-size:1.05rem !important;
+    margin:30px 0 !important;
+    text-align:center !important;
+">
+  Change output sent to standard address
+</div>
     {payjoin_note}
 
     <!-- QR -->
@@ -2297,15 +2303,13 @@ def generate_psbt(psbt_snapshot: dict) -> str:
 
     qr_html, qr_warning = _generate_qr(psbt_b64)
 
-    change_note = _render_change_type_note(params.sp_change, params.sp_full, params.sp_code, econ)
     payjoin_note = _render_payjoin_note(params.dest_override or params.scan_source)
 
     return _compose_psbt_html(
         fingerprint=params.fingerprint_short,
         qr_html=qr_html,
         qr_warning=qr_warning,
-        psbt_b64=psbt_b64,
-        change_note=change_note,
+        psbt_b64=psbt_b64
         payjoin_note=payjoin_note,
     )
 
