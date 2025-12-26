@@ -1,30 +1,29 @@
-**Ωmega Pruner v10.8 — Clarity State**
+**Ωmega Pruner v11 — Forged Anew**
 
 The last UTXO consolidator you’ll ever need.
 
-- **Table-first layout** — data appears instantly, interact before reading walls of text  
-- **Crystal-clear labeling** — no more confusion about pre/post-prune sizes  
-- **PayJoin detection** — paste full invoice → glowing CIOH-protected badge + zero new linkage  
-- **CoinJoin Recovery Plan** — turns CIOH warnings into actionable steps (“~3–5 Whirlpool mixes needed”)  
-- **Batch mode** — paste multiple addresses or xpubs (one per line) → analyze all → prune selectively across sources  
-- **Fully offline / air-gapped mode** — toggle 🔒 → paste raw UTXOs → zero API calls → true cold wallet prep  
-- **Dark mode toggle** — instant pure-black nuclear glow with preserved neon intensity  
-- **Selection JSON export + fingerprint** — download deterministic proof of your exact pruned inputs  
-- **Live mempool fee oracle** (one-click Economy / 1 hour / 30 min / Fastest)  
-- **Privacy Score (0–100)** — instant CIOH strength, address merging, wealth reveal  
-- **Tiered CIOH warnings** — spelled out, color-coded, impossible to miss  
-- “Pruning now saves you X sats” — versus pruning later when fees spike  
-- **Per-input weight column in wu** (228 wu = Taproot, 272 wu = healthy SegWit, 364+ wu = legacy dust)  
-- Live wallet size comparison + cleanup score  
-- Blinding **NUCLEAR WALLET CLEANUP!** celebration  
-- Blood-red **EXTREME CIOH** + orange **HIGH RISK** warnings when needed  
-- **Canonical state architecture** — immutable enriched_state → single source of truth → zero stale data → instant sync  
-- 100% preview-to-PSBT match (Privacy Score shown one last time before signing)  
-- Zero blur, laser-etched typography on every device  
-- Zero custody • Full coin-control • RBF • Taproot • Dust-proof  
+- **Table-first interface** — data appears instantly, act before reading  
+- **Unambiguous labeling** — no confusion between pre- and post-prune states  
+- **PayJoin-aware analysis** — invoice detection with CIOH-safe handling  
+- **CIOH Recovery Guidance** — warnings translated into concrete next steps  
+- **Batch mode** — multiple addresses or xpubs (one per line), prune across sources  
+- **True offline / air-gapped mode** 🔒 — paste raw UTXOs, zero API calls  
+- **Pure dark nuclear mode** — no blur, no haze, full contrast preserved  
+- **Deterministic selection export** — JSON + fingerprint as cryptographic proof  
+- **Live mempool fee oracle** — Economy / 1h / 30m / Fastest  
+- **Privacy Score (0–100)** — CIOH strength, linkage risk, merge exposure  
+- **Tiered CIOH warnings** — color-coded, explicit, impossible to miss  
+- **“Prune now vs later” fee delta** — see future regret in sats  
+- **Per-input weight (wu)** — Taproot, SegWit, legacy dust clearly marked  
+- **Live wallet footprint comparison** — before / after cleanup score  
+- **NUCLEAR WALLET CLEANUP** confirmation state  
+- **EXTREME CIOH** (red) and **HIGH RISK** (orange) alerts when warranted  
+- **Canonical state architecture** — immutable enriched_state, zero stale data  
+- **100% preview → PSBT fidelity** — final Privacy Score before signing  
+- Zero custody • Full coin control • RBF • Taproot • Dust-resistant by design  
 
-**Pre-checked boxes = recommended for pruning**
+**Pre-checked options reflect best-practice pruning defaults.**
 
 Custom builds → omegapruner@proton.me
 
-Prune today. Win forever. • Ω
+Prune now. Win forever. • Ω
