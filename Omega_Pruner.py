@@ -3392,7 +3392,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
     # — ANALYZE BUTTON (pure data loading + affordances) —
     # =============================
     analyze_btn.click(
-        fn=analyze_and_summarize,
+        fn=analyze_and_show_summary,
         inputs=[
             addr_input,
             strategy,
