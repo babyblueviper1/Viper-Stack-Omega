@@ -2593,7 +2593,7 @@ def analyze_and_show_summary(
         enriched_new,           # 1: enriched_state
         legacy_warning,         # 2: legacy_warning HTML
         generate_row_visibility,# 3: generate_row visibility (critical!)
-        import_update,          # 4: import_file visibility
+        import_file,          # 4: import_file visibility
         scan_source_new,        # 5: scan_source state
         status_box_html,        # 6: status_output (the big glowing box)
     )
