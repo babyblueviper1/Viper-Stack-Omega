@@ -2371,7 +2371,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         )
 
     # Generate professional-grade, hardware-compatible PSBT
-    psbt_b6, legacy_warning_html = create_psbt(tx, utxos_for_psbt)
+    psbt_b64, legacy_warning_html = create_psbt(tx, utxos_for_psbt)
 
     qr_html, qr_warning = _generate_qr(psbt_b64)
     payjoin_note = _render_payjoin_note(params.dest_override or params.scan_source)
