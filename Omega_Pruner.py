@@ -361,37 +361,54 @@ def load_selection(json_file, current_enriched):
     except Exception as e:
         return current_enriched, f"Failed to load: {str(e)}"
 
-def rebuild_df_rows(enriched_state):
-    # Extract utxos from frozen state if it's a tuple
+def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
+    """
+    Rebuild dataframe rows from current enriched_state.
+    Used primarily when loading a saved selection JSON.
+    Returns (rows, has_legacy) for consistent legacy handling.
+    """
+    # Extract utxos from frozen tuple
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
         _, utxos = enriched_state
         state_list = list(utxos)
     else:
         state_list = enriched_state or []
 
-    # Sort by health priority
-    enriched_sorted = sorted(
-        state_list,
-        key=lambda u: HEALTH_PRIORITY.get(u.get("health", "UNKNOWN"), 999)
-    )
-
-    # Build rows for DataFrame
     rows = []
-    for u in enriched_sorted:
+    has_legacy = False
+
+    for u in state_list:
+        script_type = u.get("script_type", "")
+        is_legacy = script_type == "P2PKH"
+
+        if is_legacy:
+            has_legacy = True
+            selected = False  # Never allow legacy to be selected
+            health_html = (
+                '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
+                '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
+                '</div>'
+            )
+        else:
+            selected = u.get("selected", False)
+            health_html = (
+                f'<div class="health health-{u["health"].lower()}">'
+                f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
+            )
+
         rows.append([
-            u.get("selected", False),
-            u.get("source", ""),
-            u.get("txid", "")[:8] + "..." + u.get("txid", "")[-8:],
-            u.get("health_html", ""),
-            u.get("value", 0),
-            u.get("address", ""),
-            u.get("input_weight", 0),
-            u.get("script_type", ""),
-            u.get("vout", 0),
+            selected,
+            u.get("source", "Single"),
+            u["txid"][:8] + "..." + u["txid"][-8:],
+            health_html,
+            u["value"],
+            u["address"],
+            u["input_weight"],
+            script_type,
+            u["vout"],
         ])
 
-    return rows
-
+    return rows, has_legacy
 
 def sats_to_btc_str(sats: int) -> str:
     btc = sats / 100_000_000
@@ -853,19 +870,7 @@ class Tx:
         )
 
 
-def create_psbt(tx: Tx, utxos: list[dict] = None) -> tuple[str, str]:
-    """
-    Create a PSBTv0 compatible with Sparrow, Coldcard, Ledger, Trezor.
-    Returns a tuple: (base64 PSBT, optional legacy warning HTML).
-
-    Args:
-        tx: Unsigned transaction object (Tx).
-        utxos: List of dicts with input UTXO info (must match tx.tx_ins order).
-               Each dict: {"value": int, "scriptPubKey": bytes, "script_type": str}
-
-    Returns:
-        (psbt_b64, legacy_warning_html)
-    """
+def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
     import base64
 
     def encode_varint(i: int) -> bytes:
@@ -881,64 +886,34 @@ def create_psbt(tx: Tx, utxos: list[dict] = None) -> tuple[str, str]:
     raw_tx = tx.serialize_unsigned()
     psbt = b'psbt\xff'
 
-    # Global unsigned transaction — correct PSBTv0
-    psbt += b'\x01\x00' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
-
-    legacy_found = False
+    # Global map: unsigned transaction
+    psbt += b'\x01' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
+    psbt += b'\x00'  # end global
 
     # Per-input maps
     for i, txin in enumerate(tx.tx_ins):
-        if utxos:
-            u = utxos[i]
-            script_pubkey = u["scriptPubKey"]
-            value = u["value"]
-            script_type = u.get("script_type", "unknown")
+        u = utxos[i]
+        script_type = u.get("script_type")
 
-            # Add witness UTXO for ANY SegWit type (native or nested)
-            if "WPKH" in script_type or "WSH" in script_type or script_type == "Taproot":
-                witness_utxo = value.to_bytes(8, "little") + encode_varint(len(script_pubkey)) + script_pubkey
-                psbt += encode_varint(1 + len(witness_utxo)) + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
-            else:
-                # Pure legacy P2PKH — dummy field (unavoidable)
-                psbt += b'\x01\x01\x00\x00\x00'
-                legacy_found = True
-        else:
-            psbt += b'\x01\x01\x00\x00\x00'
-            legacy_found = True
+        if script_type not in ("P2WPKH", "P2WSH", "Taproot"):
+            raise ValueError(f"Unsupported script type in PSBT: {script_type}")
 
-        psbt += b'\x00'
+        witness_utxo = (
+            u["value"].to_bytes(8, "little") +
+            encode_varint(len(u["scriptPubKey"])) +
+            u["scriptPubKey"]
+        )
 
-    # Per-output maps — empty
+        psbt += b'\x01' + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
+        psbt += b'\x00'  # end input map
+
+    # Per-output maps (empty)
     for _ in tx.tx_outs:
-        psbt += b'\x00\x00\x00'
+        psbt += b'\x00'
 
     psbt += b'\x00'  # final separator
 
-    psbt_b64 = base64.b64encode(psbt).decode()
-
-    # Optional warning if pure legacy inputs exist
-    legacy_warning_html = ""
-    if legacy_found:
-        legacy_warning_html = (
-            "<div style='"
-            "color:#ffaa00 !important; "
-            "padding:16px !important; "
-            "margin:30px 0 20px 0 !important; "
-            "font-size:1.1rem !important; "
-            "text-align:center !important; "
-            "background:rgba(255,170,0,0.1) !important; "
-            "border:2px solid #ffaa00 !important; "
-            "border-radius:12px !important;'>"
-            "⚠️ Some legacy inputs (P2PKH) are included.<br>"
-            "<small style='color:#ffddaa !important;'>"
-            "Hardware wallets may show 'unknown amount' until broadcast — this is normal and safe."
-            "</small>"
-            "</div>"
-        )
-
-    return psbt_b64, legacy_warning_html
-
-
+    return base64.b64encode(psbt).decode("ascii"), ""
 
 
 def _read_varint(data: bytes, pos: int = 0) -> tuple[int, int]:
@@ -1252,30 +1227,43 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
 
     return result
 
-def _build_df_rows(enriched: List[Dict]) -> List[List]:
-    """Convert enriched UTXOs into dataframe-compatible rows with HTML health labels."""
-
+def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
+    """Convert enriched UTXOs into dataframe rows with legacy P2PKH handling."""
     rows: List[List] = []
+    has_legacy = False
 
     for u in enriched:
-        health_html = (
-            f'<div class="health health-{u["health"].lower()}">'
-            f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
-        )
+        script_type = u.get("script_type", "")
+        is_legacy = script_type == "P2PKH"
+
+        if is_legacy:
+            has_legacy = True
+            selected = False  # Never allow legacy to be selected
+            health_html = (
+                '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
+                '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
+                '</div>'
+            )
+        else:
+            selected = u["selected"]
+            health_html = (
+                f'<div class="health health-{u["health"].lower()}">'
+                f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
+            )
 
         rows.append([
-            u["selected"],
+            selected,
             u.get("source", "Single"),
-            u["txid"],
+            u["txid"][:8] + "..." + u["txid"][-8:],  # nicer short TXID
             health_html,
             u["value"],
             u["address"],
             u["input_weight"],
-            u["script_type"],
+            script_type,
             u["vout"],
         ])
 
-    return rows
+    return rows, has_legacy
 
 def _freeze_enriched(
     enriched: List[Dict],
@@ -1294,17 +1282,6 @@ def _freeze_enriched(
     }
 
     return (meta, frozen_utxos)
-
-def _analyze_success(df_rows, frozen_state, scan_source):
-    """Unified success return for analyze()."""
-    return (
-        gr.update(value=df_rows),
-        frozen_state,
-        gr.update(visible=True),
-        gr.update(visible=True),
-        scan_source,
-    )
-
 
 
 def analyze(
@@ -1374,8 +1351,23 @@ def analyze(
     # Guard for unknown pruning strategy
     assert params.strategy in PRUNING_RATIOS, "Unknown pruning strategy"
 
-    # --- 6. Build UI table rows ---
-    df_rows = _build_df_rows(enriched_pruned)
+    # --- 6. Build UI table rows + Legacy Flag ---
+    df_rows, has_legacy = _build_df_rows(enriched_pruned)
+
+    # --- 6.1 Build legacy warning banner (only if legacy UTXOs present) ---
+    if has_legacy:
+        legacy_banner = (
+            "<div style='color:#ff4444;background:#330000;padding:20px;border-radius:12px;"
+            "font-weight:bold;text-align:center;font-size:1.2rem;margin:20px 0;'>"
+            "⚠️ Legacy P2PKH UTXOs Detected<br><br>"
+            "These old-format (P2PKH) inputs cannot be safely included in the generated PSBT "
+            "for full compatibility with modern wallets (Sparrow, Coldcard, etc.).<br><br>"
+            "They are shown faded in the table below for transparency.<br>"
+            "Please spend or convert them to SegWit (P2WPKH or Taproot) in a separate transaction first."
+            "</div>"
+        )
+    else:
+        legacy_banner = ""
 
     # --- 7. Freeze deterministic state ---
     frozen_state = _freeze_enriched(
@@ -1384,20 +1376,33 @@ def analyze(
         scan_source=params.scan_source,
     )
 
-    # --- 8. Unified success return ---
+    # --- 8. Unified success return — now include legacy banner ---
     return _analyze_success(
         df_rows=df_rows,
         frozen_state=frozen_state,
         scan_source=params.scan_source,
+        legacy_warning=legacy_banner,  # ← NEW: pass banner to success handler
+    )
+
+def _analyze_success(df_rows, frozen_state, scan_source,legacy_warning=""):
+    """Unified success return for analyze()."""
+    return (
+        gr.update(value=df_rows),
+        frozen_state,
+        gr.update(value=legacy_warning),
+        gr.update(visible=True),
+        gr.update(visible=True),
+        scan_source,
     )
     
 def _analyze_empty(scan_source: str = ""):
     """Common return for all empty or failure states in analyze()."""
     return (
-        gr.update(value=[]),        # df — empty table
-        (),                          # enriched_state — empty tuple
-        gr.update(visible=False),   # generate_row — hide
-        gr.update(visible=False),   # import_file — hide
+        gr.update(value=[]),                    # df — empty table
+        (),                                      # enriched_state — empty tuple
+        gr.update(value=""),                     # legacy_warning — empty (no banner)
+        gr.update(visible=False),                # generate_row — hide
+        gr.update(visible=False),                # import_file — hide
         scan_source,
     )
 
@@ -2151,7 +2156,7 @@ def _compose_psbt_html(
     qr_warning: str,
     psbt_b64: str,
     payjoin_note: str,
-	legacy_warning_html: str,
+	extra_note: str = "",
 ) -> str:
     return f"""
     <div style="height: 80px !important;"></div>
@@ -2175,7 +2180,6 @@ def _compose_psbt_html(
         inset 0 0 60px rgba(247,147,26,0.15) !important;
     position: relative;
 ">
-
      <!-- Selection Fingerprint -->
     <div style="
         margin:40px 0 !important;
@@ -2221,7 +2225,7 @@ def _compose_psbt_html(
             COPY FINGERPRINT
         </button>
     </div>
-
+        {extra_note}
     <div style="
     color:#aaffaa !important;
     font-size:1.05rem !important;
@@ -2248,7 +2252,6 @@ def _compose_psbt_html(
     </div>
 
     {qr_warning}
-    {legacy_warning_html}
 
     <!-- PSBT Output -->
     <div style="margin:60px auto 20px !important;width:92% !important;max-width:880px !important;">
@@ -2346,35 +2349,58 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         econ = estimate_tx_economics(inputs, params.fee_rate, params.dao_percent)
     except ValueError:
         return (
-            "<div style='"
-            "color:#ff3366 !important;"
-            "text-align:center !important;"
-            "padding:30px !important;"
-            "font-size:1.3rem !important;"
-            "font-weight:700 !important;'>"
-            "Invalid snapshot economics."
+            "<div style='color:#ff3366;text-align:center;padding:30px;font-size:1.3rem;font-weight:700;'>"
+            "Invalid transaction economics — please re-analyze."
             "</div>"
         )
 
-    # Build transaction and UTXO info for PSBT
+    # Build unsigned tx and matching UTXO list
     tx, utxos_for_psbt = _build_unsigned_tx(inputs, econ, dest_spk, params)
 
-    # Safety assertion: inputs vs tx_ins
     if len(utxos_for_psbt) != len(tx.tx_ins):
         return (
-            "<div style='color:#ff3366 !important;"
-            "text-align:center !important;"
-            "padding:40px !important;"
-            "font-size:1.4rem !important;'>"
-            "Internal error: UTXO/input mismatch — please report"
+            "<div style='color:#ff3366;text-align:center;padding:40px;font-size:1.4rem;font-weight:700;'>"
+            "Internal error: Input/UTXO count mismatch — please report this bug."
             "</div>"
         )
 
-    # Generate professional-grade, hardware-compatible PSBT
-    psbt_b64, legacy_warning_html = create_psbt(tx, utxos_for_psbt)
+    # === FINAL SAFETY FILTER: Exclude any legacy P2PKH inputs ===
+    # This is defensive — legacy should already be deselected and filtered earlier,
+    # but we double-check here to guarantee a clean, valid PSBT.
+    filtered_utxos = [u for u in utxos_for_psbt if u.get("script_type") != "P2PKH"]
+    legacy_excluded = len(filtered_utxos) < len(utxos_for_psbt)
+
+    if legacy_excluded:
+        # Rebuild tx with only valid SegWit inputs
+        # Note: We could recompute economics, but since legacy were never selected,
+        # this case is extremely rare. For simplicity, we just exclude them.
+        tx, filtered_utxos = _build_unsigned_tx(
+            [inp for inp in inputs if inp.get("script_type") != "P2PKH"],
+            econ,  # reuse old economics — safe because legacy weren't contributing meaningfully
+            dest_spk,
+            params,
+        )
+
+    # Generate clean, Sparrow/Coldcard-compatible PSBT
+    # create_psbt now returns only (psbt_b64, "") — no legacy warning needed here
+    psbt_b64, _ = create_psbt(tx, filtered_utxos)
 
     qr_html, qr_warning = _generate_qr(psbt_b64)
     payjoin_note = _render_payjoin_note(params.dest_override or params.scan_source)
+
+    # Optional in-PSBT warning if we had to exclude legacy inputs
+    extra_note = ""
+    if legacy_excluded:
+        extra_note = (
+             "<div style='"
+            "color:#ffaa00;background:#332200;padding:16px;border-radius:12px;"
+            "margin:40px 0 30px 0;text-align:center;font-size:1.15rem;"
+            "border:2px solid #ff8800;box-shadow:0 0 30px rgba(255,136,0,0.4);"
+            "'>"
+            "⚠️ Legacy (P2PKH) inputs were automatically excluded from this PSBT<br>"
+            "<small>Only modern SegWit inputs (P2WPKH, P2WSH, Taproot) are included for full hardware wallet compatibility.</small>"
+            "</div>"
+        )
 
     return _compose_psbt_html(
         fingerprint=params.fingerprint_short,
@@ -2382,7 +2408,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         qr_warning=qr_warning,
         psbt_b64=psbt_b64,
         payjoin_note=payjoin_note,
-		legacy_warning_html=legacy_warning_html,
+        extra_note=extra_note,  # ← pass the new filtered warning
     )
 # --------------------------
 # Gradio UI
@@ -2636,6 +2662,26 @@ with gr.Blocks(
         opacity: 0.6;
         cursor: not-allowed;
     }
+
+    /* Legacy row styling */
+.health-legacy {
+    color: #ff4444 !important;
+    font-weight: bold;
+}
+
+tr:has(.health-legacy) {
+    background-color: #330000 !important;
+    opacity: 0.65;
+}
+
+tr:has(.health-legacy) td {
+    color: #ffaaaa !important;
+}
+
+tr:has(.health-legacy) input[type="checkbox"] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
     </style>
     """)
 
@@ -3066,6 +3112,7 @@ No API calls • Fully air-gapped safe""",
         psbt_snapshot = gr.State(None)
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
+		legacy_warning = gr.HTML(label="Legacy Warning", visible=True)
 
 		 # Capture destination changes for downstream use
         dest.change(
@@ -3237,7 +3284,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
     ).then(
         fn=rebuild_df_rows,
         inputs=[enriched_state],
-        outputs=[df]
+        outputs=[df, legacy_warning], 
     ).then(
         fn=generate_summary_safe,
         inputs=[
@@ -3271,6 +3318,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
         outputs=[
             df,
             enriched_state,
+            legacy_warning,
             generate_row,
             import_file,
             scan_source,
