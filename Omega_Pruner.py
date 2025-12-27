@@ -3112,9 +3112,9 @@ No API calls • Fully air-gapped safe""",
         psbt_snapshot = gr.State(None)
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
-		legacy_warning = gr.HTML(label="Legacy Warning", visible=True)
+        legacy_warning = gr.HTML(label="Legacy Warning", visible=True)
 
-		 # Capture destination changes for downstream use
+        # Capture destination changes for downstream use
         dest.change(
             fn=lambda x: x.strip() if x else "",
             inputs=dest,
