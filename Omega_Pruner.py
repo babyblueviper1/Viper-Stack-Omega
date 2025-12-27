@@ -385,8 +385,9 @@ def load_selection(json_file, current_enriched):
 def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
     """
     Rebuild dataframe rows from current enriched_state.
-    Used primarily when loading a saved selection JSON.
-    Returns (rows, has_legacy) for consistent legacy handling.
+    Used when loading a saved selection JSON or restoring state.
+    Disables selection for unsupported script types and shows warnings.
+    Returns (rows, has_unsupported) — True if any input cannot be included in PSBT.
     """
     # Extract utxos from frozen tuple
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
@@ -396,40 +397,67 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
         state_list = enriched_state or []
 
     rows = []
-    has_legacy = False
+    has_unsupported = False
 
     for u in state_list:
         script_type = u.get("script_type", "")
-        is_legacy = script_type == "P2PKH"
+        selected = u.get("selected", False)
 
-        if is_legacy:
-            has_legacy = True
-            selected = False  # Never allow legacy to be selected
-            health_html = (
-                '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
-                '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
-                '</div>'
-            )
+        # Define supported types for PSBT inclusion
+        supported_in_psbt = script_type in ("P2WPKH", "Taproot")
+        is_legacy = script_type == "P2PKH"
+        is_nested = script_type == "P2SH-P2WPKH"
+
+        if not supported_in_psbt:
+            has_unsupported = True
+            selected = False  # Force off — cannot be used in pruning PSBT
+
+            if is_legacy:
+                health_html = (
+                    '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
+                    '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
+                    '</div>'
+                )
+            elif is_nested:
+                health_html = (
+                    '<div class="health health-nested" style="color:#ff9900;font-weight:bold;">'
+                    '⚠️ NESTED<br><small>Not supported yet</small>'
+                    '</div>'
+                )
+            else:
+                # Fallback (shouldn't happen)
+                health_html = (
+                    f'<div class="health health-{u["health"].lower()}">'
+                    f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
+                )
         else:
-            selected = u.get("selected", False)
+            # Fully supported — allow original selection state
             health_html = (
                 f'<div class="health health-{u["health"].lower()}">'
                 f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
             )
 
+        # Friendly display name for Type column
+        display_type = {
+            "P2WPKH": "Native SegWit",
+            "Taproot": "Taproot",
+            "P2SH-P2WPKH": "Nested SegWit",
+            "P2PKH": "Legacy",
+        }.get(script_type, script_type)
+
         rows.append([
-            selected,
+            selected,                                   # checkbox (forced False if unsupported)
             u.get("source", "Single"),
             u["txid"][:8] + "..." + u["txid"][-8:],
             health_html,
             u["value"],
             u["address"],
             u["input_weight"],
-            script_type,
+            display_type,                               # user-friendly type
             u["vout"],
         ])
 
-    return rows, has_legacy
+    return rows, has_unsupported
 
 def sats_to_btc_str(sats: int) -> str:
     btc = sats / 100_000_000
@@ -892,6 +920,20 @@ class Tx:
 
 
 def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
+    """
+    Build a Sparrow-compatible PSBT from a Tx object and enriched UTXOs.
+
+    Args:
+        tx: Unsigned transaction object with tx_ins and tx_outs.
+        utxos: List of dicts, each must contain:
+               - value (int, satoshis)
+               - scriptPubKey (bytes)
+               - script_type (str: "P2WPKH", "P2WSH", or "Taproot")
+               - tap_internal_key (bytes, optional, only for Taproot)
+
+    Returns:
+        (base64-encoded PSBT string, "")
+    """
     import base64
 
     def encode_varint(i: int) -> bytes:
@@ -904,38 +946,72 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
         else:
             return b'\xff' + i.to_bytes(8, "little")
 
+    # ---- Input validation ----
+    if not tx.tx_ins:
+        raise ValueError("Transaction has no inputs")
+    if len(tx.tx_ins) != len(utxos):
+        raise ValueError(f"Input count mismatch: {len(tx.tx_ins)} inputs vs {len(utxos)} UTXOs")
+    if not tx.tx_outs:
+        raise ValueError("Transaction must have at least one output")
+
     raw_tx = tx.serialize_unsigned()
-    psbt = b'psbt\xff'
+    psbt = b"psbt\xff"
 
-    # Global map: unsigned transaction
-    psbt += b'\x01' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
-    psbt += b'\x00'  # end global
+    # ==== Global: unsigned transaction ====
+    psbt += b"\x01"                          # key length = 1
+    psbt += b"\x00"                          # key type: PSBT_GLOBAL_UNSIGNED_TX = 0x00
+    psbt += encode_varint(len(raw_tx))
+    psbt += raw_tx
+    psbt += b"\x00"                          # field separator
+    psbt += b"\x00"                          # end of global map
 
-    # Per-input maps
-    for i, txin in enumerate(tx.tx_ins):
-        u = utxos[i]
+    # ==== Per-input maps ====
+    for u in utxos:
         script_type = u.get("script_type")
+        if script_type not in ("P2WPKH", "Taproot"):
+            raise ValueError(f"Unsupported script type in PSBT: {script_type}. Only P2WPKH and Taproot are supported.")
 
-        if script_type not in ("P2WPKH", "P2WSH", "Taproot"):
-            raise ValueError(f"Unsupported script type in PSBT: {script_type}")
-
+        # ---- PSBT_IN_WITNESS_UTXO (key type 0x01) ----
         witness_utxo = (
             u["value"].to_bytes(8, "little") +
             encode_varint(len(u["scriptPubKey"])) +
             u["scriptPubKey"]
         )
+        psbt += b"\x01"                          # key len
+        psbt += b"\x01"                          # key type
+        psbt += encode_varint(len(witness_utxo))
+        psbt += witness_utxo
 
-        psbt += b'\x01' + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
-        psbt += b'\x00'  # end input map
+        # ---- Optional: Taproot internal key (0x17) ----
+        if script_type == "Taproot":
+            tapkey = u.get("tap_internal_key")
+            if tapkey and len(tapkey) == 32:
+                psbt += b"\x01"                  # key len
+                psbt += b"\x17"                  # key type
+                psbt += encode_varint(32)
+                psbt += tapkey
 
-    # Per-output maps (empty)
+        psbt += b"\x00"  # end input map
+
+    # ==== Output maps (empty OK) ====
     for _ in tx.tx_outs:
-        psbt += b'\x00'
+        psbt += b"\x00"
 
-    psbt += b'\x00'  # final separator
+    # ==== Final separator ====
+    psbt += b"\x00"
+
+	# ---- Debug: print input summary before returning PSBT ----
+    print("=== PSBT Input Summary ===")
+    for idx, u in enumerate(utxos):
+        stype = u.get("script_type")
+        value = u.get("value")
+        tapkey = u.get("tap_internal_key")
+        tap_info = f", Taproot key present" if stype == "Taproot" and tapkey else ""
+        print(f"Input {idx}: type={stype}, value={value}{tap_info}")
+    print("==========================")
+
 
     return base64.b64encode(psbt).decode("ascii"), ""
-
 
 def _read_varint(data: bytes, pos: int = 0) -> tuple[int, int]:
     val = data[pos]
@@ -1170,42 +1246,47 @@ def _collect_online_utxos(params: AnalyzeParams) -> List[Dict]:
     return utxos
 
 def _classify_utxo(value: int, input_weight: int) -> Tuple[str, str, str]:
-    """
-    Determine internal script type, health, and recommendation for a UTXO.
-    NOTE: script_type values must be protocol-accurate for PSBT creation.
-    """
-
-    # --- Script type classification (internal, canonical names) ---
     if input_weight <= 228:
-        script_type, health, rec = "Taproot", "OPTIMAL", "KEEP"
+        return "Taproot", "OPTIMAL", "KEEP"
     elif input_weight <= 272:
-        script_type, health, rec = "P2WPKH", "OPTIMAL", "KEEP"     # Native SegWit
+        return "P2WPKH", "OPTIMAL", "KEEP"
     elif input_weight <= 364:
-        script_type, health, rec = "P2SH-P2WPKH", "MEDIUM", "OPTIONAL"
+        # Nested SegWit — not fully supported in PSBT yet
+        return "P2SH-P2WPKH", "MEDIUM", "CAUTION"
     else:
-        script_type, health, rec = "P2PKH", "HEAVY", "PRUNE"
+        return "Legacy", "HEAVY", "PRUNE"
 
-    # --- Value-based overrides ---
+    # Overrides after base classification
     if value < 10_000:
-        health, rec = "DUST", "PRUNE"
-
-    elif value > 100_000_000 and script_type in ("P2SH-P2WPKH", "P2PKH"):
-        health, rec = "CAREFUL", "OPTIONAL"
+        return script_type, "DUST", "PRUNE"
+    if value > 100_000_000 and script_type in ("P2SH-P2WPKH", "Legacy"):
+        return script_type, "CAREFUL", "OPTIONAL"
 
     return script_type, health, rec
 
-def _enrich_utxos(raw_utxos: List[Dict], params: AnalyzeParams) -> List[Dict]:
-    """Attach script metadata, weight, health, and recommendation to UTXOs."""
+def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
+    """
+    Attach script metadata, weight, health, recommendation, scriptPubKey,
+    and Taproot internal key to UTXOs.
+    """
 
-    enriched: List[Dict] = []
+    enriched: list[dict] = []
 
     for u in raw_utxos:
-        _, meta = address_to_script_pubkey(u["address"])
+        # Get both scriptPubKey and metadata (input_vb, type, etc.)
+        script_pubkey, meta = address_to_script_pubkey(u["address"])
         input_weight = meta["input_vb"] * 4
 
-        script_type, health, recommend = _classify_utxo(
-            u["value"], input_weight
-        )
+        # Classify UTXO
+        script_type, health, recommend = _classify_utxo(u["value"], input_weight)
+
+        # Taproot internal key extraction (if present)
+        tap_internal_key = None
+        if script_type == "Taproot":
+            # Extract from meta if available; must be 32 bytes
+            candidate = meta.get("tap_internal_key")
+            if candidate and len(candidate) == 32:
+                tap_internal_key = candidate
 
         enriched.append({
             **u,
@@ -1213,7 +1294,9 @@ def _enrich_utxos(raw_utxos: List[Dict], params: AnalyzeParams) -> List[Dict]:
             "health": health,
             "recommend": recommend,
             "script_type": script_type,
-            "selected": False,
+            "scriptPubKey": script_pubkey,        # raw bytes, needed for PSBT
+            "tap_internal_key": tap_internal_key, # None unless Taproot
+            # "selected" is handled elsewhere
         })
 
     return enriched
@@ -1255,42 +1338,72 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
     return result
 
 def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
-    """Convert enriched UTXOs into dataframe rows with legacy P2PKH handling."""
+    """
+    Convert enriched UTXOs into dataframe rows.
+    Handles unsupported script types by disabling selection and showing warnings.
+    """
     rows: List[List] = []
-    has_legacy = False
+    has_unsupported = False  # Track if any inputs can't be included in PSBT
 
     for u in enriched:
         script_type = u.get("script_type", "")
-        is_legacy = script_type == "P2PKH"
+        selected = u.get("selected", False)
 
-        if is_legacy:
-            has_legacy = True
-            selected = False  # Never allow legacy to be selected
-            health_html = (
-                '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
-                '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
-                '</div>'
-            )
+        # Define which types are fully supported in the generated PSBT
+        supported_in_psbt = script_type in ("P2WPKH", "Taproot")
+        is_legacy = script_type == "P2PKH"
+        is_nested = script_type == "P2SH-P2WPKH"
+
+        if not supported_in_psbt:
+            has_unsupported = True
+            selected = False  # Force unselected — cannot be pruned in this PSBT
+
+            if is_legacy:
+                health_html = (
+                    '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
+                    '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
+                    '</div>'
+                )
+            elif is_nested:
+                health_html = (
+                    '<div class="health health-nested" style="color:#ff9900;font-weight:bold;">'
+                    '⚠️ NESTED<br><small>Not supported yet</small>'
+                    '</div>'
+                )
+            else:
+                health_html = (
+                    f'<div class="health health-{u["health"].lower()}">'
+                    f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
+                )
         else:
-            selected = u["selected"]
+            # Fully supported: P2WPKH or Taproot — allow normal selection
             health_html = (
                 f'<div class="health health-{u["health"].lower()}">'
                 f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
             )
+            # Keep the original selected state from strategy/user
+
+        # Optional: nicer display name in the Type column
+        display_type = {
+            "P2WPKH": "Native SegWit",
+            "Taproot": "Taproot",
+            "P2SH-P2WPKH": "Nested SegWit",
+            "P2PKH": "Legacy",
+        }.get(script_type, script_type)
 
         rows.append([
-            selected,
-            u.get("source", "Single"),
-            u["txid"][:8] + "..." + u["txid"][-8:],  # nicer short TXID
-            health_html,
-            u["value"],
-            u["address"],
-            u["input_weight"],
-            script_type,
-            u["vout"],
+            selected,                                   # 0: checkbox (forced False if unsupported)
+            u.get("source", "Single"),                  # 1: source
+            u["txid"][:8] + "..." + u["txid"][-8:],     # 2: short txid
+            health_html,                                # 3: health badge
+            u["value"],                                 # 4: value (sats)
+            u["address"],                               # 5: address
+            u["input_weight"],                          # 6: weight
+            display_type,                               # 7: friendly type name
+            u["vout"],                                  # 8: vout (hidden)
         ])
 
-    return rows, has_legacy
+    return rows, has_unsupported
 
 def _freeze_enriched(
     enriched: List[Dict],
@@ -1339,7 +1452,7 @@ def analyze(
         manual_utxo_input=manual_utxo_input,
     )
 
-    # --- 2. Collect UTXOs (offline vs online) ---
+    # --- 2. Collect UTXOs ---
     if params.offline_mode:
         raw_utxos = _collect_manual_utxos(params)
     else:
@@ -1352,85 +1465,74 @@ def analyze(
     # --- 4. Enrich UTXOs ---
     enriched = _enrich_utxos(raw_utxos, params)
 
-    # === CANONICAL STATE ASSERTIONS ===
-    if enriched:
-        # Safety guard to check for the presence of 'script_type'
-        missing = [u for u in enriched if "script_type" not in u]
-        if missing:
-            raise RuntimeError(
-                "Invariant violation: enriched_state missing 'script_type'. "
-                "All UTXOs must define script_type at analyze() time."
-            )
+    # Safety assertion
+    missing_script_type = [u for u in enriched if "script_type" not in u]
+    if missing_script_type:
+        raise RuntimeError("Invariant violation: missing 'script_type' in enriched UTXOs")
 
-    # --- 5. Apply pruning strategy (immutable) ---
+    # --- 5. Apply pruning strategy ---
     enriched_pruned = _apply_pruning_strategy(enriched, params.strategy)
 
-    # --- 5.1 Invariants / safety assertions ---
-    # Safety guard to ensure the minimum UTXOs are retained after pruning
+    # Safety assertions
     assert len(enriched_pruned) >= MIN_KEEP_UTXOS, "Pruning violated MIN_KEEP_UTXOS"
-
-    # Safety: Never allow 100% pruning — always keep at least one UTXO
-    assert any(not u["selected"] for u in enriched_pruned), (
-        "All UTXOs selected for pruning — this would empty the address. "
-        "Rejected for safety."
-    )
-
-    # Guard for unknown pruning strategy
+    assert any(not u["selected"] for u in enriched_pruned), "All UTXOs selected for pruning — rejected"
     assert params.strategy in PRUNING_RATIOS, "Unknown pruning strategy"
 
-    # --- 6. Build UI table rows + Legacy Flag ---
-    df_rows, has_legacy = _build_df_rows(enriched_pruned)
+    # --- 6. Build table rows ---
+    df_rows, has_unsupported = _build_df_rows(enriched_pruned)
 
-    # --- 6.1 Build legacy warning banner (only if legacy UTXOs present) ---
-    if has_legacy:
-        legacy_banner = (
-            "<div style='color:#ff4444;background:#330000;padding:20px;border-radius:12px;"
-            "font-weight:bold;text-align:center;font-size:1.2rem;margin:20px 0;'>"
-            "⚠️ Legacy P2PKH UTXOs Detected<br><br>"
-            "These old-format (P2PKH) inputs cannot be safely included in the generated PSBT "
-            "for full compatibility with modern wallets (Sparrow, Coldcard, etc.).<br><br>"
-            "They are shown faded in the table below for transparency.<br>"
-            "Please spend or convert them to SegWit (P2WPKH or Taproot) in a separate transaction first."
+    # --- 6.1 Warning banner for unsupported inputs ---
+    if has_unsupported:
+        warning_banner = (
+            "<div style='color:#ff9900;background:#332200;padding:24px;border-radius:16px;"
+            "font-weight:bold;text-align:center;font-size:1.3rem;margin:24px 0;box-shadow:0 0 40px rgba(255,153,0,0.4);'>"
+            "⚠️ Some UTXOs Cannot Be Included in PSBT<br><br>"
+            "Legacy (starting with 1...) and Nested SegWit (starting with 3...) inputs "
+            "are not currently supported in the generated PSBT.<br><br>"
+            "They are shown in the table for transparency but cannot be selected.<br>"
+            "Please spend them separately or convert to Native SegWit (bc1q...) or Taproot (bc1p...) first."
             "</div>"
         )
     else:
-        legacy_banner = ""
+        warning_banner = ""
 
-    # --- 7. Freeze deterministic state ---
+    # --- 7. Freeze state ---
     frozen_state = _freeze_enriched(
         enriched_pruned,
         strategy=params.strategy,
         scan_source=params.scan_source,
     )
 
-    # --- 8. Unified success return — now include legacy banner ---
+    # --- 8. Success return ---
     return _analyze_success(
         df_rows=df_rows,
         frozen_state=frozen_state,
         scan_source=params.scan_source,
-        legacy_warning=legacy_banner,  # ← NEW: pass banner to success handler
+        warning_banner=warning_banner,
     )
 
-def _analyze_success(df_rows, frozen_state, scan_source,legacy_warning=""):
-    """Unified success return for analyze()."""
+def _analyze_success(df_rows, frozen_state, scan_source, warning_banner=""):
+    """Unified success return for analyze() — 7 outputs"""
     return (
-        gr.update(value=df_rows),
-        frozen_state,
-        gr.update(value=legacy_warning),
-        gr.update(visible=True),
-        gr.update(visible=True),
-        scan_source, 
+        gr.update(value=df_rows),         # 0: df table
+        frozen_state,                     # 1: enriched_state
+        gr.update(value=warning_banner),  # 2: warning banner (was legacy_warning)
+        gr.update(visible=True),          # 3: generate_row
+        gr.update(visible=True),          # 4: import_file
+        scan_source,                      # 5: scan_source state
+        "",                               # 6: placeholder if you added extra output — or remove if not
     )
-    
+
 def _analyze_empty(scan_source: str = ""):
-    """Common return for all empty or failure states in analyze()."""
+    """Empty/failure state return — 7 outputs"""
     return (
-        gr.update(value=[]),                    # df — empty table
-        [],                                      # enriched_state — empty tuple
-        gr.update(value=""),                     # legacy_warning — empty (no banner)
-        gr.update(visible=False),                # generate_row — hide
-        gr.update(visible=False),                # import_file — hide
+        gr.update(value=[]),
+        (),
+        gr.update(value=""),
+        gr.update(visible=False),
+        gr.update(visible=False),
         scan_source,
+        "",
     )
 
 
