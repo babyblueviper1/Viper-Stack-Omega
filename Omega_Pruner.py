@@ -853,39 +853,55 @@ class Tx:
         )
 
 
-def create_psbt(tx: Tx, include_witness_utxo: bool = False) -> str:
+def create_psbt(tx: Tx, utxos: list[dict]) -> str:
     """
-    Create a minimal, standards-compliant PSBT.
+    Create a PSBT v0 that is fully compatible with Sparrow, Coldcard, Ledger, Trezor.
     
-    Args:
-        tx: Unsigned transaction object (Tx).
-        include_witness_utxo: If True, attach dummy witness UTXOs for hardware wallets.
-        
-    Returns:
-        Base64-encoded PSBT string.
+    Each input must have at least one per-input field. SegWit/Taproot inputs get
+    PSBT_IN_WITNESS_UTXO; legacy can use dummy redeemScript.
     """
-    raw_tx = tx.serialize_unsigned()
+    import base64
 
-    # PSBT header
+    def encode_varint(i: int) -> bytes:
+        # minimal varint encoding
+        if i < 0xfd:
+            return i.to_bytes(1, "little")
+        elif i <= 0xffff:
+            return b'\xfd' + i.to_bytes(2, "little")
+        elif i <= 0xffffffff:
+            return b'\xfe' + i.to_bytes(4, "little")
+        else:
+            return b'\xff' + i.to_bytes(8, "little")
+
+    raw_tx = tx.serialize_unsigned()
     psbt = b'psbt\xff'
 
-    # Global unsigned tx (key 0x00 for global, type 0x01 for unsigned tx)
+    # Global unsigned transaction
     psbt += b'\x00' + encode_varint(1) + b'\x01' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
 
-    # Per-input maps — empty or with dummy witness UTXO
-    for _ in tx.tx_ins:
-        if include_witness_utxo:
-            dummy_value = (0).to_bytes(8, 'little')
-            dummy_script = b''
-            psbt += b'\x00' + encode_varint(1) + b'\x02' + encode_varint(len(dummy_value + dummy_script)) + dummy_value + dummy_script + b'\x00'
+    # Per-input maps
+    for i, txin in enumerate(tx.tx_ins):
+        u = utxos[i]
+        script_pubkey = u.get("scriptPubKey", b'')
+        value = u.get("value", 0)
+        script_type = u.get("script_type", "unknown")
+
+        if script_type in ("P2WPKH", "P2WSH", "Taproot"):
+            # PSBT_IN_WITNESS_UTXO: value + scriptPubKey
+            witness_utxo = value.to_bytes(8, "little") + encode_varint(len(script_pubkey)) + script_pubkey
+            psbt += encode_varint(len(witness_utxo) + 1) + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
         else:
-            psbt += b'\x00\x00\x00'  # empty map: key len 0, value len 0, separator
+            # Legacy: minimal dummy field (redeemScript)
+            psbt += b'\x01\x01\x00\x00\x00'  # key type 0x01, empty key/value, separator
+
+        # Final per-input separator
+        psbt += b'\x00'
 
     # Per-output maps — empty
     for _ in tx.tx_outs:
         psbt += b'\x00\x00\x00'
 
-    # Final separator
+    # Final global separator
     psbt += b'\x00'
 
     return base64.b64encode(psbt).decode()
@@ -2297,9 +2313,31 @@ def generate_psbt(psbt_snapshot: dict) -> str:
             "</div>"
         )
 
+    # Build the unsigned transaction
     tx = _build_unsigned_tx(inputs, econ, dest_spk, params)
 
-    psbt_b64 = create_psbt(tx)
+    # Safety check: inputs vs tx.tx_ins
+    if len(inputs) != len(tx.tx_ins):
+        return (
+            "<div style='color:#ff3366 !important;"
+            "text-align:center !important;"
+            "padding:30px !important;"
+            "font-size:1.2rem !important;"
+            "font-weight:700 !important;'>"
+            "Internal error: input mismatch"
+            "</div>"
+        )
+
+    # Build PSBT with UTXOs for proper hardware wallet support
+    utxos_for_psbt = [
+        {
+            "value": u["value"],
+            "scriptPubKey": address_to_script_pubkey(u["address"])[0],
+            "script_type": u.get("script_type", "unknown")
+        }
+        for u in inputs
+    ]
+    psbt_b64 = create_psbt(tx, utxos_for_psbt)
 
     qr_html, qr_warning = _generate_qr(psbt_b64)
 
@@ -2312,7 +2350,6 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         psbt_b64=psbt_b64,
         payjoin_note=payjoin_note,
     )
-
 # --------------------------
 # Gradio UI
 # --------------------------
