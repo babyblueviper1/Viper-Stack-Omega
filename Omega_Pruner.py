@@ -853,58 +853,75 @@ class Tx:
         )
 
 
-def create_psbt(tx: Tx, utxos: list[dict]) -> str:
+def create_psbt(tx: Tx, utxos: list[dict] | None = None) -> str:
     """
-    Create a PSBT v0 that is fully compatible with Sparrow, Coldcard, Ledger, Trezor.
+    Create a standards-compliant PSBTv0 for an unsigned transaction.
+
+    Args:
+        tx: Unsigned transaction object (Tx).
+        utxos: List of input UTXO details, matched by order to tx.tx_ins.
+               Each dict should include:
+               - "value": int (satoshis)
+               - "scriptPubKey": bytes
+               - "script_type": str ("P2WPKH", "P2WSH", "Taproot", "P2SH-P2WPKH", "P2SH-P2WSH", "P2PKH", etc.)
+
+    Returns:
+        Base64-encoded PSBT string.
     
-    Each input must have at least one per-input field. SegWit/Taproot inputs get
-    PSBT_IN_WITNESS_UTXO; legacy can use dummy redeemScript.
+    Notes:
+        - Adds PSBT_IN_WITNESS_UTXO for all SegWit types (native + nested).
+        - Legacy inputs get a harmless dummy field (PSBT_IN_REDEEM_SCRIPT empty).
+        - Fully compatible with Sparrow, Coldcard, Trezor, Ledger.
     """
-    import base64
-
-    def encode_varint(i: int) -> bytes:
-        # minimal varint encoding
-        if i < 0xfd:
-            return i.to_bytes(1, "little")
-        elif i <= 0xffff:
-            return b'\xfd' + i.to_bytes(2, "little")
-        elif i <= 0xffffffff:
-            return b'\xfe' + i.to_bytes(4, "little")
-        else:
-            return b'\xff' + i.to_bytes(8, "little")
-
     raw_tx = tx.serialize_unsigned()
     psbt = b'psbt\xff'
 
-    # Global unsigned transaction
-    psbt += b'\x00' + encode_varint(1) + b'\x01' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
+    # ----------------------
+    # Global unsigned transaction (key type 0x00)
+    # ----------------------
+    psbt += b'\x00\x00' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
 
+    # ----------------------
     # Per-input maps
+    # ----------------------
+    if utxos:
+        if len(utxos) != len(tx.tx_ins):
+            raise ValueError("UTXOs list length must match number of transaction inputs")
+
     for i, txin in enumerate(tx.tx_ins):
-        u = utxos[i]
-        script_pubkey = u.get("scriptPubKey", b'')
-        value = u.get("value", 0)
-        script_type = u.get("script_type", "unknown")
+        if utxos:
+            u = utxos[i]
+            script_pubkey = u["scriptPubKey"]
+            value = u["value"]
+            script_type = u.get("script_type", "")
 
-        if script_type in ("P2WPKH", "P2WSH", "Taproot"):
-            # PSBT_IN_WITNESS_UTXO: value + scriptPubKey
-            witness_utxo = value.to_bytes(8, "little") + encode_varint(len(script_pubkey)) + script_pubkey
-            psbt += encode_varint(len(witness_utxo) + 1) + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
+            # Include PSBT_IN_WITNESS_UTXO for all SegWit types
+            if script_type in ("P2WPKH", "P2WSH", "Taproot", "P2SH-P2WPKH", "P2SH-P2WSH"):
+                witness_utxo = value.to_bytes(8, "little") + encode_varint(len(script_pubkey)) + script_pubkey
+                # Key type 0x02 = PSBT_IN_WITNESS_UTXO
+                psbt += encode_varint(len(witness_utxo) + 1) + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
+            else:
+                # Legacy input (P2PKH or unknown) — harmless dummy field
+                # PSBT_IN_REDEEM_SCRIPT empty (key type 0x01)
+                psbt += b'\x01\x01\x00\x00\x00'
         else:
-            # Legacy: minimal dummy field (redeemScript)
-            psbt += b'\x01\x01\x00\x00\x00'  # key type 0x01, empty key/value, separator
+            # No UTXOs provided — fallback dummy field
+            psbt += b'\x01\x01\x00\x00\x00'
 
-        # Final per-input separator
+        # Input separator
         psbt += b'\x00'
 
-    # Per-output maps — empty
+    # ----------------------
+    # Per-output maps — empty for PSBTv0
+    # ----------------------
     for _ in tx.tx_outs:
         psbt += b'\x00\x00\x00'
 
-    # Final global separator
+    # Final separator
     psbt += b'\x00'
 
     return base64.b64encode(psbt).decode()
+
 
 
 
@@ -2006,31 +2023,40 @@ def _build_unsigned_tx(
     econ: TxEconomics,
     dest_spk: bytes,
     params: PsbtParams,
-) -> Tx:
-    """Construct unsigned transaction from frozen parameters."""
-    tx = Tx()
+) -> tuple[Tx, list[dict]]:
+    """
+    Construct unsigned transaction and return prepared UTXO info for PSBT.
 
-    # Inputs
+    Returns:
+        tx: Unsigned Tx object.
+        utxos_for_psbt: List of dicts with 'value', 'scriptPubKey', 'script_type' per input.
+    """
+    tx = Tx()
+    utxos_for_psbt: list[dict[str, any]] = []
+
     for u in inputs:
         tx.tx_ins.append(TxIn(bytes.fromhex(u["txid"]), int(u["vout"])))
+
+        # Prepare UTXO info for PSBT
+        utxos_for_psbt.append({
+            "value": u["value"],
+            "scriptPubKey": address_to_script_pubkey(u["address"])[0],
+            "script_type": u.get("script_type", "unknown"),
+        })
 
     # DAO output (if any)
     if econ.dao_amt > 0:
         tx.tx_outs.append(TxOut(econ.dao_amt, DEFAULT_DAO_SCRIPT_PUBKEY))
 
-    # Change / remainder output — always to the destination address
+    # Change / remainder output
     change_amt = econ.change_amt
-
-    # Legacy support: if user had "silent_payment_full" checked in old version,
-    # send full remainder (post-fee, post-dao) instead of just change
-    # (harmless to keep — just treats it as "send all remaining to dest")
     if getattr(params, "silent_payment_full", False):
         change_amt = econ.total_in - econ.fee - econ.dao_amt
 
     if change_amt > 0:
         tx.tx_outs.append(TxOut(change_amt, dest_spk))
 
-    return tx
+    return tx, utxos_for_psbt
 
 def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
     """Generate QR code image and optional warning."""
@@ -2287,7 +2313,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
     if not psbt_snapshot:
         return _render_no_snapshot()
 
-    inputs = psbt_snapshot["inputs"]
+    inputs = psbt_snapshot.get("inputs", [])
     if not inputs:
         return _render_no_inputs()
 
@@ -2307,40 +2333,29 @@ def generate_psbt(psbt_snapshot: dict) -> str:
             "text-align:center !important;"
             "padding:30px !important;"
             "font-size:1.3rem !important;"
-            "font-weight:700 !important;"
-            "'>"
+            "font-weight:700 !important;'>"
             "Invalid snapshot economics."
             "</div>"
         )
 
-    # Build the unsigned transaction
-    tx = _build_unsigned_tx(inputs, econ, dest_spk, params)
+    # Build transaction and UTXO info for PSBT
+    tx, utxos_for_psbt = _build_unsigned_tx(inputs, econ, dest_spk, params)
 
-    # Safety check: inputs vs tx.tx_ins
-    if len(inputs) != len(tx.tx_ins):
+    # Safety assertion: inputs vs tx_ins
+    if len(utxos_for_psbt) != len(tx.tx_ins):
         return (
             "<div style='color:#ff3366 !important;"
             "text-align:center !important;"
-            "padding:30px !important;"
-            "font-size:1.2rem !important;"
-            "font-weight:700 !important;'>"
-            "Internal error: input mismatch"
+            "padding:40px !important;"
+            "font-size:1.4rem !important;'>"
+            "Internal error: UTXO/input mismatch — please report"
             "</div>"
         )
 
-    # Build PSBT with UTXOs for proper hardware wallet support
-    utxos_for_psbt = [
-        {
-            "value": u["value"],
-            "scriptPubKey": address_to_script_pubkey(u["address"])[0],
-            "script_type": u.get("script_type", "unknown")
-        }
-        for u in inputs
-    ]
+    # Generate professional-grade, hardware-compatible PSBT
     psbt_b64 = create_psbt(tx, utxos_for_psbt)
 
     qr_html, qr_warning = _generate_qr(psbt_b64)
-
     payjoin_note = _render_payjoin_note(params.dest_override or params.scan_source)
 
     return _compose_psbt_html(
