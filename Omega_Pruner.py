@@ -2551,7 +2551,7 @@ def analyze_and_show_summary(
     print(">>> analyze_and_show_summary STARTED")
 
     # Run core analysis
-    df_update, enriched_new, legacy_warning, gen_row_update, import_update, scan_source_new = analyze(
+    df_update, enriched_new, warning_banner, gen_row_vis, import_vis, scan_source_new, _ = analyze(
         addr_input,
         strategy,
         dust_threshold,
