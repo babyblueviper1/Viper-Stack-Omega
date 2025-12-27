@@ -1384,7 +1384,7 @@ def analyze(
         legacy_warning=legacy_banner,  # ← NEW: pass banner to success handler
     )
 
-def _analyze_success(df_rows, frozen_state, scan_source,legacy_warning="", current_epoch=0):
+def _analyze_success(df_rows, frozen_state, scan_source,legacy_warning=""):
     """Unified success return for analyze()."""
     return (
         gr.update(value=df_rows),
@@ -1392,11 +1392,10 @@ def _analyze_success(df_rows, frozen_state, scan_source,legacy_warning="", curre
         gr.update(value=legacy_warning),
         gr.update(visible=True),
         gr.update(visible=True),
-        scan_source,
-        current_epoch + 1, 
+        scan_source, 
     )
     
-def _analyze_empty(scan_source: str = "", current_epoch=0):
+def _analyze_empty(scan_source: str = ""):
     """Common return for all empty or failure states in analyze()."""
     return (
         gr.update(value=[]),                    # df — empty table
@@ -1405,7 +1404,6 @@ def _analyze_empty(scan_source: str = "", current_epoch=0):
         gr.update(visible=False),                # generate_row — hide
         gr.update(visible=False),                # import_file — hide
         scan_source,
-        current_epoch + 1,
     )
 
 
@@ -3115,7 +3113,7 @@ No API calls • Fully air-gapped safe""",
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
         legacy_warning = gr.HTML(label="Legacy Warning", visible=True)
-        analyze_epoch = gr.State(0)
+    
 
         # Capture destination changes for downstream use
         dest.change(
@@ -3325,7 +3323,6 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             generate_row,
             import_file,
             scan_source,
-			analyze_epoch, 
         ],
     ).then(
         fn=generate_summary_safe,
@@ -3338,7 +3335,6 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             locked,
             strategy,
             dest_value,
-            analyze_epoch,
         ],
         outputs=[status_output, generate_row]
     ).then(
