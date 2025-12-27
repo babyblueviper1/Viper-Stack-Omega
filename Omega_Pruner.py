@@ -2438,18 +2438,15 @@ def analyze_and_show_summary(
     future_fee_slider,
     offline_mode,
     manual_utxo_input,
-    locked,           # gr.State(False)
-    dest_value,       # gr.State("")
+    locked,
+    dest_value,
 ):
-    # Step 1: Run analyze()
-    (
-        df_update,
-        enriched_new,
-        legacy_warning,
-        gen_row_update,
-        import_update,
-        scan_source_new,
-    ) = analyze(
+    # ---- HARD PROBE (survives Gradio queue + threads) ----
+    with open("/tmp/omega_probe.txt", "a") as f:
+        f.write("analyze_and_show_summary CALLED\n")
+
+    # ---- Run core analysis ----
+    df_update, enriched_new, legacy_warning, gen_row_update, import_update, scan_source_new = analyze(
         addr_input,
         strategy,
         dust_threshold,
@@ -2460,34 +2457,27 @@ def analyze_and_show_summary(
         manual_utxo_input,
     )
 
-    print(">>> analyze_and_show_summary: analyze() returned")
+    # ---- Extract rows safely from gr.Update ----
+    if isinstance(df_update, dict):
+        df_rows = df_update.get("value", [])
+    elif hasattr(df_update, "value"):
+        df_rows = df_update.value
+    else:
+        df_rows = []
 
-    # Extract rows from gr.update
-    df_rows = (
-        df_update.value
-        if hasattr(df_update, "value") and df_update.value is not None
-        else []
-    )
-
-    print(f">>> rows: {len(df_rows)}  utxos: {len(enriched_new) if enriched_new else 0}")
-
-    # Step 2: Generate summary immediately
-    summary_out = generate_summary_safe(
+    # ---- Build summary ----
+    summary_html, _ = generate_summary_safe(
         df_rows,
         enriched_new,
         fee_rate_slider,
         future_fee_slider,
         thank_you_slider,
-        locked,     # correct: do NOT return locked
+        locked,
         strategy,
         dest_value,
     )
 
-    # Normalize summary output
-    summary_html = summary_out[0] if isinstance(summary_out, tuple) else summary_out
-
-    print(">>> summary generated")
-
+    # ---- Return EXACTLY 7 outputs ----
     return (
         df_update,
         enriched_new,
