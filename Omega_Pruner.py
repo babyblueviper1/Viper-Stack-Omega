@@ -2239,7 +2239,7 @@ def _compose_psbt_html(
     </div>
 
     {qr_warning}
-    {legacy_warning}
+    {legacy_warning_html}
 
     <!-- PSBT Output -->
     <div style="margin:60px auto 20px !important;width:92% !important;max-width:880px !important;">
