@@ -1421,7 +1421,7 @@ def _analyze_empty(scan_source: str = ""):
     """Common return for all empty or failure states in analyze()."""
     return (
         gr.update(value=[]),                    # df — empty table
-        (),                                      # enriched_state — empty tuple
+        [],                                      # enriched_state — empty tuple
         gr.update(value=""),                     # legacy_warning — empty (no banner)
         gr.update(visible=False),                # generate_row — hide
         gr.update(visible=False),                # import_file — hide
