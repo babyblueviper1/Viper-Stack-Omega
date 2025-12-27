@@ -1442,17 +1442,15 @@ def _render_locked_state() -> Tuple[str, gr.update]:
         gr.update(visible=False)
     )
 
-def _validate_utxos_and_selection(df, utxos: List[dict]):
-    assert isinstance(df, list), f"df must be list, got {type(df)}"
-
+def _validate_utxos_and_selection(df, utxos: list[dict]):
     if not utxos:
-        return None, None, (no_utxos_msg, gr.update(visible=False))
+        return None, 0, "NO_UTXOS"
 
     selected_utxos = _resolve_selected(df, utxos)
     pruned_count = len(selected_utxos)
 
     if pruned_count == 0:
-        return None, None, (select_msg, gr.update(visible=False))
+        return None, 0, "NO_SELECTION"
 
     return selected_utxos, pruned_count, None
 
@@ -1667,22 +1665,25 @@ def generate_summary_safe(
         utxos = enriched_state or []
     
     total_utxos = len(utxos)
+
+    # === No UTXOs at all ===
     if total_utxos == 0:
         return (
-            "<div style='text-align:center !important;padding:60px !important;color:#ff9900 !important;font-size:1.4rem !important;font-weight:700 !important;'>"
-            "No UTXOs found<br><br>"
-            "Try different addresses, lower dust threshold, or paste manual UTXOs"
-            "</div>",
+            no_utxos_msg,
             gr.update(visible=False)
         )
 
-    validation = _validate_utxos_and_selection(df, utxos)
-    if len(validation) == 3 and validation[2] is not None:
-        return validation[2]
+    # === Validate selection – now returns clean data only ===
+    selected_utxos, pruned_count, error = _validate_utxos_and_selection(df, utxos)
 
-    selected_utxos, pruned_count = validation[0], validation[1]
+    if error == "NO_UTXOS":        # Shouldn't happen due to above check, but safe
+        return no_utxos_msg, gr.update(visible=False)
+    if error == "NO_SELECTION":
+        return select_msg, gr.update(visible=False)
+
+    # === At this point we KNOW we have a valid selection ===
     remaining_utxos = total_utxos - pruned_count
-
+	
     privacy_score, score_color = _compute_privacy_metrics(selected_utxos, total_utxos)
     econ = _compute_economics_safe(selected_utxos, fee_rate, dao_percent)
     if econ is None or econ.remaining <= 0:
