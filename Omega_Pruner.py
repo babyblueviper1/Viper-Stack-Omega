@@ -1422,7 +1422,13 @@ def _render_locked_state() -> Tuple[str, gr.update]:
 
 def _validate_utxos_and_selection(df, enriched_state) -> Tuple[Optional[List[dict]], Optional[int], Optional[Tuple[str, gr.update]]]:
     """Validate presence of UTXOs and user selection. Returns early message on failure."""
-    total_utxos = len(enriched_state)
+    # Extract utxos from frozen tuple
+    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
+        _, utxos = enriched_state
+    else:
+        utxos = enriched_state or []
+
+    total_utxos = len(utxos)
     if total_utxos == 0:
         return None, None, (
             "<div style='text-align:center;padding:60px;color:#ff9900;font-size:1.4rem;font-weight:700;'>"
@@ -1432,8 +1438,15 @@ def _validate_utxos_and_selection(df, enriched_state) -> Tuple[Optional[List[dic
             gr.update(visible=False)
         )
 
-    df_data = df if isinstance(df, list) else (df.value if hasattr(df, "value") else [])
-    selected_utxos = _resolve_selected(df_data, enriched_state)
+    # Robustly extract dataframe rows — handles both direct list and Gradio component
+    if isinstance(df, list):
+        df_rows = df
+    elif hasattr(df, "value") and df.value is not None:
+        df_rows = df.value
+    else:
+        df_rows = []
+
+    selected_utxos = _resolve_selected(df_rows, utxos)
     pruned_count = len(selected_utxos)
 
     if pruned_count == 0:
