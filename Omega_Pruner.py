@@ -890,23 +890,23 @@ def create_psbt(tx: Tx, utxos: list[dict] = None) -> tuple[str, str]:
     for i, txin in enumerate(tx.tx_ins):
         if utxos:
             u = utxos[i]
-            script_pubkey = u.get("scriptPubKey", b'')
-            value = u.get("value", 0)
+            script_pubkey = u["scriptPubKey"]
+            value = u["value"]
             script_type = u.get("script_type", "unknown")
 
-            # Witness UTXO for all SegWit types (native + nested)
-            if script_type in ("P2WPKH", "P2WSH", "Taproot", "P2SH-P2WPKH", "P2SH-P2WSH"):
+            # Add witness UTXO for ANY SegWit type (native or nested)
+            if "WPKH" in script_type or "WSH" in script_type or script_type == "Taproot":
                 witness_utxo = value.to_bytes(8, "little") + encode_varint(len(script_pubkey)) + script_pubkey
                 psbt += encode_varint(1 + len(witness_utxo)) + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
             else:
-                # Legacy — harmless dummy redeemScript field
+                # Pure legacy P2PKH — dummy field (unavoidable)
                 psbt += b'\x01\x01\x00\x00\x00'
                 legacy_found = True
         else:
             psbt += b'\x01\x01\x00\x00\x00'
             legacy_found = True
 
-        psbt += b'\x00'  # input separator
+        psbt += b'\x00'
 
     # Per-output maps — empty
     for _ in tx.tx_outs:
