@@ -1170,20 +1170,26 @@ def _collect_online_utxos(params: AnalyzeParams) -> List[Dict]:
     return utxos
 
 def _classify_utxo(value: int, input_weight: int) -> Tuple[str, str, str]:
-    """Determine script type, health, and recommendation for a UTXO."""
+    """
+    Determine internal script type, health, and recommendation for a UTXO.
+    NOTE: script_type values must be protocol-accurate for PSBT creation.
+    """
 
+    # --- Script type classification (internal, canonical names) ---
     if input_weight <= 228:
         script_type, health, rec = "Taproot", "OPTIMAL", "KEEP"
     elif input_weight <= 272:
-        script_type, health, rec = "Native SegWit", "OPTIMAL", "KEEP"
+        script_type, health, rec = "P2WPKH", "OPTIMAL", "KEEP"     # Native SegWit
     elif input_weight <= 364:
-        script_type, health, rec = "Nested SegWit", "MEDIUM", "OPTIONAL"
+        script_type, health, rec = "P2SH-P2WPKH", "MEDIUM", "OPTIONAL"
     else:
-        script_type, health, rec = "Legacy", "HEAVY", "PRUNE"
+        script_type, health, rec = "P2PKH", "HEAVY", "PRUNE"
 
+    # --- Value-based overrides ---
     if value < 10_000:
         health, rec = "DUST", "PRUNE"
-    elif value > 100_000_000 and script_type in ("Nested SegWit", "Legacy"):
+
+    elif value > 100_000_000 and script_type in ("P2SH-P2WPKH", "P2PKH"):
         health, rec = "CAREFUL", "OPTIONAL"
 
     return script_type, health, rec
