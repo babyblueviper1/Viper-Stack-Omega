@@ -2151,6 +2151,7 @@ def _compose_psbt_html(
     qr_warning: str,
     psbt_b64: str,
     payjoin_note: str,
+	legacy_warning_html: str,
 ) -> str:
     return f"""
     <div style="height: 80px !important;"></div>
@@ -2370,7 +2371,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         )
 
     # Generate professional-grade, hardware-compatible PSBT
-    psbt_b64 = create_psbt(tx, utxos_for_psbt)
+    psbt_b6, legacy_warning_html = create_psbt(tx, utxos_for_psbt)
 
     qr_html, qr_warning = _generate_qr(psbt_b64)
     payjoin_note = _render_payjoin_note(params.dest_override or params.scan_source)
@@ -2380,7 +2381,8 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         qr_html=qr_html,
         qr_warning=qr_warning,
         psbt_b64=psbt_b64,
-        payjoin_note=payjoin_note
+        payjoin_note=payjoin_note,
+		legacy_warning_html=legacy_warning_html,
     )
 # --------------------------
 # Gradio UI
