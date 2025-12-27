@@ -125,28 +125,34 @@ _fee_cache_lock = Lock()
 # ===========================
 def _resolve_selected(df_rows: List[list], enriched_state: List[dict]) -> List[dict]:
     """Robust, defensive resolution of selected UTXOs from UI state."""
-    # Build map only from valid UTXOs
+
     utxo_map = {
-        (u["txid"], u["vout"]): u
+        (str(u["txid"]), int(u["vout"])): u
         for u in enriched_state
         if isinstance(u, dict) and "txid" in u and "vout" in u
     }
 
     selected = []
+
     for row in df_rows or []:
         if not row:
             continue
         try:
-            if not row[CHECKBOX_COL]:
+            raw_checked = row[CHECKBOX_COL]
+
+            # Normalize checkbox value
+            checked = raw_checked is True or raw_checked == 1 or str(raw_checked).lower() == "true"
+            if not checked:
                 continue
-            # Be forgiving: convert to str/int if possible
+
             txid = str(row[TXID_COL])
             vout = int(row[VOUT_COL])
+
             utxo = utxo_map.get((txid, vout))
             if utxo:
                 selected.append(utxo)
+
         except (IndexError, ValueError, TypeError, KeyError):
-            # Silently skip malformed rows — never crash
             continue
 
     return selected
@@ -1423,21 +1429,19 @@ def _render_locked_state() -> Tuple[str, gr.update]:
 
 def _validate_utxos_and_selection(
     df,
-    utxos: List[dict]
-) -> Tuple[
-    Optional[List[dict]],
-    Optional[int],
-    Optional[Tuple[str, gr.update]]
-]:
+    enriched_state
+) -> Tuple[Optional[List[dict]], Optional[int], Optional[Tuple[str, gr.update]]]:
     """
-    Validate presence of UTXOs and user selection.
-
-    Returns:
-      - (selected_utxos, pruned_count, None) on success
-      - (None, None, (html_message, visibility_update)) on early failure
+    Validate presence of UTXOs and selected rows.
+    Handles list, DataFrame, Styler, and Gradio component values.
     """
 
-    # --- Validate UTXO existence ---
+    # --- Extract UTXOs ---
+    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
+        _, utxos = enriched_state
+    else:
+        utxos = enriched_state or []
+
     if not utxos:
         return None, None, (
             "<div style='text-align:center;padding:60px;color:#ff9900;"
@@ -1445,37 +1449,39 @@ def _validate_utxos_and_selection(
             "No UTXOs found<br><br>"
             "Try different addresses, lower dust threshold, or paste manual UTXOs"
             "</div>",
-            gr.update(visible=False),
+            gr.update(visible=False)
         )
 
-    # --- Robust extraction of DataFrame rows ---
-    # After ANALYZE → df is often a pandas DataFrame (from Styler)
-    # After interaction → df is a list of lists
-    # In some cases → df may be a Gradio component with .value
+    # --- Extract DataFrame rows robustly ---
+    df_rows = []
 
     if isinstance(df, list):
         df_rows = df
+
+    elif isinstance(df, pd.core.style.Styler):
+        # 🔥 THIS IS THE MISSING CASE
+        df_rows = df.data.values.tolist()
 
     elif isinstance(df, pd.DataFrame):
         df_rows = df.values.tolist()
 
     elif hasattr(df, "value") and df.value is not None:
-        df_rows = df.value
+        val = df.value
+        if isinstance(val, pd.DataFrame):
+            df_rows = val.values.tolist()
+        else:
+            df_rows = val
 
-    else:
-        df_rows = []
-
-    # --- Resolve selected UTXOs ---
+    # --- Resolve selected ---
     selected_utxos = _resolve_selected(df_rows, utxos)
     pruned_count = len(selected_utxos)
 
     if pruned_count == 0:
         return None, None, (
-            "<div style='text-align:center;padding:60px;color:#ff9900;"
-            "font-size:1.4rem;'>"
+            "<div style='text-align:center;padding:60px;color:#ff9900;font-size:1.4rem;'>"
             "Select UTXOs in the table to begin"
             "</div>",
-            gr.update(visible=False),
+            gr.update(visible=False)
         )
 
     return selected_utxos, pruned_count, None
