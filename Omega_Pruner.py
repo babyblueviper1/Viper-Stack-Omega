@@ -1979,9 +1979,22 @@ def _create_psbt_snapshot(
     future_fee_rate: int,
     dao_percent: float,
 ) -> dict:
-    """Create immutable snapshot of user intent (pruning selection + economic params)."""
     if not selected_utxos:
         raise ValueError("No UTXOs selected")
+
+    # Clean, JSON-serializable input list
+    clean_inputs = [
+        {
+            "txid": u["txid"],
+            "vout": u["vout"],
+            "value": u["value"],
+            "address": u.get("address"),
+            "script_type": u.get("script_type"),
+            "health": u.get("health"),
+            "source": u.get("source"),
+        }
+        for u in sorted(selected_utxos, key=lambda x: (x["txid"], x["vout"]))
+    ]
 
     snapshot = {
         "version": 1,
@@ -1991,10 +2004,10 @@ def _create_psbt_snapshot(
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
         "dao_percent": dao_percent,
-        "inputs": copy.deepcopy(selected_utxos),
+        "inputs": clean_inputs,
     }
 
-    # Deterministic fingerprint for auditability
+    # Deterministic fingerprint
     canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
     fingerprint = hashlib.sha256(canonical.encode()).hexdigest()
     snapshot["fingerprint"] = fingerprint
