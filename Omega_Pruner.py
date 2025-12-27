@@ -1427,62 +1427,18 @@ def _render_locked_state() -> Tuple[str, gr.update]:
         gr.update(visible=False)
     )
 
-def _validate_utxos_and_selection(
-    df,
-    enriched_state
-) -> Tuple[Optional[List[dict]], Optional[int], Optional[Tuple[str, gr.update]]]:
-    """
-    Validate presence of UTXOs and selected rows.
-    Handles list, DataFrame, Styler, and Gradio component values.
-    """
-
-    # --- Extract UTXOs ---
-    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
-        _, utxos = enriched_state
-    else:
-        utxos = enriched_state or []
+def _validate_utxos_and_selection(df, utxos: List[dict]):
+    # Hard guard: this should NEVER be anything else now
+    assert isinstance(df, list), f"df must be list, got {type(df)}"
 
     if not utxos:
-        return None, None, (
-            "<div style='text-align:center;padding:60px;color:#ff9900;"
-            "font-size:1.4rem;font-weight:700;'>"
-            "No UTXOs found<br><br>"
-            "Try different addresses, lower dust threshold, or paste manual UTXOs"
-            "</div>",
-            gr.update(visible=False)
-        )
+        return None, None, (no_utxos_msg, gr.update(visible=False))
 
-    # --- Extract DataFrame rows robustly ---
-    df_rows = []
-
-    if isinstance(df, list):
-        df_rows = df
-
-    elif isinstance(df, pd.core.style.Styler):
-        # 🔥 THIS IS THE MISSING CASE
-        df_rows = df.data.values.tolist()
-
-    elif isinstance(df, pd.DataFrame):
-        df_rows = df.values.tolist()
-
-    elif hasattr(df, "value") and df.value is not None:
-        val = df.value
-        if isinstance(val, pd.DataFrame):
-            df_rows = val.values.tolist()
-        else:
-            df_rows = val
-
-    # --- Resolve selected ---
-    selected_utxos = _resolve_selected(df_rows, utxos)
+    selected_utxos = _resolve_selected(df, utxos)
     pruned_count = len(selected_utxos)
 
     if pruned_count == 0:
-        return None, None, (
-            "<div style='text-align:center;padding:60px;color:#ff9900;font-size:1.4rem;'>"
-            "Select UTXOs in the table to begin"
-            "</div>",
-            gr.update(visible=False)
-        )
+        return None, None, (select_msg, gr.update(visible=False))
 
     return selected_utxos, pruned_count, None
 
