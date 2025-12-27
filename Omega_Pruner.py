@@ -2441,11 +2441,9 @@ def analyze_and_show_summary(
     locked,
     dest_value,
 ):
-    # ---- HARD PROBE (survives Gradio queue + threads) ----
-    with open("/tmp/omega_probe.txt", "a") as f:
-        f.write("analyze_and_show_summary CALLED\n")
+    print(">>> analyze_and_show_summary STARTED")
 
-    # ---- Run core analysis ----
+    # Run core analysis
     df_update, enriched_new, legacy_warning, gen_row_update, import_update, scan_source_new = analyze(
         addr_input,
         strategy,
@@ -2457,7 +2455,7 @@ def analyze_and_show_summary(
         manual_utxo_input,
     )
 
-    # ---- Extract rows safely from gr.Update ----
+    # Extract fresh rows from the update payload
     if isinstance(df_update, dict):
         df_rows = df_update.get("value", [])
     elif hasattr(df_update, "value"):
@@ -2465,8 +2463,10 @@ def analyze_and_show_summary(
     else:
         df_rows = []
 
-    # ---- Build summary ----
-    summary_html, _ = generate_summary_safe(
+    print(f">>> rows built: {len(df_rows)} UTXOs")
+
+    # Call generate_summary_safe with fresh data
+    status_box_html, generate_row_visibility = generate_summary_safe(
         df_rows,
         enriched_new,
         fee_rate_slider,
@@ -2477,15 +2477,18 @@ def analyze_and_show_summary(
         dest_value,
     )
 
-    # ---- Return EXACTLY 7 outputs ----
+    print(">>> status_box_html generated")
+    print(f">>> generate_row should be visible: {generate_row_visibility.visible if hasattr(generate_row_visibility, 'visible') else 'unknown'}")
+
+    # Return in correct order matching your .click() outputs
     return (
-        df_update,
-        enriched_new,
-        legacy_warning,
-        gen_row_update,
-        import_update,
-        scan_source_new,
-        summary_html,
+        df_update,              # 0: df (table)
+        enriched_new,           # 1: enriched_state
+        legacy_warning,         # 2: legacy_warning HTML
+        generate_row_visibility,# 3: generate_row visibility (critical!)
+        import_update,          # 4: import_file visibility
+        scan_source_new,        # 5: scan_source state
+        status_box_html,        # 6: status_output (the big glowing box)
     )
 # --------------------------
 # Gradio UI
