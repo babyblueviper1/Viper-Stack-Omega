@@ -920,11 +920,19 @@ def create_psbt(tx: Tx, utxos: list[dict] = None) -> tuple[str, str]:
     legacy_warning_html = ""
     if legacy_found:
         legacy_warning_html = (
-            "<div style='color:#ffaa00 !important; "
-            "padding:12px !important; "
+            "<div style='"
+            "color:#ffaa00 !important; "
+            "padding:16px !important; "
+            "margin:30px 0 20px 0 !important; "
             "font-size:1.1rem !important; "
-            "text-align:center !important;'>"
-            "Note: Some legacy inputs (P2PKH) cannot be fully verified offline by hardware wallets."
+            "text-align:center !important; "
+            "background:rgba(255,170,0,0.1) !important; "
+            "border:2px solid #ffaa00 !important; "
+            "border-radius:12px !important;'>"
+            "⚠️ Some legacy inputs (P2PKH) are included.<br>"
+            "<small style='color:#ffddaa !important;'>"
+            "Hardware wallets may show 'unknown amount' until broadcast — this is normal and safe."
+            "</small>"
             "</div>"
         )
 
@@ -2372,7 +2380,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         qr_html=qr_html,
         qr_warning=qr_warning,
         psbt_b64=psbt_b64,
-        payjoin_note=payjoin_note + legacy_warning,  # append legacy warning
+        payjoin_note=payjoin_note
     )
 # --------------------------
 # Gradio UI
