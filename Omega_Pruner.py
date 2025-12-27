@@ -853,74 +853,82 @@ class Tx:
         )
 
 
-def create_psbt(tx: Tx, utxos: list[dict] | None = None) -> str:
+def create_psbt(tx: Tx, utxos: list[dict] = None) -> tuple[str, str]:
     """
-    Create a standards-compliant PSBTv0 for an unsigned transaction.
+    Create a PSBTv0 compatible with Sparrow, Coldcard, Ledger, Trezor.
+    Returns a tuple: (base64 PSBT, optional legacy warning HTML).
 
     Args:
         tx: Unsigned transaction object (Tx).
-        utxos: List of input UTXO details, matched by order to tx.tx_ins.
-               Each dict should include:
-               - "value": int (satoshis)
-               - "scriptPubKey": bytes
-               - "script_type": str ("P2WPKH", "P2WSH", "Taproot", "P2SH-P2WPKH", "P2SH-P2WSH", "P2PKH", etc.)
+        utxos: List of dicts with input UTXO info (must match tx.tx_ins order).
+               Each dict: {"value": int, "scriptPubKey": bytes, "script_type": str}
 
     Returns:
-        Base64-encoded PSBT string.
-    
-    Notes:
-        - Adds PSBT_IN_WITNESS_UTXO for all SegWit types (native + nested).
-        - Legacy inputs get a harmless dummy field (PSBT_IN_REDEEM_SCRIPT empty).
-        - Fully compatible with Sparrow, Coldcard, Trezor, Ledger.
+        (psbt_b64, legacy_warning_html)
     """
+    import base64
+
+    def encode_varint(i: int) -> bytes:
+        if i < 0xfd:
+            return i.to_bytes(1, "little")
+        elif i <= 0xffff:
+            return b'\xfd' + i.to_bytes(2, "little")
+        elif i <= 0xffffffff:
+            return b'\xfe' + i.to_bytes(4, "little")
+        else:
+            return b'\xff' + i.to_bytes(8, "little")
+
     raw_tx = tx.serialize_unsigned()
     psbt = b'psbt\xff'
 
-    # ----------------------
-    # Global unsigned transaction (key type 0x00)
-    # ----------------------
-    psbt += b'\x00\x00' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
+    # Global unsigned transaction — correct PSBTv0
+    psbt += b'\x01\x00' + encode_varint(len(raw_tx)) + raw_tx + b'\x00'
 
-    # ----------------------
+    legacy_found = False
+
     # Per-input maps
-    # ----------------------
-    if utxos:
-        if len(utxos) != len(tx.tx_ins):
-            raise ValueError("UTXOs list length must match number of transaction inputs")
-
     for i, txin in enumerate(tx.tx_ins):
         if utxos:
             u = utxos[i]
-            script_pubkey = u["scriptPubKey"]
-            value = u["value"]
-            script_type = u.get("script_type", "")
+            script_pubkey = u.get("scriptPubKey", b'')
+            value = u.get("value", 0)
+            script_type = u.get("script_type", "unknown")
 
-            # Include PSBT_IN_WITNESS_UTXO for all SegWit types
+            # Witness UTXO for all SegWit types (native + nested)
             if script_type in ("P2WPKH", "P2WSH", "Taproot", "P2SH-P2WPKH", "P2SH-P2WSH"):
                 witness_utxo = value.to_bytes(8, "little") + encode_varint(len(script_pubkey)) + script_pubkey
-                # Key type 0x02 = PSBT_IN_WITNESS_UTXO
-                psbt += encode_varint(len(witness_utxo) + 1) + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
+                psbt += encode_varint(1 + len(witness_utxo)) + b'\x02' + encode_varint(len(witness_utxo)) + witness_utxo
             else:
-                # Legacy input (P2PKH or unknown) — harmless dummy field
-                # PSBT_IN_REDEEM_SCRIPT empty (key type 0x01)
+                # Legacy — harmless dummy redeemScript field
                 psbt += b'\x01\x01\x00\x00\x00'
+                legacy_found = True
         else:
-            # No UTXOs provided — fallback dummy field
             psbt += b'\x01\x01\x00\x00\x00'
+            legacy_found = True
 
-        # Input separator
-        psbt += b'\x00'
+        psbt += b'\x00'  # input separator
 
-    # ----------------------
-    # Per-output maps — empty for PSBTv0
-    # ----------------------
+    # Per-output maps — empty
     for _ in tx.tx_outs:
         psbt += b'\x00\x00\x00'
 
-    # Final separator
-    psbt += b'\x00'
+    psbt += b'\x00'  # final separator
 
-    return base64.b64encode(psbt).decode()
+    psbt_b64 = base64.b64encode(psbt).decode()
+
+    # Optional warning if pure legacy inputs exist
+    legacy_warning_html = ""
+    if legacy_found:
+        legacy_warning_html = (
+            "<div style='color:#ffaa00 !important; "
+            "padding:12px !important; "
+            "font-size:1.1rem !important; "
+            "text-align:center !important;'>"
+            "Note: Some legacy inputs (P2PKH) cannot be fully verified offline by hardware wallets."
+            "</div>"
+        )
+
+    return psbt_b64, legacy_warning_html
 
 
 
@@ -2231,6 +2239,7 @@ def _compose_psbt_html(
     </div>
 
     {qr_warning}
+    {legacy_warning}
 
     <!-- PSBT Output -->
     <div style="margin:60px auto 20px !important;width:92% !important;max-width:880px !important;">
@@ -2363,7 +2372,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         qr_html=qr_html,
         qr_warning=qr_warning,
         psbt_b64=psbt_b64,
-        payjoin_note=payjoin_note,
+        payjoin_note=payjoin_note + legacy_warning,  # append legacy warning
     )
 # --------------------------
 # Gradio UI
