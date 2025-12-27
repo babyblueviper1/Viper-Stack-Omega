@@ -1246,23 +1246,33 @@ def _collect_online_utxos(params: AnalyzeParams) -> List[Dict]:
     return utxos
 
 def _classify_utxo(value: int, input_weight: int) -> Tuple[str, str, str]:
+    # Base classification
     if input_weight <= 228:
-        return "Taproot", "OPTIMAL", "KEEP"
+        script_type = "Taproot"
+        default_health = "OPTIMAL"
+        default_rec = "KEEP"
     elif input_weight <= 272:
-        return "P2WPKH", "OPTIMAL", "KEEP"
+        script_type = "P2WPKH"
+        default_health = "OPTIMAL"
+        default_rec = "KEEP"
     elif input_weight <= 364:
-        # Nested SegWit — not fully supported in PSBT yet
-        return "P2SH-P2WPKH", "MEDIUM", "CAUTION"
+        script_type = "P2SH-P2WPKH"
+        default_health = "MEDIUM"
+        default_rec = "CAUTION"
     else:
-        return "Legacy", "HEAVY", "PRUNE"
+        script_type = "Legacy"
+        default_health = "HEAVY"
+        default_rec = "PRUNE"
 
-    # Overrides after base classification
+    # Overrides (highest priority first)
     if value < 10_000:
         return script_type, "DUST", "PRUNE"
+
     if value > 100_000_000 and script_type in ("P2SH-P2WPKH", "Legacy"):
         return script_type, "CAREFUL", "OPTIONAL"
 
-    return script_type, health, rec
+    # Fall back to base
+    return script_type, default_health, default_rec
 
 def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
     """
