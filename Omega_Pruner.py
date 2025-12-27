@@ -58,6 +58,7 @@ import tempfile
 from datetime import datetime
 import copy
 import urllib.parse
+import pandas as pd
 
 # Logging Setup
 # =========================
@@ -1420,44 +1421,65 @@ def _render_locked_state() -> Tuple[str, gr.update]:
         gr.update(visible=False)
     )
 
-def _validate_utxos_and_selection(df, enriched_state) -> Tuple[Optional[List[dict]], Optional[int], Optional[Tuple[str, gr.update]]]:
-    """Validate presence of UTXOs and user selection. Returns early message on failure."""
-    # Extract utxos from frozen tuple
-    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
-        _, utxos = enriched_state
-    else:
-        utxos = enriched_state or []
+def _validate_utxos_and_selection(
+    df,
+    utxos: List[dict]
+) -> Tuple[
+    Optional[List[dict]],
+    Optional[int],
+    Optional[Tuple[str, gr.update]]
+]:
+    """
+    Validate presence of UTXOs and user selection.
 
-    total_utxos = len(utxos)
-    if total_utxos == 0:
+    Returns:
+      - (selected_utxos, pruned_count, None) on success
+      - (None, None, (html_message, visibility_update)) on early failure
+    """
+
+    # --- Validate UTXO existence ---
+    if not utxos:
         return None, None, (
-            "<div style='text-align:center;padding:60px;color:#ff9900;font-size:1.4rem;font-weight:700;'>"
+            "<div style='text-align:center;padding:60px;color:#ff9900;"
+            "font-size:1.4rem;font-weight:700;'>"
             "No UTXOs found<br><br>"
             "Try different addresses, lower dust threshold, or paste manual UTXOs"
             "</div>",
-            gr.update(visible=False)
+            gr.update(visible=False),
         )
 
-    # Robustly extract dataframe rows — handles both direct list and Gradio component
+    # --- Robust extraction of DataFrame rows ---
+    # After ANALYZE → df is often a pandas DataFrame (from Styler)
+    # After interaction → df is a list of lists
+    # In some cases → df may be a Gradio component with .value
+
     if isinstance(df, list):
         df_rows = df
+
+    elif isinstance(df, pd.DataFrame):
+        df_rows = df.values.tolist()
+
     elif hasattr(df, "value") and df.value is not None:
         df_rows = df.value
+
     else:
         df_rows = []
 
+    # --- Resolve selected UTXOs ---
     selected_utxos = _resolve_selected(df_rows, utxos)
     pruned_count = len(selected_utxos)
 
     if pruned_count == 0:
         return None, None, (
-            "<div style='text-align:center;padding:60px;color:#ff9900;font-size:1.4rem;'>"
+            "<div style='text-align:center;padding:60px;color:#ff9900;"
+            "font-size:1.4rem;'>"
             "Select UTXOs in the table to begin"
             "</div>",
-            gr.update(visible=False)
+            gr.update(visible=False),
         )
 
     return selected_utxos, pruned_count, None
+
 
 def _compute_privacy_metrics(selected_utxos: List[dict], total_utxos: int) -> Tuple[int, str]:
     privacy_score = calculate_privacy_score(selected_utxos, total_utxos)
