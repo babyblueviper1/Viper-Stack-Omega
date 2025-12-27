@@ -139,37 +139,36 @@ _fee_cache_lock = Lock()
 # Selection resolver
 # ===========================
 def _resolve_selected(df_rows: List[list], enriched_state: List[dict]) -> List[dict]:
-    """Robust, defensive resolution of selected UTXOs from UI state."""
+    """Resolve selected UTXOs via row-order matching (Gradio-safe)."""
 
-    utxo_map = {
-        (str(u["txid"]), int(u["vout"])): u
-        for u in enriched_state
-        if isinstance(u, dict) and "txid" in u and "vout" in u
-    }
+    if not df_rows or not enriched_state:
+        return []
+
+    # Extract utxos from frozen state
+    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
+        _, utxos = enriched_state
+    else:
+        utxos = enriched_state or []
+
+    if len(df_rows) != len(utxos):
+        print(f"Warning: row mismatch df={len(df_rows)} utxos={len(utxos)}")
+        return []
 
     selected = []
 
-    for row in df_rows or []:
-        if not row:
-            continue
-        try:
-            raw_checked = row[CHECKBOX_COL]
-
-            # Normalize checkbox value
-            checked = raw_checked is True or raw_checked == 1 or str(raw_checked).lower() == "true"
-            if not checked:
-                continue
-
-            txid = str(row[TXID_COL])
-            vout = int(row[VOUT_COL])
-
-            utxo = utxo_map.get((txid, vout))
-            if utxo:
-                selected.append(utxo)
-
-        except (IndexError, ValueError, TypeError, KeyError):
+    for idx, row in enumerate(df_rows):
+        if not row or len(row) <= CHECKBOX_COL:
             continue
 
+        checkbox_val = row[CHECKBOX_COL]
+
+        checked = checkbox_val in (True, 1, "true", "True", "1") or bool(checkbox_val)
+        if not checked:
+            continue
+
+        selected.append(utxos[idx])
+
+    print(f">>> _resolve_selected: {len(selected)} UTXOs detected via row index")
     return selected
 
 def _selection_snapshot(selected_utxos: List[dict]) -> dict:
