@@ -1654,19 +1654,14 @@ def generate_summary_safe(
     strategy,
     dest_value: str,
 ) -> tuple:
-	print(">>> generate_summary_safe CALLED")
-	print(f"    locked = {locked}")
+    print(">>> generate_summary_safe CALLED")
+    print(f"    locked = {locked}")
     print(f"    enriched_state type: {type(enriched_state)}, len: {len(enriched_state[1]) if isinstance(enriched_state, tuple) and len(enriched_state) == 2 else 'N/A'}")
     print(f"    df rows: {len(df) if df else 0}")
     print(f"    fee_rate = {fee_rate}, dao_percent = {dao_percent}")
-    
+
     if locked:
         print("    → Returning locked state message")
-        return _render_locked_state()
-
-
-    """Orchestrate all summary helpers into final HTML output."""
-    if locked:
         return _render_locked_state()
 
     # Extract actual UTXO list from frozen state
