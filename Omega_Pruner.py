@@ -93,6 +93,21 @@ WEIGHT_COL   = 6
 TYPE_COL     = 7
 VOUT_COL     = 8
 
+no_utxos_msg = (
+    "<div style='text-align:center;padding:60px;color:#ff9900;"
+    "font-size:1.4rem;font-weight:700;'>"
+    "No UTXOs found<br><br>"
+    "Try different addresses, lower dust threshold, or paste manual UTXOs"
+    "</div>"
+)
+
+select_msg = (
+    "<div style='text-align:center;padding:60px;color:#ff9900;"
+    "font-size:1.4rem;'>"
+    "Select UTXOs in the table to begin"
+    "</div>"
+)
+
 
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -1428,7 +1443,6 @@ def _render_locked_state() -> Tuple[str, gr.update]:
     )
 
 def _validate_utxos_and_selection(df, utxos: List[dict]):
-    # Hard guard: this should NEVER be anything else now
     assert isinstance(df, list), f"df must be list, got {type(df)}"
 
     if not utxos:
