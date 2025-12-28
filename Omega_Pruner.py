@@ -1790,12 +1790,22 @@ def generate_summary_safe(
     # === Validate selection – now returns clean data only ===
     selected_utxos, pruned_count, error = _validate_utxos_and_selection(df, utxos)
 
-    if error == "NO_UTXOS":        # Shouldn't happen due to above check, but safe
+    if error == "NO_UTXOS":
         return no_utxos_msg, gr.update(visible=False)
     if error == "NO_SELECTION":
         return select_msg, gr.update(visible=False)
 
-    # === At this point we KNOW we have a valid selection ===
+    # === FINAL GUARD: Only count supported inputs in summary ===
+    supported_selected = [
+        u for u in selected_utxos
+        if u.get("script_type") in ("P2WPKH", "Taproot")
+    ]
+
+    pruned_count = len(supported_selected)
+    if pruned_count == 0:
+        return select_msg, gr.update(visible=False)
+
+    # Use supported_selected for everything below
     remaining_utxos = total_utxos - pruned_count
 	
     privacy_score, score_color = _compute_privacy_metrics(selected_utxos, total_utxos)
