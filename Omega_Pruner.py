@@ -3182,7 +3182,7 @@ tr:has(.health-nested) input[type="checkbox"] {
           line-height:1.6 !important;
       ">
         Fully offline operation — no API calls, perfect for cold wallets.<br>
-        Paste raw UTXOs manually below.
+        Paste raw UTXOs.
       </div>
     </div>
     """
@@ -3195,7 +3195,7 @@ tr:has(.health-nested) input[type="checkbox"] {
                     label="🔒 Offline / Air-Gapped Mode",
                     value=False,
                     interactive=True,
-                    info="No API calls • Paste raw UTXOs below • True cold wallet prep",
+                    info="No API calls • Paste raw UTXOs • True cold wallet prep",
                 )
 
         with gr.Row(visible=False) as manual_box_row:
