@@ -3172,7 +3172,7 @@ tr:has(.health-nested) input[type="checkbox"] {
           font-weight:900 !important;
           text-shadow:0 0 25px #00ff88 !important;
       ">
-        🔒 Advanced Privacy
+        🔒 Air-Gapped / Offline Mode
       </div>
 
       <div style="
@@ -3181,7 +3181,8 @@ tr:has(.health-nested) input[type="checkbox"] {
           font-size:1.1rem !important;
           line-height:1.6 !important;
       ">
-        Tools and future features for maximum sovereignty
+        Fully offline operation — no API calls, perfect for cold wallets.<br>
+        Paste raw UTXOs manually below.
       </div>
     </div>
     """
@@ -3212,50 +3213,6 @@ txidhere:2:999999
 No API calls • Fully air-gapped safe""",
                 lines=10,
             )
-
-        gr.HTML("""
-<div style="
-    padding:28px !important;
-    margin:20px 0 !important;
-    background:rgba(0, 17, 0, 0.65) !important;
-    border:4px solid #00ff88 !important;
-    border-radius:18px !important;
-    text-align:center !important;
-    box-shadow:
-        0 0 60px rgba(0,255,136,0.5) !important,
-        inset 0 0 30px rgba(0,255,136,0.15) !important;
-">
-  <div style="
-      color:#00ff88 !important;
-      font-size:1.7rem !important;
-      font-weight:900 !important;
-      text-shadow:0 0 25px #00ff88 !important;
-      letter-spacing:1px !important;
-  ">
-    🔒 Silent Payments (BIP-352)
-  </div>
-
-  <div style="
-      color:#aaffcc !important;
-      margin-top:16px !important;
-      font-size:1.15rem !important;
-      line-height:1.7 !important;
-  ">
-    Silent Payments require access to sender private keys<br>
-    for proper ECDH shared secret computation.<br><br>
-
-    Ωmega Pruner is deliberately unsigned and key-free —<br>
-    preserving maximum security and non-custodial integrity.<br><br>
-
-    <strong style="color:#00ffdd !important; font-size:1.3rem !important;">
-      Full support coming to Ωmega Wallet<br>
-      <span style="font-size:1.05rem !important; color:#00dddd !important;">
-        (local, self-custodial app)
-      </span>
-    </strong>
-  </div>
-</div>
-""")
         
         # === Seamless mode switching + dark mode + live status ===
         def update_status_and_ui(offline, dark):
