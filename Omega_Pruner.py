@@ -2042,19 +2042,19 @@ def on_generate(
     enriched_state: tuple,
     scan_source: str,
 ) -> tuple:
-    """Freeze user intent into immutable snapshot. Pure orchestration."""
+    """Freeze user intent and return both snapshot and full UTXOs for PSBT generation."""
     log.info("on_generate called")
 
     if not enriched_state:
         log.info("enriched_state is empty")
-        return None, gr.update(value=False), None
+        return None, [], gr.update(value=False), None
 
     selected_utxos = _extract_selected_utxos(enriched_state)
     log.info(f"Selected UTXOs count: {len(selected_utxos)}")
 
     if not selected_utxos:
         log.info("Generate attempted with no UTXOs selected")
-        return None, gr.update(value=False), None
+        return None, [], gr.update(value=False), None
 
     log.info(f"dest_value: {dest_value!r}")
 
@@ -2073,11 +2073,12 @@ def on_generate(
         file_path = _persist_snapshot(snapshot)
 
         log.info("Snapshot persisted — returning success")
-        return snapshot, gr.update(value=True), file_path
+        # Return: snapshot, full_selected_utxos, locked_update, file_path
+        return snapshot, selected_utxos, gr.update(value=True), file_path
 
     except Exception as e:
         log.error(f"Snapshot creation failed: {e}", exc_info=True)
-        return None, gr.update(value=False), None
+        return None, [], gr.update(value=False), None
 		
 # ====================
 # generate_psbt() helpers
@@ -2477,16 +2478,35 @@ def _compose_psbt_html(
 </div>
 """
 
-def generate_psbt(psbt_snapshot: dict) -> str:
-    """Orchestrate PSBT generation from frozen snapshot."""
+def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
+    """Orchestrate PSBT generation using both snapshot (params) and full enriched UTXOs."""
     if not psbt_snapshot:
         return _render_no_snapshot()
 
-    inputs = psbt_snapshot.get("inputs", [])
-    if not inputs:
+    if not full_selected_utxos:
         return _render_no_inputs()
 
     params = _extract_psbt_params(psbt_snapshot)
+
+    # === Use the FULL enriched UTXOs for all calculations ===
+    inputs = full_selected_utxos
+
+    # Optional: filter out unsupported types (P2PKH, etc.)
+    supported_inputs = [
+        u for u in inputs 
+        if u.get("script_type") in ("P2WPKH", "Taproot")
+    ]
+
+    if not supported_inputs:
+        return (
+            "<div style='color:#ff9900;text-align:center;padding:40px;font-size:1.4rem;'>"
+            "No supported inputs available for PSBT.<br><br>"
+            "Only Native SegWit (bc1q...) and Taproot (bc1p...) inputs can be included.<br>"
+            "Legacy and Nested SegWit inputs must be spent separately."
+            "</div>"
+        )
+
+    legacy_excluded = len(supported_inputs) < len(inputs)
 
     dest_result = _resolve_destination(params.dest_override, params.scan_source)
     if isinstance(dest_result, str):  # error HTML
@@ -2494,7 +2514,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
     dest_spk = dest_result
 
     try:
-        econ = estimate_tx_economics(inputs, params.fee_rate, params.dao_percent)
+        econ = estimate_tx_economics(supported_inputs, params.fee_rate, params.dao_percent)
     except ValueError:
         return (
             "<div style='color:#ff3366;text-align:center;padding:30px;font-size:1.3rem;font-weight:700;'>"
@@ -2502,8 +2522,8 @@ def generate_psbt(psbt_snapshot: dict) -> str:
             "</div>"
         )
 
-    # Build unsigned tx and matching UTXO list
-    tx, utxos_for_psbt = _build_unsigned_tx(inputs, econ, dest_spk, params)
+    # Build unsigned tx using supported inputs only
+    tx, utxos_for_psbt = _build_unsigned_tx(supported_inputs, econ, dest_spk, params)
 
     if len(utxos_for_psbt) != len(tx.tx_ins):
         return (
@@ -2512,41 +2532,24 @@ def generate_psbt(psbt_snapshot: dict) -> str:
             "</div>"
         )
 
-    # === FINAL SAFETY FILTER: Exclude any legacy P2PKH inputs ===
-    # This is defensive — legacy should already be deselected and filtered earlier,
-    # but we double-check here to guarantee a clean, valid PSBT.
-    filtered_utxos = [u for u in utxos_for_psbt if u.get("script_type") != "P2PKH"]
-    legacy_excluded = len(filtered_utxos) < len(utxos_for_psbt)
-
-    if legacy_excluded:
-        # Rebuild tx with only valid SegWit inputs
-        # Note: We could recompute economics, but since legacy were never selected,
-        # this case is extremely rare. For simplicity, we just exclude them.
-        tx, filtered_utxos = _build_unsigned_tx(
-            [inp for inp in inputs if inp.get("script_type") != "P2PKH"],
-            econ,  # reuse old economics — safe because legacy weren't contributing meaningfully
-            dest_spk,
-            params,
-        )
-
-    # Generate clean, Sparrow/Coldcard-compatible PSBT
-    # create_psbt now returns only (psbt_b64, "") — no legacy warning needed here
-    psbt_b64, _ = create_psbt(tx, filtered_utxos)
+    # Generate PSBT
+    psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
 
     qr_html, qr_warning = _generate_qr(psbt_b64)
     payjoin_note = _render_payjoin_note(params.dest_override or params.scan_source)
 
-    # Optional in-PSBT warning if we had to exclude legacy inputs
+    # Warning if we excluded any inputs
     extra_note = ""
     if legacy_excluded:
         extra_note = (
-             "<div style='"
+            "<div style='"
             "color:#ffaa00;background:#332200;padding:16px;border-radius:12px;"
             "margin:40px 0 30px 0;text-align:center;font-size:1.15rem;"
             "border:2px solid #ff8800;box-shadow:0 0 30px rgba(255,136,0,0.4);"
             "'>"
-            "⚠️ Legacy (P2PKH) inputs were automatically excluded from this PSBT<br>"
-            "<small>Only modern SegWit inputs (P2WPKH, P2WSH, Taproot) are included for full hardware wallet compatibility.</small>"
+            "⚠️ Some inputs were excluded from this PSBT<br>"
+            "<small>Only Native SegWit and Taproot inputs are supported. "
+            "Legacy/Nested inputs were automatically skipped.</small>"
             "</div>"
         )
 
@@ -2556,7 +2559,7 @@ def generate_psbt(psbt_snapshot: dict) -> str:
         qr_warning=qr_warning,
         psbt_b64=psbt_b64,
         payjoin_note=payjoin_note,
-        extra_note=extra_note,  # ← pass the new filtered warning
+        extra_note=extra_note,
     )
 
 def analyze_and_show_summary(
@@ -3323,6 +3326,7 @@ No API calls • Fully air-gapped safe""",
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
         legacy_warning = gr.HTML(label="Legacy Warning", visible=True)
+		selected_utxos_for_psbt = gr.State([])
     
 
         # Capture destination changes for downstream use
@@ -3552,10 +3556,10 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             enriched_state,
             scan_source,
         ],
-        outputs=[psbt_snapshot, locked, export_file],
+        outputs=[psbt_snapshot, selected_utxos_for_psbt, locked, export_file],
     ).then(
         fn=generate_psbt,
-        inputs=[psbt_snapshot],
+        inputs=[psbt_snapshot, selected_utxos_for_psbt],
         outputs=[psbt_output],
     ).then(
         fn=finalize_generate_ui,
