@@ -3090,7 +3090,6 @@ tr:has(.health-nested) input[type="checkbox"] {
     # =================================================================
     with gr.Column():
         theme_js = gr.HTML("")
-        mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
 
          # ← Modern Bitcoin Optimization Note (after toggle, before inputs)
         gr.HTML(
@@ -3129,6 +3128,7 @@ tr:has(.health-nested) input[type="checkbox"] {
         </div>
             """
         )
+		mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
         
         with gr.Row():
             with gr.Column(scale=1, min_width=220):
