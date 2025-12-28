@@ -285,14 +285,9 @@ def _coerce_float(value, default: float) -> float:
         return default
 
 def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: bool) -> tuple:
-    """
-    Live-sync checkbox changes into enriched_state.
-    CRITICALLY: prevents selection of unsupported input types (Legacy/Nested SegWit).
-    """
     if locked or not enriched_state:
         return enriched_state
 
-    # Extract utxos
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
         meta, utxos = enriched_state
     else:
@@ -300,7 +295,6 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
         utxos = enriched_state or ()
 
     if len(df_rows) != len(utxos):
-        log.warning("Row count mismatch in live selection sync — ignoring update")
         return enriched_state
 
     updated_utxos = []
@@ -308,11 +302,11 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
         new_u = dict(u)
         script_type = u.get("script_type", "")
 
-        # BLOCK: Never allow unsupported types to be selected
+        # THIS IS THE UNBREAKABLE DEFENSE
         if script_type not in ("P2WPKH", "Taproot"):
-            new_u["selected"] = False  # Force off — no override allowed
+            new_u["selected"] = False  # ALWAYS force off for legacy/nested
         else:
-            new_u["selected"] = bool(row[CHECKBOX_COL])  # Normal sync for supported
+            new_u["selected"] = bool(row[CHECKBOX_COL])
 
         updated_utxos.append(new_u)
 
@@ -2932,9 +2926,9 @@ tr:has(.health-legacy) td {
 
 tr:has(.health-legacy) input[type="checkbox"],
 tr:has(.health-nested) input[type="checkbox"] {
-    opacity: 0.4;
-    cursor: not-allowed;
-    pointer-events: none;  /* ← prevents clicking */
+    opacity: 0.3 !important;
+    cursor: not-allowed !important;
+    accent-color: #666 !important;
 }
     </style>
     """)
