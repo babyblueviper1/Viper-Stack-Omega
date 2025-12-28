@@ -2729,7 +2729,7 @@ with gr.Blocks(
         </span>
     </div>
 
-    <div style="text-align:center;margin:100px 0 60px 0;padding:60px 40px;
+    <div style="text-align:center;margin:100px 0 40px 0;padding:60px 40px;
                 background:rgba(0,0,0,0.42);
                 backdrop-filter: blur(10px);
                 border:8px solid #f7931a;
