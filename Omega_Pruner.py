@@ -1535,7 +1535,7 @@ def _analyze_success(df_rows, frozen_state, scan_source, warning_banner=""):
     return (
         gr.update(value=df_rows),         # 0: df table
         frozen_state,                     # 1: enriched_state
-        gr.update(value=warning_banner),  # 2: warning banner (was legacy_warning)
+        gr.update(value=warning_banner),  # 2: warning banner
         gr.update(visible=True),          # 3: generate_row
         gr.update(visible=True),          # 4: import_file
         scan_source,                      # 5: scan_source state
@@ -2630,7 +2630,7 @@ def analyze_and_show_summary(
     return (
         df_update,              # 0: df (table)
         enriched_new,           # 1: enriched_state
-        legacy_warning,         # 2: legacy_warning HTML
+        warning_banner,         # 2: warning_banner HTML
         generate_row_visibility,# 3: generate_row visibility (critical!)
         import_file,          # 4: import_file visibility
         scan_source_new,        # 5: scan_source state
@@ -3376,7 +3376,7 @@ No API calls • Fully air-gapped safe""",
         psbt_snapshot = gr.State(None)
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
-        legacy_warning = gr.HTML(label="Legacy Warning", visible=True)
+        warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
         selected_utxos_for_psbt = gr.State([])
 
         # Capture destination changes for downstream use
@@ -3549,7 +3549,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
     ).then(
         fn=rebuild_df_rows,
         inputs=[enriched_state],
-        outputs=[df, legacy_warning], 
+        outputs=[df, warning_banner], 
     ).then(
         fn=generate_summary_safe,
         inputs=[
@@ -3585,7 +3585,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
         outputs=[
             df,
             enriched_state,
-            legacy_warning,
+            warning_banner,
             generate_row,
             import_file,
             scan_source,
@@ -3650,13 +3650,14 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
         return (
             gr.update(value=[]),                                     # df — clear table
             tuple(),                                                 # enriched_state — empty
+            gr.update(value=""),                                     # warning_banner
             gr.update(visible=True),                                 # analyze_btn — show
             gr.update(visible=False),                                # generate_row — hide
             None,                                                    # psbt_snapshot — wipe
             False,                                                   # locked — unlock
             "",                                                      # locked_badge — clear
             gr.update(value="", interactive=True),                   # addr_input
-            gr.update(value=""),                                     # dest_value — clear
+            gr.update(value="", interactive=True),                   # dest_value — ENABLE + clear
             gr.update(interactive=True),                             # strategy
             gr.update(interactive=True),                             # dust
             gr.update(interactive=True),                             # fee_rate_slider
@@ -3664,6 +3665,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             gr.update(interactive=True),                             # thank_you_slider
             gr.update(value=False, interactive=True),                # offline_toggle
             gr.update(value="", visible=False, interactive=True),    # manual_utxo_input
+            gr.update(interactive=True),                             # theme_toggle — RE-ENABLE DARK MODE
             gr.update(interactive=True),                             # fastest_btn
             gr.update(interactive=True),                             # halfhour_btn
             gr.update(interactive=True),                             # hour_btn
@@ -3681,13 +3683,14 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
         outputs=[
             df,
             enriched_state,
+            warning_banner,
             analyze_btn,
             generate_row,
             psbt_snapshot,
             locked,
             locked_badge,
             addr_input,
-            dest_value,
+            dest,
             strategy,
             dust,
             fee_rate_slider,
@@ -3695,6 +3698,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             thank_you_slider,
             offline_toggle,
             manual_utxo_input,
+            theme_toggle,
             fastest_btn,
             halfhour_btn,
             hour_btn,
