@@ -717,7 +717,7 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
     if addr.startswith('1'):
         try:
             dec = base58_decode(addr)
-            if len(dec) == 25 and dec[0] == 0x00:  # version byte for mainnet P2PKH
+            if len(dec) == 25 and dec[0] == 0x00:  # mainnet P2PKH version
                 hash160 = dec[1:21]
                 return b'\x76\xa9\x14' + hash160 + b'\x88\xac', {
                     'input_vb': 148,
@@ -725,13 +725,16 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
                     'type': 'P2PKH'
                 }
         except Exception:
-            pass  # Invalid Base58 → fall through
+            pass
+
+        # Invalid legacy — fall to unknown, not fake P2WPKH
+        return b'\x00\x14' + b'\x00'*20, {'input_vb': 148, 'output_vb': 34, 'type': 'invalid'}
 
     # === P2SH (starts with '3') ===
     if addr.startswith('3'):
         try:
             dec = base58_decode(addr)
-            if len(dec) == 25 and dec[0] == 0x05:  # version byte for mainnet P2SH
+            if len(dec) == 25 and dec[0] == 0x05:  # mainnet P2SH version
                 hash160 = dec[1:21]
                 return b'\xa9\x14' + hash160 + b'\x87', {
                     'input_vb': 91,
@@ -741,27 +744,25 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
         except Exception:
             pass
 
-    # === Bech32 / Bech32m (bc1q... or bc1p...) ===
+        return b'\x00\x14' + b'\x00'*20, {'input_vb': 91, 'output_vb': 32, 'type': 'invalid'}
+
+    # === Bech32 / Bech32m (bc1...) ===
     if addr.startswith('bc1'):
         data_part = addr[4:]
 
-        # Early validation: all characters must be in CHARSET
         if any(c not in CHARSET for c in data_part):
             return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
 
-        # Convert to 5-bit data array (no filtering needed — already validated)
         data = [CHARSET.find(c) for c in data_part]
-
-        # Witness version is data[0]
         if len(data) < 1:
             return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
 
         witness_version = data[0]
 
-        # === P2WPKH / P2WSH (Bech32, witness v0) ===
+        # P2WPKH / P2WSH (v0, bc1q)
         if addr.startswith('bc1q') and witness_version == 0 and bech32_verify_checksum('bc', data):
             prog = convertbits(data[1:], 5, 8, False)
-            if prog:
+            if prog and len(prog) in (20, 32):
                 if len(prog) == 20:
                     return b'\x00\x14' + bytes(prog), {
                         'input_vb': 68,
@@ -775,8 +776,8 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
                         'type': 'P2WSH'
                     }
 
-        # === Taproot (Bech32m, witness v1) ===
-        elif addr.startswith('bc1p') and witness_version == 1 and bech32m_verify_checksum('bc', data):
+        # Taproot (v1, bc1p)
+        if addr.startswith('bc1p') and witness_version == 1 and bech32m_verify_checksum('bc', data):
             prog = convertbits(data[1:], 5, 8, False)
             if prog and len(prog) == 32:
                 return b'\x51\x20' + bytes(prog), {
@@ -785,11 +786,11 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
                     'type': 'Taproot'
                 }
 
-        # Invalid Bech32/Bech32m (bad checksum, wrong version, etc.)
+        # Invalid bech32
         return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
 
-    # === Final fallback for any unsupported or malformed address ===
-    return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'fallback'}
+    # === Final fallback ===
+    return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'unknown'}
 
 DEFAULT_DAO_SCRIPT_PUBKEY, _ = address_to_script_pubkey(DEFAULT_DAO_ADDR)
 # =========================
@@ -2225,37 +2226,63 @@ def _build_unsigned_tx(
     return tx, utxos_for_psbt
 
 def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
-    """Generate QR code image and optional warning."""
-    error_correction = qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2800 else qrcode.constants.ERROR_CORRECT_M
-    qr = qrcode.QRCode(version=None, error_correction=error_correction, box_size=6, border=4)
+    """Generate QR code for PSBT, with graceful fallback for large PSBTs."""
+    # Safe threshold — QR version 40 max ~2953 chars
+    if len(psbt_b64) > 2900:
+        qr_html = ""
+        qr_warning = (
+            "<div style='"
+            "margin:40px 0 !important;"
+            "padding:28px !important;"
+            "background:#332200 !important;"
+            "border:3px solid #ff9900 !important;"
+            "border-radius:16px !important;"
+            "text-align:center !important;"
+            "font-size:1.3rem !important;"
+            "color:#ffddaa !important;"
+            "box-shadow:0 0 60px rgba(255,153,0,0.5) !important;"
+            "'>"
+            "<strong>PSBT Too Large for QR Code</strong><br><br>"
+            f"Size: {len(psbt_b64):,} characters<br><br>"
+            "Use the <strong>COPY PSBT</strong> button and paste directly into your wallet.<br>"
+            "Sparrow, Coldcard, and most wallets support direct paste."
+            "</div>"
+        )
+        return qr_html, qr_warning
+
+    # Normal QR generation
+    error_correction = qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2600 else qrcode.constants.ERROR_CORRECT_M
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=error_correction,
+        box_size=6,
+        border=4,
+    )
     qr.add_data(f"bitcoin:?psbt={psbt_b64}")
     qr.make(fit=True)
+
     img = qr.make_image(fill_color="#f7931a", back_color="#000000")
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     qr_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-    qr_img_html = f'<img src="{qr_uri}" style="width:100% !important;height:auto !important;display:block !important;image-rendering:crisp-edges !important;border-radius:12px !important;" alt="PSBT QR Code"/>'
+
+    qr_html = (
+        f'<img src="{qr_uri}" style="'
+        "width:100% !important;height:auto !important;display:block !important;"
+        "image-rendering:crisp-edges !important;border-radius:12px !important;\" "
+        "alt=\"PSBT QR Code\"/>"
+    )
 
     qr_warning = ""
-    if len(psbt_b64) > 2800:
-        qr_warning = f"""
-        <div style="
-            margin-top:12px !important;
-            padding:10px 14px !important;
-            border-radius:8px !important;
-            background:#331a00 !important;
-            color:#ffb347 !important;
-            font-family:monospace !important;
-            font-size:0.95rem !important;
-            line-height:1.4 !important;
-            border:1px solid #ff9900aa !important;
-        ">
-            Large PSBT detected.<br>
-            If QR fails → tap <strong>COPY PSBT</strong> and paste directly.
-        </div>
-        """
+    if len(psbt_b64) > 2600:
+        qr_warning = (
+            "<div style='margin-top:16px;padding:12px;background:#331a00;border:1px solid #ff9900;border-radius:10px;"
+            "color:#ffb347;font-size:0.95rem;line-height:1.4;'>"
+            "Large PSBT — if QR scan fails, use <strong>COPY PSBT</strong> and paste manually."
+            "</div>"
+        )
 
-    return qr_img_html, qr_warning
+    return qr_html, qr_warning
 
 	
 def _render_payjoin_note(dest_addr: str) -> str:
