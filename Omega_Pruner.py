@@ -386,23 +386,21 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
     """
     Rebuild dataframe rows from current enriched_state.
     Used when loading a saved selection JSON.
-    Safely handles invalid or unexpected input types.
+    Safely handles invalid input and enforces unsupported type rules.
     """
-    # Handle invalid enriched_state (e.g., string, dict, None from reset or snapshot)
+    # Handle invalid enriched_state
     if not enriched_state:
         return [], False
 
-    # Extract utxos from frozen tuple — this is the expected format
+    # Extract utxos from frozen tuple
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
         _, utxos = enriched_state
         if not isinstance(utxos, (list, tuple)):
             return [], False
         state_list = list(utxos)
     elif isinstance(enriched_state, (list, tuple)):
-        # Fallback: direct list of UTXOs
         state_list = list(enriched_state)
     else:
-        # Invalid type (string, dict, etc.) — likely from reset or snapshot bleed
         print(f"Warning: rebuild_df_rows received invalid enriched_state type: {type(enriched_state)}")
         return [], False
 
@@ -410,28 +408,27 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
     has_unsupported = False
 
     for u in state_list:
-        # Safety: skip non-dict items
         if not isinstance(u, dict):
             continue
 
         script_type = u.get("script_type", "")
         selected = u.get("selected", False)
 
+        # Supported only: Native SegWit and Taproot
         supported_in_psbt = script_type in ("P2WPKH", "Taproot")
-        is_legacy = script_type == "P2PKH"
-        is_nested = script_type == "P2SH-P2WPKH"
 
         if not supported_in_psbt:
             has_unsupported = True
-            selected = False
+            selected = False  # Force unselected
 
-            if is_legacy:
+            # Unified legacy detection (catches both "P2PKH" and "Legacy")
+            if script_type in ("P2PKH", "Legacy"):
                 health_html = (
                     '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
                     '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
                     '</div>'
                 )
-            elif is_nested:
+            elif script_type == "P2SH-P2WPKH":
                 health_html = (
                     '<div class="health health-nested" style="color:#ff9900;font-weight:bold;">'
                     '⚠️ NESTED<br><small>Not supported yet</small>'
@@ -439,8 +436,8 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
                 )
             else:
                 health_html = (
-                    f'<div class="health health-{u.get("health", "UNKNOWN").lower()}">'
-                    f'{u.get("health", "UNKNOWN")}<br><small>{u.get("recommend", "")}</small></div>'
+                    f'<div class="health health-{u.get("health", "unknown").lower()}">'
+                    f'{u.get("health", "UNKNOWN")}<br><small>Cannot prune</small></div>'
                 )
         else:
             health_html = (
@@ -448,11 +445,13 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
                 f'{u.get("health", "OPTIMAL")}<br><small>{u.get("recommend", "")}</small></div>'
             )
 
+        # Friendly display name
         display_type = {
             "P2WPKH": "Native SegWit",
             "Taproot": "Taproot",
             "P2SH-P2WPKH": "Nested SegWit",
             "P2PKH": "Legacy",
+            "Legacy": "Legacy",  # ← catches classification output
         }.get(script_type, script_type)
 
         rows.append([
@@ -1362,68 +1361,67 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
     Handles unsupported script types by disabling selection and showing warnings.
     """
     rows: List[List] = []
-    has_unsupported = False  # Track if any inputs can't be included in PSBT
+    has_unsupported = False
 
     for u in enriched:
         script_type = u.get("script_type", "")
         selected = u.get("selected", False)
 
-        # Define which types are fully supported in the generated PSBT
+        # Supported types for PSBT generation
         supported_in_psbt = script_type in ("P2WPKH", "Taproot")
-        is_legacy = script_type == "P2PKH"
-        is_nested = script_type == "P2SH-P2WPKH"
 
         if not supported_in_psbt:
             has_unsupported = True
-            selected = False  # Force unselected — cannot be pruned in this PSBT
+            selected = False  # Force unselected
 
-            if is_legacy:
+            # Unified warning badges
+            if script_type in ("P2PKH", "Legacy"):
                 health_html = (
                     '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
                     '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
                     '</div>'
                 )
-            elif is_nested:
+            elif script_type == "P2SH-P2WPKH":
                 health_html = (
                     '<div class="health health-nested" style="color:#ff9900;font-weight:bold;">'
                     '⚠️ NESTED<br><small>Not supported yet</small>'
                     '</div>'
                 )
             else:
+                # Fallback — should not happen
                 health_html = (
-                    f'<div class="health health-{u["health"].lower()}">'
-                    f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
+                    f'<div class="health health-{u.get("health", "unknown").lower()}">'
+                    f'{u.get("health", "UNKNOWN")}<br><small>Cannot prune</small></div>'
                 )
         else:
-            # Fully supported: P2WPKH or Taproot — allow normal selection
             health_html = (
                 f'<div class="health health-{u["health"].lower()}">'
                 f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
             )
-            # Keep the original selected state from strategy/user
+            # Keep original selection for supported types
 
-        # Optional: nicer display name in the Type column
+        # Friendly display name
         display_type = {
             "P2WPKH": "Native SegWit",
             "Taproot": "Taproot",
             "P2SH-P2WPKH": "Nested SegWit",
             "P2PKH": "Legacy",
+            "Legacy": "Legacy",  # ← catch both
         }.get(script_type, script_type)
 
         rows.append([
-            selected,                                   # 0: checkbox (forced False if unsupported)
-            u.get("source", "Single"),                  # 1: source
-            u["txid"][:8] + "..." + u["txid"][-8:],     # 2: short txid
-            health_html,                                # 3: health badge
-            u["value"],                                 # 4: value (sats)
-            u["address"],                               # 5: address
-            u["input_weight"],                          # 6: weight
-            display_type,                               # 7: friendly type name
-            u["vout"],                                  # 8: vout (hidden)
+            selected,
+            u.get("source", "Single"),
+            u["txid"][:8] + "..." + u["txid"][-8:],
+            health_html,
+            u["value"],
+            u["address"],
+            u["input_weight"],
+            display_type,
+            u["vout"],
         ])
 
     return rows, has_unsupported
-
 def _freeze_enriched(
     enriched: List[Dict],
     *,
