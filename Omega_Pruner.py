@@ -3091,17 +3091,8 @@ tr:has(.health-nested) input[type="checkbox"] {
     with gr.Column():
         theme_js = gr.HTML("")
         mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
-        
-        with gr.Row():
-            with gr.Column(scale=1, min_width=220):
-                theme_toggle = gr.Checkbox(
-                    label="🌙 Dark Mode (pure black)",
-                    value=True,
-                    interactive=True,
-                    info="Retinal protection • Nuclear glow preserved • Recommended",
-                )
 
-        # ← Modern Bitcoin Optimization Note (after toggle, before inputs)
+         # ← Modern Bitcoin Optimization Note (after toggle, before inputs)
         gr.HTML(
             value="""
             <div style="
@@ -3138,7 +3129,16 @@ tr:has(.health-nested) input[type="checkbox"] {
         </div>
             """
         )
-
+        
+        with gr.Row():
+            with gr.Column(scale=1, min_width=220):
+                theme_toggle = gr.Checkbox(
+                    label="🌙 Dark Mode (pure black)",
+                    value=True,
+                    interactive=True,
+                    info="Retinal protection • Nuclear glow preserved • Recommended",
+                )
+                
         with gr.Row():
             addr_input = gr.Textbox(
                 label="Scan Address / xpub (one per line)",
