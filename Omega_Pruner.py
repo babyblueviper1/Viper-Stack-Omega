@@ -3326,8 +3326,7 @@ No API calls • Fully air-gapped safe""",
         locked_badge = gr.HTML("")  # Starts hidden
         selection_snapshot_state = gr.State({})
         legacy_warning = gr.HTML(label="Legacy Warning", visible=True)
-		selected_utxos_for_psbt = gr.State([])
-    
+        selected_utxos_for_psbt = gr.State([])
 
         # Capture destination changes for downstream use
         dest.change(
