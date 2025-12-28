@@ -284,50 +284,38 @@ def _coerce_float(value, default: float) -> float:
     except (TypeError, ValueError, OverflowError):
         return default
 
+def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: bool) -> tuple:
+    """
+    Live-sync checkbox changes into enriched_state.
+    Blocks selection changes for unsupported input types.
+    """
+    if locked or not enriched_state:
+        return enriched_state
 
-def sync_selection(df_rows, enriched_state, locked):
-    """Sync checkbox changes back to canonical enriched_state — disabled when locked."""
-    if locked:
-        return enriched_state  # ignore all checkbox changes post-lock
-
-    # Extract utxos from frozen tuple if needed
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
         meta, utxos = enriched_state
     else:
         meta = {}
         utxos = enriched_state or ()
 
-    if not utxos or not df_rows:
-        return enriched_state
-
     if len(df_rows) != len(utxos):
-        log.warning("Row count mismatch during sync — ignoring")
+        log.warning("Row count mismatch in live selection sync — ignoring update")
         return enriched_state
 
     updated_utxos = []
     for row, u in zip(df_rows, utxos):
         new_u = dict(u)
-        new_u["selected"] = bool(row[CHECKBOX_COL])
+        script_type = u.get("script_type", "")
+
+        if script_type not in ("P2WPKH", "Taproot"):
+            # Do NOT allow selection of unsupported types
+            new_u["selected"] = u.get("selected", False)
+        else:
+            new_u["selected"] = bool(row[CHECKBOX_COL])
+
         updated_utxos.append(new_u)
 
-    # Return in same frozen format: (meta, updated_utxos_tuple)
     return (meta, tuple(updated_utxos))
-
-def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: bool) -> tuple:
-    """
-    Live-sync checkbox changes into enriched_state.
-    Returns a new immutable tuple (preserves your frozen model).
-    Ignores changes if locked.
-    """
-    if locked or not enriched_state:
-        return enriched_state
-    
-    if len(df_rows) != (len(enriched_state[1]) if isinstance(enriched_state, tuple) and len(enriched_state) == 2 else len(enriched_state or ())):
-        log.warning("Row count mismatch in live selection sync — ignoring update")
-        return enriched_state
-    
-    # Delegate to sync_selection (which now handles tuple correctly)
-    return sync_selection(df_rows, enriched_state, locked=False)
         
 def load_selection(json_file, current_enriched):
     if not json_file:
