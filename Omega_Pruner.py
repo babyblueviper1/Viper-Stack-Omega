@@ -3102,7 +3102,7 @@ tr:has(.health-nested) input[type="checkbox"] {
                 margin: 50px auto 40px auto !important;
                 padding: 28px !important;
                 max-width: 900px !important;
-                background: rgba(0, 50, 30, 0.5) !important;
+                background: rgba(0, 20, 10, 0.6) !important;
                 border: 3px solid #00ff9d !important;
                 border-radius: 18px !important;
                 text-align: center !important;
