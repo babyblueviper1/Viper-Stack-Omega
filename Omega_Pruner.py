@@ -3128,7 +3128,7 @@ tr:has(.health-nested) input[type="checkbox"] {
         </div>
             """
         )
-		mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
+        mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
         
         with gr.Row():
             with gr.Column(scale=1, min_width=220):
