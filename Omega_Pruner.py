@@ -2480,9 +2480,10 @@ def _compose_psbt_html(
 
 def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
     """Orchestrate PSBT generation using both snapshot (params) and full enriched UTXOs."""
-	print(f">>> generate_psbt received snapshot: {type(psbt_snapshot)}")
+    print(f">>> generate_psbt received snapshot: {type(psbt_snapshot)}")
     print(f">>> generate_psbt received full_utxos: {len(full_selected_utxos) if full_selected_utxos else 0} items")
     print(f">>> First UTXO keys: {list(full_selected_utxos[0].keys()) if full_selected_utxos else 'N/A'}")
+
     if not psbt_snapshot:
         return _render_no_snapshot()
 
