@@ -2486,30 +2486,43 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
     if not full_selected_utxos:
         return _render_no_inputs()
 
-    params = _extract_psbt_params(psbt_snapshot)
+    # Safe param extraction — critical guard
+    try:
+        params = _extract_psbt_params(psbt_snapshot)
+    except Exception as e:
+        log.error(f"Failed to extract PSBT params: {e}", exc_info=True)
+        return (
+            "<div style='color:#ff3366;background:#440000;padding:40px;border-radius:16px;text-align:center;"
+            "font-size:1.4rem;box-shadow:0 0 40px rgba(255,51,102,0.5);'>"
+            "Invalid or corrupted snapshot<br><br>"
+            "Please click <strong>GENERATE</strong> again."
+            "</div>"
+        )
 
-    # === Use the FULL enriched UTXOs for all calculations ===
-    inputs = full_selected_utxos
+    # Use the full enriched UTXOs
+    all_inputs = full_selected_utxos
 
-    # Optional: filter out unsupported types (P2PKH, etc.)
+    # Filter to supported types
     supported_inputs = [
-        u for u in inputs 
+        u for u in all_inputs
         if u.get("script_type") in ("P2WPKH", "Taproot")
     ]
 
     if not supported_inputs:
         return (
-            "<div style='color:#ff9900;text-align:center;padding:40px;font-size:1.4rem;'>"
-            "No supported inputs available for PSBT.<br><br>"
-            "Only Native SegWit (bc1q...) and Taproot (bc1p...) inputs can be included.<br>"
-            "Legacy and Nested SegWit inputs must be spent separately."
+            "<div style='color:#ff9900;background:#332200;padding:40px;border-radius:16px;text-align:center;"
+            "font-size:1.4rem;box-shadow:0 0 50px rgba(255,153,0,0.4);'>"
+            "No supported inputs selected<br><br>"
+            "Only <strong>Native SegWit (bc1q...)</strong> and <strong>Taproot (bc1p...)</strong> inputs can be pruned.<br>"
+            "Legacy and Nested inputs are excluded from the PSBT."
             "</div>"
         )
 
-    legacy_excluded = len(supported_inputs) < len(inputs)
+    legacy_excluded = len(supported_inputs) < len(all_inputs)
 
+    # Continue with your existing code...
     dest_result = _resolve_destination(params.dest_override, params.scan_source)
-    if isinstance(dest_result, str):  # error HTML
+    if isinstance(dest_result, str):
         return dest_result
     dest_spk = dest_result
 
@@ -2522,7 +2535,6 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
             "</div>"
         )
 
-    # Build unsigned tx using supported inputs only
     tx, utxos_for_psbt = _build_unsigned_tx(supported_inputs, econ, dest_spk, params)
 
     if len(utxos_for_psbt) != len(tx.tx_ins):
