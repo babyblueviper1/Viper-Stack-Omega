@@ -3122,14 +3122,14 @@ tr:has(.health-nested) input[type="checkbox"] {
                     Optimized for Modern Bitcoin
                 </div>
 
-                Ωmega Pruner fully supports <strong>Native SegWit (bc1q...)</strong> and <strong>Taproot (bc1p...)</strong> inputs for maximum privacy and lowest fees.<br><br>
-                
-                Legacy addresses (starting with <strong>1...</strong>) and Nested SegWit (starting with <strong>3...</strong>) are displayed for transparency but 
-                <strong>cannot be included in the generated PSBT</strong>.<br><br>
-                
-                They will appear faded in the table and cannot be selected.<br>
-                To fully take advantage of optimized fees and better privacy, we recommend spending or converting them separately.
-            </div>
+                Ωmega Pruner fully supports <strong style="color:#00ffff !important;font-weight:900 !important;text-shadow:0 0 20px #00ffff !important;">Native SegWit (bc1q...)</strong> and <strong style="color:#00ffff !important;font-weight:900 !important;text-shadow:0 0 20px #00ffff !important;">Taproot (bc1p...)</strong> inputs for maximum privacy and lowest fees.<br><br>
+        
+            Legacy addresses (starting with <strong style="color:#ffaa00 !important;font-weight:900 !important;">1...</strong>) and Nested SegWit (starting with <strong style="color:#ffaa00 !important;font-weight:900 !important;">3...</strong>) are displayed for transparency but 
+            <strong style="color:#ff6666 !important;font-weight:900 !important;">cannot be included in the generated PSBT</strong>.<br><br>
+        
+            They will appear faded in the table and cannot be selected.<br>
+            To fully take advantage of optimized fees and better privacy, we recommend spending or converting them separately.
+        </div>
             """
         )
 
