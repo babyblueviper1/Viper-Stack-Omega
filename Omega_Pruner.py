@@ -385,32 +385,45 @@ def load_selection(json_file, current_enriched):
 def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
     """
     Rebuild dataframe rows from current enriched_state.
-    Used when loading a saved selection JSON or restoring state.
-    Disables selection for unsupported script types and shows warnings.
-    Returns (rows, has_unsupported) — True if any input cannot be included in PSBT.
+    Used when loading a saved selection JSON.
+    Safely handles invalid or unexpected input types.
     """
-    # Extract utxos from frozen tuple
+    # Handle invalid enriched_state (e.g., string, dict, None from reset or snapshot)
+    if not enriched_state:
+        return [], False
+
+    # Extract utxos from frozen tuple — this is the expected format
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
         _, utxos = enriched_state
+        if not isinstance(utxos, (list, tuple)):
+            return [], False
         state_list = list(utxos)
+    elif isinstance(enriched_state, (list, tuple)):
+        # Fallback: direct list of UTXOs
+        state_list = list(enriched_state)
     else:
-        state_list = enriched_state or []
+        # Invalid type (string, dict, etc.) — likely from reset or snapshot bleed
+        print(f"Warning: rebuild_df_rows received invalid enriched_state type: {type(enriched_state)}")
+        return [], False
 
     rows = []
     has_unsupported = False
 
     for u in state_list:
+        # Safety: skip non-dict items
+        if not isinstance(u, dict):
+            continue
+
         script_type = u.get("script_type", "")
         selected = u.get("selected", False)
 
-        # Define supported types for PSBT inclusion
         supported_in_psbt = script_type in ("P2WPKH", "Taproot")
         is_legacy = script_type == "P2PKH"
         is_nested = script_type == "P2SH-P2WPKH"
 
         if not supported_in_psbt:
             has_unsupported = True
-            selected = False  # Force off — cannot be used in pruning PSBT
+            selected = False
 
             if is_legacy:
                 health_html = (
@@ -425,19 +438,16 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
                     '</div>'
                 )
             else:
-                # Fallback (shouldn't happen)
                 health_html = (
-                    f'<div class="health health-{u["health"].lower()}">'
-                    f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
+                    f'<div class="health health-{u.get("health", "UNKNOWN").lower()}">'
+                    f'{u.get("health", "UNKNOWN")}<br><small>{u.get("recommend", "")}</small></div>'
                 )
         else:
-            # Fully supported — allow original selection state
             health_html = (
-                f'<div class="health health-{u["health"].lower()}">'
-                f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
+                f'<div class="health health-{u.get("health", "OPTIMAL").lower()}">'
+                f'{u.get("health", "OPTIMAL")}<br><small>{u.get("recommend", "")}</small></div>'
             )
 
-        # Friendly display name for Type column
         display_type = {
             "P2WPKH": "Native SegWit",
             "Taproot": "Taproot",
@@ -446,19 +456,18 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
         }.get(script_type, script_type)
 
         rows.append([
-            selected,                                   # checkbox (forced False if unsupported)
+            selected,
             u.get("source", "Single"),
-            u["txid"][:8] + "..." + u["txid"][-8:],
+            u.get("txid", "unknown")[:8] + "..." + u.get("txid", "unknown")[-8:],
             health_html,
-            u["value"],
-            u["address"],
-            u["input_weight"],
-            display_type,                               # user-friendly type
-            u["vout"],
+            u.get("value", 0),
+            u.get("address", "unknown"),
+            u.get("input_weight", 0),
+            display_type,
+            u.get("vout", 0),
         ])
 
     return rows, has_unsupported
-
 def sats_to_btc_str(sats: int) -> str:
     btc = sats / 100_000_000
     if btc >= 1:
@@ -3053,6 +3062,44 @@ tr:has(.health-legacy) input[type="checkbox"] {
                     interactive=True,
                     info="Retinal protection • Nuclear glow preserved • Recommended",
                 )
+
+        # ← Modern Bitcoin Optimization Note (after toggle, before inputs)
+        gr.HTML(
+            value="""
+            <div style="
+                margin: 50px auto 40px auto !important;
+                padding: 28px !important;
+                max-width: 900px !important;
+                background: rgba(0, 50, 30, 0.5) !important;
+                border: 3px solid #00ff9d !important;
+                border-radius: 18px !important;
+                text-align: center !important;
+                font-size: 1.2rem !important;
+                line-height: 1.8 !important;
+                color: #ccffe6 !important;
+                box-shadow: 0 0 60px rgba(0, 255, 157, 0.4) !important;
+            ">
+                <div style="
+                    color:#00ffdd !important;
+                    font-size:1.6rem !important;
+                    font-weight:900 !important;
+                    letter-spacing:2px !important;
+                    margin-bottom:16px !important;
+                    text-shadow:0 0 30px #00ffdd !important;
+                ">
+                    Optimized for Modern Bitcoin
+                </div>
+
+                Ωmega Pruner fully supports <strong>Native SegWit (bc1q...)</strong> and <strong>Taproot (bc1p...)</strong> inputs for maximum privacy and lowest fees.<br><br>
+                
+                Legacy addresses (starting with <strong>1...</strong>) and Nested SegWit (starting with <strong>3...</strong>) are displayed for transparency but 
+                <strong>cannot be included in the generated PSBT</strong>.<br><br>
+                
+                They will appear faded in the table and cannot be selected.<br>
+                To fully take advantage of optimized fees and better privacy, we recommend spending or converting them separately.
+            </div>
+            """
+        )
 
         with gr.Row():
             addr_input = gr.Textbox(
