@@ -2678,18 +2678,7 @@ def analyze_and_show_summary(
 with gr.Blocks(
     title="Ωmega Pruner v11 — Forged Anew"
 ) as demo:
-    # Social / OpenGraph Preview
-    gr.HTML("""
-    <meta property="og:title" content="Ωmega Pruner v11 — Forged Anew">
-    <meta property="og:description" content="The cleanest open-source UTXO consolidator. Zero custody. Full coin-control. RBF. Taproot.">
-    <meta property="og:image" content="https://omega-pruner.onrender.com/docs/omega_thumbnail.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:url" content="https://omega-pruner.onrender.com">
-    <meta property="og:type" content="website">
-    <meta name="twitter:card" content="summary_large_image">
-    """, visible=False)
-
+   
     # Full-screen animated Ωmega background + Hero Banner
     gr.HTML("""
     <div id="omega-bg" style="
@@ -3095,7 +3084,7 @@ tr:has(.health-nested) input[type="checkbox"] {
         gr.HTML(
             value="""
             <div style="
-                margin: 0px auto 50px auto !important;
+                margin: 0px auto 60px auto !important;
                 padding: 28px !important;
                 max-width: 900px !important;
                 background: rgba(0, 20, 10, 0.6) !important;
