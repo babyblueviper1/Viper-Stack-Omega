@@ -496,6 +496,29 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
     if input_count <= 1:
         return ""
 
+    # Calculate mix estimate
+    min_mixes, max_mixes = estimate_coinjoin_mixes_needed(input_count, distinct_addrs, privacy_score)
+
+    # Recovery note — shown when privacy is impacted
+    recovery_note = ""
+    if privacy_score <= 70:
+        recovery_note = f"""
+        <div style="
+            margin-top:20px !important;
+            padding:16px !important;
+            background:#001100 !important;
+            border:2px solid #00ff88 !important;
+            border-radius:12px !important;
+            color:#aaffcc !important;
+            font-size:1.05rem !important;
+            line-height:1.6 !important;
+            box-shadow:0 0 40px rgba(0,255,136,0.3) !important;
+        ">
+            💧 <strong>Recovery Plan</strong>: ~{min_mixes}–{max_mixes} Whirlpool cycles recommended<br>
+            <small>to reasonably break on-chain linkage after this consolidation.</small>
+        </div>
+        """
+
     if privacy_score <= 30:
         return f"""
               <div style="
@@ -524,6 +547,7 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         <div style="color:#ffaaaa !important;">Privacy state: Severely compromised</div><br>
         Maximum fee savings, but analysts will confidently cluster these addresses as yours.<br>
         Consider CoinJoin, PayJoin, or silent payments afterward to restore privacy.
+        {recovery_note}
     </div>
            """
     elif privacy_score <= 50:
@@ -552,6 +576,7 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as yours.<br><br>
         <div style="color:#ffcc88 !important;">Privacy state: Significantly reduced</div><br>
         Good fee savings, but real privacy trade-off.
+        {recovery_note}
     </div>
     """
     elif privacy_score <= 70:
@@ -580,6 +605,7 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         Spending multiple inputs together creates some on-chain linkage between them.<br>
         Analysts may assume they belong to the same person — but it's not definitive.<br><br>
         Privacy impact is moderate. Acceptable trade-off during low-fee periods when saving sats matters most.
+        {recovery_note}
     </div>
     """
     else:
