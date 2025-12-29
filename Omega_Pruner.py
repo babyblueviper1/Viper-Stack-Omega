@@ -514,8 +514,8 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
             line-height:1.6 !important;
             box-shadow:0 0 40px rgba(0,255,136,0.3) !important;
         ">
-            💧 <strong>Recovery Plan</strong>: ~{min_mixes}–{max_mixes} Whirlpool cycles recommended<br>
-            <small>to reasonably break on-chain linkage after this consolidation.</small>
+            💧 <span style="color:#00ffdd !important; font-size:1.2rem !important; font-weight:900 !important; text-shadow:0 0 20px #00ffdd !important;">Recovery Plan</span>: ~{min_mixes}–{max_mixes} Whirlpool cycles recommended<br>
+            <small style="color:#88ffcc !important;">to reasonably break on-chain linkage after this consolidation.</small>
         </div>
         """
 
