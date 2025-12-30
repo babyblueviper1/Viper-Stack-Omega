@@ -94,19 +94,67 @@ TYPE_COL     = 7
 VOUT_COL     = 8
 
 no_utxos_msg = (
-    "<div style='text-align:center;padding:60px;color:#ff9900;"
-    "font-size:1.4rem;font-weight:700;'>"
-    "No UTXOs found<br><br>"
-    "Try different addresses, lower dust threshold, or paste manual UTXOs"
+    "<div class='empty-state-msg' style='"
+    "text-align:center !important;"
+    "padding: clamp(40px, 10vw, 80px) !important;"
+    "max-width:90% !important;"
+    "margin:0 auto !important;"
+    "background: rgba(0, 20, 10, 0.7) !important;"  # Dark green translucent background
+    "border: 2px solid #00ff88 !important;"
+    "border-radius: 18px !important;"
+    "box-shadow: 0 0 50px rgba(0,255,136,0.4) !important;"
+    "'>"
+    "<div style='"
+    "color:#00ffdd !important;"
+    "font-size: clamp(1.3rem, 5.5vw, 1.8rem) !important;"
+    "font-weight:900 !important;"
+    "text-shadow: 0 0 30px #00ffdd !important;"
+    "margin-bottom: clamp(16px, 4vw, 24px) !important;"
+    "'>"
+    "No UTXOs found yet"
+    "</div>"
+    "<div style='"
+    "color:#88ffcc !important;"
+    "font-size: clamp(1rem, 3.5vw, 1.2rem) !important;"
+    "line-height:1.7 !important;"
+    "'>"
+    "Paste one or more addresses/xpubs below,<br>"
+    "lower the dust threshold, or use Offline Mode to paste raw UTXOs."
+    "</div>"
     "</div>"
 )
 
 select_msg = (
-    "<div style='text-align:center;padding:60px;color:#ff9900;"
-    "font-size:1.4rem;'>"
-    "Select UTXOs in the table to begin"
+    "<div class='empty-state-msg' style='"
+    "text-align:center !important;"
+    "padding: clamp(40px, 10vw, 80px) !important;"
+    "max-width:90% !important;"
+    "margin:0 auto !important;"
+    "background: rgba(0, 20, 10, 0.7) !important;"
+    "border: 2px solid #00ff88 !important;"
+    "border-radius: 18px !important;"
+    "box-shadow: 0 0 50px rgba(0,255,136,0.4) !important;"
+    "'>"
+    "<div style='"
+    "color:#00ffdd !important;"
+    "font-size: clamp(1.3rem, 5.5vw, 1.8rem) !important;"
+    "font-weight:900 !important;"
+    "text-shadow: 0 0 30px #00ffdd !important;"
+    "margin-bottom: clamp(16px, 4vw, 24px) !important;"
+    "'>"
+    "Select UTXOs to begin pruning"
+    "</div>"
+    "<div style='"
+    "color:#88ffcc !important;"
+    "font-size: clamp(1rem, 3.5vw, 1.2rem) !important;"
+    "line-height:1.7 !important;"
+    "'>"
+    "Check the boxes — summary and privacy score update instantly."
+    "</div>"
     "</div>"
 )
+
+
 
 
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -331,9 +379,24 @@ def load_selection(json_file, current_enriched):
         
         if not current_enriched:
             return current_enriched, (
-                "<div style='color:#00ff9d;padding:20px;background:#002200;border-radius:12px;text-align:center;'>"
-                "<strong>Selection file loaded!</strong><br><br>"
-                "Now paste the same addresses/xpubs → click <strong>ANALYZE</strong><br>"
+                "<div style='"
+                "color:#aaffcc !important;"
+                "padding: clamp(20px, 5vw, 30px) !important;"
+                "background:#001100 !important;"
+                "border:2px solid #00ff88 !important;"
+                "border-radius:16px !important;"
+                "text-align:center !important;"
+                "font-size: clamp(1.1rem, 4vw, 1.3rem) !important;"
+                "line-height:1.7 !important;"
+                "box-shadow:0 0 40px rgba(0,255,136,0.3) !important;"
+                "max-width:90% !important;"
+                "margin:20px auto !important;"
+                "'>"
+                "<span style='color:#00ffdd !important;font-size: clamp(1.3rem, 5vw, 1.6rem) !important;font-weight:900 !important;text-shadow:0 0 25px #00ffdd !important;'>"
+                "Selection file loaded!"
+                "</span><br><br>"
+                "Now paste the same addresses/xpubs → click "
+                "<span style='color:#00ffff !important;font-weight:900 !important;text-shadow:0 0 20px #00ffff !important;'>ANALYZE</span><br>"
                 "Then upload this file again to restore your exact checkboxes."
                 "</div>"
             )
@@ -350,15 +413,46 @@ def load_selection(json_file, current_enriched):
         
         if matched_count == 0:
             message = (
-                "<div style='color:#ff9900;padding:20px;background:#331100;border-radius:12px;text-align:center;'>"
-                "<strong>Selection loaded — no matching UTXOs found</strong><br><br>"
+                "<div style='"
+                "color:#ffddaa !important;"
+                "padding: clamp(20px, 5vw, 30px) !important;"
+                "background:#332200 !important;"
+                "border:2px solid #ff9900 !important;"
+                "border-radius:16px !important;"
+                "text-align:center !important;"
+                "font-size: clamp(1.1rem, 4vw, 1.3rem) !important;"
+                "line-height:1.7 !important;"
+                "box-shadow:0 0 40px rgba(255,153,0,0.4) !important;"
+                "max-width:90% !important;"
+                "margin:20px auto !important;"
+                "'>"
+                "<span style='color:#ffff66 !important;font-size: clamp(1.3rem, 5vw, 1.6rem) !important;font-weight:900 !important;text-shadow:0 0 25px #ffff00 !important;'>"
+                "Selection loaded — no matching UTXOs found"
+                "</span><br><br>"
                 f"File contains {len(selected_keys)} UTXOs.<br>"
                 "They don't match current analysis (different addresses?).<br>"
                 "Checkboxes not restored."
                 "</div>"
             )
         else:
-            message = f"Selection loaded — {matched_count}/{len(selected_keys)} UTXOs restored"
+            message = (
+                "<div style='"
+                "color:#aaffff !important;"
+                "padding: clamp(20px, 5vw, 30px) !important;"
+                "background:#001122 !important;"
+                "border:2px solid #00ffff !important;"
+                "border-radius:16px !important;"
+                "text-align:center !important;"
+                "font-size: clamp(1.1rem, 4vw, 1.3rem) !important;"
+                "box-shadow:0 0 50px rgba(0,255,255,0.4) !important;"
+                "max-width:90% !important;"
+                "margin:20px auto !important;"
+                "'>"
+                "<span style='color:#00ffff !important;font-size: clamp(1.3rem, 5vw, 1.6rem) !important;font-weight:900 !important;text-shadow:0 0 30px #00ffff !important;'>"
+                f"Selection loaded — {matched_count}/{len(selected_keys)} UTXOs restored"
+                "</span>"
+                "</div>"
+            )
         
         return tuple(updated), message
     
@@ -408,24 +502,30 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
             if script_type in ("P2PKH", "Legacy"):
                 health_html = (
                     '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
-                    '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
+                    '<span style="font-size:clamp(1rem, 4vw, 1.2rem);">⚠️ LEGACY</span><br>'
+                    '<small style="font-size:clamp(0.8rem, 3vw, 0.9rem);">Not supported for PSBT</small>'
                     '</div>'
                 )
             elif script_type == "P2SH-P2WPKH":
                 health_html = (
                     '<div class="health health-nested" style="color:#ff9900;font-weight:bold;">'
-                    '⚠️ NESTED<br><small>Not supported yet</small>'
+                    '<span style="font-size:clamp(1rem, 4vw, 1.2rem);">⚠️ NESTED</span><br>'
+                    '<small style="font-size:clamp(0.8rem, 3vw, 0.9rem);">Not supported yet</small>'
                     '</div>'
                 )
             else:
                 health_html = (
                     f'<div class="health health-{u.get("health", "unknown").lower()}">'
-                    f'{u.get("health", "UNKNOWN")}<br><small>Cannot prune</small></div>'
+                    f'<span style="font-size: clamp(1rem, 4vw, 1.2rem);">{u.get("health", "UNKNOWN")}</span><br>'
+                    f'<small style="font-size: clamp(0.85rem, 3vw, 0.95rem);">Cannot prune</small>'
+                    '</div>'
                 )
         else:
             health_html = (
                 f'<div class="health health-{u.get("health", "OPTIMAL").lower()}">'
-                f'{u.get("health", "OPTIMAL")}<br><small>{u.get("recommend", "")}</small></div>'
+                f'<span style="font-size:clamp(1rem, 4vw, 1.2rem);">{u.get("health", "OPTIMAL")}</span><br>'
+                f'<small style="font-size:clamp(0.8rem, 3vw, 0.9rem);">{u.get("recommend", "")}</small>'
+                '</div>'
             )
 
         # Friendly display name
@@ -510,11 +610,11 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
             border:2px solid #00ff88 !important;
             border-radius:12px !important;
             color:#aaffcc !important;
-            font-size:1.05rem !important;
+            font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
             line-height:1.6 !important;
             box-shadow:0 0 40px rgba(0,255,136,0.3) !important;
         ">
-            💧 <span style="color:#00ffdd !important; font-size:1.2rem !important; font-weight:900 !important; text-shadow:0 0 20px #00ffdd !important;">Recovery Plan</span>: ~{min_mixes}–{max_mixes} Whirlpool cycles recommended<br>
+            💧 <span style="color:#00ffdd !important; font-size:clamp(1rem, 3.5vw, 1.2rem)!important; font-weight:900 !important; text-shadow:0 0 20px #00ffdd !important;">Recovery Plan</span>: ~{min_mixes}–{max_mixes} Whirlpool cycles recommended<br>
             <small style="color:#88ffcc !important;">to reasonably break on-chain linkage after this consolidation.</small>
         </div>
         """
@@ -528,19 +628,19 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         border:3px solid #ff3366 !important;
         border-radius:14px !important;
         box-shadow:0 0 50px rgba(255,51,102,0.9) !important;
-        font-size:1.22rem !important;
+        font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
         line-height:1.7 !important;
         color:#ffcccc !important;
     ">
         <div style="
             color:#ff3366 !important;
-            font-size:1.6rem !important;
+            font-size:clamp(1.3rem, 5vw, 1.6rem) !important;
             font-weight:900 !important;
             text-shadow:0 0 30px #ff3366 !important;
         ">
             EXTREME CIOH LINKAGE
         </div><br>
-        <div style="color:#ff6688 !important; font-size:1.15rem !important;">
+        <div style="color:#ff6688 !important; font-size: clamp(1rem, 3.5vw, 1.2rem)!important;">
             Common Input Ownership Heuristic (CIOH)
         </div><br>
         This consolidation strongly proves common ownership of many inputs/addresses.<br><br>
@@ -558,19 +658,19 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         background:#331100 !important;
         border:2px solid #ff8800 !important;
         border-radius:12px !important;
-        font-size:1.18rem !important;
+        font-size: clamp(1rem, 3.5vw, 1.2rem)!important;
         line-height:1.6 !important;
         color:#ffddaa !important;
     ">
         <div style="
             color:#ff9900 !important;
-            font-size:1.6rem !important;
+            font-size:clamp(1.3rem, 5vw, 1.6rem) !important;
             font-weight:900 !important;
             text-shadow:0 0 30px #ff9900 !important;
         ">
             HIGH CIOH RISK
         </div><br>
-        <div style="color:#ffaa44 !important; font-size:1.12rem !important;">
+        <div style="color:#ffaa44 !important; font-size:clamp(1rem, 3.5vw, 1.2rem)!important;">
             Common Input Ownership Heuristic (CIOH)
         </div><br>
         Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as yours.<br><br>
@@ -588,18 +688,18 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         border:1px solid #00ff9d !important;
         border-radius:10px !important;
         color:#aaffaa !important;
-        font-size:1.15rem !important;
+        font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
         line-height:1.6 !important;
     ">
         <div style="
             color:#00ff9d !important;
-            font-size:1.6rem !important;
+            font-size:clamp(1.3rem, 5vw, 1.6rem)!important;
             font-weight:900 !important;
             text-shadow:0 0 30px #00ff9d !important;
         ">
             MODERATE CIOH
         </div><br>
-        <div style="color:#66ffaa !important; font-size:1.1rem !important;">
+        <div style="color:#66ffaa !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;">
             Common Input Ownership Heuristic (CIOH)
         </div><br>
         Spending multiple inputs together creates some on-chain linkage between them.<br>
@@ -613,18 +713,18 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
          <div style="
         margin-top:10px !important;
         color:#aaffaa !important;
-        font-size:1.05rem !important;
+        font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
         line-height:1.5 !important;
     ">
         <div style="
             color:#00ffdd !important;
-            font-size:1.6rem !important;
+            font-size:clamp(1.3rem, 5vw, 1.6rem) !important;
             font-weight:900 !important;
             text-shadow:0 0 30px #00ffdd !important;
         ">
             LOW CIOH IMPACT
         </div><br>
-        <span style="color:#00ffdd !important; font-size:1.1rem !important;">
+        <span style="color:#00ffdd !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;">
             (Common Input Ownership Heuristic)
         </span><br><br>
         Few inputs spent together — minimal new linkage created.<br>
@@ -1369,6 +1469,7 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
     """
     Convert enriched UTXOs into dataframe rows.
     Handles unsupported script types by disabling selection and showing warnings.
+    Fully responsive health badges for mobile.
     """
     rows: List[List] = []
     has_unsupported = False
@@ -1384,31 +1485,34 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
             has_unsupported = True
             selected = False  # Force unselected
 
-            # Unified warning badges
             if script_type in ("P2PKH", "Legacy"):
                 health_html = (
                     '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
-                    '⚠️ LEGACY<br><small>Not supported for PSBT</small>'
+                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
+                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Not supported for PSBT</small>'
                     '</div>'
                 )
             elif script_type == "P2SH-P2WPKH":
                 health_html = (
                     '<div class="health health-nested" style="color:#ff9900;font-weight:bold;">'
-                    '⚠️ NESTED<br><small>Not supported yet</small>'
+                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
+                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Not supported yet</small>'
                     '</div>'
                 )
             else:
-                # Fallback — should not happen
                 health_html = (
                     f'<div class="health health-{u.get("health", "unknown").lower()}">'
-                    f'{u.get("health", "UNKNOWN")}<br><small>Cannot prune</small></div>'
+                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{u.get("health", "UNKNOWN")}</span><br>'
+                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Cannot prune</small>'
+                    '</div>'
                 )
         else:
             health_html = (
                 f'<div class="health health-{u["health"].lower()}">'
-                f'{u["health"]}<br><small>{u["recommend"]}</small></div>'
+                f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{u["health"]}</span><br>'
+                f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">{u["recommend"]}</small>'
+                '</div>'
             )
-            # Keep original selection for supported types
 
         # Friendly display name
         display_type = {
@@ -1416,7 +1520,7 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
             "Taproot": "Taproot",
             "P2SH-P2WPKH": "Nested SegWit",
             "P2PKH": "Legacy",
-            "Legacy": "Legacy",  # ← catch both
+            "Legacy": "Legacy",
         }.get(script_type, script_type)
 
         rows.append([
@@ -1508,16 +1612,32 @@ def analyze(
     # --- 6. Build table rows ---
     df_rows, has_unsupported = _build_df_rows(enriched_pruned)
 
-    # --- 6.1 Warning banner for unsupported inputs ---
+    # --- 6.1 Responsive warning banner for unsupported inputs ---
     if has_unsupported:
         warning_banner = (
-            "<div style='color:#ff9900;background:#332200;padding:24px;border-radius:16px;"
-            "font-weight:bold;text-align:center;font-size:1.3rem;margin:24px 0;box-shadow:0 0 40px rgba(255,153,0,0.4);'>"
+            "<div style='"
+            "color:#ffddaa !important;"
+            "background:#332200 !important;"
+            "padding: clamp(20px, 6vw, 32px) !important;"
+            "margin: clamp(20px, 5vw, 40px) 0 !important;"
+            "border:3px solid #ff9900 !important;"
+            "border-radius:18px !important;"
+            "text-align:center !important;"
+            "font-size: clamp(1.1rem, 4.5vw, 1.4rem) !important;"
+            "font-weight:700 !important;"
+            "line-height:1.7 !important;"
+            "box-shadow:0 0 60px rgba(255,153,0,0.5) !important;"
+            "max-width:95% !important;"
+            "margin-left:auto !important;"
+            "margin-right:auto !important;"
+            "'>"
             "⚠️ Some UTXOs Cannot Be Included in PSBT<br><br>"
+            "<span style='font-size: clamp(0.95rem, 3.5vw, 1.15rem) !important; color:#ffcc88 !important;'>"
             "Legacy (starting with 1...) and Nested SegWit (starting with 3...) inputs "
             "are not currently supported in the generated PSBT.<br><br>"
-            "They are shown in the table for transparency but cannot be selected.<br>"
+            "They are shown in the table for transparency but cannot be selected.<br><br>"
             "Please spend them separately or convert to Native SegWit (bc1q...) or Taproot (bc1p...) first."
+            "</span>"
             "</div>"
         )
     else:
@@ -1568,10 +1688,22 @@ def _analyze_empty(scan_source: str = ""):
 # ====================
 
 def _render_locked_state() -> Tuple[str, gr.update]:
-    """Early return when selection is locked."""
+    """Early return when selection is locked — responsive on mobile."""
     return (
-        "<div style='text-align:center;padding:60px;color:#888;font-size:1.4rem;'>"
-        "SELECTION LOCKED — Ready to sign PSBT"
+        "<div style='"
+        "text-align:center !important;"
+        "padding: clamp(40px, 10vw, 80px) !important;"   # Scales padding
+        "color:#aaaaaa !important;"                     # Slightly brighter gray
+        "font-size: clamp(1.2rem, 5vw, 1.8rem) !important;"  # Responsive title
+        "font-weight:700 !important;"
+        "line-height:1.7 !important;"
+        "max-width:90% !important;"
+        "margin:0 auto !important;"
+        "'>"
+        "<span style='color:#00ffdd !important; text-shadow:0 0 30px #00ffdd !important;'>"
+        "SELECTION LOCKED"
+        "</span>"
+        " — Ready to sign PSBT"
         "</div>",
         gr.update(visible=False)
     )
@@ -1605,18 +1737,42 @@ def _render_dao_feedback(econ: TxEconomics, dao_percent: float) -> str:
         return ""
 
     dao_raw = int((econ.total_in - econ.fee) * (dao_percent / 100.0))
+
     if econ.dao_amt >= 546:
         return (
-            f" • <span style='color:#00ff88 !important;font-weight:800;text-shadow:0 0 20px #00ff88 !important;'>"
-            f"DAO: {sats_to_btc_str(econ.dao_amt)}</span><br>"
-            f"<span style='color:#00ffaa !important;font-size:0.95rem;font-style:italic;'>"
-            f"Thank you. Your support keeps Ωmega Pruner free, sovereign, and evolving. • Ω</span>"
+            f" • <span style='"
+            "color:#00ff88 !important;"
+            "font-weight:800 !important;"
+            "font-size:clamp(1.1rem, 4vw, 1.3rem) !important;"
+            "text-shadow:0 0 25px #00ff88 !important;"
+            "'>"
+            f"DAO: {sats_to_btc_str(econ.dao_amt)}"
+            "</span><br>"
+            f"<span style='"
+            "color:#00ffaa !important;"
+            "font-size:clamp(0.9rem, 3.2vw, 1rem) !important;"
+            "font-style:italic !important;"
+            "'>"
+            f"Thank you. Your support keeps Ωmega Pruner free, sovereign, and evolving. • Ω"
+            "</span>"
         )
     elif dao_raw > 0:
         return (
-            f" • <span style='color:#ff3366 !important;font-weight:800;text-shadow:0 0 20px #ff3366 !important;'>"
-            f"DAO: {sats_to_btc_str(dao_raw)} → absorbed into fee</span><br>"
-            f"<span style='color:#ff6688 !important;font-size:0.9rem;font-style:italic;'>(below 546 sat dust threshold)</span>"
+            f" • <span style='"
+            "color:#ff3366 !important;"
+            "font-weight:800 !important;"
+            "font-size:clamp(1.1rem, 4vw, 1.3rem) !important;"
+            "text-shadow:0 0 25px #ff3366 !important;"
+            "'>"
+            f"DAO: {sats_to_btc_str(dao_raw)} → absorbed into fee"
+            "</span><br>"
+            f"<span style='"
+            "color:#ff6688 !important;"
+            "font-size:clamp(0.85rem, 3vw, 0.95rem) !important;"
+            "font-style:italic !important;"
+            "'>"
+            "(below 546 sat dust threshold)"
+            "</span>"
         )
     return ""
 	
@@ -1643,21 +1799,25 @@ def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
 
     return f"""
     <div style="
-        margin:26px 0 !important;
-        padding:24px !important;
+        margin: clamp(20px, 6vw, 40px) 0 !important;
+        padding: clamp(20px, 6vw, 32px) !important;
         background:{bg} !important;
         border:4px solid {border} !important;
-        border-radius:16px !important;
-        box-shadow:0 0 50px rgba(255,100,100,0.8) !important;
-        font-size:1.28rem !important;
+        border-radius:18px !important;
+        box-shadow:0 0 60px rgba(255,100,100,0.8) !important;
+        font-size: clamp(1.1rem, 4vw, 1.35rem) !important;
         line-height:1.8 !important;
         color:#ffeeee !important;
+        max-width:95% !important;
+        margin-left:auto !important;
+        margin-right:auto !important;
     ">
       <div style="
           color:{color} !important;
-          font-size:1.55rem !important;
-          text-shadow:0 0 15px {color} !important, 0 0 30px {color} !important;
-          margin-bottom:20px !important;
+          font-size: clamp(1.3rem, 5.5vw, 1.7rem) !important;
+          font-weight:900 !important;
+          text-shadow:0 0 20px {color} !important;
+          margin-bottom: clamp(16px, 4vw, 24px) !important;
       ">
         {title}
       </div>
@@ -1665,23 +1825,24 @@ def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
       The pruned value will likely be fully or partially absorbed into miner fees.<br><br>
       <div style="
           color:#ffff88 !important;
-          font-size:1.35rem !important;
-          text-shadow:0 0 12px #ffff99 !important, 0 0 25px #ffaa00 !important;
+          font-size: clamp(1.15rem, 4.5vw, 1.45rem) !important;
+          font-weight:800 !important;
+          text-shadow:0 0 15px #ffff99 !important;
           line-height:1.8 !important;
       ">
         Only proceed if your goal is wallet cleanup
       </div>
-      <div style="color:#ffdd88 !important; font-size:1.1rem !important; margin-top:8px !important;">
+      <div style="color:#ffdd88 !important; font-size: clamp(1rem, 3.5vw, 1.15rem) !important; margin-top:8px !important;">
         — not expecting significant change back.
       </div><br>
-      <div style="color:#ffaaaa !important; font-size:1.05rem !important; line-height:1.6 !important;">
+      <div style="color:#ffaaaa !important; font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important; line-height:1.7 !important;">
         💡 For a reliable change output, aim for:<br>
         • Value Pruned > ~5× Current Fee (good change back)<br>
         • Value Pruned > ~10× Current Fee (very comfortable)<br><br>
         This prune: <span style="color:#ffffff !important; font-weight:800 !important;">{sats_to_btc_str(econ.total_in)}</span> value and <span style="color:#ffffff !important; font-weight:800 !important;">{current_fee:,} sats</span> fee<br>
         Ratio: <span style="color:#ffffff !important; font-weight:800 !important;">{ratio}×</span> current fee
       </div><br>
-      <small style="color:#88ffcc !important;">
+      <small style="color:#88ffcc !important; font-size: clamp(0.9rem, 3vw, 1rem) !important;">
         💡 Pro tip: The bigger the prune (relative to fee), the more you get back as change. Small prunes = cleanup only.
       </small>
     </div>
@@ -1697,46 +1858,50 @@ def _render_payjoin_badge(dest_value: str) -> str:
 
     return f"""
     <div style="
-        margin:24px 0 !important;
-        padding:20px !important;
+        margin: clamp(20px, 6vw, 40px) 0 !important;
+        padding: clamp(18px, 5vw, 28px) !important;
         background:#001100 !important;
         border:3px solid #00ff88 !important;
-        border-radius:16px !important;
+        border-radius:18px !important;
         box-shadow:0 0 60px rgba(0,255,136,0.8) !important;
-        font-size:1.3rem !important;
+        font-size: clamp(1.1rem, 4vw, 1.3rem) !important;
         line-height:1.8 !important;
         color:#ccffcc !important;
+        max-width:95% !important;
+        margin-left:auto !important;
+        margin-right:auto !important;
     ">
       <div style="
           color:#00ff88 !important;
-          font-size:1.6rem !important;
+          font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;
           font-weight:900 !important;
-          text-shadow:0 0 30px #00ff88 !important;
+          text-shadow:0 0 35px #00ff88 !important;
+          margin-bottom:12px !important;
       ">
         🟢 CIOH-PROTECTED SEND AVAILABLE
-      </div><br>
+      </div>
       This destination supports <span style="color:#00ffdd !important;font-weight:900 !important;">PayJoin (BIP78)</span>.<br><br>
       PayJoin breaks the Common Input Ownership Heuristic by including receiver inputs — 
       preventing new address clustering from this transaction.<br><br>
       <div style="
           color:#aaffff !important;
-          font-size:1.25rem !important;
+          font-size: clamp(1.1rem, 4.5vw, 1.3rem) !important;
           font-weight:900 !important;
       ">
         To complete a CIOH-free send:
       </div>
       <div style="
           color:#ffffff !important;
-          font-size:1.1rem !important;
+          font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
           margin-top:8px !important;
-          line-height:1.6 !important;
+          line-height:1.7 !important;
       ">
         • Sign and broadcast with a PayJoin-compatible wallet<br>
         • Receiver must support PayJoin (e.g., BTCPay Server)<br>
         • Works great with: Sparrow ↔ BTCPay, JoinMarket, etc.
       </div><br>
       <div style="
-          font-size:0.95rem !important;
+          font-size: clamp(0.9rem, 3vw, 1rem) !important;
           color:#88ffaa !important;
       ">
         Standard send = new CIOH created<br>
@@ -1748,31 +1913,36 @@ def _render_payjoin_badge(dest_value: str) -> str:
 def _render_pruning_explanation(pruned_count: int, remaining_utxos: int) -> str:
     return f"""
     <div style="
-        margin:32px 0 !important;
-        padding:28px !important;
+        margin: clamp(24px, 8vw, 48px) 0 !important;
+        padding: clamp(20px, 6vw, 36px) !important;
         background:#001a00 !important;
         border:4px solid #00ff9d !important;
         border-radius:18px !important;
         box-shadow:0 0 60px rgba(0,255,157,0.7) !important, 
                    inset 0 0 40px rgba(0,255,157,0.1) !important;
-        font-size:1.25rem !important;
+        font-size: clamp(1.1rem, 4vw, 1.3rem) !important;
         line-height:1.9 !important;
         color:#ccffe6 !important;
+        max-width:95% !important;
+        margin-left:auto !important;
+        margin-right:auto !important;
     ">
-      <strong style="
+      <div style="
           color:#00ff9d !important;
-          font-size:1.65rem !important;
-          text-shadow:0 0 20px #00ff9d !important, 0 0 40px #00ff9d !important;
+          font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;
+          font-weight:900 !important;
+          text-shadow:0 0 25px #00ff9d !important, 0 0 50px #00ff9d !important;
+          margin-bottom: clamp(12px, 4vw, 20px) !important;
       ">
         🧹 WHAT PRUNING ACTUALLY DOES
-      </strong><br><br>
-      Pruning <strong style="color:#aaffff !important;">removes inefficient UTXOs</strong> (dust, legacy, or heavy) from your address.<br><br>
-      • You pay a fee now to delete <strong style="color:#00ffff !important;">{pruned_count}</strong> bad inputs.<br>
-      • The <strong style="color:#00ffff !important;">{remaining_utxos}</strong> remaining UTXOs are now easier and cheaper to spend later.<br>
-      • <strong style="color:#ffff88 !important;">If no change output is created:</strong> the pruned value is absorbed into fees — but your wallet is <strong style="color:#aaffff !important;">cleaner forever</strong>.<br><br>
-      <strong style="color:#00ffaa !important;">Goal:</strong> Healthier address → lower future fees.<br>
+      </div>
+      Pruning <span style="color:#aaffff !important; font-size: clamp(1.05rem, 3.8vw, 1.25rem) !important;">removes inefficient UTXOs</span> (dust, legacy, or heavy) from your address.<br><br>
+      • You pay a fee now to delete <span style="color:#00ffff !important; font-weight:800 !important;">{pruned_count}</span> bad inputs.<br>
+      • The <span style="color:#00ffff !important; font-weight:800 !important;">{remaining_utxos}</span> remaining UTXOs are now easier and cheaper to spend later.<br>
+      • <span style="color:#ffff88 !important;">If no change output is created:</span> the pruned value is absorbed into fees — but your wallet is <span style="color:#aaffff !important;">cleaner forever</span>.<br><br>
+      <span style="color:#00ffaa !important;">Goal:</span> Healthier address → lower future fees.<br>
       Pruning is often worth it during low-fee periods, even if you don’t get change back.<br><br>
-      <small style="color:#88ffcc !important; font-style:italic !important;">
+      <small style="color:#88ffcc !important; font-style:italic !important; font-size: clamp(0.9rem, 3vw, 1rem) !important;">
         💡 Tip: If your goal is to get change, only prune when total value pruned > ~10–20× the current expected fee.
       </small>
     </div>
@@ -1808,12 +1978,9 @@ def generate_summary_safe(
 
     # === No UTXOs at all ===
     if total_utxos == 0:
-        return (
-            no_utxos_msg,
-            gr.update(visible=False)
-        )
+        return no_utxos_msg, gr.update(visible=False)
 
-    # === Validate selection – now returns clean data only ===
+    # === Validate selection ===
     selected_utxos, pruned_count, error = _validate_utxos_and_selection(df, utxos)
 
     if error == "NO_UTXOS":
@@ -1821,7 +1988,7 @@ def generate_summary_safe(
     if error == "NO_SELECTION":
         return select_msg, gr.update(visible=False)
 
-    # === FINAL GUARD: Only count supported inputs in summary ===
+    # === FINAL GUARD: Only count supported inputs ===
     supported_selected = [
         u for u in selected_utxos
         if u.get("script_type") in ("P2WPKH", "Taproot")
@@ -1831,16 +1998,15 @@ def generate_summary_safe(
     if pruned_count == 0:
         return select_msg, gr.update(visible=False)
 
-    # Use supported_selected for everything below
     remaining_utxos = total_utxos - pruned_count
-	
+
     privacy_score, score_color = _compute_privacy_metrics(selected_utxos, total_utxos)
     econ = _compute_economics_safe(selected_utxos, fee_rate, dao_percent)
     if econ is None or econ.remaining <= 0:
         return (
-            "<div style='text-align:center !important;padding:40px !important;background:rgba(30,0,0,0.7) !important;backdrop-filter:blur(10px) !important;border:2px solid #ff3366 !important;border-radius:16px !important;"
-            "box-shadow:0 0 40px rgba(255,51,102,0.5) !important;font-size:1.3rem !important;color:#ffaa88 !important;'>"
-            "<strong style='color:#ff3366 !important;font-size:1.5rem !important;'>Transaction Invalid</strong><br><br>"
+            "<div style='text-align:center !important;padding:clamp(30px, 8vw, 60px) !important;background:rgba(30,0,0,0.7) !important;backdrop-filter:blur(10px) !important;border:2px solid #ff3366 !important;border-radius:16px !important;"
+            "box-shadow:0 0 40px rgba(255,51,102,0.5) !important;font-size:clamp(1.2rem, 4.5vw, 1.5rem) !important;color:#ffaa88 !important;max-width:95% !important;margin:0 auto !important;'>"
+            "<strong style='color:#ff3366 !important;font-size:clamp(1.4rem, 5.5vw, 1.8rem) !important;'>Transaction Invalid</strong><br><br>"
             f"Current fee ({econ.fee:,} sats @ {fee_rate} s/vB) exceeds available balance.<br><br>"
             "<strong>Lower the fee rate</strong> or select more UTXOs."
             "</div>",
@@ -1857,7 +2023,7 @@ def generate_summary_safe(
 
     sats_saved = max(0, econ.vsize * (future_fee_rate - fee_rate))
 
-    # Component rendering (SP preview removed)
+    # Component rendering
     dao_line = _render_dao_feedback(econ, dao_percent)
     small_warning = _render_small_prune_warning(econ, fee_rate)
     payjoin_badge = _render_payjoin_badge(dest_value)
@@ -1869,8 +2035,8 @@ def generate_summary_safe(
     status_box_html = f"""
     <div style="
         text-align:center !important;
-        margin:40px auto 30px auto !important;
-        padding:32px !important;
+        margin:clamp(30px, 8vw, 60px) auto 20px auto !important;
+        padding:clamp(24px, 6vw, 40px) !important;
         background: rgba(0, 0, 0, 0.45) !important;
         backdrop-filter: blur(12px) !important;
         -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
@@ -1885,91 +2051,91 @@ def generate_summary_safe(
     ">
       <div style="
           color:#0f0 !important;
-          font-size:2.6rem !important;
+          font-size:clamp(2.2rem, 8vw, 2.8rem) !important;
           font-weight:900 !important;
           letter-spacing:3px !important;
           text-shadow:0 0 35px #0f0 !important, 0 0 70px #0f0 !important;
-          margin-bottom:24px !important;
+          margin-bottom:clamp(16px, 4vw, 24px) !important;
       ">
         SELECTION READY
       </div>
       <div style="
           color:#f7931a !important;
-          font-size:1.8rem !important;
+          font-size:clamp(1.5rem, 5vw, 1.9rem) !important;
           font-weight:800 !important;
-          margin:20px 0 !important;
+          margin:clamp(12px, 3vw, 20px) 0 !important;
       ">
         {total_utxos:,} UTXOs • <span style="color:#00ff9d !important;">{strategy_label}</span> Strategy Active
       </div>
       <div style="
           color:#fff !important;
-          font-size:1.5rem !important;
+          font-size:clamp(1.3rem, 4.5vw, 1.7rem) !important;
           font-weight:700 !important;
-          margin:16px 0 !important;
+          margin:clamp(12px, 3vw, 20px) 0 !important;
       ">
         Pruning <span style="color:#ff6600 !important;font-weight:900 !important;">{pruned_count:,}</span> inputs
       </div>
       <div style="
           color:#fff !important;
-          font-size:1.7rem !important;
+          font-size:clamp(1.4rem, 5vw, 1.8rem) !important;
           font-weight:800 !important;
-          margin:24px 0 !important;
+          margin:clamp(16px, 4vw, 28px) 0 !important;
       ">
         Privacy Score: 
         <span style="
             color:{score_color} !important;
-            font-size:2.3rem !important;
+            font-size:clamp(1.8rem, 7vw, 2.5rem) !important;
             margin-left:12px !important;
-            text-shadow:0 0 25px {score_color} !important;
+            text-shadow:0 0 30px {score_color} !important;
         ">
           {privacy_score}/100
         </span>
       </div>
-      <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:32px 0 !important;">
-      <div style="font-size:1.1rem !important;line-height:2.1 !important;">
-        <div style="margin:16px 0 !important;">
+      <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:clamp(24px, 6vw, 40px) 0 !important;">
+      <div style="font-size:clamp(1rem, 3.5vw, 1.15rem) !important;line-height:2.1 !important;">
+        <div style="margin:clamp(12px, 3vw, 16px) 0 !important;">
           <b style="color:#fff !important;">Full wallet spend size today (before pruning):</b> 
           <span style="color:#ff9900 !important;font-weight:800 !important;">~{pre_vsize:,} vB</span>
         </div>
-        <div style="margin:16px 0 !important;">
+        <div style="margin:clamp(12px, 3vw, 16px) 0 !important;">
           <b style="color:#fff !important;">Size of this one-time pruning cleanup transaction:</b> 
           <span style="color:#0f0 !important;font-weight:800 !important;">~{econ.vsize:,} vB</span>
         </div>
-        <div style="margin:18px 0 !important;color:#88ffcc !important;font-size:1.05rem !important;line-height:1.6 !important;">
+        <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.6 !important;">
           💡 After pruning: your full wallet spend size drops to roughly <span style="color:#0f0 !important;font-weight:800 !important;">~{pre_vsize - econ.vsize + 200:,} vB</span>
         </div>
         <div style="
-            margin:24px 0 !important;
+            margin:clamp(16px, 4vw, 28px) 0 !important;
             color:#0f0 !important;
-            font-size:1.35rem !important;
+            font-size:clamp(1.2rem, 4.5vw, 1.5rem) !important;
             font-weight:900 !important;
-            text-shadow:0 0 25px #0f0 !important;
+            text-shadow:0 0 30px #0f0 !important;
             line-height:1.6 !important;
         ">
           {savings_label.upper()} WALLET CLEANUP!
         </div>
-        <div style="margin:16px 0 !important;">
+        <div style="margin:clamp(12px, 3vw, 16px) 0 !important;">
           <b style="color:#fff !important;">Current fee (paid now):</b> 
           <span style="color:#0f0 !important;font-weight:800 !important;">{econ.fee:,} sats @ {fee_rate} s/vB</span>{dao_line}
         </div>
-        <div style="margin:20px 0 !important;color:#88ffcc !important;font-size:1.1rem !important;line-height:1.6 !important;">
+        <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.6 !important;">
           💧 Expected output: 
           <span style="color:#0f0 !important;font-weight:800 !important;">{econ.change_amt:,} sats</span>
           change sent to standard address
         </div>
-        <div style="margin:20px 0 !important;color:#88ffcc !important;font-size:1.05rem !important;line-height:1.7 !important;">
+        <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.7 !important;">
           💡 Pruning now saves you <span style="color:#0f0 !important;font-weight:800 !important;">+{sats_saved:,} sats</span> versus pruning later if fees reach {future_fee_rate} s/vB
         </div>
       </div>
       {payjoin_badge}
-      <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:32px 0 !important;">
-      <div style="margin:32px 0 40px 0 !important;line-height:1.7 !important;">
+      <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:clamp(24px, 6vw, 40px) 0 !important;">
+      <div style="margin:clamp(24px, 6vw, 40px) 0 30px 0 !important;line-height:1.7 !important;">
         {cioh_warning}
       </div>
-      <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:32px 0 !important;">
+      <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:clamp(24px, 6vw, 40px) 0 !important;">
       <div style="
-          margin:0 20px 40px 20px !important;
-          padding:28px !important;
+          margin:0 20px clamp(20px, 5vw, 40px) 20px !important;
+          padding:clamp(20px, 5vw, 36px) !important;
           background: rgba(0,20,0,0.6) !important;
           backdrop-filter: blur(10px) !important;
           border:3px solid #00ff9d !important;
@@ -2113,17 +2279,39 @@ def on_generate(
 
 def _render_no_snapshot() -> str:
     return (
-        "<div style='color:#ff3366 !important;text-align:center !important;padding:30px !important;font-size:1.2rem !important;font-weight:700 !important;'>"
-        "No snapshot — run Generate first."
+        "<div style='"
+        "color:#ff6666 !important;"
+        "text-align:center !important;"
+        "padding: clamp(30px, 8vw, 60px) !important;"
+        "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+        "font-weight:700 !important;"
+        "line-height:1.7 !important;"
+        "max-width:90% !important;"
+        "margin:0 auto !important;"
+        "'>"
+        "No snapshot — run <strong style='color:#ffaa66 !important;'>Generate</strong> first."
+        "</div>"
+    )
+def _render_no_inputs() -> str:
+    return (
+        "<div style='"
+        "color:#ff6666 !important;"
+        "text-align:center !important;"
+        "padding: clamp(30px, 8vw, 60px) !important;"
+        "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+        "font-weight:700 !important;"
+        "line-height:1.7 !important;"
+        "max-width:90% !important;"
+        "margin:0 auto !important;"
+        "'>"
+        "No UTXOs selected for pruning!<br><br>"
+        "<span style='font-size: clamp(1rem, 3.5vw, 1.2rem) !important; color:#ffaa88 !important;'>"
+        "Check the boxes next to inputs you want to prune."
+        "</span>"
         "</div>"
     )
 
-def _render_no_inputs() -> str:
-    return (
-        "<div style='color:#ff3366 !important;text-align:center !important;padding:30px !important;font-size:1.2rem !important;font-weight:700 !important;'>"
-        "No UTXOs selected for pruning!"
-        "</div>"
-    )
+
 
 @dataclass(frozen=True)
 class PsbtParams:
@@ -2150,19 +2338,22 @@ def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Unio
     if not final_dest:
         return (
             "<div style='"
-            "color:#ff3366 !important;"
+            "color:#ff6666 !important;"
             "text-align:center !important;"
-            "padding:40px !important;"
+            "padding: clamp(30px, 8vw, 60px) !important;"
             "background:#440000 !important;"
-            "border-radius:16px !important;"
-            "box-shadow:0 0 40px rgba(255,51,102,0.4) !important;"
-            "font-size:1.3rem !important;"
+            "border-radius:18px !important;"
+            "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
+            "font-size: clamp(1.2rem, 4.5vw, 1.5rem) !important;"
             "line-height:1.7 !important;"
+            "max-width:90% !important;"
+            "margin:0 auto !important;"
             "'>"
             "<div style='"
             "color:#ff3366 !important;"
-            "font-size:1.5rem !important;"
+            "font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;"
             "font-weight:900 !important;"
+            "text-shadow:0 0 30px #ff3366 !important;"
             "'>No destination address available.</div><br><br>"
             "Please enter a destination address or ensure your scan source is valid."
             "</div>"
@@ -2171,19 +2362,22 @@ def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Unio
     if final_dest.startswith(("xpub", "ypub", "zpub", "tpub", "upub", "vpub")):
         return (
             "<div style='"
-            "color:#ffcc00 !important;"
+            "color:#ffdd88 !important;"
             "text-align:center !important;"
-            "padding:40px !important;"
+            "padding: clamp(30px, 8vw, 60px) !important;"
             "background:#332200 !important;"
-            "border-radius:16px !important;"
-            "box-shadow:0 0 40px rgba(255,204,0,0.4) !important;"
-            "font-size:1.3rem !important;"
+            "border-radius:18px !important;"
+            "box-shadow:0 0 60px rgba(255,204,0,0.5) !important;"
+            "font-size: clamp(1.2rem, 4.5vw, 1.5rem) !important;"
             "line-height:1.7 !important;"
+            "max-width:90% !important;"
+            "margin:0 auto !important;"
             "'>"
             "<div style='"
             "color:#ffcc00 !important;"
-            "font-size:1.5rem !important;"
+            "font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;"
             "font-weight:900 !important;"
+            "text-shadow:0 0 30px #ffcc00 !important;"
             "'>xpub detected as scan source.</div><br><br>"
             "Please specify a destination address.<br>"
             "Automatic derivation coming soon."
@@ -2196,24 +2390,26 @@ def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Unio
     except Exception:
         return (
             "<div style='"
-            "color:#ff3366 !important;"
+            "color:#ff6666 !important;"
             "text-align:center !important;"
-            "padding:40px !important;"
+            "padding: clamp(30px, 8vw, 60px) !important;"
             "background:#440000 !important;"
-            "border-radius:16px !important;"
-            "box-shadow:0 0 40px rgba(255,51,102,0.4) !important;"
-            "font-size:1.3rem !important;"
+            "border-radius:18px !important;"
+            "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
+            "font-size: clamp(1.2rem, 4.5vw, 1.5rem) !important;"
             "line-height:1.7 !important;"
+            "max-width:90% !important;"
+            "margin:0 auto !important;"
             "'>"
             "<div style='"
             "color:#ff3366 !important;"
-            "font-size:1.5rem !important;"
+            "font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;"
             "font-weight:900 !important;"
+            "text-shadow:0 0 30px #ff3366 !important;"
             "'>Invalid destination address.</div><br><br>"
             "Please check the address format."
             "</div>"
         )
-
 	
 def _build_unsigned_tx(
     inputs: List[dict],
@@ -2262,24 +2458,39 @@ def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
         qr_html = ""
         qr_warning = (
             "<div style='"
-            "margin:40px 0 !important;"
-            "padding:32px !important;"
-            "background:#221100 !important;"  # Dark amber background
+            "margin: clamp(30px, 8vw, 60px) 0 !important;"
+            "padding: clamp(24px, 6vw, 40px) !important;"
+            "background:#221100 !important;"
             "border:4px solid #ff9900 !important;"
             "border-radius:18px !important;"
             "text-align:center !important;"
-            "font-size:1.35rem !important;"
-            "color:#ffeecc !important;"       # Warm light text — never gray
+            "font-size: clamp(1.15rem, 4.5vw, 1.4rem) !important;"
+            "color:#ffeecc !important;"
             "box-shadow:0 0 70px rgba(255,153,0,0.6) !important;"
+            "max-width:95% !important;"
+            "margin-left:auto !important;"
+            "margin-right:auto !important;"
             "'>"
-            "<strong style='color:#ffff66 !important;font-size:1.7rem !important;text-shadow:0 0 30px #ffff00 !important;'>"
+            "<span style='"
+            "color:#ffff66 !important;"
+            "font-size: clamp(1.4rem, 6vw, 1.8rem) !important;"
+            "font-weight:900 !important;"
+            "text-shadow:0 0 35px #ffff00 !important;"
+            "'>"
             "PSBT Too Large for QR Code"
-            "</strong><br><br>"
-            f"<span style='color:#ffddaa !important;'>Size: {len(psbt_b64):,} characters</span><br><br>"
-            "Use the <strong style='color:#00ffff !important;font-size:1.4rem !important;text-shadow:0 0 25px #00ffff !important;'>"
+            "</span><br><br>"
+            f"<span style='color:#ffddaa !important; font-size: clamp(1rem, 3.8vw, 1.2rem) !important;'>"
+            f"Size: {len(psbt_b64):,} characters"
+            "</span><br><br>"
+            "Use the <span style='"
+            "color:#00ffff !important;"
+            "font-size: clamp(1.2rem, 5vw, 1.5rem) !important;"
+            "font-weight:900 !important;"
+            "text-shadow:0 0 30px #00ffff !important;"
+            "'>"
             "COPY PSBT"
-            "</strong> button below and paste directly into your wallet.<br><br>"
-            "<span style='color:#aaffff !important;font-size:1.1rem !important;'>"
+            "</span> button below and paste directly into your wallet.<br><br>"
+            "<span style='color:#aaffff !important; font-size: clamp(0.95rem, 3.5vw, 1.1rem) !important;'>"
             "Sparrow • Coldcard • Electrum • Most wallets support direct paste"
             "</span>"
             "</div>"
@@ -2312,14 +2523,25 @@ def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
     qr_warning = ""
     if len(psbt_b64) > 2600:
         qr_warning = (
-            "<div style='margin-top:16px;padding:12px;background:#331a00;border:1px solid #ff9900;border-radius:10px;"
-            "color:#ffb347;font-size:0.95rem;line-height:1.4;'>"
-            "Large PSBT — if QR scan fails, use <strong>COPY PSBT</strong> and paste manually."
+            "<div style='"
+            "margin-top: clamp(12px, 3vw, 20px) !important;"
+            "padding: clamp(10px, 3vw, 16px) !important;"
+            "background:#331a00 !important;"
+            "border:1px solid #ff9900 !important;"
+            "border-radius:12px !important;"
+            "color:#ffb347 !important;"
+            "font-size: clamp(0.9rem, 3.2vw, 1rem) !important;"
+            "line-height:1.5 !important;"
+            "text-align:center !important;"
+            "max-width:95% !important;"
+            "margin-left:auto !important;"
+            "margin-right:auto !important;"
+            "'>"
+            "Large PSBT — if QR scan fails, use <span style='color:#00ffff !important;font-weight:900 !important;'>COPY PSBT</span> and paste manually."
             "</div>"
         )
 
     return qr_html, qr_warning
-
 	
 def _render_payjoin_note(dest_addr: str) -> str:
     if not dest_addr:
@@ -2331,97 +2553,108 @@ def _render_payjoin_note(dest_addr: str) -> str:
 
     return f"""
     <div style="
-        margin:30px 0 !important;
-        padding:16px !important;
+        margin: clamp(24px, 6vw, 40px) 0 !important;
+        padding: clamp(16px, 5vw, 28px) !important;
         background:#001100 !important;
-        border:2px solid #00ff88 !important;
-        border-radius:12px !important;
-        box-shadow:0 0 40px rgba(0,255,136,0.5) !important;
-        font-size:1.05rem !important;
-        line-height:1.6 !important;
+        border:3px solid #00ff88 !important;
+        border-radius:16px !important;
+        box-shadow:0 0 60px rgba(0,255,136,0.6) !important;
+        font-size: clamp(1rem, 3.8vw, 1.15rem) !important;
+        line-height:1.7 !important;
         color:#ccffcc !important;
+        max-width:95% !important;
+        margin-left:auto !important;
+        margin-right:auto !important;
     ">
-      🟢 PayJoin possible with this receiver<br><br>
+      <div style="
+          color:#00ff88 !important;
+          font-size: clamp(1.2rem, 4.5vw, 1.5rem) !important;
+          font-weight:900 !important;
+          text-shadow:0 0 25px #00ff88 !important;
+          margin-bottom: clamp(12px, 3vw, 20px) !important;
+      ">
+        🟢 PayJoin possible with this receiver
+      </div>
       <div style="
           color:#aaffff !important;
-          font-size:1.1rem !important;
+          font-size: clamp(1.05rem, 4vw, 1.2rem) !important;
           font-weight:900 !important;
       ">
         Sign with a PayJoin-compatible wallet to complete the CIOH-free send
       </div><br>
       <div style="
-          font-size:0.95rem !important;
+          font-size: clamp(0.9rem, 3.2vw, 1rem) !important;
           color:#88ffaa !important;
       ">
         Standard signing = normal CIOH created
       </div>
     </div>
     """
-
 def _compose_psbt_html(
     fingerprint: str,
     qr_html: str,
     qr_warning: str,
     psbt_b64: str,
     payjoin_note: str,
-	extra_note: str = "",
+    extra_note: str = "",
 ) -> str:
     return f"""
-    <div style="height: 80px !important;"></div>
+    <div style="height: clamp(60px, 15vw, 100px) !important;"></div>
 <div style="
     text-align:center !important;
-    margin:60px auto 0px !important;
+    margin: clamp(40px, 10vw, 80px) auto 0 !important;
     max-width:960px !important;
     position: relative;
     z-index: 1;
 ">
 <div style="
     display:inline-block !important;
-    padding:55px !important;
-    background: rgba(0, 0, 0, 0.42) !important;   /* Matches hero banner feel */
+    padding: clamp(40px, 10vw, 70px) !important;
+    background: rgba(0, 0, 0, 0.42) !important;
     backdrop-filter: blur(14px) !important;
     -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
-    border:14px solid #f7931a !important;
-    border-radius:36px !important;
+    border: clamp(10px, 3vw, 14px) solid #f7931a !important;
+    border-radius: clamp(24px, 6vw, 36px) !important;
     box-shadow: 
         0 0 140px rgba(247,147,26,0.95) !important,
         inset 0 0 60px rgba(247,147,26,0.15) !important;
     position: relative;
+    max-width:95% !important;
 ">
      <!-- Selection Fingerprint -->
     <div style="
-        margin:40px 0 !important;
-        padding:28px !important;
+        margin: clamp(30px, 8vw, 50px) 0 !important;
+        padding: clamp(20px, 5vw, 32px) !important;
         background: rgba(0, 30, 0, 0.6) !important;
         backdrop-filter: blur(8px) !important;
         border:4px solid #0f0 !important;
-        border-radius:18px !important;
+        border-radius: clamp(12px, 3vw, 18px) !important;
         box-shadow:0 0 80px rgba(0,255,0,0.8) !important;
         font-family:monospace !important;
     ">
         <div style="
             color:#0f0 !important;
-            font-size:1.4rem !important;
+            font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;
             font-weight:900 !important;
             letter-spacing:3px !important;
             text-shadow:0 0 20px #0f0 !important;
-            margin-bottom:16px !important;
+            margin-bottom: clamp(12px, 3vw, 20px) !important;
         ">
             Ω FINGERPRINT
         </div>
         <div style="
             color:#00ff9d !important;
-            font-size:2.2rem !important;
+            font-size: clamp(1.8rem, 6vw, 2.4rem) !important;
             font-weight:900 !important;
-            letter-spacing:8px !important;
+            letter-spacing: clamp(6px, 1.5vw, 10px) !important;
             text-shadow:0 0 30px #00ff9d !important, 0 0 60px #00ff9d !important;
         ">
             {fingerprint}
         </div>
         <div style="
-            margin-top:20px !important;
+            margin-top: clamp(16px, 4vw, 24px) !important;
             color:#00ffaa !important;
-            font-size:1.1rem !important;
+            font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
             line-height:1.6 !important;
             font-weight:800 !important;
         ">
@@ -2429,31 +2662,31 @@ def _compose_psbt_html(
             Deterministic • Audit-proof • Never changes
         </div>
         <button onclick="navigator.clipboard.writeText('{fingerprint}').then(() => {{this.innerText='COPIED';setTimeout(()=>this.innerText='COPY FINGERPRINT',1500);}})"
-            style="margin-top:16px;padding:8px 20px;background:#000;color:#0f0;border:2px solid #0f0;border-radius:12px;font-size:1.1rem;font-weight:800;cursor:pointer;box-shadow:0 0 20px #0f0;">
+            style="margin-top: clamp(12px, 3vw, 20px) !important;padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 28px) !important;background:#000;color:#0f0;border:2px solid #0f0;border-radius:12px;font-size: clamp(1rem, 3.5vw, 1.2rem) !important;font-weight:800;cursor:pointer;box-shadow:0 0 20px #0f0;">
             COPY FINGERPRINT
         </button>
     </div>
         {extra_note}
     <div style="
-    color:#aaffaa !important;
-    font-size:1.05rem !important;
-    margin:30px 0 !important;
-    text-align:center !important;
-">
-  Change output sent to standard address
-</div>
+        color:#aaffaa !important;
+        font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;
+        margin: clamp(24px, 6vw, 40px) 0 !important;
+        text-align:center !important;
+    ">
+        Change output sent to standard address
+    </div>
     {payjoin_note}
 
     <!-- QR -->
     <div style="
-        margin:40px auto !important;
-        width:520px !important;
+        margin: clamp(30px, 8vw, 50px) auto !important;
+        width: clamp(300px, 80vw, 520px) !important;
         max-width:96vw !important;
-        padding:20px !important;
+        padding: clamp(16px, 4vw, 24px) !important;
         background: rgba(0,0,0,0.7) !important;
         backdrop-filter: blur(10px) !important;
-        border:8px solid #0f0 !important;
-        border-radius:24px !important;
+        border: clamp(6px, 2vw, 10px) solid #0f0 !important;
+        border-radius: clamp(16px, 4vw, 24px) !important;
         box-shadow:0 0 60px #0f0 !important;
     ">
         {qr_html}
@@ -2462,25 +2695,25 @@ def _compose_psbt_html(
     {qr_warning}
 
     <!-- PSBT Output -->
-    <div style="margin:60px auto 20px !important;width:92% !important;max-width:880px !important;">
+    <div style="margin: clamp(40px, 10vw, 80px) auto 20px !important;width:92% !important;max-width:880px !important;">
         <div style="
             position:relative !important;
             background: rgba(0,0,0,0.75) !important;
             backdrop-filter: blur(12px) !important;
-            border:6px solid #f7931a !important;
-            border-radius:18px !important;
+            border: clamp(4px, 1.5vw, 6px) solid #f7931a !important;
+            border-radius: clamp(12px, 3vw, 18px) !important;
             box-shadow:0 0 40px #0f0 !important;
             overflow:hidden !important;
         ">
             <textarea id="psbt-output" readonly 
                 style="
                     width:100% !important;
-                    height:180px !important;
+                    height: clamp(140px, 40vw, 200px) !important;
                     background:transparent !important;
                     color:#0f0 !important;
-                    font-size:1rem !important;
-                    padding:24px !important;
-                    padding-right:140px !important;
+                    font-size: clamp(0.9rem, 3vw, 1rem) !important;
+                    padding: clamp(16px, 4vw, 28px) !important;
+                    padding-right: clamp(100px, 25vw, 160px) !important;
                     border:none !important;
                     outline:none !important;
                     resize:none !important;
@@ -2491,45 +2724,48 @@ def _compose_psbt_html(
             <button onclick="navigator.clipboard.writeText(document.getElementById('psbt-output').value).then(() => {{this.innerText='COPIED';setTimeout(()=>this.innerText='COPY PSBT',1500);}})"
                 style="
                     position:absolute !important;
-                    top:14px !important;
-                    right:14px !important;
-                    padding:12px 30px !important;
+                    top: clamp(10px, 3vw, 16px) !important;
+                    right: clamp(10px, 3vw, 16px) !important;
+                    padding: clamp(10px, 3vw, 16px) clamp(24px, 6vw, 40px) !important;
                     background:#f7931a !important;
                     color:#000 !important;
                     border:none !important;
-                    border-radius:14px !important;
+                    border-radius: clamp(10px, 3vw, 16px) !important;
                     font-weight:800 !important;
-                    font-size:1.12rem !important;
+                    font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
                     cursor:pointer !important;
                     box-shadow:0 0 30px #f7931a !important;
                 ">
                 COPY PSBT
             </button>
         </div>
-        <div style="text-align:center !important;margin-top:12px !important;">
-            <span style="color:#00f0ff !important;font-weight:700 !important;">RBF enabled</span>
-            <span style="color:#888 !important;"> • Raw PSBT • </span>
-            <span style="color:#666 !important;font-size:0.9rem !important;">Inspect before signing</span>
+        <div style="text-align:center !important;margin-top: clamp(10px, 3vw, 16px) !important;">
+            <span style="color:#00f0ff !important;font-weight:700 !important;font-size: clamp(1rem, 3.5vw, 1.2rem) !important;">RBF enabled</span>
+            <span style="color:#888 !important;font-size: clamp(0.9rem, 3vw, 1rem) !important;"> • Raw PSBT • </span>
+            <span style="color:#666 !important;font-size: clamp(0.85rem, 2.8vw, 0.95rem) !important;">Inspect before signing</span>
         </div>
     </div>
 
     <!-- Wallet support -->
     <div style="
         color:#ff9900 !important;
-        font-size:1rem !important;
+        font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;
         text-align:center !important;
-        margin:40px 0 20px !important;
-        padding:16px !important;
+        margin: clamp(30px, 8vw, 60px) 0 clamp(16px, 4vw, 32px) 0 !important;
+        padding: clamp(12px, 4vw, 20px) !important;
         background: rgba(30,0,0,0.6) !important;
         backdrop-filter: blur(8px) !important;
         border:2px solid #f7931a !important;
-        border-radius:12px !important;
+        border-radius: clamp(10px, 3vw, 16px) !important;
         box-shadow:0 0 40px rgba(247,147,26,0.4) !important;
+        max-width:95% !important;
+        margin-left:auto !important;
+        margin-right:auto !important;
     ">
-        <div style='color:#fff !important;font-weight:800 !important;'>
-            Important: Wallet must support <strong style='color:#0f0 !important;'>PSBT</strong>
+        <div style='color:#fff !important;font-weight:800 !important;font-size: clamp(1rem, 3.5vw, 1.2rem) !important;'>
+            Important: Wallet must support <span style='color:#0f0 !important;'>PSBT</span>
         </div>
-        <div style='color:#0f8 !important;margin-top:8px !important;'>
+        <div style='color:#0f8 !important;margin-top: clamp(8px, 2vw, 12px) !important;font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;'>
             Sparrow • BlueWallet • Electrum • UniSat • Nunchuk • OKX
         </div>
     </div>
@@ -2555,10 +2791,22 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
     except Exception as e:
         log.error(f"Failed to extract PSBT params: {e}", exc_info=True)
         return (
-            "<div style='color:#ff3366;background:#440000;padding:40px;border-radius:16px;text-align:center;"
-            "font-size:1.4rem;box-shadow:0 0 40px rgba(255,51,102,0.5);'>"
-            "Invalid or corrupted snapshot<br><br>"
-            "Please click <strong>GENERATE</strong> again."
+            "<div style='"
+            "color:#ff6666 !important;"
+            "text-align:center !important;"
+            "padding: clamp(30px, 8vw, 60px) !important;"
+            "background:#440000 !important;"
+            "border-radius:18px !important;"
+            "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
+            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+            "line-height:1.7 !important;"
+            "max-width:90% !important;"
+            "margin:0 auto !important;"
+            "'>"
+            "<span style='color:#ff3366 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;font-weight:900 !important;'>"
+            "Invalid or corrupted snapshot"
+            "</span><br><br>"
+            "Please click <strong style='color:#ffaa66 !important;'>GENERATE</strong> again."
             "</div>"
         )
 
@@ -2573,10 +2821,23 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
 
     if not supported_inputs:
         return (
-            "<div style='color:#ff9900;background:#332200;padding:40px;border-radius:16px;text-align:center;"
-            "font-size:1.4rem;box-shadow:0 0 50px rgba(255,153,0,0.4);'>"
-            "No supported inputs selected<br><br>"
-            "Only <strong>Native SegWit (bc1q...)</strong> and <strong>Taproot (bc1p...)</strong> inputs can be pruned.<br>"
+            "<div style='"
+            "color:#ffdd88 !important;"
+            "text-align:center !important;"
+            "padding: clamp(30px, 8vw, 60px) !important;"
+            "background:#332200 !important;"
+            "border:3px solid #ff9900 !important;"
+            "border-radius:18px !important;"
+            "box-shadow:0 0 60px rgba(255,153,0,0.5) !important;"
+            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+            "line-height:1.8 !important;"
+            "max-width:90% !important;"
+            "margin:0 auto !important;"
+            "'>"
+            "<strong style='color:#ffff66 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;'>"
+            "No supported inputs selected"
+            "</strong><br><br>"
+            "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q...)</strong> and <strong style='color:#00ffff !important;'>Taproot (bc1p...)</strong> inputs can be pruned.<br><br>"
             "Legacy and Nested inputs are excluded from the PSBT."
             "</div>"
         )
@@ -2593,7 +2854,16 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
         econ = estimate_tx_economics(supported_inputs, params.fee_rate, params.dao_percent)
     except ValueError:
         return (
-            "<div style='color:#ff3366;text-align:center;padding:30px;font-size:1.3rem;font-weight:700;'>"
+            "<div style='"
+            "color:#ff6666 !important;"
+            "text-align:center !important;"
+            "padding: clamp(30px, 8vw, 60px) !important;"
+            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+            "font-weight:700 !important;"
+            "line-height:1.7 !important;"
+            "max-width:90% !important;"
+            "margin:0 auto !important;"
+            "'>"
             "Invalid transaction economics — please re-analyze."
             "</div>"
         )
@@ -2602,7 +2872,16 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
 
     if len(utxos_for_psbt) != len(tx.tx_ins):
         return (
-            "<div style='color:#ff3366;text-align:center;padding:40px;font-size:1.4rem;font-weight:700;'>"
+            "<div style='"
+            "color:#ff6666 !important;"
+            "text-align:center !important;"
+            "padding: clamp(30px, 8vw, 60px) !important;"
+            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+            "font-weight:700 !important;"
+            "line-height:1.7 !important;"
+            "max-width:90% !important;"
+            "margin:0 auto !important;"
+            "'>"
             "Internal error: Input/UTXO count mismatch — please report this bug."
             "</div>"
         )
@@ -2618,13 +2897,24 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
     if legacy_excluded:
         extra_note = (
             "<div style='"
-            "color:#ffaa00;background:#332200;padding:16px;border-radius:12px;"
-            "margin:40px 0 30px 0;text-align:center;font-size:1.15rem;"
-            "border:2px solid #ff8800;box-shadow:0 0 30px rgba(255,136,0,0.4);"
+            "color:#ffdd88 !important;"
+            "background:#332200 !important;"
+            "padding: clamp(16px, 4vw, 24px) !important;"
+            "margin: clamp(30px, 8vw, 50px) 0 !important;"
+            "border:3px solid #ff9900 !important;"
+            "border-radius:16px !important;"
+            "text-align:center !important;"
+            "font-size: clamp(1.1rem, 4vw, 1.3rem) !important;"
+            "box-shadow:0 0 50px rgba(255,153,0,0.5) !important;"
+            "max-width:90% !important;"
+            "margin-left:auto !important;"
+            "margin-right:auto !important;"
             "'>"
-            "⚠️ Some inputs were excluded from this PSBT<br>"
-            "<small>Only Native SegWit and Taproot inputs are supported. "
-            "Legacy/Nested inputs were automatically skipped.</small>"
+            "⚠️ Some inputs were excluded from this PSBT<br><br>"
+            "<small style='color:#ffcc88 !important;font-size: clamp(0.9rem, 3vw, 1rem) !important;'>"
+            "Only Native SegWit and Taproot inputs are supported.<br>"
+            "Legacy/Nested inputs were automatically skipped."
+            "</small>"
             "</div>"
         )
 
@@ -2636,7 +2926,7 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
         payjoin_note=payjoin_note,
         extra_note=extra_note,
     )
-
+    
 def analyze_and_show_summary(
     addr_input,
     strategy,
@@ -2704,7 +2994,7 @@ def analyze_and_show_summary(
 with gr.Blocks(
     title="Ωmega Pruner v11 — Forged Anew"
 ) as demo:
-   
+    
     # Full-screen animated Ωmega background + Hero Banner
     gr.HTML("""
     <div id="omega-bg" style="
@@ -2713,7 +3003,7 @@ with gr.Blocks(
         width: 100vw;
         height: 100vh;
         pointer-events: none;
-        z-index:0;
+        z-index: 0;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -2726,7 +3016,7 @@ with gr.Blocks(
                        omega-spin 120s linear infinite;
         ">
             <span class="omega-symbol" style="
-                font-size: 100vh;
+                font-size: 100vh !important;
                 font-weight: 900;
                 background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15));
                 -webkit-background-clip: text;
@@ -2744,55 +3034,90 @@ with gr.Blocks(
         </span>
     </div>
 
-    <div style="text-align:center;margin:100px 0 30px 0;padding:60px 40px;
-                background:rgba(0,0,0,0.42);
-                backdrop-filter: blur(10px);
-                border:8px solid #f7931a;
-                border-radius:32px;
-                box-shadow:0 0 100px rgba(247,147,26,0.5), inset 0 0 80px rgba(247,147,26,0.1);
-                max-width:900px;margin-left:auto;margin-right:auto;
-                position:relative;z-index:1;">
-
-    <div style="color:#f7931a;font-size:4.8rem;font-weight:900;letter-spacing:12px;
-                text-shadow:0 0 40px #f7931a, 0 0 80px #ffaa00, 0 0 120px rgba(247,147,26,0.9);
-                margin-bottom:20px;">
-        ΩMEGA PRUNER
-    </div>
-    
-    <div style="color:#0f0;font-size:2.6rem;font-weight:900;letter-spacing:6px;
-                text-shadow:0 0 35px #0f0, 0 0 70px #0f0;margin:30px 0;">
-        NUCLEAR COIN CONTROL
-    </div>
-
-    <div style="color:#00ffaa;font-size:1.2rem;letter-spacing:3px;margin:20px 0 20px 0;
-                text-shadow:0 0 15px #00ffaa;">
-        FORGED ANEW — v11
-    </div>
-    
-    <div style="color:#ddd;font-size:1.5rem;line-height:1.8;max-width:760px;margin:40px auto 50px auto;">
-        Pruning isn't just about saving sats today — it's about <strong style="color:#0f0;">taking control</strong> of your coins for the long term.<br><br>
+    <div style="
+        text-align: center !important;
+        margin: clamp(60px, 15vw, 120px) auto 30px auto !important;
+        padding: clamp(40px, 8vw, 60px) clamp(20px, 5vw, 40px) !important;
+        background: rgba(0,0,0,0.42) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: clamp(6px, 2vw, 8px) solid #f7931a !important;
+        border-radius: clamp(24px, 6vw, 32px) !important;
+        box-shadow: 0 0 100px rgba(247,147,26,0.5), inset 0 0 80px rgba(247,147,26,0.1) !important;
+        max-width: 900px !important;
+        width: 95% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        position: relative !important;
+        z-index: 1 !important;
+    ">
+        <div style="
+            color:#f7931a !important;
+            font-size: clamp(2.8rem, 10vw, 4.8rem) !important;
+            font-weight:900 !important;
+            letter-spacing: clamp(4px, 2vw, 12px) !important;
+            text-shadow:0 0 40px #f7931a, 0 0 80px #ffaa00, 0 0 120px rgba(247,147,26,0.9);
+            margin-bottom:20px !important;
+        ">
+            ΩMEGA PRUNER
+        </div>
         
-        By consolidating inefficient UTXOs, you:<br>
-        • <strong style="color:#00ff9d;">Save significantly on fees</strong> during peak congestion<br>
-        • <strong style="color:#00ff9d;">Gain true coin control</strong> — know exactly what you're spending<br>
-        • <strong style="color:#00ff9d;">Improve privacy</strong> through deliberate structure<br>
-        • <strong style="color:#00ff9d;">Future-proof your stack</strong> — remain spendable forever<br><br>
+        <div style="
+            color:#0f0 !important;
+            font-size: clamp(1.8rem, 7vw, 2.6rem) !important;
+            font-weight:900 !important;
+            letter-spacing: clamp(4px, 1.5vw, 6px) !important;
+            text-shadow:0 0 35px #0f0, 0 0 70px #0f0;
+            margin:30px 0 !important;
+        ">
+            NUCLEAR COIN CONTROL
+        </div>
 
-        <strong style="color:#f7931a;font-size:1.8rem;font-weight:900;letter-spacing:1px;">
-            Prune now. Win forever.
-        </strong><br><br>
+        <div style="
+            color:#00ffaa !important;
+            font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
+            letter-spacing: clamp(2px, 1vw, 3px) !important;
+            text-shadow:0 0 15px #00ffaa;
+            margin:20px 0 !important;
+        ">
+            FORGED ANEW — v11
+        </div>
         
-        Paste addresses or xpubs below and click 
-        <strong style="color:#f7931a;font-size:1.7rem;">ANALYZE</strong> 
-        to unlock your personalized strategy.
-    </div>
-    
-    <div style="font-size:4rem;color:#f7931a;opacity:0.9;animation:pulse 2s infinite;">
-        ↓
-    </div>
-</div>
+        <div style="
+            color:#ddd !important;
+            font-size: clamp(1.2rem, 4vw, 1.5rem) !important;
+            line-height:1.8 !important;
+            max-width:760px !important;
+            margin:40px auto 50px auto !important;
+        ">
+            Pruning isn't just about saving sats today — it's about <strong style="color:#0f0 !important;">taking control</strong> of your coins for the long term.<br><br>
+            
+            By consolidating inefficient UTXOs, you:<br>
+            • <strong style="color:#00ff9d !important;">Save significantly on fees</strong> during peak congestion<br>
+            • <strong style="color:#00ff9d !important;">Gain true coin control</strong> — know exactly what you're spending<br>
+            • <strong style="color:#00ff9d !important;">Improve privacy</strong> through deliberate structure<br>
+            • <strong style="color:#00ff9d !important;">Future-proof your stack</strong> — remain spendable forever<br><br>
 
-    <style>
+            <strong style="color:#f7931a !important;font-size: clamp(1.4rem, 5vw, 1.8rem) !important;font-weight:900 !important;letter-spacing:1px !important;">
+                Prune now. Win forever.
+            </strong><br><br>
+            
+            Paste addresses or xpubs below and click 
+            <strong style="color:#f7931a !important;font-size: clamp(1.3rem, 4.5vw, 1.7rem) !important;">ANALYZE</strong> 
+            to unlock your personalized strategy.
+        </div>
+        
+        <div style="
+            font-size: clamp(3rem, 8vw, 4.5rem) !important;
+            color:#f7931a !important;
+            opacity:0.9;
+            animation:pulse 2s infinite;
+        ">
+            ↓
+        </div>
+    </div>
+	
+      <style>
     @keyframes pulse {
         0%, 100% { transform: translateY(0); opacity: 0.8; }
         50% { transform: translateY(20px); opacity: 1; }
@@ -2967,46 +3292,53 @@ tr:has(.health-nested) input[type="checkbox"] {
   # Global CSS for dark mode (pure black)
     gr.HTML("""
 <style>
-    .dark-mode {
-        background: #000 !important;
-    }
+    /* Force dark mode on body and all Gradio containers */
+    .dark-mode,
     .dark-mode .gradio-container,
     .dark-mode .gr-panel,
     .dark-mode .gr-form,
     .dark-mode .gr-box,
+    .dark-mode .gr-group,
     .dark-mode textarea,
     .dark-mode input,
-    .dark-mode .gr-button {
+    .dark-mode .gr-button,
+    .dark-mode .gr-textbox,
+    .dark-mode .gr-dropdown {
         background: #000 !important;
         color: #0f0 !important;
         border-color: #f7931a !important;
+    }
+
+    /* Buttons in dark mode */
+    .dark-mode .gr-button {
+        background: #000 !important;
+        color: #0f0 !important;
+        border: 2px solid #f7931a !important;
     }
     .dark-mode .gr-button:hover {
         background: #f7931a !important;
         color: #000 !important;
     }
-        /* Visible, glowing checkbox tick in dark mode */
-      /* Nuclear checkbox — visible tick + green fill from the start */
+
+    /* Nuclear checkbox — bigger and more visible */
     input[type="checkbox"] {
-        width: 28px !important;
-        height: 28px !important;
+        width: clamp(28px, 6vw, 36px) !important;
+        height: clamp(28px, 6vw, 36px) !important;
         accent-color: #0f0 !important;
         background: #000 !important;
-        border: 3px solid #f7931a !important;
+        border: clamp(2px, 0.5vw, 3px) solid #f7931a !important;
         border-radius: 8px !important;
         cursor: pointer;
         box-shadow: 0 0 20px rgba(247,147,26,0.6) !important;
-        appearance: none;                    /* Remove native look */
+        appearance: none;
         position: relative;
     }
 
-    /* Green fill when checked — works immediately */
     input[type="checkbox"]:checked {
         background: #0f0 !important;
         box-shadow: 0 0 30px #0f0 !important;
     }
 
-    /* Custom black checkmark */
     input[type="checkbox"]:checked::after {
         content: '✓';
         position: absolute;
@@ -3014,7 +3346,7 @@ tr:has(.health-nested) input[type="checkbox"] {
         left: 50%;
         transform: translate(-50%, -50%);
         color: #000;
-        font-size: 20px;
+        font-size: clamp(18px, 4vw, 24px) !important;
         font-weight: 900;
         pointer-events: none;
     }
@@ -3028,11 +3360,30 @@ tr:has(.health-nested) input[type="checkbox"] {
     :not(.dark-mode) input[type="checkbox"]:checked {
         background: #f7931a !important;
     }
+
+    /* Empty state messages */
+    .empty-state-msg {
+        color: #aaffcc !important;
+        background: rgba(0, 30, 20, 0.6) !important;
+        padding: clamp(30px, 8vw, 50px) !important;
+        border-radius: 18px !important;
+        border: 2px solid #00ff88 !important;
+        box-shadow: 0 0 50px rgba(0, 255, 136, 0.4) !important;
+    }
+
+    body:not(.dark-mode) .empty-state-msg {
+        color: #003322 !important;
+        background: rgba(200, 255, 220, 0.25) !important;
+        border: 2px solid #006644 !important;
+        box-shadow: 0 0 30px rgba(0, 100, 68, 0.3) !important;
+    }
+
+    body:not(.dark-mode) .empty-state-msg > div:first-child {
+        color: #004d33 !important;
+    }
 </style>
 """)
-
    
-  
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
     # =============================
@@ -3124,9 +3475,9 @@ tr:has(.health-nested) input[type="checkbox"] {
             ">
                 <div style="
                     color:#00ffdd !important;
-                    font-size:1.6rem !important;
+                    font-size: clamp(1.1rem, 3.5vw, 1.4rem) !important;
                     font-weight:900 !important;
-                    letter-spacing:2px !important;
+                    letter-spacing: 2px !important;
                     margin-bottom:16px !important;
                     text-shadow:0 0 30px #00ffdd !important;
                 ">
@@ -3173,41 +3524,45 @@ tr:has(.health-nested) input[type="checkbox"] {
                 scale=1,
             )
 
-        # === ADVANCED PRIVACY HEADER (full width) ===
+         # === AIR-GAPPED / OFFLINE MODE HEADER (full width) ===
         gr.HTML(
-        	value="""
-        <div style="
-            text-align:center;
-            padding:20px !important;
-        background:#001100 !important;
-        border:3px solid #00ff88 !important;
-        border-radius:16px !important;
-        box-shadow:
-            0 12px 40px rgba(0,0,0,0.6) !important,
-            0 8px 32px rgba(0,255,136,0.4) !important,
-            inset 0 0 30px rgba(0,255,136,0.2) !important;
-    "> 
-      <div style="
-          color:#00ff88 !important;
-          font-size:1.6rem !important;
-          font-weight:900 !important;
-          text-shadow:0 0 25px #00ff88 !important;
-      ">
-        🔒 Air-Gapped / Offline Mode
-      </div>
+            value="""
+            <div style="
+                text-align:center !important;
+                padding: clamp(20px, 6vw, 32px) !important;
+                margin: clamp(30px, 8vw, 50px) 0 !important;
+                background:#001100 !important;
+                border:3px solid #00ff88 !important;
+                border-radius:18px !important;
+                box-shadow:
+                    0 12px 40px rgba(0,0,0,0.6) !important,
+                    0 8px 32px rgba(0,255,136,0.4) !important,
+                    inset 0 0 30px rgba(0,255,136,0.2) !important;
+                max-width:95% !important;
+                margin-left:auto !important;
+                margin-right:auto !important;
+            "> 
+              <div style="
+                  color:#00ff88 !important;
+                  font-size: clamp(1.3rem, 5.5vw, 1.7rem) !important;
+                  font-weight:900 !important;
+                  text-shadow:0 0 30px #00ff88 !important;
+                  margin-bottom: clamp(10px, 3vw, 16px) !important;
+              ">
+                🔒 Air-Gapped / Offline Mode
+              </div>
 
-      <div style="
-          margin-top:12px !important;
-          color:#aaffcc !important;
-          font-size:1.1rem !important;
-          line-height:1.6 !important;
-      ">
-        Fully offline operation — no API calls, perfect for cold wallets.<br>
-        Paste raw UTXOs.
-      </div>
-    </div>
-    """
-    )
+              <div style="
+                  color:#aaffcc !important;
+                  font-size: clamp(1rem, 3.8vw, 1.2rem) !important;
+                  line-height:1.7 !important;
+              ">
+                Fully offline operation — no API calls, perfect for cold wallets.<br><br>
+                Paste raw UTXOs manually below.
+              </div>
+            </div>
+            """
+        )
         
         # === OFFLINE MODE — FIRST ADVANCED TOOL ===
         with gr.Row():
@@ -3235,7 +3590,7 @@ No API calls • Fully air-gapped safe""",
                 lines=10,
             )
         
-        # === Seamless mode switching + dark mode + live status ===
+      # === Seamless mode switching + dark mode + live status ===
         def update_status_and_ui(offline, dark):
             theme_icon = "🌙" if dark else "☀️"
             theme_text = "Dark" if dark else "Light"
@@ -3248,21 +3603,24 @@ No API calls • Fully air-gapped safe""",
 
             return f"""
             <div style="
-                text-align: center;
-                padding: 16px;
-                margin: 8px 0;
-                font-size: 1.4rem;
-                font-weight: 900;
-                color: {color};
-                text-shadow: {text_shadow};
-                background: {bg};
-                border-radius: 16px;
+                text-align: center !important;
+                padding: clamp(12px, 4vw, 20px) !important;
+                margin: clamp(8px, 2vw, 16px) 0 !important;
+                font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;
+                font-weight: 900 !important;
+                color: {color} !important;
+                text-shadow: {text_shadow} !important;
+                background: {bg} !important;
+                border-radius: 16px !important;
                 box-shadow: 0 12px 40px rgba(0,0,0,0.5),
                             0 8px 32px rgba(0,255,136,0.4),
                             inset 0 0 20px rgba(0,255,136,0.3);
                 transition: all 0.4s ease;
+                max-width: 95% !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
             ">
-                <span style="font-size: 1.6rem; margin-right: 8px;">{theme_icon}</span>
+                <span style="font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important; margin-right: 12px !important;">{theme_icon}</span>
                 {theme_text} • {connection}
             </div>
             """
@@ -3305,42 +3663,44 @@ No API calls • Fully air-gapped safe""",
             }
             """
         )
-        
-		# Transition banner after Silent Payments
+
         gr.HTML(
             value="""
-     <div style="
-        text-align:center;
-        padding:20px !important;
-        margin:0px 0 0px 0 !important;
-        background: linear-gradient(90deg, rgba(0,50,0,0.55), rgba(0,30,0,0.65)) !important;
-        border:3px solid #00ff88 !important;
-        border-radius:16px !important;
-        box-shadow:
-            0 12px 40px rgba(0,0,0,0.6) !important,
-            0 8px 32px rgba(0,255,136,0.3) !important,
-            inset 0 0 30px rgba(0,255,136,0.15) !important;
-    "> 
-      <div style="
-          color:#00ff88 !important;
-          font-size:1.5rem !important;
-          font-weight:900 !important;
-          text-shadow:0 0 25px #00ff88 !important;
-      ">
-        Pruning Strategy & Economic Controls
-      </div>
+            <div style="
+                text-align:center !important;
+                padding: clamp(20px, 6vw, 32px) !important;
+                margin: clamp(30px, 8vw, 60px) 0 0 0 !important;
+                background: linear-gradient(90deg, rgba(0,50,0,0.55), rgba(0,30,0,0.65)) !important;
+                border:3px solid #00ff88 !important;
+                border-radius:18px !important;
+                box-shadow:
+                    0 12px 40px rgba(0,0,0,0.6) !important,
+                    0 8px 32px rgba(0,255,136,0.3) !important,
+                    inset 0 0 30px rgba(0,255,136,0.15) !important;
+                max-width:95% !important;
+                margin-left:auto !important;
+                margin-right:auto !important;
+            "> 
+              <div style="
+                  color:#00ff88 !important;
+                  font-size: clamp(1.3rem, 5.5vw, 1.6rem) !important;
+                  font-weight:900 !important;
+                  text-shadow:0 0 30px #00ff88 !important;
+                  margin-bottom: clamp(10px, 3vw, 16px) !important;
+              ">
+                Pruning Strategy & Economic Controls
+              </div>
 
-      <div style="
-          margin-top:12px !important;
-          color:#aaffcc !important;
-          font-size:1.1rem !important;
-          line-height:1.6 !important;
-          text-shadow:0 2px 4px rgba(0,0,0,0.8) !important;
-      ">
-        Choose how aggressive your prune will be — and fine-tune fees & donations below
-      </div>
-    </div>
-    """
+              <div style="
+                  color:#aaffcc !important;
+                  font-size: clamp(1rem, 3.8vw, 1.2rem) !important;
+                  line-height:1.7 !important;
+                  text-shadow:0 2px 4px rgba(0,0,0,0.8) !important;
+              ">
+                Choose how aggressive your prune will be — and fine-tune fees & donations below
+              </div>
+            </div>
+            """
         )
 		# Strategy dropdown + Dust
         with gr.Row():
@@ -3405,7 +3765,7 @@ No API calls • Fully air-gapped safe""",
         )
 
         gr.HTML("""
-		    <div style="width: 100%; margin-top: 25px;"></div>
+            <div style="width: 100%; margin-top: 25px;"></div>
 <div class="check-to-prune-header">
     <div class="header-title">CHECK TO PRUNE</div>
     <div class="header-subtitle">Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = prune</div>
@@ -3420,7 +3780,7 @@ No API calls • Fully air-gapped safe""",
 /* Dark mode */
 .dark-mode .check-to-prune-header .header-title {
     color: #00ff88;
-    font-size: 1.3rem;
+    font-size: clamp(1.2rem, 5vw, 1.4rem);
     font-weight: 900;
     text-shadow: 0 0 20px #00ff88;
     letter-spacing: 1px;
@@ -3428,25 +3788,25 @@ No API calls • Fully air-gapped safe""",
 
 .dark-mode .check-to-prune-header .header-subtitle {
     color: #aaffaa;
-    font-size: 1.05rem;
+    font-size: clamp(0.95rem, 3.5vw, 1.1rem);
     margin-top: 8px;
 }
 
 /* Light mode — softer, readable colors */
 body:not(.dark-mode) .check-to-prune-header .header-title {
     color: #008844;
-    font-size: 1.3rem;
+    font-size: clamp(1.2rem, 5vw, 1.4rem);
     font-weight: 900;
     letter-spacing: 1px;
 }
 
 body:not(.dark-mode) .check-to-prune-header .header-subtitle {
     color: #006633;
-    font-size: 1.05rem;
+    font-size: clamp(0.95rem, 3.5vw, 1.1rem);
     margin-top: 8px;
 }
 </style>
-""")
+        """)
 
         df = gr.DataFrame(
             headers=[
@@ -3486,45 +3846,68 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
 
         # Export sections
         with gr.Row(visible=False) as export_title_row:
-            gr.HTML("""
-            <div style="text-align:center;padding:40px 0 30px 0;">
+                gr.HTML("""
+            <div style="text-align:center;padding:clamp(30px, 8vw, 60px) 0 clamp(20px, 5vw, 40px) 0 !important;">
 
-  <!-- Main Header — FROZEN = icy blue theme -->
-  <div style="color:#00ddff;font-size:2.6rem;font-weight:900;
-              letter-spacing:8px;
-              text-shadow:0 0 40px #00ddff, 0 0 80px #00ddff,
-                          0 4px 8px #000, 0 8px 20px #000000ee,
-                          0 12px 32px #000000cc;
-              margin-bottom:20px;">
-    🔒 SELECTION FROZEN
-  </div>
-  
-  <!-- Core message — signature green -->
-  <div style="color:#aaffaa;font-size:1.4rem;font-weight:700;
-              text-shadow:0 0 20px #0f0,
-                          0 3px 6px #000, 0 6px 16px #000000dd,
-                          0 10px 24px #000000bb;
-              max-width:720px;margin:0 auto 16px auto;
-              line-height:1.6;">
-    Your pruning intent is now immutable • Permanent audit trail secured
-  </div>
-  
-  <!-- Extra reassurance — bright cyan -->
-  <div style="color:#00ffdd;font-size:1.1rem;opacity:0.9;font-weight:700;
-              text-shadow:0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;
-              max-width:640px;margin:20px auto 10px auto;line-height:1.7;">
-    The file below includes:<br>
-    All selected UTXOs • Ω fingerprint • Transaction parameters
-  </div>
-  
-  <div style="color:#aaffaa;font-size:1.1rem;opacity:0.9;font-weight:700;
-              text-shadow:0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;
-              max-width:640px;margin:0 auto 40px auto;line-height:1.7;">
-    Download for backup, offline verification, or future reference
-  </div>
+              <!-- Main Header — FROZEN = icy blue theme -->
+              <div style="
+                  color:#00ddff !important;
+                  font-size:clamp(2.2rem, 9vw, 3rem) !important;
+                  font-weight:900 !important;
+                  letter-spacing:clamp(6px, 2vw, 10px) !important;
+                  text-shadow:0 0 40px #00ddff, 0 0 80px #00ddff,
+                              0 4px 8px #000, 0 8px 20px #000000ee,
+                              0 12px 32px #000000cc;
+                  margin-bottom:clamp(16px, 4vw, 24px) !important;
+              ">
+                🔒 SELECTION FROZEN
+              </div>
+              
+              <!-- Core message — signature green -->
+              <div style="
+                  color:#aaffaa !important;
+                  font-size:clamp(1.2rem, 4.5vw, 1.6rem) !important;
+                  font-weight:700 !important;
+                  text-shadow:0 0 20px #0f0,
+                              0 3px 6px #000, 0 6px 16px #000000dd,
+                              0 10px 24px #000000bb;
+                  max-width:760px !important;
+                  margin:0 auto clamp(12px, 3vw, 20px) auto !important;
+                  line-height:1.7 !important;
+              ">
+                Your pruning intent is now immutable • Permanent audit trail secured
+              </div>
+              
+              <!-- Extra reassurance — bright cyan -->
+              <div style="
+                  color:#00ffdd !important;
+                  font-size:clamp(1rem, 3.8vw, 1.2rem) !important;
+                  opacity:0.9;
+                  font-weight:700 !important;
+                  text-shadow:0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;
+                  max-width:680px !important;
+                  margin:clamp(16px, 4vw, 24px) auto clamp(8px, 2vw, 12px) auto !important;
+                  line-height:1.7 !important;
+              ">
+                The file below includes:<br>
+                All selected UTXOs • Ω fingerprint • Transaction parameters
+              </div>
+              
+              <div style="
+                  color:#aaffaa !important;
+                  font-size:clamp(1rem, 3.8vw, 1.2rem) !important;
+                  opacity:0.9;
+                  font-weight:700 !important;
+                  text-shadow:0 2px 4px #000, 0 4px 12px #000000cc, 0 8px 20px #000000aa;
+                  max-width:680px !important;
+                  margin:0 auto clamp(30px, 8vw, 50px) auto !important;
+                  line-height:1.7 !important;
+              ">
+                Download for backup, offline verification, or future reference
+              </div>
 
-</div>
-""")
+            </div>
+            """)
 
         with gr.Row(visible=False) as export_file_row:
             export_file = gr.File(
@@ -3816,122 +4199,121 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
         """
     )
     
-    # CRITICAL: DO NOT use .change() on fee_rate/future_fee for anything else
-    # 5. FOOTER
+   # 5. FOOTER
     gr.HTML(
-    """
-    <div style="width: 100%; margin-top:70px;"></div>
+        """
+        <div style="width: 100%; margin-top: clamp(50px, 12vw, 100px) !important;"></div>
 
-    <div style="
-        width: 100%;
-        max-width: 720px;
-        margin: 0 auto 30px auto;
-        text-align: center;
-        line-height: 1.8;
-    ">
-        <!-- VERSION -->
         <div style="
-            font-size: 1.08rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            color: #f7931a;
-            text-shadow: 0 0 12px rgba(247,147,26,0.65);
+            width: 100%;
+            max-width: 760px;
+            margin: 0 auto 30px auto;
+            text-align: center;
+            line-height: 1.8;
         ">
-            Ωmega Pruner v11 — Forged Anew
-        </div>
+            <!-- VERSION -->
+            <div style="
+                font-size: clamp(1rem, 4vw, 1.2rem) !important;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                color: #f7931a;
+                text-shadow: 0 0 15px rgba(247,147,26,0.7);
+            ">
+                Ωmega Pruner v11 — Forged Anew
+            </div>
 
-        <!-- GITHUB LINK -->
-        <a href="https://github.com/babyblueviper1/Viper-Stack-Omega"
-           target="_blank"
-           rel="noopener"
-           style="
-               font-size: 0.94rem;
-               font-weight: 600;
-               text-decoration: none;
-               color: #f7931a;
-               text-shadow: 0 0 10px rgba(247,147,26,0.55);
-           ">
-            GitHub • Open Source • Apache 2.0
-        </a>
-
-        <br><br>
-
-        <!-- CUSTOM BUILDS SECTION -->
-        <div style="margin: 20px auto; max-width: 680px;">
-            <a href="https://www.babyblueviper.com/p/omega-pruner-custom-builds"
+            <!-- GITHUB LINK -->
+            <a href="https://github.com/babyblueviper1/Viper-Stack-Omega"
                target="_blank"
-               style="color: inherit; text-decoration: none;">
-                   <div style="
-            display: inline-block;
-            padding: 6px 16px;
-            margin: 8px 0;
-            font-size: 0.96rem;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-            border-radius: 12px;
-            transition: all 0.4s ease;
-            color: #00ff9d;
-            background: rgba(0, 40, 20, 0.4);
-            box-shadow: 0 0 15px rgba(0, 255, 157, 0.3);
-        ">
-            This build is engineered for speed and clarity.
-        </div>
-        <br>
-        <div style="
-            display: inline-block;
-            padding: 6px 16px;
-            margin: 8px 0;
-            font-size: 0.96rem;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-            border-radius: 12px;
-            transition: all 0.4s ease;
-            color: #00ff88;
-            background: rgba(0, 35, 15, 0.4);
-            box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
-        ">
-            For extended capabilities or tailored integrations, custom versions can be commissioned.
-        </div>
-    </a>
-</div>
+               rel="noopener"
+               style="
+                   font-size: clamp(0.9rem, 3.5vw, 1.05rem) !important;
+                   font-weight: 600;
+                   text-decoration: none;
+                   color: #f7931a;
+                   text-shadow: 0 0 12px rgba(247,147,26,0.6);
+               ">
+                GitHub • Open Source • Apache 2.0
+            </a>
 
-<style>
-/* Light mode — switch to forest green with light background */
-body:not(.dark-mode) div[style*="00ff9d"], 
-body:not(.dark-mode) div[style*="00ff88"] {
-    color: #004d33 !important;
-    background: rgba(220, 255, 235, 0.15) !important;  /* almost invisible */
-    box-shadow: 0 2px 8px rgba(0, 80, 50, 0.1) !important;
-}
+            <br><br>
 
-/* Hover effect */
-a:hover div[style*="padding: 6px 16px"] {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 255, 136, 0.3);
-}
-</style>
-
-        <br><br>
-
-        <!-- TAGLINE -->
-        <span style="
-            color: #0f0;
-            font-size: 0.88rem;
-            font-weight: 800;
-            letter-spacing: 0.6px;
-            text-shadow:
-                0 0 12px #0f0,
-                0 0 24px #0f0,
-                0 0 6px #000,
-                0 4px 10px #000,
-                0 8px 20px #000000e6;
-        ">
-            Prune today. Win forever. • Ω
-        </span>
+            <!-- CUSTOM BUILDS SECTION -->
+            <div style="margin: clamp(20px, 5vw, 30px) auto; max-width: 720px;">
+                <a href="https://www.babyblueviper.com/p/omega-pruner-custom-builds"
+                   target="_blank"
+                   style="color: inherit; text-decoration: none;">
+                       <div style="
+                display: inline-block;
+                padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 24px) !important;
+                margin: clamp(8px, 2vw, 12px) 0 !important;
+                font-size: clamp(0.9rem, 3.5vw, 1.05rem) !important;
+                font-weight: 700;
+                letter-spacing: 0.3px;
+                border-radius: 14px;
+                transition: all 0.4s ease;
+                color: #00ff9d;
+                background: rgba(0, 40, 20, 0.4);
+                box-shadow: 0 0 20px rgba(0, 255, 157, 0.4);
+            ">
+                This build is engineered for speed and clarity.
+            </div>
+            <br>
+            <div style="
+                display: inline-block;
+                padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 24px) !important;
+                margin: clamp(8px, 2vw, 12px) 0 !important;
+                font-size: clamp(0.9rem, 3.5vw, 1.05rem) !important;
+                font-weight: 700;
+                letter-spacing: 0.3px;
+                border-radius: 14px;
+                transition: all 0.4s ease;
+                color: #00ff88;
+                background: rgba(0, 35, 15, 0.4);
+                box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            ">
+                For extended capabilities or tailored integrations, custom versions can be commissioned.
+            </div>
+        </a>
     </div>
-    """,
-    elem_id="omega_footer",
-)
+
+    <style>
+    /* Light mode — switch to forest green with light background */
+    body:not(.dark-mode) div[style*="00ff9d"], 
+    body:not(.dark-mode) div[style*="00ff88"] {
+        color: #004d33 !important;
+        background: rgba(220, 255, 235, 0.15) !important;
+        box-shadow: 0 2px 8px rgba(0, 80, 50, 0.1) !important;
+    }
+
+    /* Hover effect */
+    a:hover div[style*="padding"] {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
+    }
+    </style>
+
+            <br><br>
+
+            <!-- TAGLINE -->
+            <span style="
+                color: #0f0;
+                font-size: clamp(0.9rem, 3.8vw, 1.1rem) !important;
+                font-weight: 800;
+                letter-spacing: 0.6px;
+                text-shadow:
+                    0 0 15px #0f0,
+                    0 0 30px #0f0,
+                    0 0 6px #000,
+                    0 4px 10px #000,
+                    0 8px 20px #000000e6;
+            ">
+                Prune today. Win forever. • Ω
+            </span>
+        </div>
+        """,
+        elem_id="omega_footer",
+    )
 
 
 
