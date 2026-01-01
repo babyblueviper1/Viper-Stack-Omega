@@ -136,7 +136,7 @@ Your treasury. Your rules.
 - Dedicated support
 
 **By quote only.**  
-📧 omegapruner@proton.me  
+📧 babyblueviperbusiness@gmail.com
 🎙 Baby Blue Viper — https://babyblueviper.com
 
 ---
