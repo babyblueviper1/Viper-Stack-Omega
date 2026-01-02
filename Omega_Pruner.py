@@ -734,35 +734,42 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
     """
 
 def estimate_coinjoin_mixes_needed(input_count: int, distinct_addrs: int, privacy_score: int) -> tuple[int, int]:
-    """
-    Estimate Whirlpool-style mixes needed to reasonably break CIOH linkage.
-    Returns (min_mixes, max_mixes). Conservative and practical.
-    """
-    # Low impact — suggest optional hardening, not zero
+    if privacy_score > 80:
+        return 0, 1    # Truly minimal linkage
     if privacy_score > 70:
-        return 1, 1  # "Optional: 1 mix for extra caution"
+        return 1, 2    # Light optional hardening
 
-    # Base from privacy score
-    base = max(1, round(60 / privacy_score))
+    # Start with inverse of score, but smoother
+    base = max(2, round(100 / (privacy_score + 10)))  # Avoids huge spikes at low scores
 
-    # Input count penalty
-    if input_count >= 30:
-        base += 3
+    # Stronger input count scaling
+    if input_count >= 50:
+        base += 5
+    elif input_count >= 30:
+        base += 4
     elif input_count >= 15:
-        base += 2
+        base += 3
     elif input_count >= 8:
-        base += 1
-
-    # Distinct addresses penalty
-    if distinct_addrs >= 10:
         base += 2
-    elif distinct_addrs >= 5:
+    elif input_count >= 5:
         base += 1
 
-    min_mixes = max(1, base - 1)
-    max_mixes = base + 1
+    # Heavier distinct address penalty — revealing more unique addrs is worse
+    if distinct_addrs >= 15:
+        base += 5
+    elif distinct_addrs >= 10:
+        base += 4
+    elif distinct_addrs >= 6:
+        base += 3
+    elif distinct_addrs >= 3:
+        base += 2
+    elif distinct_addrs > 1:
+        base += 1
 
-    return min_mixes, max_mixes
+    min_mixes = max(1, base - 2)
+    max_mixes = base + 2
+
+    return min(12, min_mixes), min(18, max_mixes)  # Cap at realistic Whirlpool use
 
 def detect_payjoin_support(dest_input: str) -> tuple[bool, str | None]:
     """
