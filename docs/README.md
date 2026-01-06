@@ -1,4 +1,4 @@
-# Ωmega Pruner v11 — **Forged Anew**
+# Ωmega Pruner v11.1 — **Forged Anew**
 
 **The purest UTXO consolidator ever built.**  
 Reborn in fire — stripped of pretense, refined to essence, honest to the core.
@@ -6,7 +6,22 @@ Reborn in fire — stripped of pretense, refined to essence, honest to the core.
 **Ωmega Pruner** is an **unsigned, non-custodial PSBT generator** for advanced UTXO consolidation and long-term coin control.
 
 **LIVE:** https://omega-pruner.onrender.com  
-**Launched:** 26 December 2025
+**Launched:** 26 December 2025  
+**Latest:** v11.1 — January 2026
+
+---
+
+## What’s New in v11.1
+
+**Pruning Conditions Badge** — **LIVE**  
+Real-time score (1–10) with glowing nuclear design  
+Current economy fee vs dynamic medians:  
+  • 1-day  
+  • 1-week (primary benchmark)  
+  • 1-month  
+Clear vertical layout: Current → VS → Medians (1-day → 1-week → 1-month)  
+Powered by mempool.space mining statistics  
+Instant insight: know if *now* is prime pruning time before even pasting addresses
 
 ---
 
@@ -40,16 +55,17 @@ No fake privacy.
 
 ---
 
-## Ωmega Pruner v11 vs “Everyone Else” (2025)
+## Ωmega Pruner v11.1 vs “Everyone Else” (2026)
 
-| Property | Ωmega Pruner v11 | Everyone Else |
-|--------|------------------|---------------|
+| Property | Ωmega Pruner v11.1 | Everyone Else |
+|--------|--------------------|---------------|
 | Private keys ever leave browser? | **Never** | Sometimes |
 | Transaction encoding | Hand-rolled, bit-perfect | Often fragile |
 | SegWit v0 + v1 (Taproot) | Automatic, zero failures | Partial/broken |
 | PSBT output | Minimal, universally valid | Often malformed |
 | Live mempool fee oracle | One-click presets | Manual/stale |
 | Instant slider + summary updates | Zero lag | Rare |
+| **Pruning Conditions badge (real-time vs history)** | **LIVE** | Never |
 | Privacy Score (0–100) | **LIVE** — CIOH, merging, wealth reveal | Never |
 | PayJoin detection (BIP78) | **LIVE** — glowing badge | Rare |
 | CoinJoin Recovery Plan | **LIVE** — “~3–5 mixes needed” | Never |
@@ -70,21 +86,22 @@ No fake privacy.
 
 ## What Happens in ~6 Seconds
 
-1. Toggle **Offline Mode** → paste raw UTXOs → fully air-gapped  
+1. See **Pruning Conditions badge** → instantly know if fees are low
+2. Toggle **Offline Mode** → paste raw UTXOs → fully air-gapped  
    *or* paste multiple addresses / xpubs (one per line)
-2. Toggle **Dark Mode** for pure black nuclear glow
-3. Click any fee preset → instant fee + future-fee delta update
-4. **ANALYZE** → UTXO table appears instantly
-5. Check/uncheck UTXOs → Privacy Score, warnings, and savings update live
-6. Paste a PayJoin invoice → **CIOH-PROTECTED** badge lights up
-7. Review CoinJoin Recovery Plan → know exactly what to do next
-8. **GENERATE NUCLEAR PSBT** → export selection JSON + fingerprint → sign → broadcast
+3. Toggle **Dark Mode** for pure black nuclear glow
+4. Click any fee preset → instant fee + future-fee delta update
+5. **ANALYZE** → UTXO table appears instantly
+6. Check/uncheck UTXOs → Privacy Score, warnings, and savings update live
+7. Paste a PayJoin invoice → **CIOH-PROTECTED** badge lights up
+8. Review CoinJoin Recovery Plan → know exactly what to do next
+9. **GENERATE NUCLEAR PSBT** → export selection JSON + fingerprint → sign → broadcast
 
 **Prune now. Win forever.**
 
 ---
 
-## Wallet Compatibility (2025+)
+## Wallet Compatibility (2026+)
 
 Works flawlessly with:
 
@@ -92,7 +109,7 @@ Sparrow • Nunchuk • BlueWallet • Electrum • Coldcard • Ledger • Trez
 
 ---
 
-## What’s New in v11 — *Forged Anew*
+## What’s New in v11 — *Forged Anew* (December 2025)
 
 | Change | Status | Why It Matters |
 |-----|------|---------------|
@@ -141,7 +158,7 @@ Your treasury. Your rules.
 
 ---
 
-**Ωmega Pruner v11 — Forged Anew**  
-babyblueviper & the swarm • 26 December 2025 • Ω
+**Ωmega Pruner v11.1 — Forged Anew**  
+babyblueviper & the swarm • January 2026 • Ω
 
 **Prune now. Win forever.**
