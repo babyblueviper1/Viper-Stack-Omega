@@ -3170,7 +3170,7 @@ def analyze_and_show_summary(
 # Gradio UI
 # --------------------------
 with gr.Blocks(
-    title="Ωmega Pruner v11 — Forged Anew"
+    title="Ωmega Pruner v11.1 — Forged Anew"
 ) as demo:
     
     # Full-screen animated Ωmega background + Hero Banner
@@ -3258,7 +3258,7 @@ with gr.Blocks(
             text-shadow:0 0 15px #00ffaa;
             margin:20px 0 !important;
         ">
-            FORGED ANEW — v11
+            FORGED ANEW — v11.1
         </div>
         
         <div style="
@@ -4403,7 +4403,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
                 color: #f7931a;
                 text-shadow: 0 0 15px rgba(247,147,26,0.7);
             ">
-                Ωmega Pruner v11 — Forged Anew
+                Ωmega Pruner v11.1 — Forged Anew
             </div>
 
             <!-- GITHUB LINK -->
