@@ -59,6 +59,7 @@ from datetime import datetime
 import copy
 import urllib.parse
 import pandas as pd
+import statistics
 
 # Logging Setup
 # =========================
@@ -314,6 +315,176 @@ def get_live_fees() -> Optional[Dict[str, int]]:
         "economy": 1,
         "minimum": 1,
     }
+
+def get_prune_score():
+    """Dynamically calculate Pruning Conditions using mempool.space 24h, 1w, and 1m block fee-rates."""
+    urls = {
+        '24h': "https://mempool.space/api/v1/mining/blocks/fee-rates/24h",
+        '1w': "https://mempool.space/api/v1/mining/blocks/fee-rates/1w",
+        '1m': "https://mempool.space/api/v1/mining/blocks/fee-rates/1m"
+    }
+    avgs = {}
+    try:
+        for period, url in urls.items():
+            r = session.get(url, timeout=12)
+            if r.status_code == 200:
+                data = r.json()
+                if len(data) > 5:  # Sufficient blocks
+                    p50_fees = [block.get('avgFee_50', 1) for block in data if 'avgFee_50' in block]
+                    if p50_fees:
+                        avgs[period] = statistics.mean(p50_fees)
+                    else:
+                        avgs[period] = None
+                else:
+                    avgs[period] = None
+            else:
+                avgs[period] = None
+    except Exception as e:
+        log.warning(f"Failed to fetch fee-rates: {e}")
+        avgs = {'24h': None, '1w': None, '1m': None}
+
+    # Current economy fee
+    current_fees = get_live_fees() or {'economy': 1}
+    current = current_fees['economy']
+
+    # Primary avg: 1w if available (best for pruning decisions)
+    primary_avg = avgs['1w'] or avgs['1m'] or avgs['24h'] or 5.0
+    day_avg = avgs['24h'] or primary_avg
+    month_avg = avgs['1m'] or primary_avg
+
+    # Ratio based on primary (1w)
+    ratio = current / primary_avg if primary_avg > 0 else 1.0
+    if ratio < 0.5:
+        level = "Excellent"
+        color = "#00ff88"
+        score = 10
+    elif ratio < 0.8:
+        level = "Good"
+        color = "#00ffdd"
+        score = 8
+    elif ratio < 1.2:
+        level = "Fair"
+        color = "#ff9900"
+        score = 5
+    else:
+        level = "Poor"
+        color = "#ff3366"
+        score = 3
+    score = max(1, min(10, round(score + (1 - ratio) * 2)))
+
+    # Dynamic comparisons (show available)
+    comparisons = f"1-week median: {primary_avg:.1f} sats/vB"
+    if '24h' in avgs and avgs['24h'] is not None:
+        comparisons += f" • 1-day: {day_avg:.1f}"
+    if '1m' in avgs and avgs['1m'] is not None:
+        comparisons += f" • 1-month: {month_avg:.1f}"
+
+    return f"""
+    <div style="
+        text-align:center !important;
+        padding: clamp(20px, 5vw, 30px) !important;
+        margin: clamp(20px, 5vw, 40px) auto !important;
+        background: rgba(0, 20, 10, 0.7) !important;
+        border: 3px solid {color} !important;
+        border-radius: 20px !important;
+        box-shadow: 0 0 60px {color} !important;
+        max-width: 600px !important;
+    ">
+        <div style="
+            color: {color} !important;
+            font-size: clamp(1.6rem, 6vw, 2rem) !important;
+            font-weight: 900 !important;
+            text-shadow: 0 0 35px {color} !important;
+            margin-bottom: 8px !important;
+        ">
+            Pruning Conditions: {level} ({score}/10)
+        </div>
+
+        <!-- Current Economy Fee - Top -->
+        <div style="
+            color: #00ffff !important;
+            font-size: clamp(2.2rem, 8vw, 3rem) !important;
+            font-weight: 900 !important;
+            text-shadow: 0 0 40px #00ffff, 0 0 80px #00ffff !important;
+            margin: 16px 0 !important;
+            line-height: 1.2 !important;
+        ">
+            {current} sats/vB
+        </div>
+        <div style="
+            color: #88ffcc !important;
+            font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+            margin-bottom: 20px !important;
+        ">
+            Current economy fee
+        </div>
+
+        <!-- VS Separator - Middle -->
+        <div style="
+            color: #f7931a !important;
+            font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+            font-weight: 900 !important;
+            text-shadow: 0 0 30px #f7931a !important;
+            margin: 20px 0 !important;
+            letter-spacing: 2px !important;
+        ">
+            VS
+        </div>
+
+        <!-- Medians Row - Bottom: 1-day → 1-week → 1-month (left to right) -->
+        <div style="
+            display: flex !important;
+            justify-content: center !important;
+            flex-wrap: wrap !important;
+            gap: clamp(16px, 4vw, 32px) !important;
+            margin: 16px 0 !important;
+            color: #aaffcc !important;
+            font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+            font-weight: 700 !important;
+        ">
+            <!-- 1-day -->
+            <div style="text-align: center !important;">
+                <div style="color: #00ddff !important; font-size: clamp(1.3rem, 5vw, 1.7rem) !important; font-weight: 900 !important;">
+                    {day_avg:.1f} sats/vB
+                </div>
+                <div style="color: #88ccff !important; font-size: clamp(0.9rem, 3.2vw, 1.1rem) !important;">
+                    1-day median
+                </div>
+            </div>
+
+            <!-- 1-week (primary) -->
+            <div style="text-align: center !important;">
+                <div style="color: #00ff88 !important; font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important; font-weight: 900 !important; text-shadow: 0 0 20px #00ff88 !important;">
+                    {primary_avg:.1f} sats/vB
+                </div>
+                <div style="color: #88ffaa !important; font-size: clamp(0.95rem, 3.4vw, 1.15rem) !important;">
+                    1-week median
+                </div>
+            </div>
+
+            <!-- 1-month -->
+            <div style="text-align: center !important;">
+                <div style="color: #aaff88 !important; font-size: clamp(1.3rem, 5vw, 1.7rem) !important; font-weight: 900 !important;">
+                    {month_avg:.1f} sats/vB
+                </div>
+                <div style="color: #99ffbb !important; font-size: clamp(0.9rem, 3.2vw, 1.1rem) !important;">
+                    1-month median
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Tip -->
+        <div style="
+            color: #88ffaa !important;
+            font-size: clamp(0.9rem, 3vw, 1rem) !important;
+            margin-top: 20px !important;
+            font-weight: 700 !important;
+        ">
+            Lower than medians = prime time to prune dust & consolidate! 🔥<br>
+            <small style="color: #66cc99 !important; font-weight: normal !important;">Data from mempool.space mining stats</small>
+        </div>
+    </div>
+    """
 
 def _coerce_int(value, default: int) -> int:
     """
@@ -3390,6 +3561,8 @@ tr:has(.health-nested) input[type="checkbox"] {
     }
 </style>
 """)
+
+    prune_badge = gr.HTML("")
    
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
@@ -4204,6 +4377,10 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             document.body.classList.add("dark-mode");
         }
         """
+    )
+    demo.load(
+        fn=get_prune_score,
+        outputs=prune_badge
     )
     
    # 5. FOOTER
