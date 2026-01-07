@@ -20,6 +20,7 @@ Current economy fee vs dynamic medians:
   • 1-week (primary benchmark)  
   • 1-month  
 Clear vertical layout: Current → VS → Medians (1-day → 1-week → 1-month)  
+**Live BTC price + current block height** for instant context  
 Powered by mempool.space mining statistics  
 Instant insight: know if *now* is prime pruning time before even pasting addresses
 
@@ -65,7 +66,7 @@ No fake privacy.
 | PSBT output | Minimal, universally valid | Often malformed |
 | Live mempool fee oracle | One-click presets | Manual/stale |
 | Instant slider + summary updates | Zero lag | Rare |
-| **Pruning Conditions badge (real-time vs history)** | **LIVE** | Never |
+| **Pruning Conditions badge** (real-time vs history + price + block height) | **LIVE** | Never |
 | Privacy Score (0–100) | **LIVE** — CIOH, merging, wealth reveal | Never |
 | PayJoin detection (BIP78) | **LIVE** — glowing badge | Rare |
 | CoinJoin Recovery Plan | **LIVE** — “~3–5 mixes needed” | Never |
@@ -86,7 +87,7 @@ No fake privacy.
 
 ## What Happens in ~6 Seconds
 
-1. See **Pruning Conditions badge** → instantly know if fees are low
+1. See **Pruning Conditions badge** → instantly know if fees are low (with live price & block height context)
 2. Toggle **Offline Mode** → paste raw UTXOs → fully air-gapped  
    *or* paste multiple addresses / xpubs (one per line)
 3. Toggle **Dark Mode** for pure black nuclear glow
