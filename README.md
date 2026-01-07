@@ -6,7 +6,7 @@ The last UTXO consolidator you’ll ever need.
 - **Pruning Conditions badge** — real-time score (1–10) with glowing nuclear design  
 - Current economy fee vs 1-day / 1-week / 1-month medians (mempool.space mining data)  
 - Clear vertical layout: current fee → VS → medians (1-day → 1-week → 1-month)  
-- Live BTC price + current block height for instant context  
+- Live BTC price + current block height + hashrate + next difficulty adjustment + halving countdown  
 - Instant insight: know if *now* is prime pruning time before pasting addresses
 
 **Optimized for modern Bitcoin** — fully supports:  
