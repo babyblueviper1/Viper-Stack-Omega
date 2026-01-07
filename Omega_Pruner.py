@@ -329,7 +329,7 @@ def get_prune_score():
             r = session.get(url, timeout=12)
             if r.status_code == 200:
                 data = r.json()
-                if len(data) > 5:  # Sufficient blocks
+                if len(data) > 5:
                     p50_fees = [block.get('avgFee_50', 1) for block in data if 'avgFee_50' in block]
                     if p50_fees:
                         avgs[period] = statistics.mean(p50_fees)
@@ -347,12 +347,12 @@ def get_prune_score():
     current_fees = get_live_fees() or {'economy': 1}
     current = current_fees['economy']
 
-    # Primary avg: 1w if available (best for pruning decisions)
+    # Primary avg: 1w preferred
     primary_avg = avgs['1w'] or avgs['1m'] or avgs['24h'] or 5.0
     day_avg = avgs['24h'] or primary_avg
     month_avg = avgs['1m'] or primary_avg
 
-    # Ratio based on primary (1w)
+    # Score calculation
     ratio = current / primary_avg if primary_avg > 0 else 1.0
     if ratio < 0.5:
         level = "Excellent"
@@ -372,14 +372,9 @@ def get_prune_score():
         score = 3
     score = max(1, min(10, round(score + (1 - ratio) * 2)))
 
-    # Dynamic comparisons (show available)
-    comparisons = f"1-week median: {primary_avg:.1f} sats/vB"
-    if '24h' in avgs and avgs['24h'] is not None:
-        comparisons += f" • 1-day: {day_avg:.1f}"
-    if '1m' in avgs and avgs['1m'] is not None:
-        comparisons += f" • 1-month: {month_avg:.1f}"
-
-	 # Fetch price & block height (mempool.space has both)
+    # Fetch price & block height
+    price = "—"
+    height = "—"
     try:
         height_r = session.get("https://mempool.space/api/blocks/tip/height", timeout=8)
         height = height_r.text.strip() if height_r.status_code == 200 else "—"
@@ -387,11 +382,63 @@ def get_prune_score():
         price_usd = price_r.json().get('USD', 0) if price_r.status_code == 200 else 0
         price = f"${price_usd:,}" if price_usd > 0 else "—"
     except Exception:
-        price = "—"
-        height = "—"
+        pass
 
-    # Then in footer:
-    f"BTC: {price} • Block: {height}"
+   # Hashrate (try 1w first, fallback to 3d for more reliability)
+    hr_formatted = "—"
+    try:
+        for hr_period in ["1w", "3d"]:  # Prefer 1w, fallback to shorter for stability
+            hr_r = session.get(f"https://mempool.space/api/v1/mining/hashrate/{hr_period}", timeout=10)
+            if hr_r.status_code == 200:
+                hr_data = hr_r.json()
+                # Handle both structures: dict with 'avgHashrate' or flat number
+                if isinstance(hr_data.get('currentHashrate'), dict):
+                    current_hashrate = hr_data['currentHashrate'].get('avgHashrate')
+                else:
+                    current_hashrate = hr_data.get('currentHashrate')
+                
+                if isinstance(current_hashrate, (int, float)) and current_hashrate > 0:
+                    if current_hashrate > 1e18:
+                        hr_formatted = f"{current_hashrate / 1e18:.0f} EH/s"
+                    elif current_hashrate > 1e15:
+                        hr_formatted = f"{current_hashrate / 1e15:.0f} PH/s"
+                    else:
+                        hr_formatted = f"{current_hashrate / 1e12:.0f} TH/s"  # Rare fallback
+                    break  # Success — stop trying other periods
+    except Exception:
+        pass
+
+    # Next Difficulty Adjustment
+    adjustment_text = ""
+    try:
+        da_r = session.get("https://mempool.space/api/v1/difficulty-adjustment", timeout=8)
+        if da_r.status_code == 200:
+            da_data = da_r.json()
+            adjustment_pct = da_data.get('difficultyChange', 0)
+            blocks_remaining = da_data.get('remainingBlocks', 0)
+            days_remaining = round(blocks_remaining / 144) if blocks_remaining else 0
+            adjustment_text = f"Next adj: {adjustment_pct:+.2f}% in ~{days_remaining} days"
+    except Exception:
+        adjustment_text = ""
+
+    # Halving countdown
+    halving_text = ""
+    try:
+        if height != "—":
+            current_height = int(height)
+            next_halving = ((current_height // 210000) + 1) * 210000
+            blocks_to_halving = next_halving - current_height
+            days_to_halving = round(blocks_to_halving / 144)
+            halving_text = f"Halving: ~{days_to_halving:,} days"
+    except Exception:
+        halving_text = ""
+
+    # Build context line with responsive breaks
+    context_line = f"BTC: {price} • Block: {height}<br>Hashrate: {hr_formatted}"
+    if adjustment_text:
+        context_line += f" • {adjustment_text}"
+    if halving_text:
+        context_line += f"<br>{halving_text}"
 
     return f"""
     <div style="
@@ -414,14 +461,13 @@ def get_prune_score():
             Pruning Conditions: {level} ({score}/10)
         </div>
 
-        <!-- Current Economy Fee - Top -->
+        <!-- Current Economy Fee -->
         <div style="
             color: #00ffff !important;
             font-size: clamp(2.2rem, 8vw, 3rem) !important;
             font-weight: 900 !important;
             text-shadow: 0 0 40px #00ffff, 0 0 80px #00ffff !important;
             margin: 16px 0 !important;
-            line-height: 1.2 !important;
         ">
             {current} sats/vB
         </div>
@@ -433,7 +479,7 @@ def get_prune_score():
             Current economy fee
         </div>
 
-        <!-- VS Separator - Middle -->
+        <!-- VS -->
         <div style="
             color: #f7931a !important;
             font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
@@ -445,7 +491,7 @@ def get_prune_score():
             VS
         </div>
 
-        <!-- Medians Row - Bottom: 1-day → 1-week → 1-month (left to right) -->
+        <!-- Medians Row -->
         <div style="
             display: flex !important;
             justify-content: center !important;
@@ -466,7 +512,7 @@ def get_prune_score():
                 </div>
             </div>
 
-            <!-- 1-week (primary) -->
+            <!-- 1-week -->
             <div style="text-align: center !important;">
                 <div style="color: #00ff88 !important; font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important; font-weight: 900 !important; text-shadow: 0 0 20px #00ff88 !important;">
                     {primary_avg:.1f} sats/vB
@@ -487,7 +533,7 @@ def get_prune_score():
             </div>
         </div>
 
-       <!-- Footer Tip + Extra Context -->
+        <!-- Footer -->
         <div style="
             color: #88ffaa !important;
             font-size: clamp(0.9rem, 3vw, 1rem) !important;
@@ -498,7 +544,7 @@ def get_prune_score():
             Lower than medians = prime time to prune dust & consolidate! 🔥<br>
             <small style="color: #66cc99 !important; font-weight: normal !important;">
                 Data from mempool.space mining stats<br>
-                BTC: {price} • Block: {height}
+                {context_line}
             </small>
         </div>
     </div>
