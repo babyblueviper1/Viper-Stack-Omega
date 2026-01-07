@@ -379,6 +379,20 @@ def get_prune_score():
     if '1m' in avgs and avgs['1m'] is not None:
         comparisons += f" • 1-month: {month_avg:.1f}"
 
+	 # Fetch price & block height (mempool.space has both)
+    try:
+        height_r = session.get("https://mempool.space/api/blocks/tip/height", timeout=8)
+        height = height_r.text.strip() if height_r.status_code == 200 else "—"
+        price_r = session.get("https://mempool.space/api/v1/prices", timeout=8)
+        price_usd = price_r.json().get('USD', 0) if price_r.status_code == 200 else 0
+        price = f"${price_usd:,}" if price_usd > 0 else "—"
+    except Exception:
+        price = "—"
+        height = "—"
+
+    # Then in footer:
+    f"BTC: {price} • Block: {height}"
+
     return f"""
     <div style="
         text-align:center !important;
@@ -473,15 +487,19 @@ def get_prune_score():
             </div>
         </div>
 
-        <!-- Footer Tip -->
+       <!-- Footer Tip + Extra Context -->
         <div style="
             color: #88ffaa !important;
             font-size: clamp(0.9rem, 3vw, 1rem) !important;
             margin-top: 20px !important;
             font-weight: 700 !important;
+            line-height: 1.6 !important;
         ">
             Lower than medians = prime time to prune dust & consolidate! 🔥<br>
-            <small style="color: #66cc99 !important; font-weight: normal !important;">Data from mempool.space mining stats</small>
+            <small style="color: #66cc99 !important; font-weight: normal !important;">
+                Data from mempool.space mining stats<br>
+                BTC: {price} • Block: {height}
+            </small>
         </div>
     </div>
     """
