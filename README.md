@@ -36,4 +36,4 @@ Zero custody • Full coin control • RBF • Taproot • Dust-resistant
 
 Custom builds → babyblueviperbusiness@gmail.com
 
-Prune now. Win forever. • Ω
+Prune smarter. Win forever. • Ω
