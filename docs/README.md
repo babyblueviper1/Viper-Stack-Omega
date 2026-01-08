@@ -162,4 +162,4 @@ Your treasury. Your rules.
 **Ωmega Pruner v11.1 — Forged Anew**  
 babyblueviper & the swarm • January 2026 • Ω
 
-**Prune now. Win forever.**
+**Prune smarter. Win forever.**
