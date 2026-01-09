@@ -372,6 +372,9 @@ def get_prune_score():
         score = 3
     score = max(1, min(10, round(score + (1 - ratio) * 2)))
 
+    # Plural handling for current fee
+    fee_unit = "sat/vB" if current == 1 else "sats/vB"
+
     # Fetch price & block height
     price = "—"
     height = "—"
@@ -384,14 +387,13 @@ def get_prune_score():
     except Exception:
         pass
 
-   # Hashrate (try 1w first, fallback to 3d for more reliability)
+    # Hashrate (try 1w first, fallback to 3d for more reliability)
     hr_formatted = "—"
     try:
-        for hr_period in ["1w", "3d"]:  # Prefer 1w, fallback to shorter for stability
+        for hr_period in ["1w", "3d"]:
             hr_r = session.get(f"https://mempool.space/api/v1/mining/hashrate/{hr_period}", timeout=10)
             if hr_r.status_code == 200:
                 hr_data = hr_r.json()
-                # Handle both structures: dict with 'avgHashrate' or flat number
                 if isinstance(hr_data.get('currentHashrate'), dict):
                     current_hashrate = hr_data['currentHashrate'].get('avgHashrate')
                 else:
@@ -403,8 +405,8 @@ def get_prune_score():
                     elif current_hashrate > 1e15:
                         hr_formatted = f"{current_hashrate / 1e15:.0f} PH/s"
                     else:
-                        hr_formatted = f"{current_hashrate / 1e12:.0f} TH/s"  # Rare fallback
-                    break  # Success — stop trying other periods
+                        hr_formatted = f"{current_hashrate / 1e12:.0f} TH/s"
+                    break
     except Exception:
         pass
 
@@ -469,7 +471,7 @@ def get_prune_score():
             text-shadow: 0 0 40px #00ffff, 0 0 80px #00ffff !important;
             margin: 16px 0 !important;
         ">
-            {current} sats/vB
+            {current} {fee_unit}
         </div>
         <div style="
             color: #88ffcc !important;
