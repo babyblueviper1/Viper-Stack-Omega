@@ -3836,7 +3836,7 @@ No API calls • Fully air-gapped safe""",
                 lines=10,
             )
         
-      # === Seamless mode switching + dark mode + live status ===
+        # === Seamless mode switching + dark mode + live status ===
         def update_status_and_ui(offline, dark):
             theme_icon = "🌙" if dark else "☀️"
             theme_text = "Dark" if dark else "Light"
@@ -3871,28 +3871,31 @@ No API calls • Fully air-gapped safe""",
             </div>
             """
 
-        offline_toggle.change(
-            fn=lambda x: gr.update(visible=x),
-            inputs=offline_toggle,
-            outputs=manual_box_row,
-        ).then(
-            fn=lambda x: gr.update(value="") if x else gr.update(),
-            inputs=offline_toggle,
-            outputs=addr_input,
-        ).then(
-            fn=lambda x: gr.update(
-                interactive=not x,
-                placeholder="🔒 Offline mode active — paste raw UTXOs in the box below 👇" if x
-                else "Paste one or many addresses/xpubs (one per line)\nClick ANALYZE when ready"
-            ),
-            inputs=offline_toggle,
-            outputs=addr_input,
-        )
+        def offline_toggle_handler(offline, dark):
+            manual_box = gr.update(visible=offline)
+
+            addr_clear = gr.update(value="") if offline else gr.update()
+            addr_ui = gr.update(
+                interactive=not offline,
+                placeholder=(
+                    "🔒 Offline mode active — paste raw UTXOs in the box below 👇"
+                    if offline
+                    else "Paste one or many addresses/xpubs (one per line)\nClick ANALYZE when ready"
+                )
+            )
+
+            status_html = update_status_and_ui(offline, dark)
+
+            return manual_box, addr_ui, status_html
 
         offline_toggle.change(
-            fn=update_status_and_ui,
+            fn=offline_toggle_handler,
             inputs=[offline_toggle, theme_toggle],
-            outputs=mode_status
+            outputs=[
+                manual_box_row,
+                addr_input,
+                mode_status,
+            ],
         )
 
         theme_toggle.change(
@@ -4303,7 +4306,8 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             gr.update(interactive=True),                             # future_fee_slider
             gr.update(interactive=True),                             # thank_you_slider
             gr.update(value=False, interactive=True),                # offline_toggle
-            gr.update(value="", visible=False, interactive=True),    # manual_utxo_input
+            gr.update(value="", interactive=True),                    # manual_utxo_input
+            gr.update(visible=False),                                # manual_box_row 
             gr.update(interactive=True),                             # theme_toggle — RE-ENABLE DARK MODE
             gr.update(interactive=True),                             # fastest_btn
             gr.update(interactive=True),                             # halfhour_btn
@@ -4337,6 +4341,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             thank_you_slider,
             offline_toggle,
             manual_utxo_input,
+            manual_box_row,             
             theme_toggle,
             fastest_btn,
             halfhour_btn,
@@ -4349,9 +4354,12 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             psbt_output,
         ],
     ).then(
-        fn=generate_summary_safe,
-        inputs=[df, enriched_state, fee_rate_slider, future_fee_slider, thank_you_slider, locked, strategy, dest_value,],
-        outputs=[status_output, generate_row]
+        fn=lambda: (
+            "", 
+            gr.update(visible=False),    # generate_row hidden
+            gr.update(visible=True)      # analyze_btn re-shown
+        ),
+        outputs=[status_output, generate_row, analyze_btn]
     )
     # =============================
     # — LIVE INTERPRETATION (single source of truth) —
