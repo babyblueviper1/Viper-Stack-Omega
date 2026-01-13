@@ -4137,7 +4137,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             max_height=500,
             max_chars=None,
             label=" ",
-            static_columns=[1, 2, 3, 4, 5, 6, 7],
+            static_columns=[1, 2, 3, 4, 5, 6, 7, 8],
             column_widths=["90px", "160px", "200px", "120px", "140px", "160px", "130px", "90px", "80px"]
         )
 
