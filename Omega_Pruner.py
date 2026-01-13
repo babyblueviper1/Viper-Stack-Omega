@@ -1479,6 +1479,7 @@ def scan_xpub(xpub: str, dust: int = 546, gap_limit: int = 20) -> Tuple[List[dic
     except Exception as e:
         return [], f"Error: {str(e)[:120]}"
 
+
 # =================
 # Analyze functions
 # ================
@@ -1566,6 +1567,7 @@ def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
                 "health": "MANUAL",
                 "recommend": "REVIEW",
                 "script_type": meta.get("type", "Manual"),
+				"script_type_inferred": True,
                 "source": "Manual Offline",
                 "selected": False,
             })
@@ -1666,6 +1668,7 @@ def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
             "health": health,
             "recommend": recommend,
             "script_type": script_type,
+			"script_type_inferred": u.get("script_type_inferred", False),
             "scriptPubKey": script_pubkey,        # raw bytes, needed for PSBT
             "tap_internal_key": tap_internal_key, # None unless Taproot
             # "selected" is handled elsewhere
@@ -1720,16 +1723,16 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
 
     for u in enriched:
         script_type = u.get("script_type", "")
-        selected = u.get("selected", False)
+        selected = u.get("selected", False)  # ✅ preserve strategy / offline inference
 
-        # Supported types for PSBT generation
         supported_in_psbt = script_type in ("P2WPKH", "Taproot")
 
         if not supported_in_psbt:
             has_unsupported = True
-            selected = False  # Force unselected
 
+            #  Only legacy is truly forbidden
             if script_type in ("P2PKH", "Legacy"):
+                selected = False
                 health_html = (
                     '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;">'
                     f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
@@ -1952,17 +1955,26 @@ def _render_locked_state() -> Tuple[str, gr.update]:
         gr.update(visible=False)
     )
 
-def _validate_utxos_and_selection(df, utxos: list[dict]):
+def _validate_utxos_and_selection(
+    df,
+    utxos: list[dict],
+    *,
+    offline_mode: bool = False,
+):
     if not utxos:
         return None, 0, "NO_UTXOS"
 
-    selected_utxos = _resolve_selected(df, utxos)
-    pruned_count = len(selected_utxos)
+    # 🔒 Single source of truth: enriched_state / utxos
+    selected_utxos = [u for u in utxos if u.get("selected")]
 
-    if pruned_count == 0:
+    # Offline fallback: allow "select all"
+    if not selected_utxos and offline_mode:
+        selected_utxos = utxos
+
+    if not selected_utxos:
         return None, 0, "NO_SELECTION"
 
-    return selected_utxos, pruned_count, None
+    return selected_utxos, len(selected_utxos), None
 
 
 def _compute_privacy_metrics(selected_utxos: List[dict], total_utxos: int) -> Tuple[int, str]:
@@ -2201,6 +2213,7 @@ def generate_summary_safe(
     locked,
     strategy,
     dest_value: str,
+    offline_mode: bool,
 ) -> tuple:
     print(">>> generate_summary_safe CALLED")
     print(f"    locked = {locked}")
@@ -2224,19 +2237,52 @@ def generate_summary_safe(
     if total_utxos == 0:
         return no_utxos_msg, gr.update(visible=False)
 
-    # === Validate selection ===
+     # === Validate selection ===
     selected_utxos, pruned_count, error = _validate_utxos_and_selection(df, utxos)
 
+    # --- OFFLINE MODE OVERRIDE ---
+    if error == "NO_SELECTION" and offline_mode:
+        selected_utxos = utxos
+        pruned_count = len(utxos)
+        error = None
+
+    # --- Hard errors ---
     if error == "NO_UTXOS":
         return no_utxos_msg, gr.update(visible=False)
     if error == "NO_SELECTION":
         return select_msg, gr.update(visible=False)
 
-    # === FINAL GUARD: Only count supported inputs ===
+    # === FINAL GUARD: Only count supported inputs (offline-safe) ===
     supported_selected = [
         u for u in selected_utxos
-        if u.get("script_type") in ("P2WPKH", "Taproot")
+        if (
+            not u.get("script_type")                # None / unknown → allow
+            or u.get("script_type") in ("P2WPKH", "Taproot", "P2TR")
+        )
     ]
+
+    offline_inferred_count = sum(
+        1 for u in supported_selected if u.get("script_type_inferred")
+    )
+
+    offline_badge = (
+        f"""
+        <div style="
+            margin-top:14px;
+            padding-top:10px;
+            font-size:clamp(0.9rem, 3vw, 1.05rem);
+            color:#88ffcc;
+            opacity:0.85;
+        ">
+            🛰️ <b>Offline mode</b>: {offline_inferred_count} input(s) accepted<br>
+        <span style="color:#aaffdd; opacity:0.85;">
+            Script type inferred from address format — verify before signing
+        </span>
+    </div>
+    """
+        if offline_inferred_count > 0
+        else ""
+    )
 
     pruned_count = len(supported_selected)
     if pruned_count == 0:
@@ -2303,6 +2349,7 @@ def generate_summary_safe(
       ">
         SELECTION READY
       </div>
+      {offline_badge}  <!-- ← Your new offline badge here, right after header -->
       <div style="
           color:#f7931a !important;
           font-size:clamp(1.5rem, 5vw, 1.9rem) !important;
@@ -3217,6 +3264,7 @@ def analyze_and_show_summary(
         locked,
         strategy,
         dest_value,
+		offline_mode,
     )
 
     print(">>> status_box_html generated")
@@ -3228,7 +3276,7 @@ def analyze_and_show_summary(
         enriched_new,           # 1: enriched_state
         warning_banner,         # 2: warning_banner HTML
         generate_row_visibility,# 3: generate_row visibility (critical!)
-        import_file,          # 4: import_file visibility
+        import_vis,          # 4: import_file visibility
         scan_source_new,        # 5: scan_source state
         status_box_html,        # 6: status_output (the big glowing box)
     )
@@ -3236,7 +3284,7 @@ def analyze_and_show_summary(
 # Gradio UI
 # --------------------------
 with gr.Blocks(
-    title="Ωmega Pruner v11.1 — Forged Anew"
+    title="Ωmega Pruner v11 — Forged Anew"
 ) as demo:
     
     # Full-screen animated Ωmega background + Hero Banner
@@ -3324,7 +3372,7 @@ with gr.Blocks(
             text-shadow:0 0 15px #00ffaa;
             margin:20px 0 !important;
         ">
-            FORGED ANEW — v11.1
+            FORGED ANEW — v11
         </div>
         
         <div style="
@@ -4203,6 +4251,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             locked,
             strategy,
             dest_value,
+            offline_toggle,
         ],
         outputs=[status_output, generate_row]
     )
@@ -4379,6 +4428,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             locked,
             strategy,
             dest_value,
+            offline_toggle,
         ],
         outputs=[status_output, generate_row],
     )
@@ -4394,6 +4444,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             locked,
             strategy,
             dest_value,
+            offline_toggle,
         ],
         outputs=[status_output, generate_row],
     )
@@ -4409,6 +4460,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             locked,
             strategy,
             dest_value,
+            offline_toggle,
         ],
         outputs=[status_output, generate_row],
     )
@@ -4424,6 +4476,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             locked,
             strategy,
             dest_value,
+            offline_toggle,
         ],
         outputs=[status_output, generate_row],
     )
@@ -4439,6 +4492,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             locked,
             strategy,
             dest_value,
+            offline_toggle,
         ],
         outputs=[status_output, generate_row]
     )
@@ -4477,7 +4531,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
                 color: #f7931a;
                 text-shadow: 0 0 15px rgba(247,147,26,0.7);
             ">
-                Ωmega Pruner v11.1 — Forged Anew
+                Ωmega Pruner v11 — Forged Anew
             </div>
 
             <!-- GITHUB LINK -->
