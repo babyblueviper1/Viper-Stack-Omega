@@ -2240,11 +2240,6 @@ def generate_summary_safe(
      # === Validate selection ===
     selected_utxos, pruned_count, error = _validate_utxos_and_selection(df, utxos)
 
-    # --- OFFLINE MODE OVERRIDE ---
-    if error == "NO_SELECTION" and offline_mode:
-        selected_utxos = utxos
-        pruned_count = len(utxos)
-        error = None
 
     # --- Hard errors ---
     if error == "NO_UTXOS":
