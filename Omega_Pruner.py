@@ -701,6 +701,7 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
     Rebuild dataframe rows from current enriched_state.
     Used when loading a saved selection JSON.
     Safely handles invalid input and enforces unsupported type rules.
+    TXID shows truncated with ellipsis (plain string, copyable on click)
     """
     # Handle invalid enriched_state
     if not enriched_state:
@@ -726,7 +727,8 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
             continue
 
         script_type = u.get("script_type", "")
-        selected = u.get("selected", False)
+        selected = bool(u.get("selected", False))  # Preserve saved state
+        inferred = bool(u.get("script_type_inferred", False))
 
         # Supported only: Native SegWit and Taproot
         supported_in_psbt = script_type in ("P2WPKH", "Taproot")
@@ -774,10 +776,16 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
             "Legacy": "Legacy",  # ← catches classification output
         }.get(script_type, script_type)
 
+        
+        txid_full = u.get("txid", "unknown")
+        
+        if inferred:
+            display_type += ' <span style="color:#00cc66;font-weight:bold;">[inferred]</span>'
+
         rows.append([
             selected,
             u.get("source", "Single"),
-            u.get("txid", "unknown")[:8] + "..." + u.get("txid", "unknown")[-8:],
+            txid_full,
             health_html,
             u.get("value", 0),
             u.get("address", "unknown"),
@@ -1590,9 +1598,8 @@ def _collect_online_utxos(params: AnalyzeParams) -> List[Dict]:
         is_xpub = entry[:4] in ("xpub", "ypub", "zpub", "tpub", "upub", "vpub")
 
         source_label = (
-            f"xpub ({entry[:12]}...{entry[-6:]})"
-            if is_xpub
-            else (entry if len(entry) <= 34 else f"{entry[:31]}...")
+            f"xpub ({entry})" if is_xpub           # full xpub
+            else entry                             # full address
         )
 
         raw_utxos = (
@@ -1715,22 +1722,23 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
 def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
     """
     Convert enriched UTXOs into dataframe rows.
-    Handles unsupported script types by disabling selection and showing warnings.
-    Fully responsive health badges for mobile.
+    - Handles unsupported script types by disabling selection and showing warnings.
+    - Fully responsive health badges for mobile.
+    - TXID shows truncated with ellipsis, full value on hover (via CSS tooltip)
     """
     rows: List[List] = []
     has_unsupported = False
 
     for u in enriched:
         script_type = u.get("script_type", "")
-        selected = u.get("selected", False)  # ✅ preserve strategy / offline inference
+        selected = bool(u.get("selected", False))  # Preserve strategy / offline inference
+        inferred = bool(u.get("script_type_inferred", False))
 
         supported_in_psbt = script_type in ("P2WPKH", "Taproot")
 
         if not supported_in_psbt:
             has_unsupported = True
 
-            #  Only legacy is truly forbidden
             if script_type in ("P2PKH", "Legacy"):
                 selected = False
                 health_html = (
@@ -1755,9 +1763,9 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
                 )
         else:
             health_html = (
-                f'<div class="health health-{u["health"].lower()}">'
-                f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{u["health"]}</span><br>'
-                f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">{u["recommend"]}</small>'
+                f'<div class="health health-{u.get("health", "OPTIMAL").lower()}">'
+                f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{u.get("health", "OPTIMAL")}</span><br>'
+                f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">{u.get("recommend", "")}</small>'
                 '</div>'
             )
 
@@ -1770,10 +1778,15 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
             "Legacy": "Legacy",
         }.get(script_type, script_type)
 
+        txid_full = u.get("txid", "unknown")
+        
+        if inferred:
+            display_type += ' <span style="color:#00cc66;font-weight:bold;">[inferred]</span>'
+
         rows.append([
             selected,
             u.get("source", "Single"),
-            u["txid"][:8] + "..." + u["txid"][-8:],
+            txid_full,
             health_html,
             u["value"],
             u["address"],
@@ -3685,6 +3698,49 @@ tr:has(.health-nested) input[type="checkbox"] {
     body:not(.dark-mode) .empty-state-msg > div:first-child {
         color: #004d33 !important;
     }
+.gr-dataframe th:nth-child(1) {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow: visible !important;
+    line-height: 1.2 !important;
+    padding: 8px 4px !important;
+    font-size: clamp(0.9rem, 3vw, 1rem) !important;
+}
+/* Make sure these columns can wrap + break long strings */
+.gr-dataframe td:nth-child(2),  /* Source */
+.gr-dataframe td:nth-child(3),  /* TXID */
+.gr-dataframe td:nth-child(6) { /* Address */
+    white-space: normal !important;
+    word-break: break-all !important;     /* critical for hex & bech32 */
+    overflow-wrap: break-word !important; /* fallback + better looking */
+    hyphens: auto;                        /* optional: nicer breaks on some browsers */
+    font-family: monospace !important;
+    font-size: 0.95rem !important;
+    line-height: 1.35 !important;
+    padding: 8px 6px !important;          /* give a bit more breathing room */
+}
+
+/* Make sure the parent doesn't fight us */
+.gr-dataframe td:nth-child(2),
+.gr-dataframe td:nth-child(3),
+.gr-dataframe td:nth-child(6) {
+    max-width: none !important;           /* prevent artificial width caps */
+    overflow: visible !important;         /* let it grow vertically */
+}
+
+/* Hover feedback for copy-ability */
+.gr-dataframe td:nth-child(2):hover,
+.gr-dataframe td:nth-child(3):hover,
+.gr-dataframe td:nth-child(6):hover {
+    background: rgba(0, 255, 136, 0.12) !important;
+    cursor: pointer !important;
+}
+
+/* Optional: slightly reduce ellipsis aggression globally (safety net) */
+.gr-dataframe td {
+    white-space: normal !important;       /* try to weaken global nowrap */
+    overflow: visible !important;
+}
 </style>
 """)
 
@@ -4129,7 +4185,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
                 "Type",
                 "vout",
             ],
-            datatype=["bool", "str", "str", "html", "number", "str", "number", "str", "number"],
+            datatype=["bool", "str", "str", "html", "number", "str", "number", "html", "number"],
             type="array",
             interactive=True,
             wrap=True,
@@ -4138,8 +4194,23 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             max_chars=None,
             label=" ",
             static_columns=[1, 2, 3, 4, 5, 6, 7, 8],
-            column_widths=["90px", "160px", "200px", "120px", "140px", "160px", "130px", "90px", "80px"]
+            column_widths=["120px", "380px", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
         )
+
+        gr.HTML("""
+            <script>
+                // Simple click-to-expand for TXID cells
+                document.addEventListener('DOMContentLoaded', function() {
+                    const txidCells = document.querySelectorAll('.gr-dataframe td:nth-child(3)');
+                    txidCells.forEach(cell => {
+                        cell.addEventListener('click', function(e) {
+                            e.stopPropagation();  // Prevent row selection if any
+                            this.classList.toggle('expanded');
+                        });
+                    });
+                });
+            </script>
+        """)
 
         status_output = gr.HTML("")
         # Generate row — hidden until analysis complete
