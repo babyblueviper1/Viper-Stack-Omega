@@ -2263,18 +2263,35 @@ def generate_summary_safe(
     offline_badge = (
         f"""
         <div style="
-            margin-top:14px;
-            padding-top:10px;
-            font-size:clamp(0.9rem, 3vw, 1.05rem);
-            color:#88ffcc;
-            opacity:0.85;
+            margin: 20px 0 !important;
+            padding: 16px 20px !important;
+            background: rgba(0, 50, 20, 0.45) !important;
+            border: 3px solid #00ff88 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 0 25px rgba(0,255,136,0.5) !important;
+            font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
+            color: #ffffff !important;
+            line-height: 1.5 !important;
         ">
-            🛰️ <b>Offline mode</b>: {offline_inferred_count} input(s) accepted<br>
-        <span style="color:#aaffdd; opacity:0.85;">
-            Script type inferred from address format — verify before signing
-        </span>
-    </div>
-    """
+            <div style="
+                color: #00ffdd !important;
+                font-weight: 900 !important;
+                font-size: clamp(1.15rem, 4vw, 1.3rem) !important;
+                margin-bottom: 8px !important;
+                text-shadow: 0 0 12px #00ffdd !important;
+            ">
+                🛰️ OFFLINE MODE — IMPORTANT
+            </div>
+            
+            {offline_inferred_count} input(s) accepted<br>
+            <strong style="color: #ffff88 !important; font-weight: 800 !important;">
+                Script types are INFERRED from addresses only
+            </strong><br>
+            <span style="color: #ffdd88 !important; opacity: 0.95 !important;">
+                → Please double-check and verify before signing!
+            </span>
+        </div>
+        """
         if offline_inferred_count > 0
         else ""
     )
