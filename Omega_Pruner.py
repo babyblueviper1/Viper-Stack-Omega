@@ -1969,18 +1969,25 @@ def _render_locked_state() -> Tuple[str, gr.update]:
     )
 
 def _validate_utxos_and_selection(
-    df,
-    utxos: list[dict],
+    df_rows,
+    utxos,
     *,
     offline_mode: bool = False,
 ):
+    # Minimal guard: if utxos is not usable, treat as empty (no crash)
+    if not isinstance(utxos, (list, tuple)) or not utxos:
+        print(f"Warning: utxos invalid (type: {type(utxos)}) — treating as empty")
+        return None, 0, "NO_UTXOS"
+
+    # Quick filter: remove any non-dict junk (rare, but prevents crash)
+    utxos = [u for u in utxos if isinstance(u, dict)]
     if not utxos:
         return None, 0, "NO_UTXOS"
 
-    # 🔒 Single source of truth: enriched_state / utxos
-    selected_utxos = [u for u in utxos if u.get("selected")]
+    # Original correct logic — this is what made initial load work
+    selected_utxos = [u for u in utxos if u.get("selected", False)]
 
-    # Offline fallback: allow "select all"
+    # Offline fallback
     if not selected_utxos and offline_mode:
         selected_utxos = utxos
 
@@ -1988,7 +1995,6 @@ def _validate_utxos_and_selection(
         return None, 0, "NO_SELECTION"
 
     return selected_utxos, len(selected_utxos), None
-
 
 def _compute_privacy_metrics(selected_utxos: List[dict], total_utxos: int) -> Tuple[int, str]:
     privacy_score = calculate_privacy_score(selected_utxos, total_utxos)
@@ -3305,6 +3311,32 @@ def analyze_and_show_summary(
         scan_source_new,        # 5: scan_source state
         status_box_html,        # 6: status_output (the big glowing box)
     )
+
+def fresh_empty_dataframe():
+    return gr.DataFrame(
+        value=[],                      # Truly empty — no dummy rows
+        headers=[
+            "PRUNE",
+            "Source",
+            "TXID",
+            "Health",
+            "Value (sats)",
+            "Address",
+            "Weight (wu)",
+            "Type",
+            "vout",
+        ],
+        datatype=["bool", "str", "str", "html", "number", "str", "number", "html", "number"],
+        type="array",
+        interactive=True,              # Enables checkbox interaction
+        wrap=True,
+        row_count=(5, "dynamic"),
+        max_height=500,
+        max_chars=None,
+        label=" ",
+        static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # ← VERY IMPORTANT: keeps non-PRUNE columns fixed
+        column_widths=["120px", "360px", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
+    )
 # --------------------------
 # Gradio UI
 # --------------------------
@@ -4422,7 +4454,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
     def nuclear_reset():
         """NUCLEAR RESET — silent wipe of state and affordances."""
         return (
-            gr.update(value=[]),                                     # df — clear table
+            fresh_empty_dataframe(),
             tuple(),                                                 # enriched_state — empty
             gr.update(value=""),                                     # warning_banner
             gr.update(visible=True),                                 # analyze_btn — show
