@@ -1969,32 +1969,65 @@ def _render_locked_state() -> Tuple[str, gr.update]:
     )
 
 def _validate_utxos_and_selection(
-    df_rows,
-    utxos,
+    df_rows: List[list],
+    utxos: List[dict],
     *,
     offline_mode: bool = False,
-):
-    # Minimal guard: if utxos is not usable, treat as empty (no crash)
-    if not isinstance(utxos, (list, tuple)) or not utxos:
-        print(f"Warning: utxos invalid (type: {type(utxos)}) — treating as empty")
+) -> Tuple[Optional[List[dict]], int, Optional[str]]:
+    """
+    Resolve selected UTXOs from df_rows checkboxes.
+    
+    NEW: Prioritizes UI state (df_rows) over enriched_state flags.
+    - If df_rows present and matches utxos len → ALWAYS trust checkboxes, even if all unchecked
+    - Only fallback to enriched_state if df_rows is missing/mismatched (safety net)
+    - In offline_mode: even stricter, never fallback to avoid surprises
+    """
+    if not utxos:
         return None, 0, "NO_UTXOS"
 
-    # Quick filter: remove any non-dict junk (rare, but prevents crash)
+    # Filter to valid dicts (safety)
     utxos = [u for u in utxos if isinstance(u, dict)]
     if not utxos:
         return None, 0, "NO_UTXOS"
 
-    # Original correct logic — this is what made initial load work
-    selected_utxos = [u for u in utxos if u.get("selected", False)]
+    # Collect checked indices from df_rows
+    selected_indices = []
+    if isinstance(df_rows, list) and df_rows:
+        for i, row in enumerate(df_rows):
+            if not row or len(row) <= CHECKBOX_COL:
+                continue
+                
+            checkbox_val = row[CHECKBOX_COL]
+            is_checked = (
+                checkbox_val in (True, 1, "true", "True", "1") 
+                or bool(checkbox_val)
+            )
+            if is_checked and i < len(utxos):
+                selected_indices.append(i)
 
-    # Offline fallback
-    if not selected_utxos and offline_mode:
-        selected_utxos = utxos
+    # NEW LOGIC: trust df_rows if it matches utxos
+    has_valid_df = df_rows and len(df_rows) == len(utxos)
+    
+    if has_valid_df:
+        # We have fresh UI state → use it directly
+        # (even if selected_indices == [] → that's intentional "none selected")
+        selected_utxos = [utxos[i] for i in selected_indices]
+    else:
+        # Fallback only when df_rows missing/outdated
+        # (should be rare — mostly initial load)
+        selected_utxos = [u for u in utxos if u.get("selected", False)]
 
-    if not selected_utxos:
+    # Offline: override fallback if needed
+    # (extra safety — users expect exact manual control)
+    if offline_mode and not selected_indices:
+        selected_utxos = []  # Force empty if nothing checked
+
+    pruned_count = len(selected_utxos)
+
+    if pruned_count == 0:
         return None, 0, "NO_SELECTION"
 
-    return selected_utxos, len(selected_utxos), None
+    return selected_utxos, pruned_count, None
 
 def _compute_privacy_metrics(selected_utxos: List[dict], total_utxos: int) -> Tuple[int, str]:
     privacy_score = calculate_privacy_score(selected_utxos, total_utxos)
@@ -2235,36 +2268,69 @@ def generate_summary_safe(
     offline_mode: bool,
 ) -> tuple:
     print(">>> generate_summary_safe CALLED")
-    print(f"    locked = {locked}")
-    print(f"    enriched_state type: {type(enriched_state)}, len: {len(enriched_state[1]) if isinstance(enriched_state, tuple) and len(enriched_state) == 2 else 'N/A'}")
-    print(f"    df rows: {len(df) if df else 0}")
-    print(f"    fee_rate = {fee_rate}, dao_percent = {dao_percent}")
+    # ... your existing prints ...
 
     if locked:
-        print("    → Returning locked state message")
         return _render_locked_state()
 
-    # Extract actual UTXO list from frozen state
+    # Extract UTXOs
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
         meta, utxos = enriched_state
     else:
         utxos = enriched_state or []
-    
+
     total_utxos = len(utxos)
 
-    # === No UTXOs at all ===
     if total_utxos == 0:
         return no_utxos_msg, gr.update(visible=False)
 
-     # === Validate selection ===
-    selected_utxos, pruned_count, error = _validate_utxos_and_selection(df, utxos)
+    selected_utxos, pruned_count, error = _validate_utxos_and_selection(df, utxos, offline_mode=offline_mode)
+	# DEBUG PRINTS - add these two lines
+    print(f"pruned_count from validate: {pruned_count}, error: {error}, selected_utxos_len: {len(selected_utxos) if selected_utxos else 0}")
+    print(f"df_rows first row type: {type(df[0]) if df and df else 'empty'}")
+    if df and df:
+        print(f"df_rows first row preview: {df[0][:5]}")  # Optional: show first 5 columns of first row
+    print(f"total_utxos: {total_utxos}")
 
+    # NEW: Offline mode address check + warning banner
+    offline_address_warning = ""
+    if offline_mode:
+        has_address = any(
+            u.get("address") and 
+            isinstance(u["address"], str) and 
+            u["address"].strip().startswith(('bc1q', 'bc1p'))
+            for u in utxos
+        )
+        if not has_address:
+            offline_address_warning = """
+            <div style="
+                color: #ffdd88 !important;
+                background: rgba(51, 34, 0, 0.75) !important;
+                border: 3px solid #ff9900 !important;
+                border-radius: 14px !important;
+                padding: 20px !important;
+                margin: 20px auto !important;
+                font-weight: 700 !important;
+                text-align: center !important;
+                font-size: 1.1rem !important;
+                line-height: 1.5 !important;
+                box-shadow: 0 0 25px rgba(255,153,0,0.5) !important;
+                text-shadow: 0 0 6px #000000 !important;
+                max-width: 90% !important;
+            ">
+              ⚠️ Offline Mode: No valid address detected<br>
+              To receive change back to your wallet, include <strong>at least one bc1q... or bc1p... address</strong> in your pasted UTXOs.<br><br>
+              Format: <code>txid:vout:value_in_sats:your_address_here</code><br><br>
+              Right now, <strong>no change output</strong> will be created — all remaining value absorbed into fees (full wallet cleanup).<br>
+              Edit your input and re-analyze to enable change.
+            </div>
+            """
 
-    # --- Hard errors ---
+    # Hard errors
     if error == "NO_UTXOS":
         return no_utxos_msg, gr.update(visible=False)
     if error == "NO_SELECTION":
-        return select_msg, gr.update(visible=False)
+        return select_msg, gr.update(visible=False)  # Show button even with no selection
 
     # === FINAL GUARD: Only count supported inputs (offline-safe) ===
     supported_selected = [
@@ -2353,7 +2419,19 @@ def generate_summary_safe(
 
     strategy_label = strategy.split(" — ")[0] if " — " in strategy else "Recommended"
 
-    status_box_html = f"""
+	# Update the "change sent to" line to reflect reality
+    change_line = (
+        f"💧 Expected output: "
+        f"<span style='color:#0f0 !important;font-weight:800 !important;'>{econ.change_amt:,} sats</span> "
+        "change sent to standard address"
+    )
+    if offline_mode and not any(u.get("address") for u in utxos):
+        change_line = (
+            f"💧 <span style='color:#ff9900 !important;font-weight:800 !important;'>No change output</span> "
+            "(all remaining value absorbed into fees - full cleanup)"
+        )
+
+    status_box_html = offline_address_warning + f"""
     <div style="
         text-align:center !important;
         margin:clamp(30px, 8vw, 60px) auto 20px auto !important;
@@ -2441,9 +2519,7 @@ def generate_summary_safe(
           <span style="color:#0f0 !important;font-weight:800 !important;">{econ.fee:,} sats @ {fee_rate} s/vB</span>{dao_line}
         </div>
         <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.6 !important;">
-          💧 Expected output: 
-          <span style="color:#0f0 !important;font-weight:800 !important;">{econ.change_amt:,} sats</span>
-          change sent to standard address
+          {change_line}
         </div>
         <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.7 !important;">
           💡 Pruning now saves you <span style="color:#0f0 !important;font-weight:800 !important;">+{sats_saved:,} sats</span> versus pruning later if fees reach {future_fee_rate} s/vB
@@ -2655,52 +2731,17 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
     )
 
 def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Union[bytes, str]:
-    """Validate and resolve final destination scriptPubKey or return error HTML."""
+    """Validate and resolve final destination scriptPubKey or return warning HTML."""
     final_dest = (dest_override or scan_source).strip()
+
     if not final_dest:
-        return (
-            "<div style='"
-            "color:#ff6666 !important;"
-            "text-align:center !important;"
-            "padding: clamp(30px, 8vw, 60px) !important;"
-            "background:#440000 !important;"
-            "border-radius:18px !important;"
-            "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
-            "font-size: clamp(1.2rem, 4.5vw, 1.5rem) !important;"
-            "line-height:1.7 !important;"
-            "max-width:90% !important;"
-            "margin:0 auto !important;"
-            "'>"
-            "<div style='"
-            "color:#ff3366 !important;"
-            "font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;"
-            "font-weight:900 !important;"
-            "text-shadow:0 0 30px #ff3366 !important;"
-            "'>No destination address available.</div><br><br>"
-            "Please enter a destination address or ensure your scan source is valid."
-            "</div>"
-        )
+        # No address → allow no-change PSBT (absorb all into fees)
+        return b''  # Return empty bytes as sentinel for "no change output"
 
     if final_dest.startswith(("xpub", "ypub", "zpub", "tpub", "upub", "vpub")):
         return (
-            "<div style='"
-            "color:#ffdd88 !important;"
-            "text-align:center !important;"
-            "padding: clamp(30px, 8vw, 60px) !important;"
-            "background:#332200 !important;"
-            "border-radius:18px !important;"
-            "box-shadow:0 0 60px rgba(255,204,0,0.5) !important;"
-            "font-size: clamp(1.2rem, 4.5vw, 1.5rem) !important;"
-            "line-height:1.7 !important;"
-            "max-width:90% !important;"
-            "margin:0 auto !important;"
-            "'>"
-            "<div style='"
-            "color:#ffcc00 !important;"
-            "font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;"
-            "font-weight:900 !important;"
-            "text-shadow:0 0 30px #ffcc00 !important;"
-            "'>xpub detected as scan source.</div><br><br>"
+            "<div style='color:#ffdd88 !important; text-align:center !important; padding:30px; background:#332200 !important; border-radius:18px; box-shadow:0 0 60px rgba(255,204,0,0.5) !important;'>"
+            "<div style='color:#ffcc00 !important; font-size:1.8rem; font-weight:900;'>xpub detected as scan source.</div><br><br>"
             "Please specify a destination address.<br>"
             "Automatic derivation coming soon."
             "</div>"
@@ -2711,24 +2752,8 @@ def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Unio
         return spk
     except Exception:
         return (
-            "<div style='"
-            "color:#ff6666 !important;"
-            "text-align:center !important;"
-            "padding: clamp(30px, 8vw, 60px) !important;"
-            "background:#440000 !important;"
-            "border-radius:18px !important;"
-            "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
-            "font-size: clamp(1.2rem, 4.5vw, 1.5rem) !important;"
-            "line-height:1.7 !important;"
-            "max-width:90% !important;"
-            "margin:0 auto !important;"
-            "'>"
-            "<div style='"
-            "color:#ff3366 !important;"
-            "font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;"
-            "font-weight:900 !important;"
-            "text-shadow:0 0 30px #ff3366 !important;"
-            "'>Invalid destination address.</div><br><br>"
+            "<div style='color:#ff6666 !important; text-align:center !important; padding:30px; background:#440000 !important; border-radius:18px; box-shadow:0 0 50px rgba(255,51,102,0.5) !important;'>"
+            "<div style='color:#ff3366 !important; font-size:1.8rem; font-weight:900;'>Invalid destination address.</div><br><br>"
             "Please check the address format."
             "</div>"
         )
@@ -2738,13 +2763,14 @@ def _build_unsigned_tx(
     econ: TxEconomics,
     dest_spk: bytes,
     params: PsbtParams,
-) -> tuple[Tx, list[dict]]:
+) -> tuple[Tx, list[dict], str]:  # Updated return type to include warning str
     """
     Construct unsigned transaction and return prepared UTXO info for PSBT.
 
     Returns:
         tx: Unsigned Tx object.
         utxos_for_psbt: List of dicts with 'value', 'scriptPubKey', 'script_type' per input.
+        no_change_warning: HTML warning string (empty if change address provided)
     """
     tx = Tx()
     utxos_for_psbt: list[dict[str, any]] = []
@@ -2768,10 +2794,32 @@ def _build_unsigned_tx(
     if getattr(params, "silent_payment_full", False):
         change_amt = econ.total_in - econ.fee - econ.dao_amt
 
-    if change_amt > 0:
-        tx.tx_outs.append(TxOut(change_amt, dest_spk))
+    no_change_warning = ""  # Will be passed back if needed
 
-    return tx, utxos_for_psbt
+    if change_amt > 0:
+        if not dest_spk:  # Sentinel: empty bytes = no address provided
+            # Absorb all into fees (intentional full cleanup)
+            no_change_warning = (
+                "<div style='"
+                "color:#ff9900 !important;"
+                "background:rgba(51,34,0,0.6) !important;"
+                "border:2px solid #ff9900 !important;"
+                "border-radius:12px !important;"
+                "padding:16px !important;"
+                "margin:16px 0 !important;"
+                "text-align:center !important;"
+                "font-weight:600 !important;"
+                "'>"
+                "⚠️ No change address provided<br>"
+                "All remaining value absorbed into fees (full wallet cleanup).<br><br>"
+                "To receive change, include at least one bc1q... or bc1p... address in your pasted UTXOs."
+                "</div>"
+            )
+            # Do NOT add change output — all value goes to fees/DAO
+        else:
+            tx.tx_outs.append(TxOut(change_amt, dest_spk))
+
+    return tx, utxos_for_psbt, no_change_warning  # ← This is now properly inside the function
 
 def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
     """Generate QR code for PSBT, with graceful fallback for large PSBTs."""
@@ -2919,7 +2967,21 @@ def _compose_psbt_html(
     psbt_b64: str,
     payjoin_note: str,
     extra_note: str = "",
+    no_change_warning: str = "",  # Add this param to know if no change
 ) -> str:
+    change_message = ""
+    if not no_change_warning:  # Only show if there IS a change output
+        change_message = """
+        <div style="
+            color:#aaffaa !important;
+            font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;
+            margin: clamp(24px, 6vw, 40px) 0 !important;
+            text-align:center !important;
+        ">
+            Change output sent to standard address
+        </div>
+        """
+
     return f"""
     <div style="height: clamp(60px, 15vw, 100px) !important;"></div>
 <div style="
@@ -2989,14 +3051,7 @@ def _compose_psbt_html(
         </button>
     </div>
         {extra_note}
-    <div style="
-        color:#aaffaa !important;
-        font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;
-        margin: clamp(24px, 6vw, 40px) 0 !important;
-        text-align:center !important;
-    ">
-        Change output sent to standard address
-    </div>
+    {change_message}  <!-- NEW: Conditional change message -->
     {payjoin_note}
 
     <!-- QR -->
@@ -3095,7 +3150,7 @@ def _compose_psbt_html(
 </div>
 """
 
-def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
+def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows) -> str:
     """Orchestrate PSBT generation using both snapshot (params) and full enriched UTXOs."""
     print(f">>> generate_psbt received snapshot: {type(psbt_snapshot)}")
     print(f">>> generate_psbt received full_utxos: {len(full_selected_utxos) if full_selected_utxos else 0} items")
@@ -3107,6 +3162,27 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
     if not full_selected_utxos:
         return _render_no_inputs()
 
+    # Safety check: nothing actually selected for pruning
+    if not any(row[0] for row in df_rows if row):
+        return (
+            "<div style='"
+            "    color:#ff9900 !important;"
+            "    background:rgba(51,34,0,0.6) !important;"
+            "    border:3px solid #ff9900 !important;"
+            "    border-radius:14px !important;"
+            "    padding: clamp(24px,6vw,40px) !important;"
+            "    margin:20px 0 !important;"
+            "    text-align:center !important;"
+            "    font-size: clamp(1.1rem,4vw,1.3rem) !important;"
+            "    font-weight:700 !important;"
+            "    box-shadow:0 0 25px rgba(255,153,0,0.5) !important;"
+            "'>"
+            "⚠️ Nothing selected yet<br><br>"
+            "Start over and check at least one UTXO in the table to generate the PSBT.<br>"
+            "Your coins are waiting — just pick which ones to prune!"
+            "</div>"
+        )
+
     # Safe param extraction — critical guard
     try:
         params = _extract_psbt_params(psbt_snapshot)
@@ -3114,21 +3190,21 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
         log.error(f"Failed to extract PSBT params: {e}", exc_info=True)
         return (
             "<div style='"
-            "color:#ff6666 !important;"
-            "text-align:center !important;"
-            "padding: clamp(30px, 8vw, 60px) !important;"
-            "background:#440000 !important;"
-            "border-radius:18px !important;"
-            "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
-            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
-            "line-height:1.7 !important;"
-            "max-width:90% !important;"
-            "margin:0 auto !important;"
+            "    color:#ff6666 !important;"
+            "    text-align:center !important;"
+            "    padding: clamp(30px, 8vw, 60px) !important;"
+            "    background:#440000 !important;"
+            "    border-radius:18px !important;"
+            "    box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
+            "    font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+            "    line-height:1.7 !important;"
+            "    max-width:90% !important;"
+            "    margin:0 auto !important;"
             "'>"
-            "<span style='color:#ff3366 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;font-weight:900 !important;'>"
-            "Invalid or corrupted snapshot"
-            "</span><br><br>"
-            "Please click <strong style='color:#ffaa66 !important;'>GENERATE</strong> again."
+            "    <span style='color:#ff3366 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;font-weight:900 !important;'>"
+            "        Invalid or corrupted snapshot"
+            "    </span><br><br>"
+            "    Please click <strong style='color:#ffaa66 !important;'>GENERATE</strong> again."
             "</div>"
         )
 
@@ -3176,34 +3252,19 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
         econ = estimate_tx_economics(supported_inputs, params.fee_rate, params.dao_percent)
     except ValueError:
         return (
-            "<div style='"
-            "color:#ff6666 !important;"
-            "text-align:center !important;"
-            "padding: clamp(30px, 8vw, 60px) !important;"
-            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
-            "font-weight:700 !important;"
-            "line-height:1.7 !important;"
-            "max-width:90% !important;"
-            "margin:0 auto !important;"
-            "'>"
+            "<div style='color:#ff6666 !important; text-align:center !important; padding:30px; background:#440000 !important; border-radius:18px; box-shadow:0 0 50px rgba(255,51,102,0.5) !important;'>"
             "Invalid transaction economics — please re-analyze."
             "</div>"
         )
 
-    tx, utxos_for_psbt = _build_unsigned_tx(supported_inputs, econ, dest_spk, params)
+    # Updated call — now captures the warning
+    tx, utxos_for_psbt, no_change_warning = _build_unsigned_tx(
+        supported_inputs, econ, dest_spk, params
+    )
 
     if len(utxos_for_psbt) != len(tx.tx_ins):
         return (
-            "<div style='"
-            "color:#ff6666 !important;"
-            "text-align:center !important;"
-            "padding: clamp(30px, 8vw, 60px) !important;"
-            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
-            "font-weight:700 !important;"
-            "line-height:1.7 !important;"
-            "max-width:90% !important;"
-            "margin:0 auto !important;"
-            "'>"
+            "<div style='color:#ff6666 !important; text-align:center !important; padding:30px; font-size:1.2rem; font-weight:700;'>"
             "Internal error: Input/UTXO count mismatch — please report this bug."
             "</div>"
         )
@@ -3214,31 +3275,22 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict]) -> str:
     qr_html, qr_warning = _generate_qr(psbt_b64)
     payjoin_note = _render_payjoin_note(params.dest_override or params.scan_source)
 
-    # Warning if we excluded any inputs
+    # Warning if we excluded any inputs (legacy)
     extra_note = ""
     if legacy_excluded:
-        extra_note = (
-            "<div style='"
-            "color:#ffdd88 !important;"
-            "background:#332200 !important;"
-            "padding: clamp(16px, 4vw, 24px) !important;"
-            "margin: clamp(30px, 8vw, 50px) 0 !important;"
-            "border:3px solid #ff9900 !important;"
-            "border-radius:16px !important;"
-            "text-align:center !important;"
-            "font-size: clamp(1.1rem, 4vw, 1.3rem) !important;"
-            "box-shadow:0 0 50px rgba(255,153,0,0.5) !important;"
-            "max-width:90% !important;"
-            "margin-left:auto !important;"
-            "margin-right:auto !important;"
-            "'>"
+        extra_note += (
+            "<div style='color:#ffdd88 !important; background:#332200 !important; padding:16px; margin:30px 0; border:3px solid #ff9900 !important; border-radius:16px; text-align:center;'>"
             "⚠️ Some inputs were excluded from this PSBT<br><br>"
-            "<small style='color:#ffcc88 !important;font-size: clamp(0.9rem, 3vw, 1rem) !important;'>"
+            "<small style='color:#ffcc88 !important;'>"
             "Only Native SegWit and Taproot inputs are supported.<br>"
             "Legacy/Nested inputs were automatically skipped."
             "</small>"
             "</div>"
         )
+
+    # Append no-change warning if present (from _build_unsigned_tx)
+    if no_change_warning:
+        extra_note += no_change_warning
 
     return _compose_psbt_html(
         fingerprint=params.fingerprint_short,
@@ -3851,7 +3903,7 @@ tr:has(.health-nested) input[type="checkbox"] {
     with gr.Column():
         theme_js = gr.HTML("")
 
-         # ← Modern Bitcoin Optimization Note (after toggle, before inputs)
+        # ← Modern Bitcoin Optimization Note (after toggle, before inputs)
         gr.HTML(
             value="""
             <div style="
@@ -3918,7 +3970,7 @@ tr:has(.health-nested) input[type="checkbox"] {
                 scale=1,
             )
 
-         # === AIR-GAPPED / OFFLINE MODE HEADER (full width) ===
+        # === AIR-GAPPED / OFFLINE MODE HEADER (full width) ===
         gr.HTML(
             value="""
             <div style="
@@ -3969,20 +4021,53 @@ tr:has(.health-nested) input[type="checkbox"] {
                 )
 
         with gr.Row(visible=False) as manual_box_row:
-            manual_utxo_input = gr.Textbox(
-                label="🔒 OFFLINE MODE • ACTIVE INPUT • Paste raw UTXOs (one per line) • Format: txid:vout:value_in_sats  (address optional at end)",
-                placeholder="""Paste raw UTXOs — one per line
+            with gr.Column():
+                gr.HTML("""
+                <div style="
+                    color: #ffdd88 !important;
+                    background: rgba(51, 34, 0, 0.75) !important;
+                    border: 3px solid #ff9900 !important;
+                    border-radius: 14px !important;
+                    padding: 20px !important;
+                    margin: 16px 0 20px 0 !important;
+                    font-weight: 700 !important;
+                    text-align: center !important;
+                    font-size: 1.1rem !important;
+                    line-height: 1.5 !important;
+                    box-shadow: 0 0 25px rgba(255,153,0,0.5) !important, inset 0 0 12px rgba(0,0,0,0.6) !important;
+                ">
+                  ⚠️ Important: Offline Mode Address Requirement<br>
+                  <span style="
+                      font-size: 1.15rem;
+                      color: #ffffff !important;
+                      text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
+                      font-weight: 900 !important;
+                  ">
+                    To receive change back to your wallet, include 
+                    <span style="font-weight:900; color: #ffffff !important;">at least one valid address</span> 
+                    (bc1q... or bc1p...) in your pasted UTXOs.<br><br>
+                    Format example: <code>txid:vout:value_in_sats:bc1qyouraddresshere</code><br><br>
+                    If no address is provided, 
+                    <span style="font-weight:900; color: #ffffff !important;">no change output</span> 
+                    will be created — all remaining value will be absorbed into fees (full wallet cleanup only).<br>
+                    Add an address and re-analyze if you want change.
+                  </span>
+                </div>
+                """)
+                manual_utxo_input = gr.Textbox(
+                    label="🔒 OFFLINE MODE • ACTIVE INPUT • Paste raw UTXOs (one per line)",
+                    placeholder="""Paste raw UTXOs — one per line
 
 Format: txid:vout:value_in_sats[:address]
 
 Examples:
-abc123...000:0:125000:bc1qexample...
-def456...789:1:5000000          ← 0.05 BTC, address optional
-txidhere:2:999999
+abc123...000:0:125000:bc1qexample...          ← include address!
+def456...789:1:5000000:bc1p...               ← REQUIRED for change output
+txidhere:2:999999                            ← OK if another line has address
 
 No API calls • Fully air-gapped safe""",
-                lines=10,
-            )
+                    lines=10,
+                )
         
         # === Seamless mode switching + dark mode + live status ===
         def update_status_and_ui(offline, dark):
@@ -4021,6 +4106,7 @@ No API calls • Fully air-gapped safe""",
 
         def offline_toggle_handler(offline, dark):
             manual_box = gr.update(visible=offline)
+            warning_visible = gr.update(visible=offline)
 
             addr_clear = gr.update(value="") if offline else gr.update()
             addr_ui = gr.update(
@@ -4415,7 +4501,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
         outputs=[psbt_snapshot, selected_utxos_for_psbt, locked, export_file],
     ).then(
         fn=generate_psbt,
-        inputs=[psbt_snapshot, selected_utxos_for_psbt],
+        inputs=[psbt_snapshot, selected_utxos_for_psbt,df],
         outputs=[psbt_output],
     ).then(
         fn=finalize_generate_ui,
