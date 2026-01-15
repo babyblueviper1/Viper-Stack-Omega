@@ -2303,28 +2303,45 @@ def generate_summary_safe(
         )
         if not has_address:
             offline_address_warning = """
-            <div style="
-                color: #ffdd88 !important;
-                background: rgba(51, 34, 0, 0.75) !important;
-                border: 3px solid #ff9900 !important;
-                border-radius: 14px !important;
-                padding: 20px !important;
-                margin: 20px auto !important;
-                font-weight: 700 !important;
-                text-align: center !important;
-                font-size: 1.1rem !important;
-                line-height: 1.5 !important;
-                box-shadow: 0 0 25px rgba(255,153,0,0.5) !important;
-                text-shadow: 0 0 6px #000000 !important;
-                max-width: 90% !important;
-            ">
-              ⚠️ Offline Mode: No valid address detected<br>
-              To receive change back to your wallet, include <strong>at least one bc1q... or bc1p... address</strong> in your pasted UTXOs.<br><br>
-              Format: <code>txid:vout:value_in_sats:your_address_here</code><br><br>
-              Right now, <strong>no change output</strong> will be created — all remaining value absorbed into fees (full wallet cleanup).<br>
-              Edit your input and re-analyze to enable change.
-            </div>
-            """
+<div style="
+    color: #ffdd88 !important;
+    background: rgba(51, 34, 0, 0.75) !important;
+    border: 3px solid #ff9900 !important;
+    border-radius: 14px !important;
+    padding: 20px !important;
+    margin: 20px auto !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    font-size: 1.1rem !important;
+    line-height: 1.5 !important;
+    box-shadow: 0 0 25px rgba(255,153,0,0.5) !important;
+    text-shadow: 0 0 6px #000000 !important;
+    max-width: 90% !important;
+">
+  ⚠️ Offline Mode: No valid address detected<br>
+  To receive change back to your wallet, include 
+  <strong style="color:#ffffff !important; text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important; font-weight:900 !important;">
+    at least one bc1q... or bc1p... address
+  </strong> 
+  in your pasted UTXOs.<br><br>
+  Format: 
+    <code style="
+        background: #000000 !important;
+        color: #ffffff !important;
+        padding: 4px 8px !important;
+        border-radius: 6px !important;
+        font-family: monospace !important;
+        text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
+        box-shadow: inset 0 0 6px rgba(0,0,0,0.8) !important;
+    ">txid:vout:value_in_sats:bc1qyouraddresshere</code><br><br>
+  Right now, 
+  <strong style="color:#ffffff !important; text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important; font-weight:900 !important;">
+    no change output
+  </strong> 
+  will be created — all remaining value absorbed into fees (full wallet cleanup).<br>
+  Edit your input and re-analyze to enable change.
+</div>
+"""
 
     # Hard errors
     if error == "NO_UTXOS":
@@ -2391,11 +2408,30 @@ def generate_summary_safe(
     econ = _compute_economics_safe(selected_utxos, fee_rate, dao_percent)
     if econ is None or econ.remaining <= 0:
         return (
-            "<div style='text-align:center !important;padding:clamp(30px, 8vw, 60px) !important;background:rgba(30,0,0,0.7) !important;backdrop-filter:blur(10px) !important;border:2px solid #ff3366 !important;border-radius:16px !important;"
-            "box-shadow:0 0 40px rgba(255,51,102,0.5) !important;font-size:clamp(1.2rem, 4.5vw, 1.5rem) !important;color:#ffaa88 !important;max-width:95% !important;margin:0 auto !important;'>"
-            "<strong style='color:#ff3366 !important;font-size:clamp(1.4rem, 5.5vw, 1.8rem) !important;'>Transaction Invalid</strong><br><br>"
+            "<div style='"
+            "text-align:center !important;"
+            "padding:clamp(30px, 8vw, 60px) !important;"
+            "background:rgba(30,0,0,0.7) !important;"
+            "backdrop-filter:blur(10px) !important;"
+            "border:2px solid #ff3366 !important;"
+            "border-radius:16px !important;"
+            "box-shadow:0 0 40px rgba(255,51,102,0.5) !important;"
+            "font-size:clamp(1.2rem, 4.5vw, 1.5rem) !important;"
+            "color:#ffaa88 !important;"
+            "max-width:95% !important;"
+            "margin:0 auto !important;"
+            "'>"
+            "<strong style='"
+            "color:#ff3366 !important;"
+            "font-size:clamp(1.4rem, 5.5vw, 1.8rem) !important;"
+            "text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;"  # ← Black shadow for crisp outline
+            "'>Transaction Invalid</strong><br><br>"
             f"Current fee ({econ.fee:,} sats @ {fee_rate} s/vB) exceeds available balance.<br><br>"
-            "<strong>Lower the fee rate</strong> or select more UTXOs."
+            "<strong style='"
+            "color:#ff3366 !important;"
+            "text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;"  # ← Same black shadow here
+            "font-weight:900 !important;"
+            "'>Lower the fee rate</strong> or select more UTXOs."
             "</div>",
             gr.update(visible=False)
         )
@@ -4046,13 +4082,24 @@ tr:has(.health-nested) input[type="checkbox"] {
                     To receive change back to your wallet, include 
                     <span style="font-weight:900; color: #ffffff !important;">at least one valid address</span> 
                     (bc1q... or bc1p...) in your pasted UTXOs.<br><br>
-                    Format example: <code>txid:vout:value_in_sats:bc1qyouraddresshere</code><br><br>
+                      Format example: 
+                      <code style="
+                          background: #000000 !important;
+                          color: #ffffff !important;
+                          padding: 4px 8px !important;
+                          border-radius: 6px !important;
+                          font-family: monospace !important;
+                          text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
+                          box-shadow: inset 0 0 6px rgba(0,0,0,0.8) !important;
+                    ">txid:vout:value_in_sats:bc1qyouraddresshere</code><br><br>
                     If no address is provided, 
-                    <span style="font-weight:900; color: #ffffff !important;">no change output</span> 
-                    will be created — all remaining value will be absorbed into fees (full wallet cleanup only).<br>
+                    <span style="font-weight:900; color: #ffffff !important; text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;">
+                    no change output
+                    </span> 
+                    will be created — all remaining value absorbed into fees (full wallet cleanup only).<br>
                     Add an address and re-analyze if you want change.
-                  </span>
-                </div>
+                    </span>
+                    </div>
                 """)
                 manual_utxo_input = gr.Textbox(
                     label="🔒 OFFLINE MODE • ACTIVE INPUT • Paste raw UTXOs (one per line)",
