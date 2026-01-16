@@ -2558,7 +2558,12 @@ def generate_summary_safe(
           {change_line}
         </div>
         <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.7 !important;">
-          💡 Pruning now saves you <span style="color:#0f0 !important;font-weight:800 !important;">+{sats_saved:,} sats</span> versus pruning later if fees reach {future_fee_rate} s/vB
+          💡 Pruning now saves you <span style="color:#0f0 !important;font-weight:800 !important;">+{sats_saved:,} sats</span> versus pruning later if fees reach
+        <span style="
+              color:#ff3366 !important;           /* Bright red for urgency */
+              font-weight:900 !important;
+              text-shadow: 0 0 8px #ff3366, 0 0 16px #ff3366 !important;  /* Red glow for pop */
+          ">{future_fee_rate} s/vB</span>
         </div>
       </div>
       {payjoin_badge}
