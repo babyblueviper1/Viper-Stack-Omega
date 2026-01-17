@@ -597,104 +597,108 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
 
     return (meta, tuple(updated_utxos))
         
-def load_selection(json_file, current_enriched):
-    if not json_file:
-        return current_enriched, "No file selected"
-    
+from typing import Tuple, Any
+
+def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, str]:
+    print(">>> load_selection CALLED - snapshot type:", type(parsed_snapshot))
+
+    if not parsed_snapshot or not isinstance(parsed_snapshot, dict):
+        return current_enriched, "No valid parsed JSON loaded"
+
+    print(">>> Using pre-parsed snapshot - inputs count:", len(parsed_snapshot.get("inputs", [])))
+
     try:
-        with open(json_file.name, "r") as f:
-            snapshot = json.load(f)
-        
-        if not isinstance(snapshot, dict) or "inputs" not in snapshot:
+        # No need for json.loads anymore — it's already parsed!
+        snapshot = parsed_snapshot
+
+        if "inputs" not in snapshot:
+            print(">>> Invalid snapshot format")
             return current_enriched, "Invalid Ωmega Pruner selection file"
-        
-        selected_keys = {
-            (u["txid"], u["vout"]) 
-            for u in snapshot.get("inputs", []) 
-            if isinstance(u, dict) and "txid" in u and "vout" in u
-        }
-        
-        if not current_enriched:
-            return current_enriched, (
-                "<div style='"
-                "color:#aaffcc !important;"
-                "padding: clamp(20px, 5vw, 30px) !important;"
-                "background:#001100 !important;"
-                "border:2px solid #00ff88 !important;"
-                "border-radius:16px !important;"
-                "text-align:center !important;"
-                "font-size: clamp(1.1rem, 4vw, 1.3rem) !important;"
-                "line-height:1.7 !important;"
-                "box-shadow:0 0 40px rgba(0,255,136,0.3) !important;"
-                "max-width:90% !important;"
-                "margin:20px auto !important;"
-                "'>"
-                "<span style='color:#00ffdd !important;font-size: clamp(1.3rem, 5vw, 1.6rem) !important;font-weight:900 !important;text-shadow:0 0 25px #00ffdd !important;'>"
-                "Selection file loaded!"
-                "</span><br><br>"
-                "Now paste the same addresses/xpubs → click "
-                "<span style='color:#00ffff !important;font-weight:900 !important;text-shadow:0 0 20px #00ffff !important;'>ANALYZE</span><br>"
-                "Then upload this file again to restore your exact checkboxes."
+
+        # Case-insensitive + safe vout conversion
+        selected_keys = set()
+        for u in snapshot.get("inputs", []):
+            if not isinstance(u, dict) or "txid" not in u or "vout" not in u:
+                continue
+            try:
+                txid = str(u["txid"]).lower().strip()
+                vout = int(u["vout"])
+                selected_keys.add((txid, vout))
+            except (ValueError, TypeError):
+                print(">>> Skipping invalid input in JSON:", u)
+                continue
+
+        print(">>> Selected keys from JSON (case-insensitive):", len(selected_keys))
+
+        # Normalize current_enriched to utxos list — critical fix!
+        if isinstance(current_enriched, tuple) and len(current_enriched) == 2:
+            meta, utxos = current_enriched
+            utxos = list(utxos)  # make mutable copy for safety
+            print(">>> Using frozen state: meta present, utxos len =", len(utxos))
+        else:
+            meta = {}
+            utxos = list(current_enriched or [])
+            print(">>> Using raw list state: utxos len =", len(utxos))
+
+        # Early exit if no UTXOs to restore into
+        if not utxos:
+            print(">>> current_enriched is empty - cannot restore yet")
+            return (), (
+                "<div style='color:#aaffcc !important;padding:30px;background:#001100 !important;border:2px solid #00ff88 !important;border-radius:16px !important;text-align:center !important;'>"
+                "<span style='color:#00ffdd !important;font-size:1.6rem;font-weight:900 !important;'>Selection file loaded!</span><br><br>"
+                "<strong>Table is empty — restore will happen after:</strong><br>"
+                "1. Paste the same addresses/xpubs<br>"
+                "2. Click ANALYZE (table must load first)<br>"
+                "3. Upload JSON again — checkboxes will restore<br><br>"
+                "If table stays empty, check your address input."
                 "</div>"
             )
-        
+
+        # Restore loop — now safe and case-insensitive
         updated = []
         matched_count = 0
-        for u in current_enriched:
+        for u in utxos:
             new_u = dict(u)
-            is_selected = (u["txid"], u["vout"]) in selected_keys
+            txid_lower = str(u.get("txid", "")).lower().strip()
+            vout = u.get("vout")
+            try:
+                vout = int(vout) if vout is not None else None
+            except (ValueError, TypeError):
+                vout = None
+
+            is_selected = (txid_lower, vout) in selected_keys if vout is not None else False
             new_u["selected"] = is_selected
             if is_selected:
                 matched_count += 1
             updated.append(new_u)
-        
+
+        print(">>> Restore complete - matched:", matched_count, "out of", len(selected_keys))
+
+        # Build return tuple consistently
+        return_tuple = (meta, tuple(updated)) if meta else tuple(updated)
+
         if matched_count == 0:
             message = (
-                "<div style='"
-                "color:#ffddaa !important;"
-                "padding: clamp(20px, 5vw, 30px) !important;"
-                "background:#332200 !important;"
-                "border:2px solid #ff9900 !important;"
-                "border-radius:16px !important;"
-                "text-align:center !important;"
-                "font-size: clamp(1.1rem, 4vw, 1.3rem) !important;"
-                "line-height:1.7 !important;"
-                "box-shadow:0 0 40px rgba(255,153,0,0.4) !important;"
-                "max-width:90% !important;"
-                "margin:20px auto !important;"
-                "'>"
-                "<span style='color:#ffff66 !important;font-size: clamp(1.3rem, 5vw, 1.6rem) !important;font-weight:900 !important;text-shadow:0 0 25px #ffff00 !important;'>"
-                "Selection loaded — no matching UTXOs found"
-                "</span><br><br>"
+                "<div style='color:#ffddaa !important;padding:30px;background:#332200 !important;border:2px solid #ff9900 !important;border-radius:16px !important;text-align:center !important;'>"
+                "<span style='color:#ffff66 !important;font-size:1.6rem;font-weight:900 !important;'>Selection loaded — no matching UTXOs found</span><br><br>"
                 f"File contains {len(selected_keys)} UTXOs.<br>"
-                "They don't match current analysis (different addresses?).<br>"
+                "They don't match current analysis (different addresses? UTXOs spent? txid case?).<br>"
                 "Checkboxes not restored."
                 "</div>"
             )
         else:
             message = (
-                "<div style='"
-                "color:#aaffff !important;"
-                "padding: clamp(20px, 5vw, 30px) !important;"
-                "background:#001122 !important;"
-                "border:2px solid #00ffff !important;"
-                "border-radius:16px !important;"
-                "text-align:center !important;"
-                "font-size: clamp(1.1rem, 4vw, 1.3rem) !important;"
-                "box-shadow:0 0 50px rgba(0,255,255,0.4) !important;"
-                "max-width:90% !important;"
-                "margin:20px auto !important;"
-                "'>"
-                "<span style='color:#00ffff !important;font-size: clamp(1.3rem, 5vw, 1.6rem) !important;font-weight:900 !important;text-shadow:0 0 30px #00ffff !important;'>"
-                f"Selection loaded — {matched_count}/{len(selected_keys)} UTXOs restored"
-                "</span>"
+                "<div style='color:#aaffff !important;padding:30px;background:#001122 !important;border:2px solid #00ffff !important;border-radius:16px !important;text-align:center !important;'>"
+                f"<span style='color:#00ffff !important;font-size:1.6rem;font-weight:900 !important;'>Selection loaded — {matched_count}/{len(selected_keys)} UTXOs restored "
+                f"({len(utxos)} total in current table)</span>"
                 "</div>"
             )
-        
-        return tuple(updated), message
-    
+
+        return return_tuple, message
+
     except Exception as e:
-        return current_enriched, f"Failed to load: {str(e)}"
+        print(">>> Processing ERROR:", str(e))
+        return current_enriched, f"Failed to process selection: {str(e)}"
 
 def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
     """
@@ -703,6 +707,9 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
     Safely handles invalid input and enforces unsupported type rules.
     TXID shows truncated with ellipsis (plain string, copyable on click)
     """
+    print(">>> rebuild_df_rows called - enriched_state len:", len(enriched_state) if enriched_state else 0)
+    print(">>> enriched_state type:", type(enriched_state))
+
     # Handle invalid enriched_state
     if not enriched_state:
         return [], False
@@ -1830,6 +1837,12 @@ def analyze(
     Orchestrates input sanitization, UTXO collection, enrichment, pruning,
     and UI-safe deterministic outputs.
     """
+    print("!!! ANALYZE FUNCTION STARTED !!!")
+    print(f"addr_input: {addr_input[:50] if addr_input else 'empty'}")
+    print(f"offline_mode: {offline_mode}")
+    print(f"manual_utxo_input len: {len(manual_utxo_input) if manual_utxo_input else 0}")
+    print(f"strategy: {strategy}")
+    print(f"locked: {locked if 'locked' in globals() else 'not defined'}")  # if locked is global
 
     # --- 1. Sanitize & normalize inputs ---
     params = _sanitize_analyze_inputs(
@@ -1843,11 +1856,17 @@ def analyze(
         manual_utxo_input=manual_utxo_input,
     )
 
+    print(">>> Params sanitized - offline:", params.offline_mode)
+    print(">>> Raw input len:", len(params.addr_input) if params.addr_input else 0)
+
     # --- 2. Collect UTXOs ---
     if params.offline_mode:
         raw_utxos = _collect_manual_utxos(params)
+        print(">>> Raw UTXOs collected - len:", len(raw_utxos) if raw_utxos else 0)
     else:
         raw_utxos = _collect_online_utxos(params)
+
+    print(">>> First raw UTXO:", raw_utxos[0] if raw_utxos else "empty")
 
     # --- 3. Handle empty scan ---
     if not raw_utxos:
@@ -1855,6 +1874,9 @@ def analyze(
 
     # --- 4. Enrich UTXOs ---
     enriched = _enrich_utxos(raw_utxos, params)
+
+    print(">>> After Analyze - enriched type:", type(enriched), "len:", len(enriched) if enriched else 0)
+    print(">>> First enriched UTXO keys:", list(enriched[0].keys()) if enriched and len(enriched) > 0 else "empty")
 
     # Safety assertion
     missing_script_type = [u for u in enriched if "script_type" not in u]
@@ -1928,6 +1950,8 @@ def _analyze_success(df_rows, frozen_state, scan_source, warning_banner=""):
         gr.update(visible=True),          # 4: import_file
         scan_source,                      # 5: scan_source state
         "",                               # 6: placeholder if you added extra output — or remove if not
+		gr.update(visible=True),          # ← NEW: load_json_btn visible
+		gr.update(visible=False),         # ← NEW: hide analyze_btn after success
     )
 
 def _analyze_empty(scan_source: str = ""):
@@ -1940,6 +1964,8 @@ def _analyze_empty(scan_source: str = ""):
         gr.update(visible=False),
         scan_source,
         "",
+		gr.update(visible=False),
+		gr.update(visible=True),          # ← keep analyze_btn visible on failure
     )
 
 
@@ -3356,8 +3382,7 @@ def analyze_and_show_summary(
 ):
     print(">>> analyze_and_show_summary STARTED")
 
-    # Run core analysis
-    df_update, enriched_new, warning_banner, gen_row_vis, import_vis, scan_source_new, _ = analyze(
+    df_update, enriched_new, warning_banner, gen_row_vis, import_vis, scan_source_new, status_box_html, load_btn_vis, analyze_btn_vis = analyze(
         addr_input,
         strategy,
         dust_threshold,
@@ -3367,7 +3392,6 @@ def analyze_and_show_summary(
         offline_mode,
         manual_utxo_input,
     )
-
     # Extract fresh rows from the update payload
     if isinstance(df_update, dict):
         df_rows = df_update.get("value", [])
@@ -3396,13 +3420,15 @@ def analyze_and_show_summary(
 
     # Return in correct order matching your .click() outputs
     return (
-        df_update,              # 0: df (table)
-        enriched_new,           # 1: enriched_state
-        warning_banner,         # 2: warning_banner HTML
-        generate_row_visibility,# 3: generate_row visibility (critical!)
-        import_vis,          # 4: import_file visibility
-        scan_source_new,        # 5: scan_source state
-        status_box_html,        # 6: status_output (the big glowing box)
+        df_update,
+        enriched_new,
+        warning_banner,
+        gen_row_vis,
+        import_vis,
+        scan_source_new,
+        status_box_html,
+        load_btn_vis,   # ← This controls load_json_btn visibility
+		analyze_btn_vis, 
     )
 
 def fresh_empty_dataframe():
@@ -3430,6 +3456,29 @@ def fresh_empty_dataframe():
         static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # ← VERY IMPORTANT: keeps non-PRUNE columns fixed
         column_widths=["120px", "360px", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
     )
+
+
+def process_uploaded_file(file):
+    if not file:
+        print(">>> process_uploaded_file: No file provided on button click")
+        return {}
+    try:
+        print(">>> Opening file on button click:", file.name)
+        with open(file.name, "r", encoding="utf-8") as f:
+            content = f.read()
+            print(">>> Raw content length on button:", len(content))
+            if len(content) == 0:
+                print(">>> File is empty on button click!")
+                return {}
+            parsed = json.loads(content)
+            print(">>> Parsed OK on button - inputs count:", len(parsed.get("inputs", [])))
+            return parsed
+    except json.JSONDecodeError as e:
+        print(">>> JSON decode error on button:", str(e))
+        return {}
+    except Exception as e:
+        print(">>> File process error on button:", type(e).__name__, str(e))
+        return {}
 # --------------------------
 # Gradio UI
 # --------------------------
@@ -3935,7 +3984,10 @@ tr:has(.health-nested) input[type="checkbox"] {
             gr.update(interactive=False),                # hour_btn
             gr.update(interactive=False),                # halfhour_btn
             gr.update(interactive=False),                # fastest_btn
+            gr.update(visible=False),                    # ← NEW: hide load_json_btn when locked
+            gr.update(visible=False),                    # ← Optional: also hide file uploader again
         )
+
 
    
     # =================================================================
@@ -4283,7 +4335,7 @@ No API calls • Fully air-gapped safe""",
         selection_snapshot_state = gr.State({})
         warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
         selected_utxos_for_psbt = gr.State([])
-
+		
         # Capture destination changes for downstream use
         dest.change(
             fn=lambda x: x.strip() if x else "",
@@ -4298,6 +4350,10 @@ No API calls • Fully air-gapped safe""",
             type="filepath",
             visible=False,
         )
+
+        load_json_btn = gr.Button("Load Selection from JSON", variant="primary", visible=False)
+        json_parsed_state = gr.State({})  # ← dict instead of str
+
 
         gr.HTML("""
             <div style="width: 100%; margin-top: 25px;"></div>
@@ -4483,16 +4539,21 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
         )
 
     # =============================
-    # — Import File (pure state mutation) —
+    # — Import File (pure state mutation) — Now with Button for stability
     # =============================
-    import_file.change(
+    load_json_btn.click(
+        fn=process_uploaded_file,  # ← This one reads + parses
+        inputs=[import_file],      # ← Directly from the file component
+        outputs=[json_parsed_state],
+    ).then(
         fn=load_selection,
-        inputs=[import_file, enriched_state],
-        outputs=[enriched_state],
+        inputs=[json_parsed_state, enriched_state],
+        outputs=[enriched_state, warning_banner],
+        js="() => { console.log('LOAD_JSON_BUTTON_CLICKED'); return true; }"
     ).then(
         fn=rebuild_df_rows,
         inputs=[enriched_state],
-        outputs=[df, warning_banner], 
+        outputs=[df, gr.State()]
     ).then(
         fn=generate_summary_safe,
         inputs=[
@@ -4507,6 +4568,10 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             offline_toggle,
         ],
         outputs=[status_output, generate_row]
+    ).then(
+        fn=lambda x: print(">>> RESTORE_CHAIN_COMPLETED - enriched len:", len(x) if x else 0),
+        inputs=[enriched_state],
+        outputs=[gr.State()]
     )
 
     # =============================
@@ -4534,6 +4599,8 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             import_file,
             scan_source,
 			status_output,
+			load_json_btn,
+			analyze_btn,
         ],
     )
 
@@ -4578,6 +4645,8 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             hour_btn,
             halfhour_btn,
             fastest_btn,
+            load_json_btn,          # ← NEW
+            import_file,            # ← Optional: hide uploader too (if you want double-hide)
         ],
     ).then(
         lambda: gr.update(interactive=False),
@@ -4620,6 +4689,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             None,                                                    # export_file
             gr.update(value=None, visible=False, interactive=True),  # import_file
             "",                                                      # psbt_output — clear PSBT
+			gr.update(visible=False),								 # ← load_json_btn hidden on reset
         )
 
     reset_btn.click(
@@ -4654,6 +4724,7 @@ body:not(.dark-mode) .check-to-prune-header .header-subtitle {
             export_file,
             import_file,
             psbt_output,
+			load_json_btn
         ],
     ).then(
         fn=lambda: (
