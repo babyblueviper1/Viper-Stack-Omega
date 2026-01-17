@@ -4121,42 +4121,55 @@ tr:has(.health-nested) input[type="checkbox"] {
                     background: rgba(51, 34, 0, 0.75) !important;
                     border: 3px solid #ff9900 !important;
                     border-radius: 14px !important;
-                    padding: 20px !important;
+                    padding: clamp(16px, 4vw, 20px) !important;  /* smaller padding on mobile */
                     margin: 16px 0 20px 0 !important;
                     font-weight: 700 !important;
                     text-align: center !important;
-                    font-size: 1.1rem !important;
+                    font-size: clamp(1rem, 3.8vw, 1.1rem) !important;  /* responsive font */
                     line-height: 1.5 !important;
                     box-shadow: 0 0 25px rgba(255,153,0,0.5) !important, inset 0 0 12px rgba(0,0,0,0.6) !important;
+                    max-width: 100% !important;  /* prevent overflow */
+                    overflow-wrap: break-word !important;  /* force long words to wrap */
+                    word-break: break-all !important;      /* aggressive wrap for code */
                 ">
                   ⚠️ Important: Offline Mode Address Requirement<br>
                   <span style="
-                      font-size: 1.15rem;
+                      font-size: clamp(1.05rem, 4vw, 1.15rem) !important;
                       color: #ffffff !important;
                       text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
                       font-weight: 900 !important;
                   ">
                     To receive change back to your wallet, include 
-                    <span style="font-weight:900; color: #ffffff !important;">at least one valid address</span> 
+                    <strong style="color: #ffffff !important;">at least one valid address</strong> 
                     (bc1q... or bc1p...) in your pasted UTXOs.<br><br>
-                      Format example: 
-                      <code style="
-                          background: #000000 !important;
-                          color: #ffffff !important;
-                          padding: 4px 8px !important;
-                          border-radius: 6px !important;
-                          font-family: monospace !important;
-                          text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
-                          box-shadow: inset 0 0 6px rgba(0,0,0,0.8) !important;
+
+                    Format example:<br>
+                    <code style="
+                        display: block !important;
+                        background: #000000 !important;
+                        color: #ffffff !important;
+                        padding: 12px !important;
+                        margin: 12px auto !important;
+                        border-radius: 8px !important;
+                        font-family: monospace !important;
+                        font-size: clamp(0.85rem, 3.2vw, 0.95rem) !important;
+                        text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
+                        box-shadow: inset 0 0 6px rgba(0,0,0,0.8) !important;
+                        white-space: pre-wrap !important;       /* allow wrapping */
+                        word-break: break-all !important;       /* break long strings */
+                        overflow-wrap: anywhere !important;     /* best mobile support */
+                        max-width: 100% !important;
+                        line-height: 1.4 !important;
                     ">txid:vout:value_in_sats:bc1qyouraddresshere</code><br><br>
+
                     If no address is provided, 
-                    <span style="font-weight:900; color: #ffffff !important; text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;">
+                    <strong style="color:#ffffff !important; text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;">
                     no change output
-                    </span> 
+                    </strong> 
                     will be created — all remaining value absorbed into fees (full wallet cleanup only).<br>
                     Add an address and re-analyze if you want change.
-                    </span>
-                    </div>
+                  </span>
+                </div>
                 """)
                 manual_utxo_input = gr.Textbox(
                     label="🔒 OFFLINE MODE • ACTIVE INPUT • Paste raw UTXOs (one per line)",
