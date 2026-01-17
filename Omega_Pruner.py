@@ -4161,7 +4161,7 @@ tr:has(.health-nested) input[type="checkbox"] {
                           width: fit-content !important;
                           min-width: 100% !important;
                       ">txid:vout:value_in_sats:bc1qyouraddresshere</code>
-                    </div><br><br>
+                    </div><br>
 
                     If no address is provided, 
                     <strong style="color:#ffffff !important; text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;">
