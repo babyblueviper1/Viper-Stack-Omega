@@ -4121,16 +4121,15 @@ tr:has(.health-nested) input[type="checkbox"] {
                     background: rgba(51, 34, 0, 0.75) !important;
                     border: 3px solid #ff9900 !important;
                     border-radius: 14px !important;
-                    padding: clamp(16px, 4vw, 20px) !important;  /* smaller padding on mobile */
+                    padding: clamp(16px, 4vw, 20px) !important;
                     margin: 16px 0 20px 0 !important;
                     font-weight: 700 !important;
                     text-align: center !important;
-                    font-size: clamp(1rem, 3.8vw, 1.1rem) !important;  /* responsive font */
+                    font-size: clamp(1rem, 3.8vw, 1.1rem) !important;
                     line-height: 1.5 !important;
                     box-shadow: 0 0 25px rgba(255,153,0,0.5) !important, inset 0 0 12px rgba(0,0,0,0.6) !important;
-                    max-width: 100% !important;  /* prevent overflow */
-                    overflow-wrap: break-word !important;  /* force long words to wrap */
-                    word-break: break-all !important;      /* aggressive wrap for code */
+                    max-width: 100% !important;
+                    overflow-x: hidden !important;
                 ">
                   ⚠️ Important: Offline Mode Address Requirement<br>
                   <span style="
@@ -4144,23 +4143,25 @@ tr:has(.health-nested) input[type="checkbox"] {
                     (bc1q... or bc1p...) in your pasted UTXOs.<br><br>
 
                     Format example:<br>
-                    <code style="
-                        display: block !important;
-                        background: #000000 !important;
-                        color: #ffffff !important;
-                        padding: 12px !important;
-                        margin: 12px auto !important;
-                        border-radius: 8px !important;
-                        font-family: monospace !important;
-                        font-size: clamp(0.85rem, 3.2vw, 0.95rem) !important;
-                        text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
-                        box-shadow: inset 0 0 6px rgba(0,0,0,0.8) !important;
-                        white-space: pre-wrap !important;       /* allow wrapping */
-                        word-break: break-all !important;       /* break long strings */
-                        overflow-wrap: anywhere !important;     /* best mobile support */
-                        max-width: 100% !important;
-                        line-height: 1.4 !important;
-                    ">txid:vout:value_in_sats:bc1qyouraddresshere</code><br><br>
+                    <div style="overflow-x: auto; max-width: 100%; margin: 12px 0;">
+                      <code style="
+                          display: block !important;
+                          background: #000000 !important;
+                          color: #ffffff !important;
+                          padding: 12px !important;
+                          border-radius: 8px !important;
+                          font-family: monospace !important;
+                          font-size: clamp(0.85rem, 3.2vw, 0.95rem) !important;
+                          text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
+                          box-shadow: inset 0 0 6px rgba(0,0,0,0.8) !important;
+                          white-space: pre-wrap !important;
+                          word-break: break-all !important;
+                          overflow-wrap: anywhere !important;
+                          line-height: 1.4 !important;
+                          width: fit-content !important;
+                          min-width: 100% !important;
+                      ">txid:vout:value_in_sats:bc1qyouraddresshere</code>
+                    </div><br><br>
 
                     If no address is provided, 
                     <strong style="color:#ffffff !important; text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;">
