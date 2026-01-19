@@ -4046,9 +4046,9 @@ tr:has(.health-nested) input[type="checkbox"] {
                 
         with gr.Row():
             addr_input = gr.Textbox(
-                label="Scan Address / xpub (one per line)",
-                placeholder="Paste address(es) or xpub — 100% non-custodial",
-                lines=6,
+                label="Scan Address or xpub",
+                placeholder="Paste a single address or account xpub — 100% non-custodial",
+                lines=4,
                 scale=2,
             )
             dest = gr.Textbox(
