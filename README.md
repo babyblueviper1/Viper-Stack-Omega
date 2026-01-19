@@ -1,39 +1,62 @@
-**Ωmega Pruner v11.1 — Forged Anew + Pruning Conditions Badge**
+**# Ωmega Pruner v11.1 — Forged Anew + Pruning Conditions Badge**  
+*The last UTXO consolidator you’ll ever need.*
 
-The last UTXO consolidator you’ll ever need.
+### New in v11.1
 
-**New in v11.1**  
 - **Pruning Conditions badge** — real-time score (1–10) with glowing nuclear design  
 - Current economy fee vs 1-day / 1-week / 1-month medians (mempool.space mining data)  
-- Clear vertical layout: current fee → VS → medians (1-day → 1-week → 1-month)  
-- Live BTC price + current block height + hashrate + next difficulty adjustment + halving countdown  
-- Instant insight: know if *now* is prime pruning time before pasting addresses
+- Clear vertical layout: **current fee → VS → medians** (1-day → 1-week → 1-month)  
+- Live BTC price + current block height + hashrate  
+- Next difficulty adjustment + halving countdown  
+- **Instant insight**: know if now is prime pruning time **before** pasting anything
 
-**Optimized for modern Bitcoin** — fully supports:  
-- Native SegWit (bc1q...)  
-- Taproot (bc1p...)
+### Optimized for modern Bitcoin
 
-Legacy (1...) and Nested SegWit (3...) inputs are shown for transparency but cannot be pruned (faded + disabled in table).
+**Fully supported input types:**
+- Native SegWit (`bc1q…`)
+- Taproot (`bc1p…`)
 
-**Core Features**  
-Table-first interface — data loads instantly, act before reading  
-Unambiguous labeling — no confusion between pre- and post-prune states  
-PayJoin-aware analysis — invoice detection with CIOH-safe handling  
-CIOH Recovery Guidance — warnings translated into concrete next steps (e.g., Whirlpool cycles)  
-Batch mode — multiple addresses or xpubs (one per line)  
-True air-gapped/offline mode 🔒 — paste raw UTXOs, zero API calls  
-Pure dark nuclear mode — full contrast, no haze  
-Deterministic selection export — JSON + fingerprint as proof  
-Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
-Privacy Score (0–100) — CIOH risk, linkage, merge exposure  
-Tiered CIOH warnings — color-coded, impossible to miss  
-“Prune now vs later” fee delta — see future regret in sats  
-Per-input weight (wu) — Taproot, SegWit, dust clearly marked  
-Live wallet footprint comparison — before/after cleanup  
-NUCLEAR WALLET CLEANUP confirmation  
-100% preview → PSBT fidelity  
-Zero custody • Full coin control • RBF • Taproot • Dust-resistant  
+**Legacy (`1…`) and Nested SegWit (`3…`) inputs** are shown for transparency only and **cannot be pruned** (faded + disabled).  
+Spend or convert them separately before consolidation.
 
-Custom builds → babyblueviperbusiness@gmail.com
+### Scope & Safety Model (Important)
 
-Prune smarter. Win forever. • Ω
+- Single-scope analysis only  
+- One address **OR** one xpub per run  
+- **No** cross-wallet or multi-wallet mixing  
+- **No** hidden aggregation, ever  
+
+This guarantees deterministic results, safer signing, and minimized CIOH risk.
+
+### Hardware Wallet & Taproot Notes
+
+- Taproot inputs may require a derivation path for some hardware wallets  
+- If no derivation path is provided, PSBTs are still valid but signing may be refused by certain devices  
+- A **non-blocking warning** is shown when this condition is detected  
+- Re-generate the PSBT with the correct path if your device requests it
+
+### Core Features
+
+- Table-first interface — data loads instantly, act before reading  
+- Unambiguous labeling — no confusion between pre- and post-prune states  
+- PayJoin-aware analysis — invoice detection with CIOH-safe handling  
+- CIOH recovery guidance — warnings translated into concrete next steps  
+- **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls  
+- Pure dark nuclear mode — full contrast, no haze  
+- Deterministic selection export — JSON + cryptographic fingerprint  
+- Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
+- **Privacy Score (0–100)** — linkage, merge exposure, CIOH risk  
+- Tiered CIOH warnings — color-coded and impossible to miss  
+- “Prune now vs later” fee delta — see future regret in sats  
+- Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
+- Live wallet footprint comparison — before / after cleanup  
+- **NUCLEAR WALLET CLEANUP** confirmation step  
+- 100% preview → PSBT fidelity  
+- Zero custody • Full coin control • RBF • Taproot • Dust-resistant  
+
+**Custom builds** → babyblueviperbusiness@gmail.com
+
+---
+
+**Prune smarter. Win forever.**  
+**Ω**
