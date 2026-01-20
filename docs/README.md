@@ -66,8 +66,7 @@ This preserves maximum flexibility while being honest about hardware limitations
 ### Core Features
 
 - Table-first interface — data loads instantly, act before reading  
-- Unambiguous labeling — no confusion between pre- and post-prune states  
-- PayJoin-aware analysis — invoice detection with CIOH-safe handling  
+- Unambiguous labeling — no confusion between pre- and post-prune states
 - CIOH recovery guidance — warnings translated into concrete next steps  
 - **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls  
 - Pure dark nuclear mode — full contrast, no haze  
@@ -116,6 +115,4 @@ Your treasury. Your rules.
 **Ωmega Pruner v11.1 — Forged Anew**  
 babyblueviper & the swarm • January 2026
 
-**Prune smarter. Win forever.**
-
-**Ω**
+**Prune smarter. Win forever. • Ω**
