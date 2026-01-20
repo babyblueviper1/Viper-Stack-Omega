@@ -1,39 +1,38 @@
-**# Ωmega Pruner v11.1 — Forged Anew + Pruning Conditions Badge**  
-*The last UTXO consolidator you’ll ever need.*
+# Ωmega Pruner v11.1 — Forged Anew + Pruning Conditions Badge
+
+**Reclaim Sovereignty**
 
 ### New in v11.1
 
-- **Pruning Conditions badge** — real-time score (1–10) with glowing nuclear design  
+- **Pruning Conditions Badge** — real-time 1–10 score with glowing nuclear design  
 - Current economy fee vs 1-day / 1-week / 1-month medians (mempool.space mining data)  
 - Clear vertical layout: **current fee → VS → medians** (1-day → 1-week → 1-month)  
-- Live BTC price + current block height + hashrate  
+- Live BTC price + block height + hashrate  
 - Next difficulty adjustment + halving countdown  
-- **Instant insight**: know if now is prime pruning time **before** pasting anything
+- **Instant insight**: know if now is prime pruning time — before pasting anything
 
-### Optimized for modern Bitcoin
+### Optimized for Modern Bitcoin
 
 **Fully supported input types:**
 - Native SegWit (`bc1q…`)
 - Taproot (`bc1p…`)
 
-**Legacy (`1…`) and Nested SegWit (`3…`) inputs** are shown for transparency only and **cannot be pruned** (faded + disabled).  
+**Legacy (`1…`) and Nested SegWit (`3…`) inputs** are displayed for transparency only and **cannot be pruned** (faded, disabled checkboxes).  
 Spend or convert them separately before consolidation.
 
 ### Scope & Safety Model (Important)
 
-- Single-scope analysis only  
-- One address **OR** one xpub per run  
+- Single-address analysis only  
 - **No** cross-wallet or multi-wallet mixing  
-- **No** hidden aggregation, ever  
-
-This guarantees deterministic results, safer signing, and minimized CIOH risk.
+- **No** hidden aggregation — ever  
+- Deterministic results → safer signing → minimized CIOH risk
 
 ### Hardware Wallet & Taproot Notes
 
 - Taproot inputs may require a derivation path for some hardware wallets  
-- If no derivation path is provided, PSBTs are still valid but signing may be refused by certain devices  
-- A **non-blocking warning** is shown when this condition is detected  
-- Re-generate the PSBT with the correct path if your device requests it
+- If no derivation path is provided, PSBTs are still valid but signing may fail on certain devices  
+- A **non-blocking warning** appears when this condition is detected  
+- **No re-generation with corrected path** is currently supported — use a wallet that already knows the account (e.g., Sparrow) or recreate the tx there
 
 ### Core Features
 
@@ -56,7 +55,12 @@ This guarantees deterministic results, safer signing, and minimized CIOH risk.
 
 **Custom builds** → babyblueviperbusiness@gmail.com
 
----
+**Limitations**
+- Only Native SegWit & Taproot inputs can be pruned  
+- Legacy/Nested inputs cannot be included in PSBTs  
+- No automatic derivation path inference for Taproot hardware signing  
+- Single-address scope only — no batch/multi-wallet support
 
-**Prune smarter. Win forever.**  
+**Prune smarter. Win forever.**
+
 **Ω**
