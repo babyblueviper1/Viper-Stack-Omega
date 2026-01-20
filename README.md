@@ -38,7 +38,6 @@ Spend or convert them separately before consolidation.
 
 - Table-first interface — data loads instantly, act before reading  
 - Unambiguous labeling — no confusion between pre- and post-prune states  
-- PayJoin-aware analysis — invoice detection with CIOH-safe handling  
 - CIOH recovery guidance — warnings translated into concrete next steps  
 - **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls  
 - Pure dark nuclear mode — full contrast, no haze  
@@ -61,6 +60,4 @@ Spend or convert them separately before consolidation.
 - No automatic derivation path inference for Taproot hardware signing  
 - Single-address scope only — no batch/multi-wallet support
 
-**Prune smarter. Win forever.**
-
-**Ω**
+**Prune smarter. Win forever. • Ω**
