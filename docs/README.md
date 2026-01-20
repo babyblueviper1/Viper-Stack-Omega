@@ -1,6 +1,8 @@
-**# Ωmega Pruner v11.1 — Forged Anew**
+# Ωmega Pruner v11.1 — Forged Anew
 
-*The purest UTXO consolidator ever built.*  
+**Reclaim Sovereignty**
+
+The purest UTXO consolidator ever built.  
 Reborn in fire — stripped of pretense, refined to essence, honest to the core.
 
 Ωmega Pruner is an **unsigned, non-custodial PSBT generator** for advanced UTXO consolidation and long-term coin control.
@@ -13,120 +15,72 @@ Reborn in fire — stripped of pretense, refined to essence, honest to the core.
 ### What’s New in v11.1
 
 - **Pruning Conditions Badge — LIVE**  
-  Real-time score (1–10) with glowing nuclear design  
+  Real-time 1–10 score with glowing nuclear design  
 - Current economy fee vs dynamic medians:  
   • 1-day  
   • 1-week **(primary benchmark)**  
   • 1-month  
 - Clear vertical layout: **Current → VS → Medians** (1-day → 1-week → 1-month)  
-- Live BTC price + current block height + hashrate  
+- Live BTC price + block height + hashrate  
 - Next difficulty adjustment + halving countdown  
 - Powered by **mempool.space** mining statistics  
-- **Instant insight**: know if now is prime pruning time **before** even pasting anything
+- **Instant insight**: know if now is prime pruning time — before pasting anything
 
 ### Supported Address Types
 
-Ωmega Pruner is optimized for modern Bitcoin and fully supports:
+Optimized for modern Bitcoin:
 
-- **Native SegWit** (`bc1q...`) — P2WPKH  
-- **Taproot** (`bc1p...`) — P2TR  
+- **Native SegWit** (`bc1q…`) — P2WPKH  
+- **Taproot** (`bc1p…`) — P2TR  
 
-These offer the best fee efficiency, privacy characteristics, and forward compatibility.
+These deliver the best fee efficiency, privacy characteristics, and forward compatibility.
 
-**Legacy (`1...`) and Nested SegWit (`3...`)** inputs are displayed for transparency but **cannot be selected** or included in the generated PSBT (faded + disabled in the table).  
+**Legacy (`1…`) and Nested SegWit (`3…`)** inputs are displayed for transparency only and **cannot be pruned** (faded, disabled checkboxes).  
 Spend or migrate them separately before consolidation.
 
 ### Scope & Safety Model (Read This)
 
-Ωmega Pruner operates under a strict **single-scope safety model**:
+Strict **single-scope safety model**:
 
 - One address **OR** one xpub per run  
-- No multi-wallet aggregation  
-- No cross-derivation merging  
-- No silent expansion of scope  
+- **No** cross-wallet or multi-wallet mixing  
+- **No** hidden aggregation — ever  
+- Deterministic results → safer signing → minimized CIOH risk
 
-This is deliberate. It guarantees:
+### Hardware Wallet & Taproot Notes
 
-- Deterministic results  
-- Hardware-wallet-safe PSBTs  
-- Minimized CIOH and linkage risk  
-- No accidental wallet merging — **ever**
-
-### Hardware Wallet & Taproot Behavior
-
-Ωmega Pruner always allows PSBT generation — even without derivation metadata.  
+Ωmega Pruner always generates valid PSBTs — even without derivation metadata.
 
 However:
 
 - Some hardware wallets require Taproot derivation paths to authorize signing  
-- If Taproot inputs are detected and hardware support is enabled without a derivation path:  
+- If Taproot inputs are detected and hardware support is enabled without a path:  
   - A **non-blocking warning** is displayed  
   - PSBT generation still succeeds  
   - Signing may be refused by certain devices  
-- If your hardware wallet refuses to sign: Re-generate the PSBT with the correct Taproot derivation path.
+- **No re-generation with corrected path** is currently supported  
+- Workaround: Import into a wallet that already knows the account (e.g., Sparrow) or recreate the transaction there
 
-This behavior is intentional and preserves maximum flexibility.
+This preserves maximum flexibility while being honest about hardware limitations.
 
-### Why Ωmega Pruner Exists
+### Core Features
 
-Pruning isn’t about saving sats today.  
-It’s about **owning your coins for the rest of Bitcoin’s lifetime**.
-
-Most tools optimize for convenience.  
-Ωmega Pruner optimizes for:
-
-- Truth  
-- Sovereignty  
-- Architectural honesty  
-
-No keys. No signing. No silent failures. No fake privacy.
-
-### Ωmega Pruner v11.1 vs “Everyone Else” (2026)
-
-| Property                              | Ωmega Pruner v11.1          | Everyone Else              |
-|---------------------------------------|------------------------------|----------------------------|
-| Private keys ever leave browser?      | Never                        | Sometimes                  |
-| Transaction encoding                  | Hand-rolled, bit-perfect     | Often fragile              |
-| SegWit v0 + v1 (Taproot)              | Fully supported              | Partial/broken             |
-| PSBT output                           | Minimal, universally valid   | Often malformed            |
-| Live mempool fee oracle               | One-click presets            | Manual/stale               |
-| Instant slider + summary updates      | Zero lag                     | Rare                       |
-| Pruning Conditions badge              | LIVE                         | Never                      |
-| Privacy Score (0–100)                 | LIVE — CIOH & linkage        | Never                      |
-| PayJoin detection (BIP78)             | LIVE                         | Rare                       |
-| CoinJoin recovery guidance            | LIVE                         | Never                      |
-| CIOH warnings                         | Explicit, unavoidable        | Vague/silent               |
-| Per-input weight (wu)                 | LIVE                         | Never                      |
-| Full wallet vs prune comparison       | LIVE                         | Never                      |
-| “Prune now vs later” fee math         | LIVE                         | Never                      |
-| Fully offline / air-gapped mode       | LIVE                         | Never                      |
-| Selection JSON + fingerprint          | LIVE                         | Never                      |
-| Preview = final PSBT                  | 100% match                   | Often wrong                |
-
-### What Happens in ~6 Seconds
-
-1. See **Pruning Conditions badge** → instantly know fee context  
-2. Toggle Offline Mode → paste raw UTXOs → fully air-gapped  
-   *or* paste a single address or xpub  
-3. Choose a fee preset → instant economics update  
-4. Click **ANALYZE** → UTXO table appears immediately  
-5. Select inputs → Privacy Score, CIOH warnings, and footprint update live  
-6. (Optional) Paste a PayJoin invoice → CIOH-safe handling  
-7. Review recovery guidance if applicable  
-8. **GENERATE NUCLEAR PSBT**  
-9. Export PSBT + selection fingerprint → sign → broadcast  
-
-No ambiguity. No surprises.
-
-### Wallet Compatibility (2026+)
-
-PSBTs generated by Ωmega Pruner are compatible with:
-
-- Sparrow • Nunchuk • BlueWallet • Electrum  
-- Coldcard • Ledger • Trezor • Specter  
-- Fully Noded • Keystone • Aqua  
-
-(Actual signing behavior depends on wallet policy and provided metadata.)
+- Table-first interface — data loads instantly, act before reading  
+- Unambiguous labeling — no confusion between pre- and post-prune states  
+- PayJoin-aware analysis — invoice detection with CIOH-safe handling  
+- CIOH recovery guidance — warnings translated into concrete next steps  
+- **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls  
+- Pure dark nuclear mode — full contrast, no haze  
+- Deterministic selection export — JSON + cryptographic fingerprint  
+- Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
+- **Privacy Score (0–100)** — linkage, merge exposure, CIOH risk  
+- Tiered CIOH warnings — color-coded and impossible to miss  
+- “Prune now vs later” fee delta — see future regret in sats  
+- Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
+- Live wallet footprint comparison — before / after cleanup  
+- **NUCLEAR WALLET CLEANUP** confirmation step  
+- 100% preview → PSBT fidelity  
+- Zero custody • Full coin control • RBF • Taproot • Dust-resistant  
 
 ### Under the Hood — Canonical State Model
 
@@ -143,7 +97,7 @@ PSBTs generated by Ωmega Pruner are compatible with:
 Most consolidators lie to you with half-implemented features.  
 Ωmega Pruner tells the truth — and nothing but the truth.
 
-**Prune with confidence. Win with certainty.**
+**No keys. No signing. No silent failures. No fake privacy.**
 
 ### Ωmega Pruner — Custom Builds
 
@@ -160,6 +114,8 @@ Your treasury. Your rules.
 🎙 **Baby Blue Viper** — https://babyblueviper.com
 
 **Ωmega Pruner v11.1 — Forged Anew**  
-babyblueviper & the swarm • January 2026 • Ω
+babyblueviper & the swarm • January 2026
 
 **Prune smarter. Win forever.**
+
+**Ω**
