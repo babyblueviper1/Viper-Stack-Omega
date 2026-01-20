@@ -60,10 +60,6 @@ import copy
 import urllib.parse
 import pandas as pd
 import statistics
-from bitcoinlib.keys import HDKey
-from bitcoinlib.encoding import pubkeyhash_to_addr_bech32
-from embit import bip32, script
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
