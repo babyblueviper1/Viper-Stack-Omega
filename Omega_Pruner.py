@@ -3487,9 +3487,6 @@ def analyze_and_show_summary(
     manual_utxo_input,
     locked,
     dest_value,
-    hw_support_toggle,
-    xpub_field,
-    base_path_field,
 ):
     print(">>> analyze_and_show_summary STARTED")
 
@@ -5062,7 +5059,7 @@ No API calls • Fully air-gapped safe""",
         outputs=prune_badge
     )
     
-  # 5. FOOTER — single block with HTML + JS together
+    # 5. FOOTER
     gr.HTML(
         """
         <div style="width: 100%; margin-top: clamp(50px, 12vw, 100px) !important;"></div>
@@ -5140,70 +5137,69 @@ No API calls • Fully air-gapped safe""",
                 </a>
             </div>
 
-     <!-- Donation section – centered QR + copy feedback -->
-<div style="
-    text-align: center !important;
-    margin: clamp(40px, 10vw, 80px) auto 60px auto !important;
-    padding: clamp(20px, 5vw, 40px) !important;
-    background: rgba(0,0,0,0.5) !important;
-    border-top: 2px solid #f7931a !important;
-    max-width: 95vw !important;
-    color: #aaa !important;
-    font-size: clamp(0.9rem, 3vw, 1.1rem) !important;
-">
-    <div style="margin-bottom: 12px !important;">
-        <strong style="color:#f7931a !important;">Support Ωmega Pruner</strong><br>
-        <small>If this tool saved you sats or helped your stack — any amount appreciated.</small>
-    </div>
+            <!-- Donation section -->
+            <div style="
+                text-align: center !important;
+                margin: clamp(40px, 10vw, 80px) auto 60px auto !important;
+                padding: clamp(20px, 5vw, 40px) !important;
+                background: rgba(0,0,0,0.5) !important;
+                border-top: 2px solid #f7931a !important;
+                max-width: 95vw !important;
+                color: #aaa !important;
+                font-size: clamp(0.9rem, 3vw, 1.1rem) !important;
+            ">
+                <div style="margin-bottom: 12px !important;">
+                    <strong style="color:#f7931a !important;">Support Ωmega Pruner</strong><br>
+                    <small>If this tool saved you sats or helped your stack — any amount appreciated.</small>
+                </div>
 
-    <div style="
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: clamp(20px, 5vw, 40px);
-        flex-wrap: wrap;
-    ">
-        <!-- On-chain QR – fully centered -->
-        <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 180px;
-        ">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?data=bitcoin:bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj&size=300x300&color=247-147-26&bgcolor=0-0-0" 
-                 alt="Donate Bitcoin On-chain" 
-                 style="
-                     width: 180px;
-                     height: 180px;
-                     border: 2px solid #f7931a;
-                     border-radius: 12px;
-                     box-shadow: 0 0 20px rgba(247,147,26,0.5);
-                     max-width: 45vw;
-                 " />
-            <br>
-            <small style="display: block; margin-top: 8px; word-break: break-all;">
-                bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
-                <button id="copy-onchain" onclick="copyAddress('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj', 'copy-onchain')" style="background:none;border:none;color:#f7931a;cursor:pointer;font-size:0.9rem;margin-left:8px;">Copy</button>
-                <span id="copy-onchain-feedback" style="display:none;color:#00ff88;font-size:0.85rem;margin-left:8px;font-weight:600;">Copied!</span>
-            </small>
-        </div>
+                <div style="
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    gap: clamp(20px, 5vw, 40px);
+                    flex-wrap: wrap;
+                ">
+                    <!-- On-chain QR – centered -->
+                    <div style="
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        min-width: 180px;
+                    ">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?data=bitcoin:bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj&size=300x300&color=247-147-26&bgcolor=0-0-0" 
+                             alt="Donate Bitcoin On-chain" 
+                             style="
+                                 width: 180px;
+                                 height: 180px;
+                                 border: 2px solid #f7931a;
+                                 border-radius: 12px;
+                                 box-shadow: 0 0 20px rgba(247,147,26,0.5);
+                                 max-width: 45vw;
+                             " />
+                        <br>
+                        <small style="display: block; margin-top: 8px; word-break: break-all;">
+                            bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+                            <button onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {this.innerText='COPIED';setTimeout(()=>this.innerText='Copy',1500);})"
+                                    style="
+                                        background:none !important;
+                                        border:none !important;
+                                        color:#f7931a !important;
+                                        cursor:pointer !important;
+                                        font-size:0.9rem !important;
+                                        margin-left:8px !important;
+                                        padding:0 !important;
+                                    ">
+                                Copy
+                            </button>
+                        </small>
+                    </div>
+                </div>
 
-        <!-- Lightning placeholder – uncomment when ready -->
-        <!-- <div style="display: flex; flex-direction: column; align-items: center; min-width: 180px;">
-            <img src="YOUR_LIGHTNING_QR" alt="Donate Lightning" style="width: 180px; height: 180px; border: 2px solid #00ff88; border-radius: 12px; box-shadow: 0 0 20px rgba(0,255,136,0.5); max-width: 45vw;" />
-            <br>
-            <small style="display: block; margin-top: 8px; word-break: break-all;">
-                yourname@getalby.com
-                <button id="copy-ln" onclick="copyAddress('yourname@getalby.com', 'copy-ln')" style="background:none;border:none;color:#00ff88;cursor:pointer;font-size:0.9rem;margin-left:8px;">Copy</button>
-                <span id="copy-ln-feedback" style="display:none;color:#00ff88;font-size:0.85rem;margin-left:8px;font-weight:600;">Copied!</span>
-            </small>
-        </div> -->
-    </div>
-
-    <div style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
-        Thank you for supporting open-source Bitcoin tools. • Ω
-    </div>
-</div>
+                <div style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
+                    Thank you for supporting open-source Bitcoin tools. • Ω
+                </div>
+            </div>
 
             <!-- Light mode overrides -->
             <style>
@@ -5238,21 +5234,6 @@ No API calls • Fully air-gapped safe""",
                 Prune smarter. Win forever. • Ω
             </span>
         </div>
-
-        <!-- JavaScript for copy feedback – inside the same block -->
-        <script>
-        function copyAddress(text, buttonId) {
-            navigator.clipboard.writeText(text).then(() => {
-                const feedback = document.getElementById(buttonId + '-feedback');
-                feedback.style.display = 'inline';
-                setTimeout(() => {
-                    feedback.style.display = 'none';
-                }, 1500);
-            }).catch(err => {
-                console.error('Copy failed', err);
-            });
-        }
-        </script>
         """,
         elem_id="omega_footer",
     )
