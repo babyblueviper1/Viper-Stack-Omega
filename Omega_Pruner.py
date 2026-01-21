@@ -3731,62 +3731,28 @@ with gr.Blocks(
     </div>
 
     <div style="
-        text-align: center !important;
-        margin: clamp(60px, 15vw, 120px) auto 30px auto !important;
-        padding: clamp(40px, 8vw, 60px) clamp(20px, 5vw, 40px) !important;
-        background: rgba(0,0,0,0.42) !important;
-        backdrop-filter: blur(10px) !important;
-        -webkit-backdrop-filter: blur(10px) !important;
-        border: clamp(6px, 2vw, 8px) solid #f7931a !important;
-        border-radius: clamp(24px, 6vw, 32px) !important;
-        box-shadow: 0 0 100px rgba(247,147,26,0.5), inset 0 0 80px rgba(247,147,26,0.1) !important;
-        max-width: 900px !important;
-        width: 95% !important;
-        margin-left: auto !important;
-        margin-right: auto !important;
-        position: relative !important;
-        z-index: 1 !important;
-    ">
-<!-- Reclaim Sovereignty – brightest, white outline -->
-<div style="
     text-align: center !important;
-    margin: clamp(40px, 12vw, 100px) auto 30px auto !important;  /* reduced top margin on mobile */
-    padding: clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;  /* tighter side padding */
+    margin: clamp(40px, 12vw, 100px) auto 30px auto !important;  /* tighter top on mobile */
+    padding: clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;
     background: rgba(0,0,0,0.42) !important;
     backdrop-filter: blur(10px) !important;
-    border: clamp(4px, 2vw, 8px) solid #f7931a !important;  /* thinner border on mobile */
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: clamp(4px, 2vw, 8px) solid #f7931a !important;
     border-radius: clamp(16px, 5vw, 24px) !important;
     box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
-    max-width: 95vw !important;  /* safer than 900px */
+    max-width: 95vw !important;  /* safe for all screens */
     width: 100% !important;
     position: relative !important;
     z-index: 1 !important;
-    overflow: hidden !important;  /* prevent any child overflow */
+    overflow: hidden !important;
 ">
 
-  <!-- Reclaim Sovereignty – smaller min, tighter spacing, word-break -->
-<div style="
-    text-align: center !important;
-    margin: clamp(40px, 12vw, 100px) auto 30px auto !important;  /* reduced top margin on mobile */
-    padding: clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;  /* tighter side padding */
-    background: rgba(0,0,0,0.42) !important;
-    backdrop-filter: blur(10px) !important;
-    border: clamp(4px, 2vw, 8px) solid #f7931a !important;  /* thinner border on mobile */
-    border-radius: clamp(16px, 5vw, 24px) !important;
-    box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
-    max-width: 95vw !important;  /* safer than 900px */
-    width: 100% !important;
-    position: relative !important;
-    z-index: 1 !important;
-    overflow: hidden !important;  /* prevent any child overflow */
-">
-
-  <!-- Reclaim Sovereignty – smaller min, tighter spacing, word-break -->
+  <!-- Reclaim Sovereignty – brightest, white outline -->
   <div style="
       color: #ffcc00 !important;
-      font-size: clamp(2.8rem, 11vw, 4.8rem) !important;  /* lower min & max – fits better */
+      font-size: clamp(2.8rem, 11vw, 4.8rem) !important;
       font-weight: 900 !important;
-      letter-spacing: clamp(2px, 1.8vw, 10px) !important;  /* much tighter on mobile */
+      letter-spacing: clamp(2px, 1.8vw, 10px) !important;
       text-shadow: 
           0 0 40px #ffcc00,
           0 0 80px #ffaa00,
@@ -3794,14 +3760,14 @@ with gr.Blocks(
           -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
       margin-bottom: clamp(20px, 5vw, 40px) !important;
       text-align: center !important;
-      word-break: break-word !important;          /* allow breaking long words */
-      line-height: 1.1 !important;                /* tighter line height */
-      padding: 0 clamp(10px, 3vw, 20px) !important;  /* side padding prevents edge bleed */
+      word-break: break-word !important;
+      line-height: 1.1 !important;
+      padding: 0 clamp(10px, 3vw, 20px) !important;
   ">
     Reclaim Sovereignty
   </div>
 
-  <!-- ΩMEGA PRUNER – adjusted to match scale -->
+  <!-- ΩMEGA PRUNER – deeper red-orange, black outline -->
   <div style="
       color: #e65c00 !important;
       font-size: clamp(2.4rem, 9vw, 4.2rem) !important;
@@ -3820,7 +3786,7 @@ with gr.Blocks(
     ΩMEGA PRUNER
   </div>
 
-  <!-- NUCLEAR COIN CONTROL – scaled down slightly -->
+  <!-- NUCLEAR COIN CONTROL -->
   <div style="
       color: #0f0 !important;
       font-size: clamp(1.8rem, 7vw, 2.8rem) !important;
@@ -3845,11 +3811,11 @@ with gr.Blocks(
     FORGED ANEW — v11
   </div>
 
-  <!-- Body text – tighter on mobile -->
+  <!-- Body text -->
   <div style="
       color:#ddd !important;
-      font-size: clamp(1.1rem, 3.8vw, 1.4rem) !important;  /* smaller min for phones */
-      line-height: 1.6 !important;  /* tighter line height */
+      font-size: clamp(1.1rem, 3.8vw, 1.4rem) !important;
+      line-height: 1.6 !important;
       max-width: 90vw !important;
       margin: clamp(30px, 6vw, 45px) auto !important;
       padding: 0 clamp(10px, 3vw, 20px) !important;
@@ -3871,7 +3837,7 @@ with gr.Blocks(
     Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
   </div>
 
-  <!-- Down arrow – smaller on mobile -->
+  <!-- Down arrow -->
   <div style="
       font-size: clamp(2.5rem, 7vw, 4rem) !important;
       color:#f7931a !important;
