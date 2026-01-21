@@ -5062,7 +5062,7 @@ No API calls • Fully air-gapped safe""",
         outputs=prune_badge
     )
     
-     # 5. FOOTER — indented ONE level (inside the main Blocks/Column)
+    # 5. FOOTER — correctly indented ONE level
     gr.HTML(
         """
         <div style="width: 100%; margin-top: clamp(50px, 12vw, 100px) !important;"></div>
@@ -5075,143 +5075,70 @@ No API calls • Fully air-gapped safe""",
             line-height: 1.8;
         ">
             <!-- VERSION -->
-            <div style="
-                font-size: clamp(1rem, 4vw, 1.2rem) !important;
-                font-weight: 700;
-                letter-spacing: 0.5px;
-                color: #f7931a;
-                text-shadow: 0 0 15px rgba(247,147,26,0.7);
-            ">
+            <div style="...">
                 Ωmega Pruner v11 — Forged Anew
             </div>
 
             <!-- GITHUB LINK -->
-            <a href="https://github.com/babyblueviper1/Viper-Stack-Omega"
-               target="_blank"
-               rel="noopener"
-               style="
-                   font-size: clamp(0.9rem, 3.5vw, 1.05rem) !important;
-                   font-weight: 600;
-                   text-decoration: none;
-                   color: #f7931a;
-                   text-shadow: 0 0 12px rgba(247,147,26,0.6);
-               ">
+            <a href="..." ...>
                 GitHub • Open Source • Apache 2.0
             </a>
 
             <br><br>
 
             <!-- CUSTOM BUILDS SECTION -->
-            <div style="margin: clamp(20px, 5vw, 30px) auto; max-width: 720px;">
-                <a href="https://www.babyblueviper.com/p/omega-pruner-custom-builds"
-                   target="_blank"
-                   style="color: inherit; text-decoration: none;">
-                    <div style="
-                        display: inline-block;
-                        padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 24px) !important;
-                        margin: clamp(8px, 2vw, 12px) 0 !important;
-                        font-size: clamp(0.9rem, 3.5vw, 1.05rem) !important;
-                        font-weight: 700;
-                        letter-spacing: 0.3px;
-                        border-radius: 14px;
-                        transition: all 0.4s ease;
-                        color: #00ff9d;
-                        background: rgba(0, 40, 20, 0.4);
-                        box-shadow: 0 0 20px rgba(0, 255, 157, 0.4);
-                    ">
-                        This build is engineered for speed and clarity.
-                    </div>
+            <div ...>
+                <a href="..." ...>
+                    <div ...>This build is engineered for speed and clarity.</div>
                     <br>
-                    <div style="
-                        display: inline-block;
-                        padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 24px) !important;
-                        margin: clamp(8px, 2vw, 12px) 0 !important;
-                        font-size: clamp(0.9rem, 3.5vw, 1.05rem) !important;
-                        font-weight: 700;
-                        letter-spacing: 0.3px;
-                        border-radius: 14px;
-                        transition: all 0.4s ease;
-                        color: #00ff88;
-                        background: rgba(0, 35, 15, 0.4);
-                        box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
-                    ">
-                        For extended capabilities or tailored integrations, custom versions can be commissioned.
-                    </div>
+                    <div ...>For extended capabilities or tailored integrations...</div>
                 </a>
             </div>
 
             <!-- Donation section -->
-            <div style="
-                text-align: center !important;
-                margin: clamp(40px, 10vw, 80px) auto 60px auto !important;
-                padding: clamp(20px, 5vw, 40px) !important;
-                background: rgba(0,0,0,0.5) !important;
-                border-top: 2px solid #f7931a !important;
-                max-width: 95vw !important;
-                color: #aaa !important;
-                font-size: clamp(0.9rem, 3vw, 1.1rem) !important;
-            ">
-                <div style="margin-bottom: 12px !important;">
-                    <strong style="color:#f7931a !important;">Support Ωmega Pruner</strong><br>
-                    <small>If this tool saved you sats or helped your stack — any amount appreciated.</small>
+            <div style="...">
+                <div ...>
+                    <strong ...>Support Ωmega Pruner</strong><br>
+                    <small>...</small>
                 </div>
 
-                <div style="display: flex; justify-content: center; gap: clamp(20px, 5vw, 40px); flex-wrap: wrap;">
+                <div style="display: flex; justify-content: center; ...">
                     <!-- On-chain QR -->
-                    <div style="text-align: center;">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?data=bitcoin:bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj&size=300x300&color=247-147-26&bgcolor=0-0-0" 
-                             alt="Donate Bitcoin On-chain" 
-                             style="width: 180px; height: 180px; border: 2px solid #f7931a; border-radius: 12px; box-shadow: 0 0 20px rgba(247,147,26,0.5); max-width: 45vw;" />
+                    <div style="text-align: center; min-width: 180px;">
+                        <img src="https://api.qrserver.com/..." ... />
                         <br>
-                        <small>bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj 
-                            <button onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj')" style="background:none;border:none;color:#f7931a;cursor:pointer;font-size:0.9rem;">Copy</button>
+                        <small>
+                            bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+                            <button id="copy-onchain" ...>Copy</button>
+                            <span id="copy-onchain-feedback" ...>Copied!</span>
                         </small>
                     </div>
-
-                    <!-- Lightning placeholder -->
-                    <!-- Uncomment and add your LN QR when ready -->
-                    <!-- <div style="text-align: center;">
-                        <img src="YOUR_LIGHTNING_QR_URL" alt="Donate Lightning" style="width: 180px; height: 180px; border: 2px solid #00ff88; border-radius: 12px; box-shadow: 0 0 20px rgba(0,255,136,0.5); max-width: 45vw;" />
-                        <br>
-                        <small>Lightning: yourname@getalby.com</small>
-                    </div> -->
                 </div>
 
-                <div style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
+                <div ...>
                     Thank you for supporting open-source Bitcoin tools. • Ω
                 </div>
             </div>
 
             <!-- Light mode overrides -->
             <style>
-            body:not(.dark-mode) div[style*="00ff9d"], 
-            body:not(.dark-mode) div[style*="00ff88"] {
-                color: #004d33 !important;
-                background: rgba(220, 255, 235, 0.15) !important;
-                box-shadow: 0 2px 8px rgba(0, 80, 50, 0.1) !important;
-            }
+                body:not(.dark-mode) div[style*="00ff9d"], 
+                body:not(.dark-mode) div[style*="00ff88"] {
+                    color: #004d33 !important;
+                    background: rgba(220, 255, 235, 0.15) !important;
+                    box-shadow: 0 2px 8px rgba(0, 80, 50, 0.1) !important;
+                }
 
-            a:hover div[style*="padding"] {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
-            }
+                a:hover div[style*="padding"] {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
+                }
             </style>
 
             <br><br>
 
             <!-- TAGLINE -->
-            <span style="
-                color: #0f0;
-                font-size: clamp(0.9rem, 3.8vw, 1.1rem) !important;
-                font-weight: 800;
-                letter-spacing: 0.6px;
-                text-shadow:
-                    0 0 15px #0f0,
-                    0 0 30px #0f0,
-                    0 0 6px #000,
-                    0 4px 10px #000,
-                    0 8px 20px #000000e6;
-            ">
+            <span style="...">
                 Prune smarter. Win forever. • Ω
             </span>
         </div>
@@ -5219,6 +5146,22 @@ No API calls • Fully air-gapped safe""",
         elem_id="omega_footer",
     )
 
+    # JavaScript for copy feedback – also one level indented
+    gr.HTML("""
+    <script>
+    function copyAddress(text, buttonId) {
+        navigator.clipboard.writeText(text).then(() => {
+            const feedback = document.getElementById(buttonId + '-feedback');
+            feedback.style.display = 'inline';
+            setTimeout(() => {
+                feedback.style.display = 'none';
+            }, 1500);
+        }).catch(err => {
+            console.error('Copy failed', err);
+        });
+    }
+    </script>
+    """)
 
 if __name__ == "__main__":
     demo.queue(default_concurrency_limit=None, max_size=40)
