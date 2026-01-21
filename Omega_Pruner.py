@@ -3749,100 +3749,123 @@ with gr.Blocks(
     ">
 <!-- Reclaim Sovereignty – brightest, white outline -->
 <div style="
-    color: #ffcc00 !important;
-    font-size: clamp(3.2rem, 12vw, 5.2rem) !important;   /* slightly smaller max – better proportion */
-    font-weight: 900 !important;
-    letter-spacing: clamp(5px, 2.5vw, 14px) !important;
-    text-shadow: 
-        0 0 50px #ffcc00,
-        0 0 100px #ffaa00,
-        0 0 150px rgba(255,204,0,0.9),
-        -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
-        -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-    margin-bottom: clamp(30px, 6vw, 50px) !important;
     text-align: center !important;
+    margin: clamp(40px, 12vw, 100px) auto 30px auto !important;  /* reduced top margin on mobile */
+    padding: clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;  /* tighter side padding */
+    background: rgba(0,0,0,0.42) !important;
+    backdrop-filter: blur(10px) !important;
+    border: clamp(4px, 2vw, 8px) solid #f7931a !important;  /* thinner border on mobile */
+    border-radius: clamp(16px, 5vw, 24px) !important;
+    box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
+    max-width: 95vw !important;  /* safer than 900px */
+    width: 100% !important;
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: hidden !important;  /* prevent any child overflow */
 ">
-  Reclaim Sovereignty
-</div>
 
-<!-- ΩMEGA PRUNER – deeper red-orange, black outline, bigger for presence -->
-<div style="
-    color: #e65c00 !important;
-    font-size: clamp(2.8rem, 10vw, 4.8rem) !important;   /* increased – feels more equal to headline */
-    font-weight: 900 !important;
-    letter-spacing: clamp(4px, 2vw, 12px) !important;
-    text-shadow: 
-        0 0 25px #e65c00,
-        0 0 50px #c94a00,
-        0 0 75px rgba(230,92,0,0.7),
-        -2px -2px 0 #000000, 2px -2px 0 #000000,
-        -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
-    margin-bottom: clamp(40px, 8vw, 60px) !important;
-    text-align: center !important;
-">
-  ΩMEGA PRUNER
-</div>
-
-<!-- NUCLEAR COIN CONTROL – bigger to match energy -->
-<div style="
-    color: #0f0 !important;
-    font-size: clamp(2.0rem, 8vw, 3.2rem) !important;    /* increased – now pops more */
-    font-weight: 900 !important;
-    letter-spacing: clamp(4px, 1.5vw, 6px) !important;
-    text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
-    margin: 30px 0 !important;
-    text-align: center !important;
-">
-  NUCLEAR COIN CONTROL
-</div>
-
-<!-- Version -->
-<div style="
-    color: #00ffaa !important;
-    font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
-    letter-spacing: clamp(2px, 1vw, 3px) !important;
-    text-shadow: 0 0 15px #00ffaa;
-    margin: 20px 0 !important;
-    text-align: center !important;
-">
-  FORGED ANEW — v11
-</div>
-
-  <!-- Body text — now feels like supporting detail -->
+  <!-- Reclaim Sovereignty – smaller min, tighter spacing, word-break -->
   <div style="
-    color:#ddd !important;
-    font-size: clamp(1.2rem, 4vw, 1.5rem) !important;
-    line-height:1.8 !important;
-    max-width:760px !important;
-    margin:40px auto 50px auto !important;
-    text-align:center !important;
+      color: #ffcc00 !important;
+      font-size: clamp(2.8rem, 11vw, 4.8rem) !important;  /* lower min & max – fits better */
+      font-weight: 900 !important;
+      letter-spacing: clamp(2px, 1.8vw, 10px) !important;  /* much tighter on mobile */
+      text-shadow: 
+          0 0 40px #ffcc00,
+          0 0 80px #ffaa00,
+          -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
+          -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
+      margin-bottom: clamp(20px, 5vw, 40px) !important;
+      text-align: center !important;
+      word-break: break-word !important;          /* allow breaking long words */
+      line-height: 1.1 !important;                /* tighter line height */
+      padding: 0 clamp(10px, 3vw, 20px) !important;  /* side padding prevents edge bleed */
   ">
-  Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
-  <strong style="color:#0f0 !important;">full strategic control</strong> of your Bitcoin.<br><br>
+    Reclaim Sovereignty
+  </div>
+
+  <!-- ΩMEGA PRUNER – adjusted to match scale -->
+  <div style="
+      color: #e65c00 !important;
+      font-size: clamp(2.4rem, 9vw, 4.2rem) !important;
+      font-weight: 900 !important;
+      letter-spacing: clamp(2px, 1.5vw, 9px) !important;
+      text-shadow: 
+          0 0 25px #e65c00,
+          0 0 50px #c94a00,
+          -2px -2px 0 #000000, 2px -2px 0 #000000,
+          -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
+      margin-bottom: clamp(30px, 6vw, 50px) !important;
+      text-align: center !important;
+      word-break: break-word !important;
+      line-height: 1.1 !important;
+  ">
+    ΩMEGA PRUNER
+  </div>
+
+  <!-- NUCLEAR COIN CONTROL – scaled down slightly -->
+  <div style="
+      color: #0f0 !important;
+      font-size: clamp(1.8rem, 7vw, 2.8rem) !important;
+      font-weight: 900 !important;
+      letter-spacing: clamp(3px, 1.2vw, 6px) !important;
+      text-shadow: 0 0 30px #0f0, 0 0 60px #0f0;
+      margin: clamp(20px, 5vw, 35px) 0 !important;
+      text-align: center !important;
+  ">
+    NUCLEAR COIN CONTROL
+  </div>
+
+  <!-- Version -->
+  <div style="
+      color: #00ffaa !important;
+      font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
+      letter-spacing: clamp(1px, 0.8vw, 3px) !important;
+      text-shadow: 0 0 12px #00ffaa;
+      margin: clamp(15px, 4vw, 25px) 0 !important;
+      text-align: center !important;
+  ">
+    FORGED ANEW — v11
+  </div>
+
+  <!-- Body text – tighter on mobile -->
+  <div style="
+      color:#ddd !important;
+      font-size: clamp(1.1rem, 3.8vw, 1.4rem) !important;  /* smaller min for phones */
+      line-height: 1.6 !important;  /* tighter line height */
+      max-width: 90vw !important;
+      margin: clamp(30px, 6vw, 45px) auto !important;
+      padding: 0 clamp(10px, 3vw, 20px) !important;
+      text-align: center !important;
+      word-break: break-word !important;
+  ">
+    Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
+    <strong style="color:#0f0 !important;">full strategic control</strong> of your Bitcoin.<br><br>
     
     By pruning inefficient UTXOs, you:<br>
     • <strong style="color:#00ff9d !important;">Slash fees</strong> during high-congestion periods<br>
     • <strong style="color:#00ff9d !important;">Reduce future costs</strong> with a cleaner UTXO set<br>
     • <strong style="color:#00ff9d !important;">Optimize your stack</strong> for speed, savings and privacy<br><br>
 
-    <strong style="color:#f7931a !important;font-size: clamp(1.4rem, 5vw, 1.8rem) !important;font-weight:900 !important;letter-spacing:1px !important;">
+    <strong style="color:#f7931a !important;font-size: clamp(1.3rem, 4.5vw, 1.7rem) !important;font-weight:900 !important;letter-spacing:1px !important;">
       Prune smarter. Win forever.
     </strong><br><br>
     
     Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
   </div>
 
-  <!-- Down arrow -->
+  <!-- Down arrow – smaller on mobile -->
   <div style="
-    font-size: clamp(3rem, 8vw, 4.5rem) !important;
-    color:#f7931a !important;
-    opacity:0.9;
-    animation:pulse 2s infinite;
-    text-align:center !important;
+      font-size: clamp(2.5rem, 7vw, 4rem) !important;
+      color:#f7931a !important;
+      opacity:0.9;
+      animation:pulse 2s infinite;
+      text-align:center !important;
+      margin-top: clamp(20px, 5vw, 40px) !important;
   ">
     ↓
   </div>
-    </div>
+</div>
 	
       <style>
     @keyframes pulse {
