@@ -3446,7 +3446,7 @@ with gr.Blocks(
     overflow: visible !important;
 ">
 
-  <!-- Reclaim Sovereignty – one line on desktop, natural break on mobile -->
+  <!-- Reclaim Sovereignty – centered, one line on desktop, natural break on mobile -->
   <div style="
       color: #ffcc00 !important;
       font-size: clamp(2.8rem, 11vw, 5.2rem) !important;
@@ -3458,11 +3458,12 @@ with gr.Blocks(
           0 0 150px rgba(255,204,0,0.9),
           -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
           -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin-bottom: clamp(20px, 5vw, 40px) !important;
+      margin: 0 auto clamp(15px, 4vw, 30px) auto !important;  /* tighter spacing below */
       text-align: center !important;
       line-height: 1.0 !important;
       white-space: pre-wrap !important;
       word-break: break-word !important;
+      display: inline-block !important;  /* fixes any centering shift */
   ">
     Reclaim Sovereignty
   </div>
