@@ -3439,7 +3439,7 @@ with gr.Blocks(
     border: clamp(4px, 2vw, 8px) solid #f7931a !important;
     border-radius: clamp(16px, 5vw, 24px) !important;
     box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
-    max-width: 95vw !important;
+    max-width: clamp(95vw, 95vw, 1200px) !important;          /* ← Key change: tighter on desktop */
     width: 100% !important;
     position: relative !important;
     z-index: 1 !important;
