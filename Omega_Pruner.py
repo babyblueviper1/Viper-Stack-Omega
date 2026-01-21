@@ -5241,16 +5241,21 @@ No API calls • Fully air-gapped safe""",
                                  max-width: 45vw;
                              " />
                         <br>
-                            <small style="
+                           <small style="
                                 display: block;
                                 margin-top: 8px;
-                                max-width: 220px;
-                                overflow: hidden;
-                                text-overflow: ellipsis;
-                                white-space: nowrap;
                                 font-family: monospace;
                             ">
-                                lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c
+                                <span style="
+                                    display: inline-block;
+                                    max-width: 180px;
+                                    overflow: hidden;
+                                    text-overflow: ellipsis;
+                                    white-space: nowrap;
+                                    vertical-align: middle;
+                                ">
+                                    lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c
+                                </span>
                                 <button onclick="navigator.clipboard.writeText('lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c').then(() => {
                                     this.innerText='COPIED';
                                     this.style.color='#00ff88';
@@ -5264,14 +5269,15 @@ No API calls • Fully air-gapped safe""",
                                     }, 1500);
                                 })"
                                         style="
-                                            background:none !important;
-                                            border:none !important;
-                                            color:#00ff88 !important;
-                                            cursor:pointer !important;
-                                            font-size:0.9rem !important;
-                                            margin-left:8px !important;
-                                            padding:0 !important;
+                                            background: none !important;
+                                            border: none !important;
+                                            color: #00ff88 !important;
+                                            cursor: pointer !important;
+                                            font-size: 0.9rem !important;
+                                            margin-left: 8px !important;
+                                            padding: 0 !important;
                                             transition: all 0.2s ease !important;
+                                            vertical-align: middle;
                                         ">
                                     Copy
                                 </button>
