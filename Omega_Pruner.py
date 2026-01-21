@@ -1201,7 +1201,7 @@ def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
 # Transaction Economics (Single Source of Truth)
 # =========================
 
-@@dataclass(frozen=True)
+@dataclass(frozen=True)
 class TxEconomics:
     total_in: int          # Sum of selected UTXO values (satoshis)
     vsize: int             # Final transaction virtual size (vbytes)
