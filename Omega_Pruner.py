@@ -3447,7 +3447,7 @@ with gr.Blocks(
 ">
 
   <!-- Reclaim (line 1) -->
-  <div style="
+  <div class="hero-title" style="
       color: #ffcc00 !important;
       font-size: clamp(2.8rem, 11vw, 5.0rem) !important;
       font-weight: 900 !important;
@@ -3465,7 +3465,7 @@ with gr.Blocks(
   </div>
 
   <!-- Sovereignty (line 2) -->
-  <div style="
+  <div class="hero-title" style="
       color: #ffcc00 !important;
       font-size: clamp(2.6rem, 10vw, 4.6rem) !important;
       font-weight: 900 !important;
@@ -3483,7 +3483,7 @@ with gr.Blocks(
   </div>
 
   <!-- ΩMEGA PRUNER -->
-  <div style="
+  <div class="hero-title" style="
       color: #e65c00 !important;
       font-size: clamp(2.4rem, 9vw, 4.2rem) !important;
       font-weight: 900 !important;
@@ -3500,7 +3500,7 @@ with gr.Blocks(
   </div>
 
   <!-- NUCLEAR COIN CONTROL -->
-  <div style="
+  <div class="hero-subtitle" style="
       color: #0f0 !important;
       font-size: clamp(1.8rem, 7vw, 2.8rem) !important;
       font-weight: 900 !important;
@@ -3524,7 +3524,7 @@ with gr.Blocks(
     FORGED ANEW — v11
   </div>
 
-  <!-- Body text -->
+  <!-- Body text (unchanged) -->
   <div style="
       color:#ddd !important;
       font-size: clamp(1.1rem, 3.8vw, 1.4rem) !important;
@@ -3550,7 +3550,7 @@ with gr.Blocks(
     Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
   </div>
 
-  <!-- Down arrow -->
+  <!-- Down arrow (unchanged) -->
   <div style="
       font-size: clamp(2.5rem, 7vw, 4rem) !important;
       color:#f7931a !important;
@@ -3562,6 +3562,32 @@ with gr.Blocks(
     ↓
   </div>
 </div>
+
+<!-- Desktop font boost (media query) -->
+<style>
+  @media (min-width: 1024px) {
+    .hero-title {
+      font-size: clamp(4.5rem, 9vw, 7.5rem) !important;  /* Much bigger on desktop */
+      letter-spacing: clamp(6px, 1.2vw, 18px) !important;
+    }
+    
+    .hero-subtitle {
+      font-size: clamp(2.8rem, 5vw, 4.2rem) !important;
+      letter-spacing: clamp(5px, 0.8vw, 10px) !important;
+    }
+    
+    /* Optional: make body text a bit larger too on big screens */
+    div[style*="font-size: clamp(1.1rem"] {
+      font-size: clamp(1.3rem, 2.2vw, 1.8rem) !important;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    .hero-title {
+      font-size: clamp(6rem, 8vw, 9rem) !important;  /* Even bigger on ultra-wide */
+    }
+  }
+</style>
 	
       <style>
     @keyframes pulse {
