@@ -3446,7 +3446,7 @@ with gr.Blocks(
     overflow: visible !important;
 ">
 
-  <!-- Reclaim Sovereignty – perfectly centered, one line on desktop, natural break on mobile -->
+  <!-- Reclaim Sovereignty – dead-center, no right shift -->
   <div style="
       color: #ffcc00 !important;
       font-size: clamp(2.8rem, 11vw, 5.2rem) !important;
@@ -3458,17 +3458,20 @@ with gr.Blocks(
           0 0 150px rgba(255,204,0,0.9),
           -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
           -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin: 0 auto clamp(10px, 3vw, 20px) auto !important;  /* tighter spacing below – reduced from 20–40px */
+      margin: 0 auto clamp(5px, 2vw, 15px) auto !important;  /* tighter below – less room to ΩMEGA PRUNER */
       text-align: center !important;
       line-height: 1.0 !important;
       white-space: pre-wrap !important;
       word-break: break-word !important;
-      display: block !important;           /* forces true centering */
+      display: block !important;
+      width: fit-content !important;               /* key centering fix */
+      margin-left: auto !important;
+      margin-right: auto !important;
   ">
     Reclaim Sovereignty
   </div>
 
-  <!-- ΩMEGA PRUNER -->
+  <!-- ΩMEGA PRUNER – moved up, closer to headline -->
   <div style="
       color: #e65c00 !important;
       font-size: clamp(2.4rem, 9vw, 4.8rem) !important;
@@ -3480,7 +3483,7 @@ with gr.Blocks(
           0 0 75px rgba(230,92,0,0.7),
           -2px -2px 0 #000000, 2px -2px 0 #000000,
           -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
-      margin-bottom: clamp(30px, 6vw, 50px) !important;
+      margin: clamp(10px, 3vw, 25px) auto clamp(30px, 6vw, 50px) auto !important;  /* reduced top margin = closer to headline */
       text-align: center !important;
   ">
     ΩMEGA PRUNER
