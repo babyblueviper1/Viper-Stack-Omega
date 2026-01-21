@@ -3730,46 +3730,59 @@ with gr.Blocks(
         </span>
     </div>
 
-    <div style="
+<div style="
     text-align: center !important;
-    margin: clamp(40px, 12vw, 100px) auto 30px auto !important;  /* tighter top on mobile */
+    margin: clamp(40px, 12vw, 100px) auto 30px auto !important;
     padding: clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;
     background: rgba(0,0,0,0.42) !important;
     backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
     border: clamp(4px, 2vw, 8px) solid #f7931a !important;
     border-radius: clamp(16px, 5vw, 24px) !important;
     box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
-    max-width: 95vw !important;  /* safe for all screens */
+    max-width: 95vw !important;
     width: 100% !important;
     position: relative !important;
     z-index: 1 !important;
     overflow: hidden !important;
 ">
-<!-- Reclaim Sovereignty – smaller on narrow screens to avoid wrap -->
-<div style="
-    color: #ffcc00 !important;
-    font-size: clamp(2.4rem, 9.5vw, 4.8rem) !important;  /* lower min (2.4rem) fits 320px phones */
-    font-weight: 900 !important;
-    letter-spacing: clamp(0.5px, 1vw, 10px) !important;  /* extremely tight on mobile */
-    text-shadow: 
-        0 0 40px #ffcc00,
-        0 0 80px #ffaa00,
-        -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
-        -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-    margin-bottom: clamp(20px, 5vw, 40px) !important;
-    text-align: center !important;
-    line-height: 1.05 !important;                /* tight vertical fit */
-    padding: 0 clamp(8px, 2.5vw, 15px) !important;  /* side breathing room */
-    word-wrap: normal !important;                /* prevent forced wrap */
-    white-space: nowrap !important;              /* force single line */
-    overflow: hidden !important;                 /* hide overflow if desperate */
-    text-overflow: ellipsis !important;          /* subtle fallback ellipsis if still too long */
-">
-  Reclaim Sovereignty
+
+  <!-- Reclaim (line 1) -->
+  <div style="
+      color: #ffcc00 !important;
+      font-size: clamp(2.8rem, 11vw, 5.0rem) !important;
+      font-weight: 900 !important;
+      letter-spacing: clamp(3px, 2vw, 12px) !important;
+      text-shadow: 
+          0 0 50px #ffcc00,
+          0 0 100px #ffaa00,
+          -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
+          -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
+      margin-bottom: clamp(8px, 2vw, 15px) !important;
+      text-align: center !important;
+      line-height: 1.0 !important;
+  ">
+    Reclaim
   </div>
 
-  <!-- ΩMEGA PRUNER – deeper red-orange, black outline -->
+  <!-- Sovereignty (line 2) -->
+  <div style="
+      color: #ffcc00 !important;
+      font-size: clamp(2.6rem, 10vw, 4.6rem) !important;
+      font-weight: 900 !important;
+      letter-spacing: clamp(3px, 2vw, 12px) !important;
+      text-shadow: 
+          0 0 50px #ffcc00,
+          0 0 100px #ffaa00,
+          -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
+          -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
+      margin-bottom: clamp(20px, 5vw, 40px) !important;
+      text-align: center !important;
+      line-height: 1.0 !important;
+  ">
+    Sovereignty
+  </div>
+
+  <!-- ΩMEGA PRUNER -->
   <div style="
       color: #e65c00 !important;
       font-size: clamp(2.4rem, 9vw, 4.2rem) !important;
@@ -3782,8 +3795,6 @@ with gr.Blocks(
           -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
       margin-bottom: clamp(30px, 6vw, 50px) !important;
       text-align: center !important;
-      word-break: break-word !important;
-      line-height: 1.1 !important;
   ">
     ΩMEGA PRUNER
   </div>
