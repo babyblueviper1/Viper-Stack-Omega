@@ -4652,7 +4652,7 @@ No API calls • Fully air-gapped safe""",
             max_chars=None,
             label=" ",
             static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # 0-based index — PRUNE is editable
-            column_widths=["120px", "auto", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
+            column_widths=["120px", "380", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
         )
 
         gr.HTML("""
