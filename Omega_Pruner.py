@@ -5150,7 +5150,7 @@ No API calls • Fully air-gapped safe""",
             ">
                 <div style="margin-bottom: 12px !important;">
                     <strong style="color:#f7931a !important;">Support Ωmega Pruner</strong><br>
-                    <small>If this tool saved you sats or helped your stack — any amount appreciated.</small>
+                    <small>If this tool saved you sats or helped your stack — show your love.</small>
                 </div>
 
                 <div style="
@@ -5180,18 +5180,30 @@ No API calls • Fully air-gapped safe""",
                         <br>
                         <small style="display: block; margin-top: 8px; word-break: break-all;">
                             bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
-                            <button onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {this.innerText='COPIED';setTimeout(()=>this.innerText='Copy',1500);})"
-                                    style="
-                                        background:none !important;
-                                        border:none !important;
-                                        color:#f7931a !important;
-                                        cursor:pointer !important;
-                                        font-size:0.9rem !important;
-                                        margin-left:8px !important;
-                                        padding:0 !important;
-                                    ">
-                                Copy
-                            </button>
+                          <button onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {
+    this.innerText='COPIED';
+    this.style.color='#00ff88';
+    this.style.fontWeight='900';
+    this.style.textShadow='0 0 10px #00ff88';
+    setTimeout(() => {
+        this.innerText='Copy';
+        this.style.color='#f7931a';
+        this.style.fontWeight='normal';
+        this.style.textShadow='none';
+    }, 1500);
+})"
+        style="
+            background:none !important;
+            border:none !important;
+            color:#f7931a !important;
+            cursor:pointer !important;
+            font-size:0.9rem !important;
+            margin-left:8px !important;
+            padding:0 !important;
+            transition: all 0.2s ease !important;
+        ">
+    Copy
+</button>
                         </small>
                     </div>
                 </div>
