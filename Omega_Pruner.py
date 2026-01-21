@@ -3432,9 +3432,8 @@ with gr.Blocks(
 
 <div style="
     text-align: center !important;
-    margin: clamp(-20px, -8vw, -60px) auto 30px auto !important;  /* gentler negative pull */
-    padding-top: clamp(60px, 10vw, 100px) !important;             /* add internal top padding to compensate */
-    padding: clamp(60px, 10vw, 100px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;
+    margin: clamp(-10px, -5vw, -30px) auto 30px auto !important;  /* even gentler negative — starts almost zero on mobile */
+    padding: clamp(80px, 12vw, 140px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;  /* more top padding = more space above text */
     background: rgba(0,0,0,0.42) !important;
     backdrop-filter: blur(10px) !important;
     border: clamp(4px, 2vw, 8px) solid #f7931a !important;
@@ -3444,7 +3443,7 @@ with gr.Blocks(
     width: 100% !important;
     position: relative !important;
     z-index: 1 !important;
-    overflow: visible !important;                                 /* prevent clipping */
+    overflow: visible !important;
 ">
 
   <!-- Reclaim (line 1) -->
