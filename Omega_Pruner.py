@@ -3765,6 +3765,23 @@ with gr.Blocks(
 ">
 
   <!-- Reclaim Sovereignty – smaller min, tighter spacing, word-break -->
+<div style="
+    text-align: center !important;
+    margin: clamp(40px, 12vw, 100px) auto 30px auto !important;  /* reduced top margin on mobile */
+    padding: clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;  /* tighter side padding */
+    background: rgba(0,0,0,0.42) !important;
+    backdrop-filter: blur(10px) !important;
+    border: clamp(4px, 2vw, 8px) solid #f7931a !important;  /* thinner border on mobile */
+    border-radius: clamp(16px, 5vw, 24px) !important;
+    box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
+    max-width: 95vw !important;  /* safer than 900px */
+    width: 100% !important;
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: hidden !important;  /* prevent any child overflow */
+">
+
+  <!-- Reclaim Sovereignty – smaller min, tighter spacing, word-break -->
   <div style="
       color: #ffcc00 !important;
       font-size: clamp(2.8rem, 11vw, 4.8rem) !important;  /* lower min & max – fits better */
