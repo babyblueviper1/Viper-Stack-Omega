@@ -5208,6 +5208,41 @@ No API calls • Fully air-gapped safe""",
                     </div>
                 </div>
 
+				<!-- Lightning (Bolt 12) -->
+        <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 180px;
+        ">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?data=lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c&size=300x300&color=0-255-136&bgcolor=0-0-0" 
+                 alt="Donate Lightning (Bolt 12)" 
+                 style="
+                     width: 180px;
+                     height: 180px;
+                     border: 2px solid #00ff88;
+                     border-radius: 12px;
+                     box-shadow: 0 0 20px rgba(0,255,136,0.5);
+                     max-width: 45vw;
+                 " />
+            <br>
+<small style="display: block; margin-top: 8px; word-break: break-all; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+    Lightning (Bolt 12 offer)
+    <button onclick="navigator.clipboard.writeText('lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c').then(() => {this.innerText='COPIED';setTimeout(()=>this.innerText='Copy',1500);})"
+            style="
+                background:none !important;
+                border:none !important;
+                color:#00ff88 !important;
+                cursor:pointer !important;
+                font-size:0.9rem !important;
+                margin-left:8px !important;
+                padding:0 !important;
+            ">
+        Copy
+    </button>
+</small>
+        </div>
+    </div>
                 <div style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
                     Thank you for supporting open-source Bitcoin tools. • Ω
                 </div>
