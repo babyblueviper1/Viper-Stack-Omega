@@ -3432,8 +3432,8 @@ with gr.Blocks(
 
 <div style="
     text-align: center !important;
-    margin: clamp(-10px, -5vw, -30px) auto 30px auto !important;  /* even gentler negative — starts almost zero on mobile */
-    padding: clamp(80px, 12vw, 140px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;  /* more top padding = more space above text */
+    margin: clamp(5px, 2vw, 15px) auto 30px auto !important;   /* positive small top margin = tiny breathing room above whole banner */
+    padding: clamp(50px, 8vw, 90px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;  /* reduced top padding = Reclaim & Sovereignty higher inside banner */
     background: rgba(0,0,0,0.42) !important;
     backdrop-filter: blur(10px) !important;
     border: clamp(4px, 2vw, 8px) solid #f7931a !important;
@@ -3446,7 +3446,7 @@ with gr.Blocks(
     overflow: visible !important;
 ">
 
-  <!-- Reclaim (line 1) -->
+  <!-- Reclaim (line 1) – now starts higher inside the banner -->
   <div class="hero-title" style="
       color: #ffcc00 !important;
       font-size: clamp(2.8rem, 11vw, 5.0rem) !important;
@@ -3457,14 +3457,14 @@ with gr.Blocks(
           0 0 100px #ffaa00,
           -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
           -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin-bottom: clamp(8px, 2vw, 15px) !important;
+      margin-bottom: clamp(6px, 1.8vw, 12px) !important;   /* slightly tighter vertical flow to Sovereignty */
       text-align: center !important;
       line-height: 1.0 !important;
   ">
     Reclaim
   </div>
 
-  <!-- Sovereignty (line 2) -->
+  <!-- Sovereignty (line 2) – closer to Reclaim and higher in banner -->
   <div class="hero-title" style="
       color: #ffcc00 !important;
       font-size: clamp(2.6rem, 10vw, 4.6rem) !important;
@@ -3475,7 +3475,7 @@ with gr.Blocks(
           0 0 100px #ffaa00,
           -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
           -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin-bottom: clamp(20px, 5vw, 40px) !important;
+      margin-bottom: clamp(15px, 4vw, 30px) !important;    /* reduced slightly for tighter overall stack */
       text-align: center !important;
       line-height: 1.0 !important;
   ">
