@@ -3432,22 +3432,19 @@ with gr.Blocks(
 
 <div style="
     text-align: center !important;
-    margin: -40px auto 30px auto !important;           /* ← Negative top margin pulls it up */
-    margin-top: calc(-1 * clamp(40px, 12vw, 100px)) !important;  /* ← Respect your clamp but negate it */
-    padding: clamp(40px, 6vw, 60px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;
+    margin: clamp(-20px, -8vw, -60px) auto 30px auto !important;  /* gentler negative pull */
+    padding-top: clamp(60px, 10vw, 100px) !important;             /* add internal top padding to compensate */
+    padding: clamp(60px, 10vw, 100px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;
     background: rgba(0,0,0,0.42) !important;
     backdrop-filter: blur(10px) !important;
     border: clamp(4px, 2vw, 8px) solid #f7931a !important;
-    border-top: none !important;                       /* ← Optional: remove top border if it looks odd */
     border-radius: clamp(16px, 5vw, 24px) !important;
-    border-top-left-radius: 0 !important;
-    border-top-right-radius: 0 !important;
     box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
     max-width: clamp(95vw, 95vw, 1200px) !important;
     width: 100% !important;
     position: relative !important;
     z-index: 1 !important;
-    overflow: hidden !important;
+    overflow: visible !important;                                 /* prevent clipping */
 ">
 
   <!-- Reclaim (line 1) -->
