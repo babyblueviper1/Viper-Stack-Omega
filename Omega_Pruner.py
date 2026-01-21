@@ -3432,8 +3432,8 @@ with gr.Blocks(
 
 <div style="
     text-align: center !important;
-    margin: clamp(8px, 2.5vw, 20px) auto 30px auto !important;   /* small positive top margin = clean breathing room above whole banner */
-    padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;  /* reduced top padding = Reclaim & Sovereignty much higher inside banner */
+    margin: clamp(8px, 2.5vw, 20px) auto 30px auto !important;
+    padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;
     background: rgba(0,0,0,0.42) !important;
     backdrop-filter: blur(10px) !important;
     border: clamp(4px, 2vw, 8px) solid #f7931a !important;
@@ -3446,51 +3446,37 @@ with gr.Blocks(
     overflow: visible !important;
 ">
 
-  <!-- Reclaim (line 1) – now starts higher inside the banner -->
+  <!-- Reclaim Sovereignty – one line on desktop, natural break on mobile -->
   <div style="
       color: #ffcc00 !important;
-      font-size: clamp(2.8rem, 11vw, 5.0rem) !important;
+      font-size: clamp(2.8rem, 11vw, 5.2rem) !important;
       font-weight: 900 !important;
-      letter-spacing: clamp(3px, 2vw, 12px) !important;
+      letter-spacing: clamp(3px, 2vw, 14px) !important;
       text-shadow: 
           0 0 50px #ffcc00,
           0 0 100px #ffaa00,
+          0 0 150px rgba(255,204,0,0.9),
           -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
           -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin-bottom: clamp(4px, 1.2vw, 8px) !important;   /* very tight vertical flow to Sovereignty */
+      margin-bottom: clamp(20px, 5vw, 40px) !important;
       text-align: center !important;
       line-height: 1.0 !important;
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
   ">
-    Reclaim
-  </div>
-
-  <!-- Sovereignty (line 2) – now even closer to Reclaim and higher overall -->
-  <div style="
-      color: #ffcc00 !important;
-      font-size: clamp(2.6rem, 10vw, 4.6rem) !important;
-      font-weight: 900 !important;
-      letter-spacing: clamp(3px, 2vw, 12px) !important;
-      text-shadow: 
-          0 0 50px #ffcc00,
-          0 0 100px #ffaa00,
-          -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
-          -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin-bottom: clamp(12px, 3.5vw, 25px) !important;  /* slightly reduced for tighter stack */
-      text-align: center !important;
-      line-height: 1.0 !important;
-  ">
-    Sovereignty
+    Reclaim Sovereignty
   </div>
 
   <!-- ΩMEGA PRUNER -->
-  <div class="hero-title" style="
+  <div style="
       color: #e65c00 !important;
-      font-size: clamp(2.4rem, 9vw, 4.2rem) !important;
+      font-size: clamp(2.4rem, 9vw, 4.8rem) !important;
       font-weight: 900 !important;
-      letter-spacing: clamp(2px, 1.5vw, 9px) !important;
+      letter-spacing: clamp(2px, 1.5vw, 12px) !important;
       text-shadow: 
           0 0 25px #e65c00,
           0 0 50px #c94a00,
+          0 0 75px rgba(230,92,0,0.7),
           -2px -2px 0 #000000, 2px -2px 0 #000000,
           -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
       margin-bottom: clamp(30px, 6vw, 50px) !important;
@@ -3500,12 +3486,12 @@ with gr.Blocks(
   </div>
 
   <!-- NUCLEAR COIN CONTROL -->
-  <div class="hero-subtitle" style="
+  <div style="
       color: #0f0 !important;
-      font-size: clamp(1.8rem, 7vw, 2.8rem) !important;
+      font-size: clamp(1.8rem, 7vw, 3.2rem) !important;
       font-weight: 900 !important;
       letter-spacing: clamp(3px, 1.2vw, 6px) !important;
-      text-shadow: 0 0 30px #0f0, 0 0 60px #0f0;
+      text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
       margin: clamp(20px, 5vw, 35px) 0 !important;
       text-align: center !important;
   ">
@@ -3524,7 +3510,7 @@ with gr.Blocks(
     FORGED ANEW — v11
   </div>
 
-  <!-- Body text (unchanged) -->
+  <!-- Body text -->
   <div style="
       color:#ddd !important;
       font-size: clamp(1.1rem, 3.8vw, 1.4rem) !important;
@@ -3550,7 +3536,7 @@ with gr.Blocks(
     Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
   </div>
 
-  <!-- Down arrow (unchanged) -->
+  <!-- Down arrow -->
   <div style="
       font-size: clamp(2.5rem, 7vw, 4rem) !important;
       color:#f7931a !important;
@@ -3562,32 +3548,6 @@ with gr.Blocks(
     ↓
   </div>
 </div>
-
-<!-- Desktop font boost (media query) -->
-<style>
-  @media (min-width: 1024px) {
-    .hero-title {
-      font-size: clamp(4.5rem, 9vw, 7.5rem) !important;  /* Much bigger on desktop */
-      letter-spacing: clamp(6px, 1.2vw, 18px) !important;
-    }
-    
-    .hero-subtitle {
-      font-size: clamp(2.8rem, 5vw, 4.2rem) !important;
-      letter-spacing: clamp(5px, 0.8vw, 10px) !important;
-    }
-    
-    /* Optional: make body text a bit larger too on big screens */
-    div[style*="font-size: clamp(1.1rem"] {
-      font-size: clamp(1.3rem, 2.2vw, 1.8rem) !important;
-    }
-  }
-
-  @media (min-width: 1440px) {
-    .hero-title {
-      font-size: clamp(6rem, 8vw, 9rem) !important;  /* Even bigger on ultra-wide */
-    }
-  }
-</style>
 	
       <style>
     @keyframes pulse {
