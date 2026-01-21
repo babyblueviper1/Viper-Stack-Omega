@@ -872,12 +872,8 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
     if input_count <= 1:
         return ""
 
-    # Estimate recovery difficulty (used only as guidance, not a promise)
-    min_mixes, max_mixes = estimate_coinjoin_mixes_needed(
-        input_count, distinct_addrs, privacy_score
-    )
+    min_mixes, max_mixes = estimate_coinjoin_mixes_needed(input_count, distinct_addrs, privacy_score)
 
-    # Recovery guidance — shown when privacy is meaningfully impacted
     recovery_note = ""
     if privacy_score <= 70:
         recovery_note = f"""
@@ -890,7 +886,7 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
             color:#aaffcc !important;
             font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
             line-height:1.6 !important;
-            box-shadow:0 0 40px rgba(0,255,136,0.4) !important;  /* ← matched green glow */
+            box-shadow:0 0 40px rgba(0,255,136,0.4) !important;
         ">
             💧 <span style="
                 color:#00ffdd !important;
@@ -900,11 +896,10 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
             ">Recovery Plan</span>:<br>
             Break address linkage using transactions that involve other participants<br>
             <small style="color:#88ffcc !important;">
-                (~{min_mixes}–{max_mixes} coordinated rounds are typically needed,
-                depending on method and wallet support)
+                (~{min_mixes}–{max_mixes} coordinated rounds typically needed)
             </small><br>
             <small style="color:#66ffaa !important;">
-                Examples include CoinJoin-style transactions (e.g. Whirlpool)
+                Examples: CoinJoin (Whirlpool), PayJoin, Silent Payments
             </small>
         </div>
         """
@@ -923,40 +918,25 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
             line-height:1.7 !important;
             color:#ffcccc !important;
         ">
-            <div style="
-                color:#ff3366 !important;
-                font-size:clamp(1.3rem, 5vw, 1.6rem) !important;
-                font-weight:900 !important;
-                text-shadow:0 0 30px #ff3366 !important;
-            ">
+            <div style="color:#ff3366 !important; font-size:clamp(1.3rem, 5vw, 1.6rem) !important; font-weight:900 !important; text-shadow:0 0 30px #ff3366 !important;">
                 EXTREME CIOH LINKAGE
             </div><br>
-
             <div style="color:#ff6688 !important; font-size:clamp(1rem, 3.5vw, 1.2rem)!important;">
                 Common Input Ownership Heuristic (CIOH)
             </div><br>
-
             This consolidation strongly proves common ownership of many inputs and addresses.<br><br>
-
-            <div style="color:#ffaaaa !important;">
-                Privacy state: Severely compromised
-            </div><br>
-
-            Maximum fee efficiency — but analysts will confidently cluster these addresses as yours.
-            <br><br>
-
+            <div style="color:#ffaaaa !important;">Privacy state: Severely compromised</div><br>
+            Maximum fee efficiency — but analysts will confidently cluster these addresses as yours.<br><br>
             <div style="color:#ffbbbb !important;">
                 <span style="font-weight:900 !important;">Best practices after this point:</span><br>
                 • Do not consolidate these addresses again<br>
                 • Avoid direct spending to KYC or identity-linked services<br>
                 • Restore privacy only via transactions involving other participants
             </div>
-
             <div style="margin-top:10px;color:#ff9999 !important;font-size:0.95em;">
                 Examples include CoinJoin, PayJoin, or Silent Payments —
                 which require wallet support or coordination and cannot be added after the fact.
             </div>
-
             {recovery_note}
         </div>
         """
@@ -974,29 +954,16 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
             line-height:1.6 !important;
             color:#ffddaa !important;
         ">
-            <div style="
-                color:#ff9900 !important;
-                font-size:clamp(1.3rem, 5vw, 1.6rem) !important;
-                font-weight:900 !important;
-                text-shadow:0 0 30px #ff9900 !important;
-            ">
+            <div style="color:#ff9900 !important; font-size:clamp(1.3rem, 5vw, 1.6rem) !important; font-weight:900 !important; text-shadow:0 0 30px #ff9900 !important;">
                 HIGH CIOH RISK
             </div><br>
-
             <div style="color:#ffaa44 !important; font-size:clamp(1rem, 3.5vw, 1.2rem)!important;">
                 Common Input Ownership Heuristic (CIOH)
             </div><br>
-
-            Merging {input_count} inputs from {distinct_addrs} address(es) →
-            analysts will cluster them as belonging to the same entity.<br><br>
-
-            <div style="color:#ffcc88 !important;">
-                Privacy state: Significantly reduced
-            </div><br>
-
+            Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as belonging to the same entity.<br><br>
+            <div style="color:#ffcc88 !important;">Privacy state: Significantly reduced</div><br>
             Good fee savings, but a real privacy trade-off.<br>
             Further consolidation will worsen linkage — consider restoring privacy before your next spend.
-
             {recovery_note}
         </div>
         """
@@ -1014,57 +981,52 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
             font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
             line-height:1.6 !important;
         ">
-            <div style="
-                color:#00ff9d !important;
-                font-size:clamp(1.3rem, 5vw, 1.6rem)!important;
-                font-weight:900 !important;
-                text-shadow:0 0 30px #00ff9d !important;
-            ">
+            <div style="color:#00ff9d !important; font-size:clamp(1.3rem, 5vw, 1.6rem)!important; font-weight:900 !important; text-shadow:0 0 30px #00ff9d !important;">
                 MODERATE CIOH
             </div><br>
-
             <div style="color:#66ffaa !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem)!important;">
                 Common Input Ownership Heuristic (CIOH)
             </div><br>
-
             Spending multiple inputs together creates some on-chain linkage.<br>
             Analysts may assume common ownership — but it is not definitive.<br><br>
-
-            Privacy impact is moderate.
+            Privacy impact is moderate.<br>
             Avoid repeating this pattern if long-term privacy is a priority.
-
             {recovery_note}
         </div>
         """
 
-    # LOW CIOH
+    # LOW CIOH — now with light green box for consistency
     else:
         return f"""
         <div style="
             margin-top:10px !important;
-            color:#aaffaa !important;
+            padding:12px !important;
+            background:#001a00 !important;           /* very dark green, subtle */
+            border:1px solid #00ff88 !important;     /* light green border */
+            border-radius:10px !important;
+            color:#aaffcc !important;
             font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
-            line-height:1.5 !important;
+            line-height:1.6 !important;
+            box-shadow:0 0 20px rgba(0,255,136,0.2) !important;  /* soft green glow */
         ">
             <div style="
                 color:#00ffdd !important;
-                font-size:clamp(1.3rem, 5vw, 1.6rem) !important;
+                font-size:clamp(1.3rem, 4vw, 1.6rem) !important;
                 font-weight:900 !important;
-                text-shadow:0 0 30px #00ffdd !important;
+                text-shadow:0 0 20px #00ffdd !important;
             ">
                 LOW CIOH IMPACT
             </div><br>
-
             <span style="color:#00ffdd !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem)!important;">
                 (Common Input Ownership Heuristic)
             </span><br><br>
-
             Few inputs spent together — minimal new linkage created.<br>
             Address separation remains strong.<br>
             Privacy preserved.
+            {recovery_note}  <!-- now included if score barely >70 but still has note -->
         </div>
         """
-
+		
 def estimate_coinjoin_mixes_needed(input_count: int, distinct_addrs: int, privacy_score: int) -> tuple[int, int]:
     if privacy_score > 80:
         return 0, 1    # Truly minimal linkage
