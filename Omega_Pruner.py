@@ -3746,25 +3746,27 @@ with gr.Blocks(
     z-index: 1 !important;
     overflow: hidden !important;
 ">
-
-  <!-- Reclaim Sovereignty – brightest, white outline -->
-  <div style="
-      color: #ffcc00 !important;
-      font-size: clamp(2.8rem, 11vw, 4.8rem) !important;
-      font-weight: 900 !important;
-      letter-spacing: clamp(2px, 1.8vw, 10px) !important;
-      text-shadow: 
-          0 0 40px #ffcc00,
-          0 0 80px #ffaa00,
-          -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
-          -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin-bottom: clamp(20px, 5vw, 40px) !important;
-      text-align: center !important;
-      word-break: break-word !important;
-      line-height: 1.1 !important;
-      padding: 0 clamp(10px, 3vw, 20px) !important;
-  ">
-    Reclaim Sovereignty
+<!-- Reclaim Sovereignty – smaller on narrow screens to avoid wrap -->
+<div style="
+    color: #ffcc00 !important;
+    font-size: clamp(2.4rem, 9.5vw, 4.8rem) !important;  /* lower min (2.4rem) fits 320px phones */
+    font-weight: 900 !important;
+    letter-spacing: clamp(0.5px, 1vw, 10px) !important;  /* extremely tight on mobile */
+    text-shadow: 
+        0 0 40px #ffcc00,
+        0 0 80px #ffaa00,
+        -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
+        -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
+    margin-bottom: clamp(20px, 5vw, 40px) !important;
+    text-align: center !important;
+    line-height: 1.05 !important;                /* tight vertical fit */
+    padding: 0 clamp(8px, 2.5vw, 15px) !important;  /* side breathing room */
+    word-wrap: normal !important;                /* prevent forced wrap */
+    white-space: nowrap !important;              /* force single line */
+    overflow: hidden !important;                 /* hide overflow if desperate */
+    text-overflow: ellipsis !important;          /* subtle fallback ellipsis if still too long */
+">
+  Reclaim Sovereignty
   </div>
 
   <!-- ΩMEGA PRUNER – deeper red-orange, black outline -->
