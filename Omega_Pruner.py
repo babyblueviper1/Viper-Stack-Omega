@@ -5039,31 +5039,33 @@ No API calls • Fully air-gapped safe""",
     ">
         Thank you for supporting open-source Bitcoin tools. • Ω
     </div>
-
-    <!-- TAGLINE -->
-    <div style="
-        margin-top: clamp(30px, 6vw, 50px);
-        text-align: center;
-        isolation: isolate;
-    ">
-        <span style="
-            color: #00ff00 !important;
-            font-size: clamp(0.95rem, 3.8vw, 1.15rem) !important;
-            font-weight: 800;
-            letter-spacing: 0.6px;
-            text-shadow:
-                0 0 15px #00ff00,
-                0 0 30px #00ff00,
-                0 0 6px #000,
-                0 4px 10px #000,
-                0 8px 20px #000000e6;
-            opacity: 1 !important;
-            filter: none !important;
-        ">
-            Prune smarter. Win forever. • Ω
-        </span>
-    </div>
 </div>
+
+<!-- TAGLINE (outside support box, inside footer) -->
+<div style="
+    margin-top: clamp(40px, 8vw, 70px);
+    text-align: center;
+    isolation: isolate;
+">
+    <span style="
+        color: #00ff00 !important;
+        font-size: clamp(0.95rem, 3.8vw, 1.15rem) !important;
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        text-shadow:
+            0 0 15px #00ff00,
+            0 0 30px #00ff00,
+            0 0 6px #000,
+            0 4px 10px #000,
+            0 8px 20px #000000e6;
+        opacity: 1 !important;
+        filter: none !important;
+    ">
+        Prune smarter. Win forever. • Ω
+    </span>
+</div>
+
+</div> <!-- END FOOTER -->
 """,
     elem_id="omega_footer",
 )
