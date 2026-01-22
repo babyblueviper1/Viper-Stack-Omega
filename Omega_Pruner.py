@@ -4890,118 +4890,144 @@ No API calls • Fully air-gapped safe""",
                 On-chain Bitcoin
             </div>
 
-      <div style="
-    display: block;
-    font-family: monospace;
-    max-width: 180px;
-    font-size: 0.9rem;
-    color: #ffffff !important;
-    opacity: 1 !important;
-    filter: none !important;
-    isolation: isolate;
-">
+            <div style="
+                display: block;
+                font-family: monospace;
+                max-width: 180px;
+                font-size: 0.9rem;
+                color: #ffffff !important;
+                opacity: 1 !important;
+                filter: none !important;
+                isolation: isolate;
+            ">
+                <span style="
+                    display: inline-block;
+                    max-width: 130px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    vertical-align: bottom;
+                    color: #ffffff !important;
+                    opacity: 1 !important;
+                    text-decoration: none !important;
+                    filter: none !important;
+                ">
+                    bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+                </span>
 
-    <span style="
-        display: inline-block;
-        max-width: 130px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        vertical-align: bottom;
-        color: #ffffff !important;
-        opacity: 1 !important;
-        text-decoration: none !important;
-        filter: none !important;
-    ">
-        bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
-    </span>
-
-    <button
-        onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {
-            this.innerText='COPIED';
-            this.style.color='#00ff88';
-            this.style.fontWeight='900';
-            this.style.textShadow='0 0 10px #00ff88';
-            setTimeout(() => {
-                this.innerText='Copy';
-                this.style.color='#f7931a';
-                this.style.fontWeight='normal';
-                this.style.textShadow='none';
-            }, 1500);
-        })"
-        style="
-            background:none !important;
-            border:none !important;
-            color:#f7931a !important;
-            cursor:pointer !important;
-            font-size:0.9rem !important;
-            margin-left:8px !important;
-            padding:0 !important;
-            line-height:1.4 !important;
-            opacity:1 !important;
-        "
-    >
-        Copy
-    </button>
-</div>
+                <button
+                    onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {
+                        this.innerText='COPIED';
+                        this.style.color='#00ff88';
+                        this.style.fontWeight='900';
+                        this.style.textShadow='0 0 10px #00ff88';
+                        setTimeout(() => {
+                            this.innerText='Copy';
+                            this.style.color='#f7931a';
+                            this.style.fontWeight='normal';
+                            this.style.textShadow='none';
+                        }, 1500);
+                    })"
+                    style="
+                        background:none !important;
+                        border:none !important;
+                        color:#f7931a !important;
+                        cursor:pointer !important;
+                        font-size:0.9rem !important;
+                        margin-left:8px !important;
+                        padding:0 !important;
+                        line-height:1.4 !important;
+                        opacity:1 !important;
+                    "
+                >
+                    Copy
+                </button>
+            </div>
         </div>
 
         <!-- Lightning -->
-<div style="
-    display: block;
-    font-family: monospace;
-    max-width: 180px;
-    font-size: 0.9rem;
-    color: #ffffff !important;
-    opacity: 1 !important;
-    filter: none !important;
-    isolation: isolate;
-">
+        <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 180px;
+        ">
+            <img
+                src="https://api.qrserver.com/v1/create-qr-code/?data=lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c&size=300x300&color=0-255-136&bgcolor=0-0-0"
+                alt="Donate Lightning (Bolt 12)"
+                style="
+                    width: 180px;
+                    height: 180px;
+                    border: 2px solid #00ff88;
+                    border-radius: 12px;
+                    box-shadow: 0 0 20px rgba(0,255,136,0.5);
+                    max-width: 45vw;
+                "
+            />
 
-    <span style="
-        display: inline-block;
-        max-width: 130px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        vertical-align: bottom;
-        color: #ffffff !important;
-        opacity: 1 !important;
-        text-decoration: none !important;
-        filter: none !important;
-    ">
-        lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c
-    </span>
+            <div style="
+                font-weight: 700;
+                color: #00ff88 !important;
+                margin: 8px 0 6px 0;
+                font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+            ">
+                Lightning (Bolt 12)
+            </div>
 
-    <button
-        onclick="navigator.clipboard.writeText('lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c').then(() => {
-            this.innerText='COPIED';
-            this.style.color='#f7931a';
-            this.style.fontWeight='900';
-            this.style.textShadow='0 0 10px #f7931a';
-            setTimeout(() => {
-                this.innerText='Copy';
-                this.style.color='#00ff88';
-                this.style.fontWeight='normal';
-                this.style.textShadow='none';
-            }, 1500);
-        })"
-        style="
-            background:none !important;
-            border:none !important;
-            color:#00ff88 !important;
-            cursor:pointer !important;
-            font-size:0.9rem !important;
-            margin-left:8px !important;
-            padding:0 !important;
-            line-height:1.4 !important;
-            opacity:1 !important;
-        "
-    >
-        Copy
-    </button>
-</div>
+            <div style="
+                display: block;
+                font-family: monospace;
+                max-width: 180px;
+                font-size: 0.9rem;
+                color: #ffffff !important;
+                opacity: 1 !important;
+                filter: none !important;
+                isolation: isolate;
+            ">
+                <span style="
+                    display: inline-block;
+                    max-width: 130px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    vertical-align: bottom;
+                    color: #ffffff !important;
+                    opacity: 1 !important;
+                    text-decoration: none !important;
+                    filter: none !important;
+                ">
+                    lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c
+                </span>
 
+                <button
+                    onclick="navigator.clipboard.writeText('lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c').then(() => {
+                        this.innerText='COPIED';
+                        this.style.color='#f7931a';
+                        this.style.fontWeight='900';
+                        this.style.textShadow='0 0 10px #f7931a';
+                        setTimeout(() => {
+                            this.innerText='Copy';
+                            this.style.color='#00ff88';
+                            this.style.fontWeight='normal';
+                            this.style.textShadow='none';
+                        }, 1500);
+                    })"
+                    style="
+                        background:none !important;
+                        border:none !important;
+                        color:#00ff88 !important;
+                        cursor:pointer !important;
+                        font-size:0.9rem !important;
+                        margin-left:8px !important;
+                        padding:0 !important;
+                        line-height:1.4 !important;
+                        opacity:1 !important;
+                    "
+                >
+                    Copy
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Footer line -->
@@ -5014,6 +5040,7 @@ No API calls • Fully air-gapped safe""",
         Thank you for supporting open-source Bitcoin tools. • Ω
     </div>
 </div>
+
         """,
         elem_id="omega_footer",
     )
