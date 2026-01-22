@@ -3461,7 +3461,7 @@ with gr.Blocks(
             -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
             -2px  2px 0 #ffffff, 2px  2px 0 #ffffff;
         line-height: 1;
-        margin: 0 auto 4px auto;
+        margin: 0 auto clamp(24px, 5vw, 40px) auto;
         transform: translateX(-0.03em); /* optical centering */
     ">
       Reclaim Sovereignty
