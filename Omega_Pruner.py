@@ -3446,32 +3446,33 @@ with gr.Blocks(
     overflow: visible !important;
 ">
 
-  <!-- Reclaim Sovereignty – dead-center, no shift -->
+  <!-- Reclaim Sovereignty – dead-center, no right shift -->
   <div style="
       color: #ffcc00 !important;
       font-size: clamp(2.8rem, 11vw, 5.2rem) !important;
       font-weight: 900 !important;
-      letter-spacing: clamp(2px, 1.8vw, 12px) !important;  /* slightly reduced on mobile to help centering feel */
+      letter-spacing: clamp(2px, 1.8vw, 12px) !important;
       text-shadow: 
           0 0 50px #ffcc00,
           0 0 100px #ffaa00,
           0 0 150px rgba(255,204,0,0.9),
           -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
           -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin: 0 auto clamp(5px, 1.5vw, 12px) auto !important;  /* very tight below – minimal gap to ΩMEGA PRUNER */
+      margin: 0 auto clamp(3px, 1vw, 10px) auto !important;  /* very tight below – minimal gap to ΩMEGA PRUNER */
       text-align: center !important;
       line-height: 1.0 !important;
       white-space: pre-wrap !important;
       word-break: break-word !important;
       display: block !important;
       width: fit-content !important;
+      max-width: 100% !important;                /* prevents overflow push */
       margin-left: auto !important;
       margin-right: auto !important;
   ">
     Reclaim Sovereignty
   </div>
 
-  <!-- ΩMEGA PRUNER – pulled up close to headline -->
+  <!-- ΩMEGA PRUNER – pulled up very close to headline -->
   <div style="
       color: #e65c00 !important;
       font-size: clamp(2.4rem, 9vw, 4.8rem) !important;
@@ -3483,7 +3484,7 @@ with gr.Blocks(
           0 0 75px rgba(230,92,0,0.7),
           -2px -2px 0 #000000, 2px -2px 0 #000000,
           -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
-      margin: clamp(5px, 2vw, 15px) auto clamp(30px, 6vw, 50px) auto !important;  /* very small top margin = closer to headline -->
+      margin: clamp(3px, 1.5vw, 12px) auto clamp(30px, 6vw, 50px) auto !important;  /* very small top margin = super close to headline -->
       text-align: center !important;
   ">
     ΩMEGA PRUNER
