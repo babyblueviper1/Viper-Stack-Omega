@@ -4827,7 +4827,7 @@ No API calls • Fully air-gapped safe""",
                 </a>
             </div>
 
-<!-- Donation section – centered QRs + copy buttons (fixed) -->
+<!-- Donation section – centered QRs + copy buttons (FINAL FIXED) -->
 <div style="
     text-align: center !important;
     margin: clamp(40px, 10vw, 80px) auto 60px auto !important;
@@ -4847,9 +4847,9 @@ No API calls • Fully air-gapped safe""",
         ">
             Support Ωmega Pruner
         </strong><br>
-        <small style="color:#ccc !important;">
+        <span style="color:#ccc !important;">
             If this tool saved you sats or helped your stack — any amount appreciated.
-        </small>
+        </span>
     </div>
 
     <!-- QR row -->
@@ -4890,11 +4890,12 @@ No API calls • Fully air-gapped safe""",
                 On-chain Bitcoin
             </div>
 
-            <small style="
+            <div style="
                 display: block;
                 font-family: monospace;
                 max-width: 180px;
-                color: #ddd !important;
+                color: #f0f0f0 !important;
+                font-size: 0.9rem;
             ">
                 <span style="
                     display: inline-block;
@@ -4933,7 +4934,7 @@ No API calls • Fully air-gapped safe""",
                 >
                     Copy
                 </button>
-            </small>
+            </div>
         </div>
 
         <!-- Lightning -->
@@ -4965,11 +4966,12 @@ No API calls • Fully air-gapped safe""",
                 Lightning (Bolt 12)
             </div>
 
-            <small style="
+            <div style="
                 display: block;
                 font-family: monospace;
                 max-width: 180px;
-                color: #ddd !important;
+                color: #f0f0f0 !important;
+                font-size: 0.9rem;
             ">
                 <span style="
                     display: inline-block;
@@ -5008,7 +5010,7 @@ No API calls • Fully air-gapped safe""",
                 >
                     Copy
                 </button>
-            </small>
+            </div>
         </div>
     </div>
 
