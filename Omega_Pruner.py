@@ -4069,8 +4069,7 @@ tr:has(.health-nested) input[type="checkbox"] {
                   font-size: clamp(1rem, 3.8vw, 1.2rem) !important;
                   line-height:1.7 !important;
               ">
-                Fully offline operation — no API calls, perfect for cold wallets.<br><br>
-                Paste raw UTXOs manually below.
+                Fully offline operation — no API calls, perfect for cold wallets.
               </div>
             </div>
             """
