@@ -3420,8 +3420,8 @@ with gr.Blocks(
                 background-clip: text;
                 color: transparent;
                 text-shadow:
-                  0 0 80px rgba(247,147,26,0.55),
-                  0 0 140px rgba(247,147,26,0.35);
+                    0 0 80px rgba(247,147,26,0.55),
+                    0 0 140px rgba(247,147,26,0.35);
                 animation: omega-breath 28s infinite ease-in-out;
                 user-select: none;
                 line-height: 1;
@@ -3430,129 +3430,128 @@ with gr.Blocks(
         </span>
     </div>
 
-<div style="
-    text-align: center !important;
-    margin: clamp(8px, 2.5vw, 20px) auto 30px auto !important;
-    padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;
-    background: rgba(0,0,0,0.42) !important;
-    backdrop-filter: blur(10px) !important;
-    border: clamp(4px, 2vw, 8px) solid #f7931a !important;
-    border-radius: clamp(16px, 5vw, 24px) !important;
-    box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
-    max-width: clamp(95vw, 95vw, 1200px) !important;
-    width: 100% !important;
-    position: relative !important;
-    z-index: 1 !important;
-    overflow: visible !important;
-">
+    <div style="
+        text-align: center !important;
+        margin: clamp(8px, 2.5vw, 20px) auto 30px auto !important;
+        padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px) clamp(15px, 4vw, 30px) !important;
+        background: rgba(0,0,0,0.42) !important;
+        backdrop-filter: blur(10px) !important;
+        border: clamp(4px, 2vw, 8px) solid #f7931a !important;
+        border-radius: clamp(16px, 5vw, 24px) !important;
+        box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08) !important;
+        max-width: clamp(95vw, 95vw, 1200px) !important;
+        width: 100% !important;
+        position: relative !important;
+        z-index: 1 !important;
+        overflow: visible !important;
+    ">
 
-  <!-- Reclaim Sovereignty – dead-center, no right shift -->
-  <div style="
-      color: #ffcc00 !important;
-      font-size: clamp(2.8rem, 11vw, 5.2rem) !important;
-      font-weight: 900 !important;
-      letter-spacing: clamp(2px, 1.8vw, 12px) !important;
-      text-shadow: 
-          0 0 50px #ffcc00,
-          0 0 100px #ffaa00,
-          0 0 150px rgba(255,204,0,0.9),
-          -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
-          -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-      margin: 0 auto clamp(3px, 1vw, 10px) auto !important;  /* very tight below – minimal gap to ΩMEGA PRUNER */
-      text-align: center !important;
-      line-height: 1.0 !important;
-      white-space: pre-wrap !important;
-      word-break: break-word !important;
-      display: block !important;
-      width: fit-content !important;
-      max-width: 100% !important;                /* prevents overflow push */
-      margin-left: auto !important;
-      margin-right: auto !important;
-  ">
-    Reclaim Sovereignty
-  </div>
+      <!-- Reclaim Sovereignty – bullet-proof centered -->
+      <div style="
+          color: #ffcc00 !important;
+          font-size: clamp(2.8rem, 11vw, 5.2rem) !important;
+          font-weight: 900 !important;
+          letter-spacing: clamp(2px, 1.8vw, 12px) !important;
+          text-shadow: 
+              0 0 50px #ffcc00,
+              0 0 100px #ffaa00,
+              0 0 150px rgba(255,204,0,0.9),
+              -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
+              -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
+          margin: 0 auto clamp(2px, 1vw, 8px) auto !important;
+          text-align: center !important;
+          line-height: 1.0 !important;
+          white-space: pre-wrap !important;
+          word-break: break-word !important;
+          display: inline-block !important;
+          position: relative !important;
+          left: 50% !important;
+          transform: translateX(-50%) !important;
+      ">
+        Reclaim Sovereignty
+      </div>
 
-  <!-- ΩMEGA PRUNER – pulled up very close to headline -->
-  <div style="
-      color: #e65c00 !important;
-      font-size: clamp(2.4rem, 9vw, 4.8rem) !important;
-      font-weight: 900 !important;
-      letter-spacing: clamp(2px, 1.5vw, 12px) !important;
-      text-shadow: 
-          0 0 25px #e65c00,
-          0 0 50px #c94a00,
-          0 0 75px rgba(230,92,0,0.7),
-          -2px -2px 0 #000000, 2px -2px 0 #000000,
-          -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
-      margin: clamp(3px, 1.5vw, 12px) auto clamp(30px, 6vw, 50px) auto !important;  /* very small top margin = super close to headline -->
-      text-align: center !important;
-  ">
-    ΩMEGA PRUNER
-  </div>
+      <!-- ΩMEGA PRUNER – pulled up very close -->
+      <div style="
+          color: #e65c00 !important;
+          font-size: clamp(2.4rem, 9vw, 4.8rem) !important;
+          font-weight: 900 !important;
+          letter-spacing: clamp(2px, 1.5vw, 12px) !important;
+          text-shadow: 
+              0 0 25px #e65c00,
+              0 0 50px #c94a00,
+              0 0 75px rgba(230,92,0,0.7),
+              -2px -2px 0 #000000, 2px -2px 0 #000000,
+              -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
+          margin: clamp(2px, 1vw, 8px) auto clamp(30px, 6vw, 50px) auto !important;
+          text-align: center !important;
+      ">
+        ΩMEGA PRUNER
+      </div>
 
-  <!-- NUCLEAR COIN CONTROL -->
-  <div style="
-      color: #0f0 !important;
-      font-size: clamp(1.8rem, 7vw, 3.2rem) !important;
-      font-weight: 900 !important;
-      letter-spacing: clamp(3px, 1.2vw, 6px) !important;
-      text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
-      margin: clamp(20px, 5vw, 35px) 0 !important;
-      text-align: center !important;
-  ">
-    NUCLEAR COIN CONTROL
-  </div>
+      <!-- NUCLEAR COIN CONTROL -->
+      <div style="
+          color: #0f0 !important;
+          font-size: clamp(1.8rem, 7vw, 3.2rem) !important;
+          font-weight: 900 !important;
+          letter-spacing: clamp(3px, 1.2vw, 6px) !important;
+          text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
+          margin: clamp(20px, 5vw, 35px) 0 !important;
+          text-align: center !important;
+      ">
+        NUCLEAR COIN CONTROL
+      </div>
 
-  <!-- Version -->
-  <div style="
-      color: #00ffaa !important;
-      font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
-      letter-spacing: clamp(1px, 0.8vw, 3px) !important;
-      text-shadow: 0 0 12px #00ffaa;
-      margin: clamp(15px, 4vw, 25px) 0 !important;
-      text-align: center !important;
-  ">
-    FORGED ANEW — v11
-  </div>
+      <!-- Version -->
+      <div style="
+          color: #00ffaa !important;
+          font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
+          letter-spacing: clamp(1px, 0.8vw, 3px) !important;
+          text-shadow: 0 0 12px #00ffaa;
+          margin: clamp(15px, 4vw, 25px) 0 !important;
+          text-align: center !important;
+      ">
+        FORGED ANEW — v11
+      </div>
 
-  <!-- Body text -->
-  <div style="
-      color:#ddd !important;
-      font-size: clamp(1.1rem, 3.8vw, 1.4rem) !important;
-      line-height: 1.6 !important;
-      max-width: 90vw !important;
-      margin: clamp(30px, 6vw, 45px) auto !important;
-      padding: 0 clamp(10px, 3vw, 20px) !important;
-      text-align: center !important;
-      word-break: break-word !important;
-  ">
-    Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
-    <strong style="color:#0f0 !important;">full strategic control</strong> of your Bitcoin.<br><br>
-    
-    By pruning inefficient UTXOs, you:<br>
-    • <strong style="color:#00ff9d !important;">Slash fees</strong> during high-congestion periods<br>
-    • <strong style="color:#00ff9d !important;">Reduce future costs</strong> with a cleaner UTXO set<br>
-    • <strong style="color:#00ff9d !important;">Optimize your stack</strong> for speed, savings and privacy<br><br>
+      <!-- Body text -->
+      <div style="
+          color:#ddd !important;
+          font-size: clamp(1.1rem, 3.8vw, 1.4rem) !important;
+          line-height: 1.6 !important;
+          max-width: 90vw !important;
+          margin: clamp(30px, 6vw, 45px) auto !important;
+          padding: 0 clamp(10px, 3vw, 20px) !important;
+          text-align: center !important;
+          word-break: break-word !important;
+      ">
+        Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
+        <strong style="color:#0f0 !important;">full strategic control</strong> of your Bitcoin.<br><br>
+        
+        By pruning inefficient UTXOs, you:<br>
+        • <strong style="color:#00ff9d !important;">Slash fees</strong> during high-congestion periods<br>
+        • <strong style="color:#00ff9d !important;">Reduce future costs</strong> with a cleaner UTXO set<br>
+        • <strong style="color:#00ff9d !important;">Optimize your stack</strong> for speed, savings and privacy<br><br>
 
-    <strong style="color:#f7931a !important;font-size: clamp(1.3rem, 4.5vw, 1.7rem) !important;font-weight:900 !important;letter-spacing:1px !important;">
-      Prune smarter. Win forever.
-    </strong><br><br>
-    
-    Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
-  </div>
+        <strong style="color:#f7931a !important;font-size: clamp(1.3rem, 4.5vw, 1.7rem) !important;font-weight:900 !important;letter-spacing:1px !important;">
+          Prune smarter. Win forever.
+        </strong><br><br>
+        
+        Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
+      </div>
 
-  <!-- Down arrow -->
-  <div style="
-      font-size: clamp(2.5rem, 7vw, 4rem) !important;
-      color:#f7931a !important;
-      opacity:0.9;
-      animation:pulse 2s infinite;
-      text-align:center !important;
-      margin-top: clamp(20px, 5vw, 40px) !important;
-  ">
-    ↓
-  </div>
-</div>
+      <!-- Down arrow -->
+      <div style="
+          font-size: clamp(2.5rem, 7vw, 4rem) !important;
+          color:#f7931a !important;
+          opacity:0.9;
+          animation:pulse 2s infinite;
+          text-align:center !important;
+          margin-top: clamp(20px, 5vw, 40px) !important;
+      ">
+        ↓
+      </div>
+    </div>
 	
       <style>
     @keyframes pulse {
