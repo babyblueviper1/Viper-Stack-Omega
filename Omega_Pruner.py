@@ -4193,7 +4193,7 @@ No API calls • Fully air-gapped safe""",
                   line-height:1.7 !important;
                   text-shadow:0 2px 4px rgba(0,0,0,0.8) !important;
               ">
-                Choose how aggressive your prune will be — and fine-tune fees & donations below
+                Fine tune your prune.
               </div>
             </div>
             """
