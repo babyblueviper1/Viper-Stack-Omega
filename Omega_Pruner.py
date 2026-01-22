@@ -3391,7 +3391,7 @@ with gr.Blocks(
     title="Ωmega Pruner v11 — Forged Anew"
 ) as demo:
     
-    # Full-screen animated Ωmega background + Hero Banner
+   # Full-screen animated Ωmega background + Hero Banner
     gr.HTML("""
     <div id="omega-bg" style="
         position: fixed;
@@ -3446,7 +3446,7 @@ with gr.Blocks(
         overflow: visible !important;
     ">
 
-      <!-- Reclaim Sovereignty – bullet-proof centered -->
+      <!-- Reclaim Sovereignty – ultra-strong centering -->
       <div style="
           color: #ffcc00 !important;
           font-size: clamp(2.8rem, 11vw, 5.2rem) !important;
@@ -3458,7 +3458,7 @@ with gr.Blocks(
               0 0 150px rgba(255,204,0,0.9),
               -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
               -2px  2px 0 #ffffff, 2px  2px 0 #ffffff !important;
-          margin: 0 auto clamp(2px, 1vw, 8px) auto !important;
+          margin: 0 auto clamp(2px, 0.8vw, 6px) auto !important;
           text-align: center !important;
           line-height: 1.0 !important;
           white-space: pre-wrap !important;
@@ -3467,11 +3467,12 @@ with gr.Blocks(
           position: relative !important;
           left: 50% !important;
           transform: translateX(-50%) !important;
+          max-width: 100% !important;
       ">
         Reclaim Sovereignty
       </div>
 
-      <!-- ΩMEGA PRUNER – pulled up very close -->
+      <!-- ΩMEGA PRUNER – pulled up extremely close (almost touching) -->
       <div style="
           color: #e65c00 !important;
           font-size: clamp(2.4rem, 9vw, 4.8rem) !important;
@@ -3483,7 +3484,7 @@ with gr.Blocks(
               0 0 75px rgba(230,92,0,0.7),
               -2px -2px 0 #000000, 2px -2px 0 #000000,
               -2px  2px 0 #000000, 2px  2px 0 #000000 !important;
-          margin: clamp(2px, 1vw, 8px) auto clamp(30px, 6vw, 50px) auto !important;
+          margin: clamp(2px, 0.8vw, 6px) auto clamp(30px, 6vw, 50px) auto !important;  /* minimal top margin = almost touching headline -->
           text-align: center !important;
       ">
         ΩMEGA PRUNER
