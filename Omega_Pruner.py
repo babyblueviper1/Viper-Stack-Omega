@@ -4827,7 +4827,7 @@ No API calls • Fully air-gapped safe""",
                 </a>
             </div>
 
-<!-- Donation section – centered QRs + copy buttons + truncated Lightning text -->
+<!-- Donation section – centered QRs + copy buttons (fixed) -->
 <div style="
     text-align: center !important;
     margin: clamp(40px, 10vw, 80px) auto 60px auto !important;
@@ -4835,188 +4835,193 @@ No API calls • Fully air-gapped safe""",
     background: rgba(0,0,0,0.5) !important;
     border-top: 2px solid #f7931a !important;
     max-width: 95vw !important;
-    color: #ddd !important;  /* brighter base color fallback */
+    color: #ddd !important;
     font-size: clamp(0.9rem, 3vw, 1.1rem) !important;
 ">
-    <div style="margin-bottom: 12px !important;">
-        <strong style="color:#f7931a !important; font-size: clamp(1.1rem, 4vw, 1.3rem) !important;">Support Ωmega Pruner</strong><br>
-        <small style="color: #ccc !important;">If this tool saved you sats or helped your stack — any amount appreciated.</small>
+
+    <!-- Header -->
+    <div style="margin-bottom: 14px !important;">
+        <strong style="
+            color:#f7931a !important;
+            font-size: clamp(1.1rem, 4vw, 1.3rem) !important;
+        ">
+            Support Ωmega Pruner
+        </strong><br>
+        <small style="color:#ccc !important;">
+            If this tool saved you sats or helped your stack — any amount appreciated.
+        </small>
     </div>
 
+    <!-- QR row -->
     <div style="
         display: flex;
         justify-content: center;
-        align-items: center;
+        align-items: flex-start;
         gap: clamp(20px, 5vw, 40px);
         flex-wrap: wrap;
     ">
-        <!-- On-chain QR -->
+
+        <!-- On-chain -->
         <div style="
             display: flex;
             flex-direction: column;
             align-items: center;
             min-width: 180px;
         ">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?data=bitcoin:bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj&size=300x300&color=247-147-26&bgcolor=0-0-0" 
-                 alt="Donate On-chain" 
-                 style="
-                     width: 180px;
-                     height: 180px;
-                     border: 2px solid #f7931a;
-                     border-radius: 12px;
-                     box-shadow: 0 0 20px rgba(247,147,26,0.5);
-                     max-width: 45vw;
-                 " />
-            <br>
+            <img
+                src="https://api.qrserver.com/v1/create-qr-code/?data=bitcoin:bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj&size=300x300&color=247-147-26&bgcolor=0-0-0"
+                alt="Donate On-chain"
+                style="
+                    width: 180px;
+                    height: 180px;
+                    border: 2px solid #f7931a;
+                    border-radius: 12px;
+                    box-shadow: 0 0 20px rgba(247,147,26,0.5);
+                    max-width: 45vw;
+                "
+            />
+
             <div style="
                 font-weight: 700;
                 color: #f7931a !important;
-                margin-bottom: 6px;
+                margin: 8px 0 6px 0;
                 font-size: clamp(0.95rem, 3.2vw, 1.1rem);
             ">
                 On-chain Bitcoin
             </div>
+
             <small style="
                 display: block;
-                margin-top: 4px;
-                color: #ddd !important;
                 font-family: monospace;
-                word-break: break-all;
                 max-width: 180px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+                color: #ddd !important;
             ">
-                bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
-                <button onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {
-                    this.innerText='COPIED';
-                    this.style.color='#00ff88';
-                    this.style.fontWeight='900';
-                    this.style.textShadow='0 0 10px #00ff88';
-                    setTimeout(() => {
-                        this.innerText='Copy';
-                        this.style.color='#f7931a';
-                        this.style.fontWeight='normal';
-                        this.style.textShadow='none';
-                    }, 1500);
-                })"
-                        style="
-                            background:none !important;
-                            border:none !important;
-                            color:#f7931a !important;
-                            cursor:pointer !important;
-                            font-size:0.9rem !important;
-                            margin-left:8px !important;
-                            padding:0 !important;
-                            transition: all 0.2s ease !important;
-                        ">
+                <span style="
+                    display: inline-block;
+                    max-width: 130px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    vertical-align: bottom;
+                ">
+                    bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+                </span>
+                <button
+                    onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {
+                        this.innerText='COPIED';
+                        this.style.color='#00ff88';
+                        this.style.fontWeight='900';
+                        this.style.textShadow='0 0 10px #00ff88';
+                        setTimeout(() => {
+                            this.innerText='Copy';
+                            this.style.color='#f7931a';
+                            this.style.fontWeight='normal';
+                            this.style.textShadow='none';
+                        }, 1500);
+                    })"
+                    style="
+                        background:none !important;
+                        border:none !important;
+                        color:#f7931a !important;
+                        cursor:pointer !important;
+                        font-size:0.9rem !important;
+                        margin-left:8px !important;
+                        padding:0 !important;
+                        line-height:1.4 !important;
+                        touch-action: manipulation;
+                    "
+                >
                     Copy
                 </button>
             </small>
         </div>
 
-        <!-- Lightning (Bolt 12) -->
+        <!-- Lightning -->
         <div style="
             display: flex;
             flex-direction: column;
             align-items: center;
             min-width: 180px;
         ">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?data=lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c&size=300x300&color=0-255-136&bgcolor=0-0-0" 
-                 alt="Donate Lightning (Bolt 12)" 
-                 style="
-                     width: 180px;
-                     height: 180px;
-                     border: 2px solid #00ff88;
-                     border-radius: 12px;
-                     box-shadow: 0 0 20px rgba(0,255,136,0.5);
-                     max-width: 45vw;
-                 " />
-            <br>
+            <img
+                src="https://api.qrserver.com/v1/create-qr-code/?data=lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c&size=300x300&color=0-255-136&bgcolor=0-0-0"
+                alt="Donate Lightning (Bolt 12)"
+                style="
+                    width: 180px;
+                    height: 180px;
+                    border: 2px solid #00ff88;
+                    border-radius: 12px;
+                    box-shadow: 0 0 20px rgba(0,255,136,0.5);
+                    max-width: 45vw;
+                "
+            />
+
             <div style="
                 font-weight: 700;
                 color: #00ff88 !important;
-                margin-bottom: 6px;
+                margin: 8px 0 6px 0;
                 font-size: clamp(0.95rem, 3.2vw, 1.1rem);
             ">
                 Lightning (Bolt 12)
             </div>
+
             <small style="
                 display: block;
-                margin-top: 4px;
-                color: #ddd !important;
                 font-family: monospace;
                 max-width: 180px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+                color: #ddd !important;
             ">
-                lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c
-                <button onclick="navigator.clipboard.writeText('lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c').then(() => {
-                    this.innerText='COPIED';
-                    this.style.color='#f7931a';
-                    this.style.fontWeight='900';
-                    this.style.textShadow='0 0 10px #f7931a';
-                    setTimeout(() => {
-                        this.innerText='Copy';
-                        this.style.color='#00ff88';
-                        this.style.fontWeight='normal';
-                        this.style.textShadow='none';
-                    }, 1500);
-                })"
-                        style="
-                            background:none !important;
-                            border:none !important;
-                            color:#00ff88 !important;
-                            cursor:pointer !important;
-                            font-size:0.9rem !important;
-                            margin-left:8px !important;
-                            padding:0 !important;
-                        ">
+                <span style="
+                    display: inline-block;
+                    max-width: 130px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    vertical-align: bottom;
+                ">
+                    lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c
+                </span>
+                <button
+                    onclick="navigator.clipboard.writeText('lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c').then(() => {
+                        this.innerText='COPIED';
+                        this.style.color='#f7931a';
+                        this.style.fontWeight='900';
+                        this.style.textShadow='0 0 10px #f7931a';
+                        setTimeout(() => {
+                            this.innerText='Copy';
+                            this.style.color='#00ff88';
+                            this.style.fontWeight='normal';
+                            this.style.textShadow='none';
+                        }, 1500);
+                    })"
+                    style="
+                        background:none !important;
+                        border:none !important;
+                        color:#00ff88 !important;
+                        cursor:pointer !important;
+                        font-size:0.9rem !important;
+                        margin-left:8px !important;
+                        padding:0 !important;
+                        line-height:1.4 !important;
+                        touch-action: manipulation;
+                    "
+                >
                     Copy
                 </button>
             </small>
         </div>
     </div>
 
-    <div style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
+    <!-- Footer line -->
+    <div style="
+        margin-top: 24px;
+        font-size: 0.9rem;
+        color: #e6e6e6 !important;
+        font-weight: 500;
+    ">
         Thank you for supporting open-source Bitcoin tools. • Ω
     </div>
 </div>
-
-            <!-- Light mode overrides -->
-            <style>
-            body:not(.dark-mode) div[style*="00ff9d"],
-            body:not(.dark-mode) div[style*="00ff88"] {
-                color: #004d33 !important;
-                background: rgba(220, 255, 235, 0.15) !important;
-                box-shadow: 0 2px 8px rgba(0, 80, 50, 0.1) !important;
-            }
-
-            a:hover div[style*="padding"] {
-                transform: translateY(-2px);
-                box-shadow: 0 8px 25px rgba(0, 255, 136, 0.4);
-            }
-            </style>
-
-            <br><br>
-
-            <!-- TAGLINE -->
-            <span style="
-                color: #0f0;
-                font-size: clamp(0.9rem, 3.8vw, 1.1rem) !important;
-                font-weight: 800;
-                letter-spacing: 0.6px;
-                text-shadow:
-                    0 0 15px #0f0,
-                    0 0 30px #0f0,
-                    0 0 6px #000,
-                    0 4px 10px #000,
-                    0 8px 20px #000000e6;
-            ">
-                Prune smarter. Win forever. • Ω
-            </span>
-        </div>
         """,
         elem_id="omega_footer",
     )
