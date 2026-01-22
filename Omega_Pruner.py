@@ -4848,7 +4848,7 @@ No API calls • Fully air-gapped safe""",
             Support Ωmega Pruner
         </strong><br>
         <span style="color:#ccc !important;">
-            If this tool saved you sats or helped your stack — any amount appreciated.
+            If this tool saved you sats or helped your stack — show your love.
         </span>
     </div>
 
@@ -5037,7 +5037,7 @@ No API calls • Fully air-gapped safe""",
         color: #e6e6e6 !important;
         font-weight: 500;
     ">
-        Thank you for supporting open-source Bitcoin tools. • Ω
+        Thank you for supporting open-source Bitcoin tools.
     </div>
 </div>
 
