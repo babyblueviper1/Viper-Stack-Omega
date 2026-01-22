@@ -4193,7 +4193,7 @@ No API calls • Fully air-gapped safe""",
                   line-height:1.7 !important;
                   text-shadow:0 2px 4px rgba(0,0,0,0.8) !important;
               ">
-                Fine tune your prune.
+                Fine-tune your prune — compare now vs future fees below
               </div>
             </div>
             """
