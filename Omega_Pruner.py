@@ -3479,7 +3479,7 @@ with gr.Blocks(
             0 0 75px rgba(230,92,0,0.7),
             -2px -2px 0 #000000, 2px -2px 0 #000000,
             -2px  2px 0 #000000, 2px  2px 0 #000000;
-        margin: 4px auto clamp(30px, 6vw, 50px) auto;
+        margin: 4px auto clamp(26px, 5.5vw, 44px) auto;
     ">
       ΩMEGA PRUNER
     </div>
