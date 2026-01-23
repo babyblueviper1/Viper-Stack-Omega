@@ -4184,7 +4184,7 @@ No API calls • Fully air-gapped safe""",
                   text-shadow:0 0 30px #00ff88 !important;
                   margin-bottom: clamp(10px, 3vw, 16px) !important;
               ">
-                Pruning Strategy & Economic Controls
+                Pruning Strategy & Fee Dynamics
               </div>
 
               <div style="
@@ -4193,7 +4193,7 @@ No API calls • Fully air-gapped safe""",
                   line-height:1.7 !important;
                   text-shadow:0 2px 4px rgba(0,0,0,0.8) !important;
               ">
-                Fine-tune your prune — compare now vs future fees below
+                Compare current vs future fees and choose your privacy–cost tradeoff
               </div>
             </div>
             """
