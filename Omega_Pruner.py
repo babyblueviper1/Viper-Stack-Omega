@@ -1931,8 +1931,6 @@ def analyze(
     if has_unsupported:
         warning_banner += (...)  # your existing legacy/nested HTML
 
-    if taproot_hw_needed:
-        warning_banner += (...)  # your existing Taproot HW warning HTML
 
     # 6. Freeze the enriched state
     frozen_state = _freeze_enriched(
