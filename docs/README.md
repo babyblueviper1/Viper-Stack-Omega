@@ -5,8 +5,8 @@
 The purest UTXO consolidator ever built.  
 Reborn in fire — stripped of pretense, refined to essence, honest to the core.
 
-Ωmega Pruner is an **unsigned, non-custodial PSBT generator** designed for
-**fee-aware UTXO consolidation and long-term coin control** under real network
+Ωmega Pruner is an **unsigned, non-custodial PSBT generator** designed for  
+**fee-aware UTXO consolidation and long-term coin control** under real network  
 conditions.
 
 > **Design note:**  
@@ -24,9 +24,9 @@ conditions.
 - **Pruning Conditions Badge — LIVE**  
   Real-time 1–10 score reflecting current pruning conditions
 - Current economy fee vs dynamic medians:
-  - 1-day  
-  - 1-week **(primary benchmark)**  
-  - 1-month  
+  - 1-day
+  - 1-week **(primary benchmark)**
+  - 1-month
 - Clear vertical comparison: **Current → VS → Medians**
 - Live BTC price, block height, and network hashrate
 - Next difficulty adjustment and halving countdown
@@ -39,13 +39,14 @@ conditions.
 
 Optimized for modern Bitcoin script types:
 
-- **Native SegWit** (`bc1q…`) — P2WPKH  
-- **Taproot** (`bc1p…`) — P2TR  
+- **Native SegWit** (`bc1q…`) — P2WPKH
+- **Taproot** (`bc1p…`) — P2TR
 
 These offer the best fee efficiency, privacy characteristics, and forward compatibility.
 
 **Legacy (`1…`) and Nested SegWit (`3…`)** inputs are shown for transparency only and  
-**cannot be pruned** (faded, disabled).  
+**cannot be pruned** (faded, disabled).
+
 Spend or migrate them separately before consolidation.
 
 ---
@@ -76,7 +77,7 @@ However:
   - Signing may be refused by certain devices
 - No automatic re-generation with corrected paths is currently supported
 
-**Workaround:** Import the PSBT into a wallet that already knows the account
+**Workaround:** Import the PSBT into a wallet that already knows the account  
 (e.g., Sparrow), or recreate the transaction there.
 
 This preserves flexibility while remaining explicit about hardware limitations.
@@ -105,19 +106,179 @@ This preserves flexibility while remaining explicit about hardware limitations.
 
 ## Under the Hood — Canonical State Model
 
-| Principle              | Implementation           | Why It Matters            |
-|------------------------|--------------------------|---------------------------|
-| Single source of truth | Immutable enriched state | No stale or desynced UI   |
-| Derived economics      | Live computation         | Perfect internal coherence|
-| Selection fingerprint  | Deterministic hash       | Provable user intent      |
+| Principle              | Implementation           | Why It Matters             |
+|------------------------|--------------------------|----------------------------|
+| Single source of truth | Immutable enriched state | No stale or desynced UI    |
+| Derived economics      | Live computation         | Perfect internal coherence |
+| Selection fingerprint  | Deterministic hash       | Provable user intent       |
 
 **Audit-friendly. Deterministic. Explicit.**
 
 ---
 
+## Diagram — Fee-Aware Pruning Flow
+
+```text
+┌──────────────────────────┐
+│        User Input        │
+│  (Single Address / xpub) │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│     UTXO Enumeration     │
+│  (No clustering, no mix) │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│   Immutable Enriched     │
+│        State             │
+│  (values, script type,   │
+│   weight, age, dust)     │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│     Fee Context Layer    │
+│  Current fee vs medians  │
+│  (1d / 1w / 1m)          │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│   Deterministic Pruning  │
+│        Strategy          │
+│  (user-selected policy) │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│   CIOH Risk Evaluation   │
+│  Linkage & merge checks  │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│   PSBT Construction      │
+│  (unsigned, reproducible)│
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│  Deterministic Export &  │
+│        Review            │
+│  (JSON + fingerprint)   │
+└──────────────────────────┘
+````
+
+### Diagram Notes
+
+* **Single-entry point:** Only one address or xpub is processed per run
+* **No hidden inference:** No clustering, labeling, or wallet-level heuristics
+* **Immutable state:** All downstream computation derives from a fixed snapshot
+* **Fee-aware decision layer:** Pruning decisions are evaluated against time-based fee context
+* **Deterministic output:** Identical inputs and fee context produce identical PSBTs
+* **Human-in-the-loop:** No automatic broadcasting or signing
+
+### Why This Matters
+
+Most pruning tools conflate selection, economics, and privacy into a single opaque step.
+
+Ωmega Pruner separates these layers explicitly, allowing users to reason about:
+
+* **When** to prune (fee timing)
+* **What** to prune (UTXO selection)
+* **How much** risk is introduced (CIOH visibility)
+
+Before any transaction is signed.
+
+This layered approach mirrors protocol design: constrain scope, surface tradeoffs, and preserve determinism.
+
+---
+
+## Diagram — Threat Model & Explicit Non-Goals
+
+```text
+┌────────────────────────────────────────────┐
+│               NOT IN SCOPE                 │
+│                                            │
+│  ┌───────────────┐   ┌─────────────────┐  │
+│  │ Wallet        │   │ Address          │  │
+│  │ Clustering    │   │ Attribution      │  │
+│  └───────────────┘   └─────────────────┘  │
+│                                            │
+│  ┌───────────────┐   ┌─────────────────┐  │
+│  │ Cross-Wallet  │   │ Multi-Account   │  │
+│  │ Aggregation   │   │ Inference       │  │
+│  └───────────────┘   └─────────────────┘  │
+│                                            │
+│  ┌───────────────┐   ┌─────────────────┐  │
+│  │ Heuristic     │   │ Silent           │  │
+│  │ Enrichment    │   │ Auto-Selection   │  │
+│  └───────────────┘   └─────────────────┘  │
+│                                            │
+└────────────────────────────────────────────┘
+                ▲
+                │  Explicit boundary
+                │
+┌────────────────────────────────────────────┐
+│                 IN SCOPE                   │
+│                                            │
+│  ┌───────────────┐   ┌─────────────────┐  │
+│  │ Single        │   │ Deterministic    │  │
+│  │ Address/xpub  │   │ UTXO Selection  │  │
+│  └───────────────┘   └─────────────────┘  │
+│                                            │
+│  ┌───────────────┐   ┌─────────────────┐  │
+│  │ Fee & Time    │   │ CIOH Visibility  │  │
+│  │ Context       │   │ (No suppression)│  │
+│  └───────────────┘   └─────────────────┘  │
+│                                            │
+│  ┌───────────────┐   ┌─────────────────┐  │
+│  │ PSBT          │   │ Human-in-the-    │  │
+│  │ Construction  │   │ Loop Review     │  │
+│  └───────────────┘   └─────────────────┘  │
+│                                            │
+└────────────────────────────────────────────┘
+```
+
+### Threat Model Notes
+
+Ωmega Pruner is deliberately **not** a wallet, coordinator, or inference engine.
+
+#### Explicit Non-Goals
+
+* Wallet clustering or address attribution
+* Cross-wallet or multi-account inference
+* Heuristic enrichment beyond visible CIOH signals
+* Automatic selection or silent optimization
+* Transaction signing or broadcasting
+
+These are excluded to avoid **false certainty**, **hidden linkage**, and **irreversible privacy mistakes**.
+
+### Security Posture
+
+* **Local-first:** No custody, no signing, no broadcast
+* **Deterministic:** Identical inputs yield identical outputs
+* **Explainable:** Every selection and warning is visible to the user
+* **Interruptible:** Users may abort at any stage without side effects
+
+### Design Rationale
+
+Pruning is irreversible once spent.
+
+Ωmega Pruner therefore optimizes for **constraint, visibility, and reversibility of intent**, not automation.
+
+Reducing scope is treated as a **security feature**, not a limitation.
+
+> *The safest pruning decision is one whose risks are visible before the transaction exists.*
+
+---
+
 ## Philosophy
 
-Most consolidators hide complexity or paper over tradeoffs.  
+Most consolidators hide complexity or paper over tradeoffs.
 Ωmega Pruner does neither.
 
 **No keys. No signing. No silent failures. No fake privacy.**
@@ -128,19 +289,23 @@ Most consolidators hide complexity or paper over tradeoffs.
 
 Your treasury. Your rules.
 
-- Custom integrations
-- Air-gapped / on-prem deployments
-- Branded dashboards
-- Dedicated support
+* Custom integrations
+* Air-gapped / on-prem deployments
+* Branded dashboards
+* Dedicated support
 
-**By quote only**  
-📧 babyblueviperbusiness@gmail.com
+**By quote only**
+📧 [babyblueviperbusiness@gmail.com](mailto:babyblueviperbusiness@gmail.com)
 
-🎙 **Baby Blue Viper** — https://babyblueviper.com
+🎙 **Baby Blue Viper** — [https://babyblueviper.com](https://babyblueviper.com)
 
 ---
 
-**Ωmega Pruner v11.1 — Forged Anew**  
-babyblueviper & the swarm • January 2026  
+**Ωmega Pruner v11.1 — Forged Anew**
+babyblueviper & the swarm • January 2026
 
 **Prune smarter. Win forever. • Ω**
+
+You’ve done this exactly right.
+```
+
