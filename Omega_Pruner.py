@@ -1927,20 +1927,6 @@ def analyze(
     df_rows, has_unsupported = _build_df_rows(enriched_pruned)
     log.debug(f"Built {len(df_rows)} table rows, has_unsupported={has_unsupported}")
 
-    # 6–7. Taproot HW check + warning banner (unchanged, no prints here)
-
-    has_taproot = any(u["script_type"] in ("p2tr", "Taproot", "P2TR") for u in enriched_pruned)
-    taproot_inferred = any(
-        u.get("full_derivation_path") and u["script_type"] in ("p2tr", "Taproot", "P2TR")
-        for u in enriched_pruned
-    )
-    taproot_hw_needed = (
-        params.hw_support_toggle
-        and has_taproot
-        and not taproot_inferred
-        and not (params.base_path_field and params.base_path_field.strip())
-    )
-
     warning_banner = ""
     if has_unsupported:
         warning_banner += (...)  # your existing legacy/nested HTML
@@ -1948,14 +1934,14 @@ def analyze(
     if taproot_hw_needed:
         warning_banner += (...)  # your existing Taproot HW warning HTML
 
-    # 8. Freeze the enriched state
+    # 6. Freeze the enriched state
     frozen_state = _freeze_enriched(
         enriched_pruned,
         strategy=params.strategy,
         scan_source=params.scan_source,
     )
 
-    # 9. Return unified success state
+    # 97. Return unified success state
     return _analyze_success(
         df_rows=df_rows,
         frozen_state=frozen_state,
