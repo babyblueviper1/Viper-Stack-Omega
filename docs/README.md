@@ -305,7 +305,3 @@ Your treasury. Your rules.
 babyblueviper & the swarm • January 2026
 
 **Prune smarter. Win forever. • Ω**
-
-You’ve done this exactly right.
-```
-
