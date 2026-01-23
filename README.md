@@ -1,7 +1,17 @@
-# Ωmega Pruner v11.1 — Forged Anew + Pruning Conditions Badge
 
+# Ωmega Pruner v11.1 — Forged Anew  
 **Reclaim Sovereignty**
 
+Ωmega Pruner is a fee-aware UTXO pruning tool designed to help users make
+**economically informed and privacy-conscious pruning decisions** under
+changing network conditions.
+
+> **Design note:**  
+> For a technical overview of the fee model, threat assumptions, and CIOH
+> tradeoffs, see  
+> **[`docs/design.md`](docs/design.md)**
+
+---
 ### New in v11.1
 
 - **Pruning Conditions Badge** — real-time 1–10 score with glowing nuclear design  
@@ -59,5 +69,7 @@ Spend or convert them separately before consolidation.
 - Legacy/Nested inputs cannot be included in PSBTs  
 - No automatic derivation path inference for Taproot hardware signing  
 - Single-address scope only — no batch/multi-wallet support
+
+Technical design notes and threat model are documented in `docs/design.md`.
 
 **Prune smarter. Win forever. • Ω**
