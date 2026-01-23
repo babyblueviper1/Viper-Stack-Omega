@@ -70,6 +70,4 @@ Spend or convert them separately before consolidation.
 - No automatic derivation path inference for Taproot hardware signing  
 - Single-address scope only — no batch/multi-wallet support
 
-Technical design notes and threat model are documented in `docs/design.md`.
-
 **Prune smarter. Win forever. • Ω**
