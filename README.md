@@ -1,4 +1,3 @@
-
 # Ωmega Pruner v11.1 — Forged Anew  
 **Reclaim Sovereignty**
 
@@ -7,10 +6,12 @@
 changing network conditions.
 
 > **Design note:**  
-> For a technical overview of the fee model, threat assumptions, and CIOH
-> tradeoffs, see  
-> **[`docs/design.md`](docs/design.md)**
-
+> For a formal overview of the fee model, scope, and CIOH tradeoffs, see  
+> **[`docs/design.md`](docs/design.md)**.  
+>  
+> A longer, text-heavy README with architecture diagrams and the explicit
+> threat model lives in  
+> **[`docs/README.md`](docs/README.md)**.
 ---
 ### New in v11.1
 
