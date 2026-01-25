@@ -837,40 +837,32 @@ def sats_to_btc_str(sats: int) -> str:
     return f"{int(sats):,} sats"
 
 def calculate_privacy_score(selected_utxos: List[dict], total_utxos: int) -> int:
-    if not selected_utxos or len(selected_utxos) <= 1:
-        return 95  # Single input or none = minimal linkage
-    
-    input_count = len(selected_utxos)
-    distinct_addrs = len(set(u["address"] for u in selected_utxos))
-    total_value_btc = sum(u["value"] for u in selected_utxos) / 100_000_000
-    
-    score = 100
-    
-    # CIOH linkage penalty (core privacy cost)
-    if input_count >= 50: score -= 60
-    elif input_count >= 20: score -= 45
-    elif input_count >= 10: score -= 30
-    elif input_count >= 5: score -= 15
-    elif input_count > 1: score -= 8
-    
-    # Address merging penalty
-    if distinct_addrs >= 15: score -= 40
-    elif distinct_addrs >= 8: score -= 25
-    elif distinct_addrs >= 4: score -= 12
-    elif distinct_addrs > 1: score -= 6
-    
-    # Wealth reveal
-    if total_value_btc >= 10: score -= 20
-    elif total_value_btc >= 1: score -= 8
-    elif total_value_btc >= 0.1: score -= 3
-    
-    # Tiny bonus for script diversity (confuses clustering)
-    script_types = set(u.get("script_type", "Unknown") for u in selected_utxos)
-    if len(script_types) >= 3: score += 6
-    elif len(script_types) == 2: score += 3
-    
-    return max(5, min(100, score))  # Never 0 — some privacy always remains
+    """
+    2025–2026 realistic privacy scoring.
+    Much harsher penalties for consolidation — reflects current chain analysis capabilities.
+    """
+    n = len(selected_utxos)
+    if n == 0:
+        return 100  # nothing spent = perfect privacy
+    if n == 1:
+        return 92   # single input = very low linkage
 
+    # Harsh penalties even for small numbers
+    if n == 2:
+        return 65
+    if n <= 4:
+        return 45
+    if n <= 8:
+        return 28
+    if n <= 15:
+        return 15
+    if n <= 30:
+        return 8
+    if n <= 50:
+        return 5
+
+    # Above 50 inputs → near-zero privacy
+    return max(3, 100 - 9 * n)  # steep drop-off
 
 def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) -> str:
     if input_count <= 1:
@@ -1223,7 +1215,7 @@ def estimate_tx_economics(
     # Base SegWit vsize (more accurate for modern inputs)
     base_vsize = (input_weight + 43 * 4 + 31 * 4 + 10 * 4 + input_count) // 4 + 10
 
-    # Conservative fallback (covers worst-case witness data estimation)
+    # Conservative fallback
     conservative_vsize = (input_weight + 150 + input_count * 60) // 4
 
     vsize = max(base_vsize, conservative_vsize)
@@ -1231,10 +1223,13 @@ def estimate_tx_economics(
 
     remaining_after_fee = total_in - fee
 
-    # Change output logic (dust threshold = 546 sats)
-    change_amt = remaining_after_fee if remaining_after_fee >= 546 else 0
+    # ── 2025 best practice: avoid creating new dust ─────────────────────────────
+    MIN_REASONABLE_CHANGE = 10_000   # ~0.0001 BTC — configurable later if desired
+    DUST_THRESHOLD = 546             # classic dust, but we use higher bar for change
 
-    # If change is dust → absorb it into the fee
+    change_amt = remaining_after_fee if remaining_after_fee >= MIN_REASONABLE_CHANGE else 0
+
+    # If change is below reasonable threshold → absorb into fee
     if remaining_after_fee > 0 and change_amt == 0:
         fee += remaining_after_fee
 
@@ -1244,7 +1239,6 @@ def estimate_tx_economics(
         fee=fee,
         change_amt=change_amt,
     )
-
 
 def encode_varint(i: int) -> bytes:
     if i < 0xfd: return bytes([i])
@@ -1325,7 +1319,7 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
     def write_bip32_derivation(psbt: bytearray, pubkey: bytes, fingerprint: bytes, path_bytes: bytes):
         write_kv(psbt, 0x06, pubkey, fingerprint + path_bytes)
 
-    # Validation — minimal requirements
+    # ── Global validation ───────────────────────────────────────────────────────
     if not tx.tx_ins:
         raise ValueError("Transaction has no inputs")
     if not tx.tx_outs:
@@ -1338,13 +1332,27 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
 
     # Global: unsigned tx
     write_kv(psbt, 0x00, b"", raw_tx)
-    psbt += b"\x00"  # end global
+    psbt += b"\x00"  # end global map
 
-    # Input maps
+    # ── Input maps ──────────────────────────────────────────────────────────────
     for u in utxos:
         stype = u.get("script_type", "").lower()
         if stype not in ("p2wpkh", "p2tr", "taproot"):
             raise ValueError(f"Unsupported script type: {stype}")
+
+        # ── Per-UTXO sanity checks (early fail + better debugging) ─────────────
+        txid_short = (u.get("txid", "unknown")[:8] + "...") if u.get("txid") else "?"
+        vout = u.get("vout", "?")
+        ident = f"txid={txid_short} vout={vout}"
+
+        if u.get("value", 0) <= 0:
+            raise ValueError(f"Invalid UTXO value <= 0 detected ({ident})")
+        if u.get("value", 0) > 21_000_000 * 100_000_000:
+            raise ValueError(f"UTXO value impossibly large (> 21M BTC) ({ident})")
+        if "scriptPubKey" not in u:
+            raise ValueError(f"Missing scriptPubKey in UTXO data ({ident})")
+        if not isinstance(u["scriptPubKey"], (bytes, str)):
+            raise ValueError(f"scriptPubKey has invalid type (must be bytes or hex str) ({ident})")
 
         # Required: Witness UTXO
         spk = u["scriptPubKey"]
@@ -1358,36 +1366,38 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
         )
         write_kv(psbt, 0x01, b"", witness_utxo)
 
-        # Optional BIP32 derivation (only if all fields present)
+        # ALWAYS write SIGHASH_ALL (0x00000001) — critical for most hardware wallets
+        write_kv(psbt, 0x03, b"", bytes([0x01, 0x00, 0x00, 0x00]))
+
+        # Optional: BIP32 derivation path (only if all fields are present)
         if all(k in u for k in ["pubkey", "fingerprint", "full_derivation_path"]):
             try:
                 pubkey = bytes.fromhex(u["pubkey"])
                 fingerprint = bytes.fromhex(u["fingerprint"])
                 path_str = u["full_derivation_path"].replace("m/", "")
                 path_bytes = b""
-                for p in path_str.split("/"):
-                    hardened = p.endswith("'")
-                    n = int(p.rstrip("'"))
+                for part in path_str.split("/"):
+                    hardened = part.endswith("'")
+                    n = int(part.rstrip("'"))
                     if hardened:
                         n |= 0x80000000
                     path_bytes += n.to_bytes(4, "little")
 
                 write_bip32_derivation(psbt, pubkey, fingerprint, path_bytes)
             except Exception as e:
-                print(f"Warning: Failed to add BIP32 derivation: {e}")
+                print(f"Warning: Failed to add BIP32 derivation ({ident}): {e}")
 
-        # Explicit SIGHASH_ALL
-        write_kv(psbt, 0x03, b"", (1).to_bytes(4, "little"))
+        psbt += b"\x00"  # end this input map
 
-        psbt += b"\x00"  # end input map
-
-    # Empty output maps
+    # ── Output maps (empty) ─────────────────────────────────────────────────────
     for _ in tx.tx_outs:
         psbt += b"\x00"
 
-    psbt += b"\x00"  # final separator
+    # Final separator
+    psbt += b"\x00"
 
-    return base64.b64encode(psbt).decode("ascii"), ""
+    psbt_b64 = base64.b64encode(psbt).decode("ascii")
+    return psbt_b64, ""
 
 # =========================
 # UTXO Fetching Functions
@@ -2640,34 +2650,55 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
 def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Union[bytes, str]:
     """
     Resolve final destination to scriptPubKey (bytes) or return error HTML.
-    
-    - Prefers explicit dest_override
-    - Falls back to scan_source only if dest_override is empty/falsy
-    - If both empty → returns b'' (no change output, absorb to fees/DAO)
-    - Error message focused on modern addresses (bc1q... / bc1p...)
+    Enforces modern output types only (P2WPKH or Taproot) to avoid high-fee legacy change.
     """
-    # Clean inputs
     override_clean = (dest_override or "").strip()
     source_clean = scan_source.strip()
 
-    # Use override if provided; fallback to source only if override is empty
     final_dest = override_clean if override_clean else source_clean
 
     if not final_dest:
-        # No destination at all → allow no-change PSBT (absorb remainder)
+        # No destination → absorb remainder into fee (full cleanup mode)
         return b''
 
     try:
-        spk, _ = address_to_script_pubkey(final_dest)
+        spk, meta = address_to_script_pubkey(final_dest)
+        typ = meta.get('type', 'unknown')
+
+        # Enforce modern types only
+        if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
+            return (
+                "<div style='"
+                "color:#ff3366 !important; "
+                "padding: clamp(20px, 5vw, 32px) !important; "
+                "background:#330000 !important; "
+                "border:3px solid #ff3366 !important; "
+                "border-radius:14px !important; "
+                "box-shadow:0 0 40px rgba(255,51,102,0.5) !important; "
+                "text-align:center !important; "
+                "max-width:95% !important; "
+                "margin:20px auto !important;"
+                "'>"
+                "<div style='font-size:clamp(1.3rem, 5vw, 1.7rem); font-weight:900;'>"
+                "Change address must be modern"
+                "</div><br>"
+                "Only <strong>bc1q… (Native SegWit)</strong> or <strong>bc1p… (Taproot)</strong> allowed.<br><br>"
+                f"Detected: <strong>{typ}</strong><br>"
+                "Legacy (1…) or Nested (3…) outputs create very expensive change in 2025+ fee environment.<br><br>"
+                "Please use a modern address for change output."
+                "</div>"
+            )
+
         return spk
+
     except Exception:
         return (
-            "<div style='color:#ff6666 !important; text-align:center !important; padding:30px; background:#440000 !important; border-radius:18px; box-shadow:0 0 50px rgba(255,51,102,0.5) !important;'>"
-            "<div style='color:#ff3366 !important; font-size:1.8rem; font-weight:900;'>Invalid destination address</div><br><br>"
-            "Please enter a <span style='font-weight:900; color:#ffffff !important;'>valid modern Bitcoin address</span>:<br>"
-            "• <span style='font-weight:900; color:#00ffff !important;'>Native SegWit</span>: starts with bc1q...<br>"
-            "• <span style='font-weight:900; color:#00ffff !important;'>Taproot</span>: starts with bc1p...<br><br>"
-            "Legacy (1...) and Nested (3...) are supported for display but <span style='font-weight:900; color:#ffdd88 !important;'>not recommended</span> for new change outputs."
+            "<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+            "Invalid destination address<br><br>"
+            "Must be a valid modern Bitcoin address:<br>"
+            "• <strong>bc1q…</strong> — Native SegWit<br>"
+            "• <strong>bc1p…</strong> — Taproot<br><br>"
+            "Legacy (1…) and Nested (3…) are not allowed for change."
             "</div>"
         )
     
@@ -3136,14 +3167,51 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
             "<strong style='color:#ffff66 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;'>"
             "No supported inputs selected"
             "</strong><br><br>"
-            "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q...)</strong> and <strong style='color:#00ffff !important;'>Taproot (bc1p...)</strong> inputs can be pruned.<br><br>"
-            "Legacy and Nested inputs are excluded from the PSBT."
+            "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q…)</strong> and <strong style='color:#00ffff !important;'>Taproot (bc1p…)</strong> inputs can be pruned.<br><br>"
+            "Legacy and Nested inputs were automatically skipped."
             "</div>"
         )
 
     legacy_excluded = len(supported_inputs) < len(all_inputs)
 
-    # Continue with your existing code...
+    # ── NEW: Strict input value sanity checks (protect against dust attacks / bad data) ──
+    MAX_BTC = 21_000_000
+    MAX_SATS = MAX_BTC * 100_000_000
+
+    for u in supported_inputs:
+        val = u.get("value", 0)
+        txid_short = (u.get("txid", "unknown")[:12] + "...") if u.get("txid") else "?"
+        vout = u.get("vout", "?")
+        ident = f"txid={txid_short} vout={vout}"
+
+        if val <= 0:
+            return (
+                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                f"Invalid UTXO value ≤ 0 sats detected<br>"
+                f"<strong>{ident}</strong><br><br>"
+                "This is likely a paste error or corrupted data. Please re-analyze or correct the UTXO value."
+                "</div>"
+            )
+
+        if val > MAX_SATS:
+            return (
+                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                f"Impossible UTXO value > {MAX_BTC:,} BTC detected<br>"
+                f"<strong>{val:,} sats — {ident}</strong><br><br>"
+                "This exceeds the total Bitcoin supply. Likely bad input data. Please verify and re-analyze."
+                "</div>"
+            )
+
+        if "scriptPubKey" not in u or not u["scriptPubKey"]:
+            return (
+                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                f"Missing or empty scriptPubKey for input<br>"
+                f"<strong>{ident}</strong><br><br>"
+                "Cannot build safe PSBT without scriptPubKey. Please re-analyze or correct the UTXO entry."
+                "</div>"
+            )
+
+    # If we reach here, all inputs look sane → proceed
     dest_result = _resolve_destination(params.dest_override, params.scan_source)
     if isinstance(dest_result, str):
         return dest_result
@@ -3177,9 +3245,7 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
     psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
     qr_html, qr_warning = _generate_qr(psbt_b64)
 
-    # -------------------------
     # Warnings only (NO success state here)
-    # -------------------------
     extra_note = ""
 
     if legacy_excluded:
@@ -3195,16 +3261,14 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
             "</div>"
         )
 
-    # -------------------------
     # Final render
-    # -------------------------
     return _compose_psbt_html(
         fingerprint=params.fingerprint_short,
         qr_html=qr_html,
         qr_warning=qr_warning,
         psbt_b64=psbt_b64,
         extra_note=extra_note,
-		has_change_output=has_change_output,
+        has_change_output=has_change_output,
     )
     
 def analyze_and_show_summary(
