@@ -44,62 +44,65 @@ RULES:
 Violations will be treated as bugs.
 """
 
-# Omega_Pruner.py
 import gradio as gr
-import requests, time, base64, io, qrcode, json, os
+import requests
+import time
+import base64
+import io
+import qrcode
+import json
+import os
 from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Any, Optional, Union
-import warnings, logging
+import logging
 from functools import partial
 import threading
 import hashlib
 import tempfile
 from datetime import datetime
 import copy
-import urllib.parse
 import pandas as pd
 import statistics
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Logging Setup
-# =========================
+# ── Logging ─────────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# =========================
-# Config / Constants
-# =========================
+# ── Constants ───────────────────────────────────────────────────────────────────
 MEMPOOL_API = "https://mempool.space/api"
 BLOCKSTREAM_API = "https://blockstream.info/api/address/{addr}/utxo"
 BITCOINER_API = "https://bitcoiner.live/api/address/{addr}/utxo"
-MIN_KEEP_UTXOS = 1  # minimum UTXOs to keep regardless of strategy
+
+MIN_KEEP_UTXOS = 1
+
 HEALTH_PRIORITY = {
-    "DUST": 0,
-    "HEAVY": 1,
+    "DUST":    0,
+    "HEAVY":   1,
     "CAREFUL": 2,
-    "MEDIUM": 3,
-    "MANUAL": 3,     # Neutral position — doesn't push to prune or keep aggressively
+    "MEDIUM":  3,
+    "MANUAL":  3,     # Neutral — no strong prune/keep bias
     "OPTIMAL": 4,
 }
+
+# DataFrame column indices (0-based)
 CHECKBOX_COL = 0
 SOURCE_COL   = 1
 TXID_COL     = 2
-HEALTH_COL   = 3 
+HEALTH_COL   = 3
 VALUE_COL    = 4
 ADDRESS_COL  = 5
 WEIGHT_COL   = 6
 TYPE_COL     = 7
 VOUT_COL     = 8
 
+# Empty state messages
 no_utxos_msg = (
     "<div class='empty-state-msg' style='"
     "text-align:center !important;"
     "padding: clamp(40px, 10vw, 80px) !important;"
     "max-width:90% !important;"
     "margin:0 auto !important;"
-    "background: rgba(0, 20, 10, 0.7) !important;"  # Dark green translucent background
+    "background: rgba(0, 20, 10, 0.7) !important;"
     "border: 2px solid #00ff88 !important;"
     "border-radius: 18px !important;"
     "box-shadow: 0 0 50px rgba(0,255,136,0.4) !important;"
@@ -154,14 +157,6 @@ select_msg = (
     "</div>"
 )
 
-DERIVATION_PROFILES = {
-    "p2pkh":       "m/44'/0'/0'",
-    "p2sh-p2wpkh": "m/49'/0'/0'",
-    "p2wpkh":      "m/84'/0'/0'",
-    "p2tr":        "m/86'/0'/0'",
-}
-
-
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
@@ -172,9 +167,7 @@ PRUNING_RATIOS = {
     "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)": 0.90,
 }
 
-# =========================
-# Global Requests Session (production-grade)
-# =========================
+# ── Global HTTP session ─────────────────────────────────────────────────────────
 session = requests.Session()
 session.headers.update({
     "User-Agent": "OmegaPruner-v11 (+https://github.com/babyblueviper1/Viper-Stack-Omega)",
@@ -182,57 +175,66 @@ session.headers.update({
     "Connection": "keep-alive",
 })
 
+_fee_cache_lock = threading.Lock()
 
-from threading import Lock
-_fee_cache_lock = Lock()
-
+# Globals for simple in-memory cache
+_last_medians = {"24h": None, "1w": None, "1m": None}
+_last_fetch_time = 0
+_CACHE_TTL = 300  # 5 minutes
 
 
 # ===========================
 # Selection resolver
 # ===========================
-def _resolve_selected(df_rows: List[list], enriched_state: List[dict]) -> List[dict]:
-    """Resolve selected UTXOs via row-order matching (Gradio-safe)."""
-
-    if not df_rows or not enriched_state:
+def _resolve_selected(df_rows: List[list], enriched_state: tuple) -> List[dict]:
+    """
+    Resolve selected UTXOs from Gradio DataFrame checkbox state.
+    Uses row-order matching — safe for Gradio's mutable UI representation.
+    """
+    if not df_rows:
         return []
 
-    # Extract utxos from frozen state
-    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
-        _, utxos = enriched_state
-    else:
-        utxos = enriched_state or []
+    # Extract frozen utxos (enforced by canonical model: tuple[dict])
+    _, utxos = enriched_state   # safe — analyze() always returns (meta, tuple)
 
     if len(df_rows) != len(utxos):
-        print(f"Warning: row mismatch df={len(df_rows)} utxos={len(utxos)}")
+        log.warning(f"Row mismatch: df_rows={len(df_rows)}, utxos={len(utxos)}")
         return []
 
     selected = []
-
     for idx, row in enumerate(df_rows):
         if not row or len(row) <= CHECKBOX_COL:
             continue
 
         checkbox_val = row[CHECKBOX_COL]
+        # Gradio can send bool, int, str — normalize safely
+        is_checked = checkbox_val in (True, 1, "true", "True", "1") or bool(checkbox_val)
+        if is_checked:
+            selected.append(utxos[idx])
 
-        checked = checkbox_val in (True, 1, "true", "True", "1") or bool(checkbox_val)
-        if not checked:
-            continue
-
-        selected.append(utxos[idx])
-
-    print(f">>> _resolve_selected: {len(selected)} UTXOs detected via row index")
+    log.debug(f"_resolve_selected: {len(selected)} UTXOs selected via checkboxes")
     return selected
+
 
 def _selection_snapshot(selected_utxos: List[dict]) -> dict:
     """
-    Deterministic, audit-friendly snapshot of the current UTXO selection.
-    This is the canonical representation of user intent.
+    Deterministic, audit-friendly snapshot of the current user selection.
+    This is the canonical representation saved to JSON.
     """
+    if not selected_utxos:
+        return {
+            "fingerprint": "none",
+            "count": 0,
+            "total_value": 0,
+            "utxos": [],
+        }
+
+    sorted_utxos = sorted(selected_utxos, key=lambda u: (u["txid"], u["vout"]))
+
     return {
-        "fingerprint": _selection_fingerprint(selected_utxos),
-        "count": len(selected_utxos),
-        "total_value": sum(u["value"] for u in selected_utxos),
+        "fingerprint": _selection_fingerprint(sorted_utxos),
+        "count": len(sorted_utxos),
+        "total_value": sum(u["value"] for u in sorted_utxos),
         "utxos": [
             {
                 "txid": u["txid"],
@@ -243,109 +245,114 @@ def _selection_snapshot(selected_utxos: List[dict]) -> dict:
                 "health": u.get("health"),
                 "source": u.get("source"),
             }
-            for u in sorted(
-                selected_utxos,
-                key=lambda u: (u["txid"], u["vout"])
-            )
-        ]
+            for u in sorted_utxos
+        ],
     }
 
+
 def _selection_fingerprint(selected_utxos: List[dict]) -> str:
-    """Deterministic short hash of selected inputs (sorted txid:vout)."""
+    """
+    Deterministic short hash of selected inputs (sorted by txid:vout).
+    Used for audit trail and duplicate detection.
+    """
     if not selected_utxos:
         return "none"
+
     keys = sorted((u["txid"], u["vout"]) for u in selected_utxos)
     data = ":".join(f"{txid}:{vout}" for txid, vout in keys).encode()
     return hashlib.sha256(data).hexdigest()[:16]
-
 
 # =========================
 # Utility Functions
 # =========================
 
-def safe_get(url: str, timeout: int = 12) -> Optional[requests.Response]:
-    """Robust GET with retries, exponential backoff, and proper timeout support."""
+def safe_get(url: str, timeout: int = 8) -> Optional[requests.Response]:
+    """Robust GET with 3 retries, exponential backoff, and strict timeout."""
     for attempt in range(3):
         try:
             log.debug(f"safe_get attempt {attempt+1}: {url} (timeout={timeout}s)")
             r = session.get(url, timeout=timeout)
-            
-            log.debug(f"Response from {url}: {r.status_code}")
-            
+
             if r.status_code == 200:
                 return r
-            
-            elif r.status_code == 429:  # Rate limit
+
+            if r.status_code == 429:  # Rate limit
                 sleep_time = 1.5 ** attempt
                 log.warning(f"Rate limited (429) on {url} — sleeping {sleep_time:.1f}s")
                 time.sleep(sleep_time)
-            
-            else:
-                log.debug(f"Bad status from {url}: {r.status_code}")
-        
+                continue
+
+            log.debug(f"Bad status from {url}: {r.status_code}")
+
         except Exception as e:
             log.debug(f"Request failed (attempt {attempt+1}): {type(e).__name__}: {e}")
             if attempt < 2:
                 time.sleep(0.5 * (2 ** attempt))  # Short backoff
-    
+
     log.warning(f"safe_get failed after 3 attempts: {url}")
     return None
 
-def get_live_fees() -> Optional[Dict[str, int]]:
+def get_live_fees() -> Dict[str, int]:
     """Fetch recommended fees from mempool.space with 30-second caching."""
-    # Safe cache check — avoid AttributeError on first call
-    if (
-        hasattr(get_live_fees, "cache")
-        and hasattr(get_live_fees, "cache_time")
-        and time.time() - get_live_fees.cache_time < 30
-    ):
-        return get_live_fees.cache
+    # Safe cache check
+    if hasattr(get_live_fees, "cache") and hasattr(get_live_fees, "cache_time"):
+        if time.time() - get_live_fees.cache_time < 30:
+            return get_live_fees.cache
 
     try:
         r = session.get("https://mempool.space/api/v1/fees/recommended", timeout=8)
         if r.status_code == 200:
             data = r.json()
             fees = {
-                "fastest": int(data["fastestFee"]),
+                "fastest":   int(data["fastestFee"]),
                 "half_hour": int(data["halfHourFee"]),
-                "hour": int(data["hourFee"]),
-                "economy": int(data["economyFee"]),
-                "minimum": int(data["minimumFee"]),
+                "hour":      int(data["hourFee"]),
+                "economy":   int(data["economyFee"]),
+                "minimum":   int(data["minimumFee"]),
             }
             now = time.time()
             with _fee_cache_lock:
                 get_live_fees.cache = fees
                 get_live_fees.cache_time = now
+            log.debug(f"Fetched live fees: economy={fees['economy']}, fastest={fees['fastest']}")
             return fees
+        else:
+            log.warning(f"Fees endpoint returned {r.status_code}: {r.text[:100]}")
     except requests.exceptions.RequestException as e:
         log.warning(f"Failed to fetch live fees: {e}")
 
-    # Fallback conservative defaults
+    # Conservative fallback
     return {
-        "fastest": 10,
+        "fastest":   10,
         "half_hour": 6,
-        "hour": 3,
-        "economy": 1,
-        "minimum": 1,
+        "hour":      3,
+        "economy":   1,
+        "minimum":   1,
     }
 
-def get_prune_score():
-    """Dynamically calculate Pruning Conditions using mempool.space 24h, 1w, and 1m block fee-rates."""
+def get_prune_score() -> str:
+    """
+    Display current fee vs recent medians with color-coded badge.
+    No explicit score — colors reflect relative conditions.
+    Uses real medians from mempool.space (avgFee_90 mean).
+    Includes price, block height, hashrate, difficulty adjustment, and halving in context.
+    """
     urls = {
         '24h': "https://mempool.space/api/v1/mining/blocks/fee-rates/24h",
         '1w': "https://mempool.space/api/v1/mining/blocks/fee-rates/1w",
         '1m': "https://mempool.space/api/v1/mining/blocks/fee-rates/1m"
     }
     avgs = {}
+
     try:
         for period, url in urls.items():
             r = session.get(url, timeout=12)
             if r.status_code == 200:
                 data = r.json()
                 if len(data) > 5:
-                    p50_fees = [block.get('avgFee_50', 1) for block in data if 'avgFee_50' in block]
-                    if p50_fees:
-                        avgs[period] = statistics.mean(p50_fees)
+                    p90_fees = [block.get('avgFee_90', 1) for block in data if 'avgFee_90' in block]
+                    if p90_fees:
+                        avgs[period] = statistics.mean(p90_fees)
                     else:
                         avgs[period] = None
                 else:
@@ -361,52 +368,50 @@ def get_prune_score():
     current = current_fees['economy']
 
     # Primary avg: 1w preferred
-    primary_avg = avgs['1w'] or avgs['1m'] or avgs['24h'] or 5.0
-    day_avg = avgs['24h'] or primary_avg
-    month_avg = avgs['1m'] or primary_avg
+    primary_avg = avgs['1w'] or avgs['1m'] or avgs['24h'] or None
+    day_avg   = avgs['24h']
+    month_avg = avgs['1m']
 
-    # Score calculation
-    ratio = current / primary_avg if primary_avg > 0 else 1.0
+    # Ratio for color only (neutral if no primary avg)
+    ratio = current / primary_avg if primary_avg is not None and primary_avg > 0 else 1.0
+
+    # Badge color based on ratio
     if ratio < 0.5:
-        level = "Excellent"
-        color = "#00ff88"
-        score = 10
+        color = "#00ff88"  # Excellent green
     elif ratio < 0.8:
-        level = "Good"
-        color = "#00ffdd"
-        score = 8
+        color = "#00ffdd"  # Good cyan
     elif ratio < 1.2:
-        level = "Fair"
-        color = "#ff9900"
-        score = 5
+        color = "#ff9900"  # Fair orange
     else:
-        level = "Poor"
-        color = "#ff3366"
-        score = 3
-    score = max(1, min(10, round(score + (1 - ratio) * 2)))
+        color = "#ff3366"  # Poor red
 
-    # Plural handling for current fee
     fee_unit = "sat/vB" if current == 1 else "sats/vB"
 
-    # Fetch price & block height
+    # Context: price, block height, hashrate, difficulty adjustment, halving
     price = "—"
     height = "—"
-    try:
-        height_r = session.get("https://mempool.space/api/blocks/tip/height", timeout=8)
-        height = height_r.text.strip() if height_r.status_code == 200 else "—"
-        price_r = session.get("https://mempool.space/api/v1/prices", timeout=8)
-        price_usd = price_r.json().get('USD', 0) if price_r.status_code == 200 else 0
-        price = f"${price_usd:,}" if price_usd > 0 else "—"
-    except Exception:
-        pass
-
-    # Hashrate (try 1w first, fallback to 3d for more reliability)
     hr_formatted = "—"
+    adjustment_text = ""
+    halving_text = ""
+
     try:
+        # Block height
+        height_r = session.get("https://mempool.space/api/blocks/tip/height", timeout=8)
+        if height_r.status_code == 200:
+            height = height_r.text.strip()
+
+        # Price
+        price_r = session.get("https://mempool.space/api/v1/prices", timeout=8)
+        if price_r.status_code == 200:
+            price_usd = price_r.json().get('USD', 0)
+            price = f"${price_usd:,}" if price_usd > 0 else "—"
+
+        # Hashrate (prefer 1w, fallback 3d)
         for hr_period in ["1w", "3d"]:
             hr_r = session.get(f"https://mempool.space/api/v1/mining/hashrate/{hr_period}", timeout=10)
             if hr_r.status_code == 200:
                 hr_data = hr_r.json()
+                current_hashrate = None
                 if isinstance(hr_data.get('currentHashrate'), dict):
                     current_hashrate = hr_data['currentHashrate'].get('avgHashrate')
                 else:
@@ -420,12 +425,8 @@ def get_prune_score():
                     else:
                         hr_formatted = f"{current_hashrate / 1e12:.0f} TH/s"
                     break
-    except Exception:
-        pass
 
-    # Next Difficulty Adjustment
-    adjustment_text = ""
-    try:
+        # Next Difficulty Adjustment
         da_r = session.get("https://mempool.space/api/v1/difficulty-adjustment", timeout=8)
         if da_r.status_code == 200:
             da_data = da_r.json()
@@ -433,28 +434,33 @@ def get_prune_score():
             blocks_remaining = da_data.get('remainingBlocks', 0)
             days_remaining = round(blocks_remaining / 144) if blocks_remaining else 0
             adjustment_text = f"Next adj: {adjustment_pct:+.2f}% in ~{days_remaining} days"
-    except Exception:
-        adjustment_text = ""
 
-    # Halving countdown
-    halving_text = ""
-    try:
+        # Halving countdown (computed from height)
         if height != "—":
-            current_height = int(height)
-            next_halving = ((current_height // 210000) + 1) * 210000
-            blocks_to_halving = next_halving - current_height
-            days_to_halving = round(blocks_to_halving / 144)
-            halving_text = f"Halving: ~{days_to_halving:,} days"
-    except Exception:
-        halving_text = ""
+            try:
+                current_height = int(height)
+                next_halving = ((current_height // 210000) + 1) * 210000
+                blocks_to_halving = next_halving - current_height
+                days_to_halving = round(blocks_to_halving / 144)
+                halving_text = f"Halving: ~{days_to_halving:,} days"
+            except ValueError:
+                pass
+
+    except Exception as e:
+        log.warning(f"Context fetch partial failure: {e}")
 
     # Build context line with responsive breaks
-    context_line = f"BTC: {price} • Block: {height}<br>Hashrate: {hr_formatted}"
+    context_line = f"BTC: {price} • Block: {height}"
+    if hr_formatted != "—":
+        context_line += f" • Hashrate: {hr_formatted}"
     if adjustment_text:
         context_line += f" • {adjustment_text}"
     if halving_text:
         context_line += f"<br>{halving_text}"
+    if context_line == f"BTC: {price} • Block: {height}":
+        context_line = "—"
 
+    # Final HTML
     return f"""
     <div style="
         text-align:center !important;
@@ -473,10 +479,9 @@ def get_prune_score():
             text-shadow: 0 0 35px {color} !important;
             margin-bottom: 8px !important;
         ">
-            Pruning Conditions: {level} ({score}/10)
+            Pruning Conditions
         </div>
 
-        <!-- Current Economy Fee -->
         <div style="
             color: #00ffff !important;
             font-size: clamp(2.2rem, 8vw, 3rem) !important;
@@ -494,7 +499,6 @@ def get_prune_score():
             Current economy fee
         </div>
 
-        <!-- VS -->
         <div style="
             color: #f7931a !important;
             font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
@@ -506,7 +510,6 @@ def get_prune_score():
             VS
         </div>
 
-        <!-- Medians Row -->
         <div style="
             display: flex !important;
             justify-content: center !important;
@@ -517,30 +520,27 @@ def get_prune_score():
             font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
             font-weight: 700 !important;
         ">
-            <!-- 1-day -->
             <div style="text-align: center !important;">
                 <div style="color: #00ddff !important; font-size: clamp(1.3rem, 5vw, 1.7rem) !important; font-weight: 900 !important;">
-                    {day_avg:.1f} sats/vB
+                    {f"{day_avg:.1f}" if day_avg is not None else "—"} sats/vB
                 </div>
                 <div style="color: #88ccff !important; font-size: clamp(0.9rem, 3.2vw, 1.1rem) !important;">
                     1-day median
                 </div>
             </div>
 
-            <!-- 1-week -->
             <div style="text-align: center !important;">
                 <div style="color: #00ff88 !important; font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important; font-weight: 900 !important; text-shadow: 0 0 20px #00ff88 !important;">
-                    {primary_avg:.1f} sats/vB
+                    {f"{primary_avg:.1f}" if primary_avg is not None else "—"} sats/vB
                 </div>
                 <div style="color: #88ffaa !important; font-size: clamp(0.95rem, 3.4vw, 1.15rem) !important;">
                     1-week median
                 </div>
             </div>
 
-            <!-- 1-month -->
             <div style="text-align: center !important;">
                 <div style="color: #aaff88 !important; font-size: clamp(1.3rem, 5vw, 1.7rem) !important; font-weight: 900 !important;">
-                    {month_avg:.1f} sats/vB
+                    {f"{month_avg:.1f}" if month_avg is not None else "—"} sats/vB
                 </div>
                 <div style="color: #99ffbb !important; font-size: clamp(0.9rem, 3.2vw, 1.1rem) !important;">
                     1-month median
@@ -548,118 +548,100 @@ def get_prune_score():
             </div>
         </div>
 
-        <!-- Footer -->
         <div style="
             color: #88ffaa !important;
-            font-size: clamp(0.9rem, 3vw, 1rem) !important;
+            font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
+            font-weight: 600 !important;
+            line-height: 1.5 !important;
             margin-top: 20px !important;
-            font-weight: 700 !important;
-            line-height: 1.6 !important;
         ">
-            Lower than medians = prime time to prune dust & consolidate! 🔥<br>
             <small style="color: #66cc99 !important; font-weight: normal !important;">
-                Data from mempool.space mining stats<br>
                 {context_line}
             </small>
         </div>
     </div>
     """
-
-def _coerce_int(value, default: int) -> int:
-    """
-    Safely coerce a value to int, falling back to default on failure.
-    Handles None, "", malformed strings, floats, etc.
-    Used for slider inputs that can arrive as None or empty in Gradio edge cases.
-    """
-    try:
-        return int(float(value))
-    except (TypeError, ValueError, OverflowError):
-        return default
-
-def _coerce_float(value, default: float) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError, OverflowError):
-        return default
-
+	
+# ── Update enriched state from UI checkbox changes ──────────────────────────────
 def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: bool) -> tuple:
+    """
+    Apply current checkbox state from DataFrame to the frozen enriched_state.
+    Enforces unbreakable rule: legacy/nested inputs ALWAYS unselected.
+    Returns new immutable tuple (never mutates original).
+    """
     if locked or not enriched_state:
         return enriched_state
 
-    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
-        meta, utxos = enriched_state
-    else:
-        meta = {}
-        utxos = enriched_state or ()
+    # Unpack frozen state (invariant: always (meta, tuple[dict]))
+    meta, utxos = enriched_state if isinstance(enriched_state, tuple) and len(enriched_state) == 2 else ({}, enriched_state)
 
     if len(df_rows) != len(utxos):
+        log.warning(f"df_rows length mismatch: {len(df_rows)} vs utxos {len(utxos)}")
         return enriched_state
 
     updated_utxos = []
     for row, u in zip(df_rows, utxos):
-        new_u = dict(u)
-        script_type = u.get("script_type", "")
+        new_u = dict(u)  # shallow copy — safe since we rebuild tuple
 
-        # THIS IS THE UNBREAKABLE DEFENSE
-        if script_type not in ("P2WPKH", "Taproot"):
-            new_u["selected"] = False  # ALWAYS force off for legacy/nested
+        script_type = u.get("script_type", "")
+        if script_type not in ("P2WPKH", "Taproot", "P2TR"):
+            new_u["selected"] = False  # Unbreakable defense: legacy/nested never selected
         else:
-            new_u["selected"] = bool(row[CHECKBOX_COL])
+            # Gradio checkbox can be bool, int, str — normalize safely
+            checkbox_val = row[CHECKBOX_COL] if len(row) > CHECKBOX_COL else False
+            new_u["selected"] = checkbox_val in (True, 1, "true", "True", "1") or bool(checkbox_val)
 
         updated_utxos.append(new_u)
 
     return (meta, tuple(updated_utxos))
-        
-from typing import Tuple, Any
 
+
+# ── Load saved selection from JSON snapshot ─────────────────────────────────────
 def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, str]:
-    """Load and restore a saved selection snapshot into the current enriched state."""
-    log.debug("load_selection called - snapshot type: %s", type(parsed_snapshot))
+    """
+    Restore checkbox selection from a saved JSON snapshot into the current enriched state.
+    Returns updated enriched_state tuple + user-facing HTML message.
+    """
+    log.debug(f"load_selection called - snapshot type: {type(parsed_snapshot)}")
 
     if not parsed_snapshot or not isinstance(parsed_snapshot, dict):
         log.debug("No valid parsed snapshot provided")
         return current_enriched, "No valid parsed JSON loaded"
 
     try:
-        snapshot = parsed_snapshot
-        log.debug("Using pre-parsed snapshot - inputs count: %d", len(snapshot.get("inputs", [])))
-
-        if "inputs" not in snapshot:
+        if "inputs" not in parsed_snapshot:
             log.warning("Invalid snapshot format: missing 'inputs'")
             return current_enriched, "Invalid Ωmega Pruner selection file"
 
-        # Case-insensitive + safe vout conversion
+        # Build case-insensitive set of (txid.lower(), vout) keys
         selected_keys = set()
-        for u in snapshot.get("inputs", []):
-            if not isinstance(u, dict) or "txid" not in u or "vout" not in u:
-                log.debug("Skipping invalid input in JSON: %s", u)
+        for inp in parsed_snapshot.get("inputs", []):
+            if not isinstance(inp, dict) or "txid" not in inp or "vout" not in inp:
+                log.debug(f"Skipping invalid input in JSON: {inp}")
                 continue
             try:
-                txid = str(u["txid"]).lower().strip()
-                vout = int(u["vout"])
+                txid = str(inp["txid"]).lower().strip()
+                vout = int(inp["vout"])
                 selected_keys.add((txid, vout))
             except (ValueError, TypeError):
-                log.debug("Skipping invalid input (txid/vout error): %s", u)
+                log.debug(f"Skipping invalid txid/vout: {inp}")
                 continue
 
-        log.debug("Selected keys from JSON (case-insensitive): %d", len(selected_keys))
+        log.debug(f"Loaded {len(selected_keys)} selected keys from snapshot")
 
-        # Normalize current_enriched
+        # Normalize current enriched state
         if isinstance(current_enriched, tuple) and len(current_enriched) == 2:
             meta, utxos = current_enriched
-            utxos = list(utxos)  # mutable copy
-            log.debug("Using frozen state: meta present, utxos len = %d", len(utxos))
+            utxos = list(utxos)
         else:
             meta = {}
             utxos = list(current_enriched or [])
-            log.debug("Using raw list state: utxos len = %d", len(utxos))
 
-        # Early exit if nothing to restore into
         if not utxos:
-            log.info("Current enriched state is empty - cannot restore selection yet")
+            log.info("Current enriched state empty — restore deferred until analysis")
             return (), (
-                "<div style='color:#aaffcc !important;padding:30px;background:#001100 !important;border:2px solid #00ff88 !important;border-radius:16px !important;text-align:center !important;'>"
-                "<span style='color:#00ffdd !important;font-size:1.6rem;font-weight:900 !important;'>Selection file loaded!</span><br><br>"
+                "<div style='color:#aaffcc;padding:30px;background:#001100;border:2px solid #00ff88;border-radius:16px;text-align:center;'>"
+                "<span style='color:#00ffdd;font-size:1.6rem;font-weight:900;'>Selection file loaded!</span><br><br>"
                 "<strong>Table is empty — restore will happen after:</strong><br>"
                 "1. Paste the same addresses/xpubs<br>"
                 "2. Click ANALYZE (table must load first)<br>"
@@ -668,33 +650,33 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
                 "</div>"
             )
 
-        # Restore loop
+        # Restore selection flags
         updated = []
-        matched_count = 0
+        matched = 0
         for u in utxos:
             new_u = dict(u)
             txid_lower = str(u.get("txid", "")).lower().strip()
-            vout = u.get("vout")
+            vout = None
             try:
-                vout = int(vout) if vout is not None else None
+                vout_raw = u.get("vout")
+                vout = int(vout_raw) if vout_raw is not None else None
             except (ValueError, TypeError):
-                vout = None
+                pass
 
             is_selected = (txid_lower, vout) in selected_keys if vout is not None else False
             new_u["selected"] = is_selected
             if is_selected:
-                matched_count += 1
+                matched += 1
             updated.append(new_u)
 
-        log.debug("Restore complete - matched: %d out of %d", matched_count, len(selected_keys))
+        log.debug(f"Restore complete - matched {matched}/{len(selected_keys)}")
 
-        # Build return tuple
         return_tuple = (meta, tuple(updated)) if meta else tuple(updated)
 
-        if matched_count == 0:
+        if matched == 0:
             message = (
-                "<div style='color:#ffddaa !important;padding:30px;background:#332200 !important;border:2px solid #ff9900 !important;border-radius:16px !important;text-align:center !important;'>"
-                "<span style='color:#ffff66 !important;font-size:1.6rem;font-weight:900 !important;'>Selection loaded — no matching UTXOs found</span><br><br>"
+                "<div style='color:#ffddaa;padding:30px;background:#332200;border:2px solid #ff9900;border-radius:16px;text-align:center;'>"
+                "<span style='color:#ffff66;font-size:1.6rem;font-weight:900;'>Selection loaded — no matching UTXOs found</span><br><br>"
                 f"File contains {len(selected_keys)} UTXOs.<br>"
                 "They don't match current analysis (different addresses? UTXOs spent? txid case?).<br>"
                 "Checkboxes not restored."
@@ -702,8 +684,8 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
             )
         else:
             message = (
-                "<div style='color:#aaffff !important;padding:30px;background:#001122 !important;border:2px solid #00ffff !important;border-radius:16px !important;text-align:center !important;'>"
-                f"<span style='color:#00ffff !important;font-size:1.6rem;font-weight:900 !important;'>Selection loaded — {matched_count}/{len(selected_keys)} UTXOs restored "
+                "<div style='color:#aaffff;padding:30px;background:#001122;border:2px solid #00ffff;border-radius:16px;text-align:center;'>"
+                f"<span style='color:#00ffff;font-size:1.6rem;font-weight:900;'>Selection loaded — {matched}/{len(selected_keys)} UTXOs restored "
                 f"({len(utxos)} total in current table)</span>"
                 "</div>"
             )
@@ -711,32 +693,29 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
         return return_tuple, message
 
     except Exception as e:
-        log.error("Error processing selection snapshot: %s", str(e), exc_info=True)
+        log.error(f"Error processing selection snapshot: {e}", exc_info=True)
         return current_enriched, f"Failed to process selection: {str(e)}"
 
-def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
-    """
-    Rebuild dataframe rows from current enriched_state.
-    Used when loading a saved selection JSON.
-    Safely handles invalid input, enforces unsupported type rules,
-    and uses 'is_legacy' flag to disable legacy UTXOs.
-    TXID shows full value (copyable on click).
-    """
 
-    # Handle invalid enriched_state
+# ── Rebuild DataFrame rows from enriched state (for restore / refresh) ───────────
+def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
+    """
+    Rebuild DataFrame rows from enriched_state for display.
+    Handles legacy/nested disabling, preserves saved 'selected' flags,
+    and flags unsupported types for UX warnings.
+    Returns (rows, has_unsupported)
+    """
     if not enriched_state:
         return [], False
 
-    # Extract utxos from frozen tuple
+    # Normalize to list of dicts
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
         _, utxos = enriched_state
-        if not isinstance(utxos, (list, tuple)):
-            return [], False
-        state_list = list(utxos)
+        state_list = list(utxos) if isinstance(utxos, (list, tuple)) else []
     elif isinstance(enriched_state, (list, tuple)):
         state_list = list(enriched_state)
     else:
-        print(f"Warning: rebuild_df_rows received invalid enriched_state type: {type(enriched_state)}")
+        log.warning(f"Invalid enriched_state type: {type(enriched_state)}")
         return [], False
 
     rows = []
@@ -747,34 +726,32 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
             continue
 
         script_type = u.get("script_type", "").strip()
-        selected = bool(u.get("selected", False))  # Preserve from saved state
+        selected = bool(u.get("selected", False))
         inferred = bool(u.get("script_type_inferred", False))
-        is_legacy = bool(u.get("is_legacy", False))  # NEW: from _enrich_utxos
+        is_legacy = bool(u.get("is_legacy", False))
 
-        # Force legacy to be unselected (safety + clear UX)
+        # Force legacy unselected (safety + UX)
         if is_legacy:
             selected = False
             has_unsupported = True
 
-        # Supported only: Native SegWit and Taproot
-        supported_in_psbt = script_type in ("P2WPKH", "Taproot", "P2TR")
+        supported = script_type in ("P2WPKH", "Taproot", "P2TR")
 
-        # ── Health badge HTML ─────────────────────────────────────────────────
-        if not supported_in_psbt or is_legacy:
+        # Health badge
+        if not supported or is_legacy:
             has_unsupported = True
-
             if is_legacy or script_type in ("P2PKH", "Legacy"):
                 health_html = (
                     '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;background:rgba(255,68,68,0.12);padding:6px;border-radius:6px;">'
-                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
-                    f'<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported for PSBT – migrate first</small>'
+                    '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
+                    '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported for PSBT – migrate first</small>'
                     '</div>'
                 )
             elif script_type in ("P2SH-P2WPKH", "Nested"):
                 health_html = (
                     '<div class="health health-nested" style="color:#ff9900;font-weight:bold;background:rgba(255,153,0,0.12);padding:6px;border-radius:6px;">'
-                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
-                    f'<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported yet</small>'
+                    '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
+                    '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported yet</small>'
                     '</div>'
                 )
             else:
@@ -786,7 +763,6 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
                     '</div>'
                 )
         else:
-            # Modern & supported
             health = u.get("health", "OPTIMAL")
             recommend = u.get("recommend", "")
             health_html = (
@@ -796,7 +772,7 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
                 '</div>'
             )
 
-        # ── Friendly display name ─────────────────────────────────────────────
+        # Friendly type display
         display_type_map = {
             "P2WPKH": "Native SegWit",
             "Taproot": "Taproot",
@@ -809,17 +785,13 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
 
         if inferred:
             display_type += ' <span style="color:#00cc66;font-weight:bold;">[inferred]</span>'
-
         if is_legacy:
             display_type += ' <span style="color:#ff6666;font-weight:bold;">[legacy – disabled]</span>'
 
-        txid_full = u.get("txid", "unknown")
-
-        # Build row
         rows.append([
-            selected,                           # PRUNE checkbox (forced off for legacy)
-            u.get("source", "Single"),          # Includes derivation group if from xpub
-            txid_full,
+            selected,
+            u.get("source", "Single"),
+            u.get("txid", "unknown"),
             health_html,
             u.get("value", 0),
             u.get("address", "unknown"),
@@ -829,25 +801,30 @@ def rebuild_df_rows(enriched_state) -> tuple[List[List], bool]:
         ])
 
     return rows, has_unsupported
-	
+
+
+# ── Simple sat → BTC string formatter ───────────────────────────────────────────
 def sats_to_btc_str(sats: int) -> str:
+    """Convert satoshis to human-readable BTC string (removes trailing zeros)."""
     btc = sats / 100_000_000
     if btc >= 1:
         return f"{btc:,.8f}".rstrip("0").rstrip(".") + " BTC"
     return f"{int(sats):,} sats"
 
+# ── Privacy scoring & CIOH warnings ─────────────────────────────────────────────
 def calculate_privacy_score(selected_utxos: List[dict], total_utxos: int) -> int:
     """
-    2025–2026 realistic privacy scoring.
-    Much harsher penalties for consolidation — reflects current chain analysis capabilities.
+    Realistic 2025–2026 privacy score.
+    Harsh penalties for consolidation — reflects current chain analysis reality.
+    Single input = near-perfect; 2+ inputs = significant linkage risk.
     """
     n = len(selected_utxos)
     if n == 0:
-        return 100  # nothing spent = perfect privacy
+        return 100  # Nothing spent → perfect privacy
     if n == 1:
-        return 92   # single input = very low linkage
+        return 92   # Single input → very low new linkage
 
-    # Harsh penalties even for small numbers
+    # Steep drop-off — even small consolidations hurt badly today
     if n == 2:
         return 65
     if n <= 4:
@@ -861,15 +838,74 @@ def calculate_privacy_score(selected_utxos: List[dict], total_utxos: int) -> int
     if n <= 50:
         return 5
 
-    # Above 50 inputs → near-zero privacy
-    return max(3, 100 - 9 * n)  # steep drop-off
+    # Beyond 50 inputs → privacy is effectively gone
+    return max(3, 100 - 9 * n)
 
-def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) -> str:
+
+def estimate_coinjoin_mixes_needed(
+    input_count: int,
+    distinct_addrs: int,
+    privacy_score: int
+) -> tuple[int, int]:
+    """
+    Rough estimate of CoinJoin rounds needed to meaningfully restore privacy.
+    Caps at realistic Whirlpool / similar limits.
+    """
+    if privacy_score > 80:
+        return 0, 1     # Minimal linkage — optional single mix
+    if privacy_score > 70:
+        return 1, 2     # Light hardening recommended
+
+    # Base: inverse of score (smoother curve)
+    base = max(2, round(100 / (privacy_score + 10)))
+
+    # Scale by input count (more inputs = more work)
+    if input_count >= 50:
+        base += 5
+    elif input_count >= 30:
+        base += 4
+    elif input_count >= 15:
+        base += 3
+    elif input_count >= 8:
+        base += 2
+    elif input_count >= 5:
+        base += 1
+
+    # Scale by distinct addresses revealed (worse than raw count)
+    if distinct_addrs >= 15:
+        base += 5
+    elif distinct_addrs >= 10:
+        base += 4
+    elif distinct_addrs >= 6:
+        base += 3
+    elif distinct_addrs >= 3:
+        base += 2
+    elif distinct_addrs > 1:
+        base += 1
+
+    min_mixes = max(1, base - 2)
+    max_mixes = base + 2
+
+    return min(12, min_mixes), min(18, max_mixes)  # Realistic upper bounds
+
+
+def get_cioh_warning(
+    input_count: int,
+    distinct_addrs: int,
+    privacy_score: int
+) -> str:
+    """
+    Generate CIOH (Common Input Ownership Heuristic) warning HTML.
+    Color-coded severity, includes recovery suggestions when needed.
+    """
     if input_count <= 1:
         return ""
 
-    min_mixes, max_mixes = estimate_coinjoin_mixes_needed(input_count, distinct_addrs, privacy_score)
+    min_mixes, max_mixes = estimate_coinjoin_mixes_needed(
+        input_count, distinct_addrs, privacy_score
+    )
 
+    # Recovery suggestion shown when score ≤ 70
     recovery_note = ""
     if privacy_score <= 70:
         recovery_note = f"""
@@ -900,7 +936,7 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         </div>
         """
 
-    # EXTREME CIOH
+    # ── Extreme linkage (≤30) ───────────────────────────────────────────────────
     if privacy_score <= 30:
         return f"""
         <div style="
@@ -937,7 +973,7 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         </div>
         """
 
-    # HIGH CIOH
+    # ── High risk (≤50) ─────────────────────────────────────────────────────────
     elif privacy_score <= 50:
         return f"""
         <div style="
@@ -964,7 +1000,7 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         </div>
         """
 
-    # MODERATE CIOH
+    # ── Moderate risk (≤70) ─────────────────────────────────────────────────────
     elif privacy_score <= 70:
         return f"""
         <div style="
@@ -991,19 +1027,19 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
         </div>
         """
 
-    # LOW CIOH — now with light green box for consistency
+    # ── Low impact (>70) ────────────────────────────────────────────────────────
     else:
         return f"""
         <div style="
             margin-top:10px !important;
             padding:12px !important;
-            background:#001a00 !important;           /* very dark green, subtle */
-            border:1px solid #00ff88 !important;     /* light green border */
+            background:#001a00 !important;
+            border:1px solid #00ff88 !important;
             border-radius:10px !important;
             color:#aaffcc !important;
             font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
             line-height:1.6 !important;
-            box-shadow:0 0 20px rgba(0,255,136,0.2) !important;  /* soft green glow */
+            box-shadow:0 0 20px rgba(0,255,136,0.2) !important;
         ">
             <div style="
                 color:#00ffdd !important;
@@ -1019,62 +1055,23 @@ def get_cioh_warning(input_count: int, distinct_addrs: int, privacy_score: int) 
             Few inputs spent together — minimal new linkage created.<br>
             Address separation remains strong.<br>
             Privacy preserved.
-            {recovery_note}  <!-- now included if score barely >70 but still has note -->
+            {recovery_note}
         </div>
         """
-		
-def estimate_coinjoin_mixes_needed(input_count: int, distinct_addrs: int, privacy_score: int) -> tuple[int, int]:
-    if privacy_score > 80:
-        return 0, 1    # Truly minimal linkage
-    if privacy_score > 70:
-        return 1, 2    # Light optional hardening
-
-    # Start with inverse of score, but smoother
-    base = max(2, round(100 / (privacy_score + 10)))  # Avoids huge spikes at low scores
-
-    # Stronger input count scaling
-    if input_count >= 50:
-        base += 5
-    elif input_count >= 30:
-        base += 4
-    elif input_count >= 15:
-        base += 3
-    elif input_count >= 8:
-        base += 2
-    elif input_count >= 5:
-        base += 1
-
-    # Heavier distinct address penalty — revealing more unique addrs is worse
-    if distinct_addrs >= 15:
-        base += 5
-    elif distinct_addrs >= 10:
-        base += 4
-    elif distinct_addrs >= 6:
-        base += 3
-    elif distinct_addrs >= 3:
-        base += 2
-    elif distinct_addrs > 1:
-        base += 1
-
-    min_mixes = max(1, base - 2)
-    max_mixes = base + 2
-
-    return min(12, min_mixes), min(18, max_mixes)  # Cap at realistic Whirlpool use
-
 # =========================
 # Helper Functions for Bitcoin Addresses
 # =========================
 
 def base58_decode(s: str) -> bytes:
-    """Decode base58 encoded string."""
+    """Decode Base58Check-encoded string (with leading zeros preserved)."""
     n = 0
     for c in s:
         n = n * 58 + BASE58_ALPHABET.index(c)
     leading_zeros = len(s) - len(s.lstrip('1'))
     return b'\x00' * leading_zeros + n.to_bytes((n.bit_length() + 7) // 8, 'big')
 
-def bech32_polymod(values: List[int]) -> int:
-    """Checksum calculation for Bech32 addresses."""
+def bech32_polymod(values: list[int]) -> int:
+    """Polymod computation - same generator table for both Bech32 and Bech32m"""
     GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
     chk = 1
     for v in values:
@@ -1085,110 +1082,143 @@ def bech32_polymod(values: List[int]) -> int:
                 chk ^= GEN[i]
     return chk
 
-def bech32_verify_checksum(hrp: str, data: List[int]) -> bool:
-    return bech32_polymod([ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp] + data) == 1
 
-def bech32m_verify_checksum(hrp: str, data: List[int]) -> bool:
-    return bech32_polymod([ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp] + data) == 0x2bc830a3
+def bech32_hrp_expand(hrp: str) -> list[int]:
+    """Expand HRP for checksum calculation (BIP-173 / BIP-350)"""
+    return [ord(x) >> 5 for x in hrp] + [0] + [ord(x) & 31 for x in hrp]
 
-def convertbits(data: List[int], frombits: int, tobits: int, pad: bool = True) -> List[int]:
-    """Convert bit sizes for address formats."""
-    acc = bits = 0
+
+def bech32_verify_checksum(hrp: str, data: list[int]) -> bool:
+    """Verify classic Bech32 checksum (BIP-173)"""
+    return bech32_polymod(bech32_hrp_expand(hrp) + data) == 1
+
+
+def bech32m_verify_checksum(hrp: str, data: list[int]) -> bool:
+    """Verify Bech32m checksum (BIP-350, used for Taproot)"""
+    return bech32_polymod(bech32_hrp_expand(hrp) + data) == 0x2bc830a3
+
+
+def convertbits(data: list[int], frombits: int, tobits: int, pad: bool = True) -> list[int] | None:
+    """Convert bits between groups with strict validation when pad=False"""
+    acc = 0
+    bits = 0
     ret = []
     maxv = (1 << tobits) - 1
+    max_acc = (1 << (frombits + tobits - 1)) - 1
+
     for value in data:
-        acc = (acc << frombits) | value
+        if value < 0 or (value >> frombits):
+            return None
+        acc = ((acc << frombits) | value) & max_acc
         bits += frombits
         while bits >= tobits:
             bits -= tobits
-            ret.append(acc >> bits & maxv)
-    if pad and bits:
-        ret.append((acc << (tobits - bits)) & maxv)
-    elif bits >= frombits or (acc << (tobits - bits)) & maxv:
-        raise ValueError("Invalid padding")
+            ret.append((acc >> bits) & maxv)
+
+    if pad:
+        if bits:
+            ret.append((acc << (tobits - bits)) & maxv)
+    else:
+        # BIP-173 strict rule: leftover bits must be zero
+        if bits >= frombits or ((acc << (tobits - bits)) & maxv):
+            return None
+
     return ret
 
-def address_to_script_pubkey(addr: str) -> Tuple[bytes, Dict[str, Any]]:
-    """Convert Bitcoin address to script pubkey + metadata."""
-    addr = (addr or "").strip().lower()
-    if not addr:
-        return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'unknown'}
 
-    # Legacy P2PKH (1...)
+def address_to_script_pubkey(addr: str) -> tuple[bytes, dict]:
+    """
+    Convert Bitcoin address → scriptPubKey + metadata.
+    Supports: P2PKH, P2SH, P2WPKH, P2WSH, P2TR (Taproot).
+    Returns fallback on invalid input.
+    """
+    addr = (addr or "").strip().lower()
+    fallback_spk = b'\x00\x14' + b'\x00' * 20
+    fallback_meta = {'input_vb': 68, 'output_vb': 31, 'type': 'unknown'}
+
+    if not addr:
+        return fallback_spk, fallback_meta
+
+    # ── Legacy P2PKH (1...) ────────────────────────────────────────────────────
     if addr.startswith('1'):
         try:
             dec = base58_decode(addr)
             if len(dec) == 25 and dec[0] == 0x00:
                 hash160 = dec[1:21]
-                return b'\x76\xa9\x14' + hash160 + b'\x88\xac', {
-                    'input_vb': 148,
-                    'output_vb': 34,
-                    'type': 'P2PKH'
-                }
-        except Exception:
-            pass
-        return b'\x00\x14' + b'\x00'*20, {'input_vb': 148, 'output_vb': 34, 'type': 'invalid'}
+                return (
+                    b'\x76\xa9\x14' + hash160 + b'\x88\xac',
+                    {'input_vb': 148, 'output_vb': 34, 'type': 'P2PKH'}
+                )
+        except (ValueError, IndexError) as e:
+            log.warning("P2PKH decode failed for %s: %s", addr, str(e))
+        return fallback_spk, {'input_vb': 148, 'output_vb': 34, 'type': 'invalid'}
 
-    # P2SH (3...)
+    # ── P2SH (3...) ────────────────────────────────────────────────────────────
     if addr.startswith('3'):
         try:
             dec = base58_decode(addr)
             if len(dec) == 25 and dec[0] == 0x05:
                 hash160 = dec[1:21]
-                return b'\xa9\x14' + hash160 + b'\x87', {
-                    'input_vb': 91,
-                    'output_vb': 32,
-                    'type': 'P2SH'
-                }
-        except Exception:
-            pass
-        return b'\x00\x14' + b'\x00'*20, {'input_vb': 91, 'output_vb': 32, 'type': 'invalid'}
+                return (
+                    b'\xa9\x14' + hash160 + b'\x87',
+                    {'input_vb': 91, 'output_vb': 32, 'type': 'P2SH'}
+                )
+        except (ValueError, IndexError) as e:
+            log.warning("P2SH decode failed for %s: %s", addr, str(e))
+        return fallback_spk, {'input_vb': 91, 'output_vb': 32, 'type': 'invalid'}
 
-    # Bech32 / Bech32m (bc1...)
+    # ── Bech32 / Bech32m (bc1...) ──────────────────────────────────────────────
     if addr.startswith('bc1'):
-        data_part = addr[4:]
-
-        if any(c not in CHARSET for c in data_part):
-            return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
-
+        hrp = 'bc'
+        data_part = addr[3:]
         data = [CHARSET.find(c) for c in data_part]
-        if len(data) < 1:
-            return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
+        if -1 in data:
+            log.warning("Invalid charset in Bech32 address: %s", addr)
+            return fallback_spk, fallback_meta
 
-        witness_version = data[0]
+        if bech32_verify_checksum(hrp, data):
+            witness_version = 0
+            log.debug("Valid classic Bech32 (v0) checksum for: %s", addr)
+        elif bech32m_verify_checksum(hrp, data):
+            witness_version = 1
+            log.debug("Valid Bech32m (v1+) checksum for: %s", addr)
+        else:
+            polymod_val = bech32_polymod(bech32_hrp_expand(hrp) + data)
+            log.warning("Checksum failed for both Bech32 and Bech32m: %s (polymod=0x%08x)", addr, polymod_val)
+            return fallback_spk, fallback_meta
 
-        # P2WPKH / P2WSH (v0, bc1q...)
-        if addr.startswith('bc1q') and witness_version == 0 and bech32_verify_checksum('bc', data):
-            prog = convertbits(data[1:], 5, 8, False)
-            if prog and len(prog) in (20, 32):
-                if len(prog) == 20:
-                    return b'\x00\x14' + bytes(prog), {
-                        'input_vb': 68,
-                        'output_vb': 31,
-                        'type': 'P2WPKH'
-                    }
-                elif len(prog) == 32:
-                    return b'\x00\x20' + bytes(prog), {
-                        'input_vb': 69,
-                        'output_vb': 43,
-                        'type': 'P2WSH'
-                    }
+        if len(data) < 7:
+            log.warning("Bech32 address too short: %s", addr)
+            return fallback_spk, fallback_meta
 
-        # Taproot (v1, bc1p...)
-        if addr.startswith('bc1p') and witness_version == 1 and bech32m_verify_checksum('bc', data):
-            prog = convertbits(data[1:], 5, 8, False)
-            if prog and len(prog) == 32:
-                return b'\x51\x20' + bytes(prog), {
-                    'input_vb': 57,
-                    'output_vb': 43,
-                    'type': 'Taproot'
-                }
+        prog_data = data[1 : -6]  # drop version (first) + checksum (last 6)
 
-        return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'invalid'}
+        prog = convertbits(prog_data, 5, 8, pad=False)
+        if prog is None:
+            log.warning("convertbits failed after dropping checksum (leftover/invalid bits): %s", addr)
+            return fallback_spk, fallback_meta
 
-    # Fallback
-    return b'\x00\x14' + b'\x00'*20, {'input_vb': 68, 'output_vb': 31, 'type': 'unknown'}
+        # ── Valid cases ────────────────────────────────────────────────────────
+        if witness_version == 0:
+            if len(prog) == 20:
+                log.debug("Valid P2WPKH: %s", addr)
+                return b'\x00\x14' + bytes(prog), {'input_vb': 68, 'output_vb': 31, 'type': 'P2WPKH'}
+            if len(prog) == 32:
+                log.debug("Valid P2WSH: %s", addr)
+                return b'\x00\x20' + bytes(prog), {'input_vb': 69, 'output_vb': 43, 'type': 'P2WSH'}
 
+        if witness_version == 1 and len(prog) == 32:
+            log.debug("Valid Taproot (P2TR): %s", addr)
+            return b'\x51\x20' + bytes(prog), {'input_vb': 57, 'output_vb': 43, 'type': 'Taproot'}
+
+        log.warning("Unsupported witness version %d or program length %d: %s",
+                    witness_version, len(prog), addr)
+        return fallback_spk, fallback_meta
+
+    # ── Fallback for unrecognized format ───────────────────────────────────────
+    log.warning("Unrecognized address format: %s", addr)
+    return fallback_spk, fallback_meta
+	
 # =========================
 # Transaction Economics (Single Source of Truth)
 # =========================
@@ -1200,36 +1230,47 @@ class TxEconomics:
     fee: int               # Final miner fee (includes any absorbed dust/change)
     change_amt: int        # Amount returned as change output (0 if dust or no destination)
 
+
 def estimate_tx_economics(
     selected_utxos: List[Dict],
     fee_rate: int,
 ) -> TxEconomics:
-    """Estimate transaction economics — prioritizes returning change when possible."""
+    """
+    Estimate transaction economics — prioritizes returning meaningful change.
+    Uses modern 2025+ heuristics to avoid creating new dust outputs.
+    """
     if not selected_utxos:
         raise ValueError("No UTXOs selected")
 
     total_in = sum(u["value"] for u in selected_utxos)
+    if total_in <= 0:
+        raise ValueError("Total input value is zero or negative")
+
     input_weight = sum(u["input_weight"] for u in selected_utxos)
     input_count = len(selected_utxos)
 
-    # Base SegWit vsize (more accurate for modern inputs)
+    # Base SegWit vsize calculation (accurate for P2WPKH/Taproot inputs)
     base_vsize = (input_weight + 43 * 4 + 31 * 4 + 10 * 4 + input_count) // 4 + 10
 
-    # Conservative fallback
+    # Conservative fallback (covers worst-case witness estimation)
     conservative_vsize = (input_weight + 150 + input_count * 60) // 4
 
     vsize = max(base_vsize, conservative_vsize)
-    fee = max(600, int(vsize * fee_rate))  # Minimum ~1 sat/vB effective fee
+
+    # Fee with minimum ~1 sat/vB effective rate
+    fee = max(600, int(vsize * fee_rate))
 
     remaining_after_fee = total_in - fee
+    if remaining_after_fee < 0:
+        raise ValueError(f"Fee exceeds total input value ({fee:,} > {total_in:,} sats)")
 
     # ── 2025 best practice: avoid creating new dust ─────────────────────────────
-    MIN_REASONABLE_CHANGE = 10_000   # ~0.0001 BTC — configurable later if desired
-    DUST_THRESHOLD = 546             # classic dust, but we use higher bar for change
+    MIN_REASONABLE_CHANGE = 10_000   # ~0.0001 BTC — considered dust by most wallets today
+    DUST_THRESHOLD = 546             # Classic dust limit (not used for change decision)
 
     change_amt = remaining_after_fee if remaining_after_fee >= MIN_REASONABLE_CHANGE else 0
 
-    # If change is below reasonable threshold → absorb into fee
+    # Absorb tiny remainder into fee (cleanup mode)
     if remaining_after_fee > 0 and change_amt == 0:
         fee += remaining_after_fee
 
@@ -1240,47 +1281,65 @@ def estimate_tx_economics(
         change_amt=change_amt,
     )
 
+
+# ── Transaction serialization helpers ───────────────────────────────────────────
+
 def encode_varint(i: int) -> bytes:
-    if i < 0xfd: return bytes([i])
-    if i < 0x10000: return b'\xfd' + i.to_bytes(2, 'little')
-    if i < 0x100000000: return b'\xfe' + i.to_bytes(4, 'little')
+    """Encode variable-length integer (CompactSize) per Bitcoin protocol."""
+    if i < 0xfd:
+        return bytes([i])
+    if i < 0x10000:
+        return b'\xfd' + i.to_bytes(2, 'little')
+    if i < 0x100000000:
+        return b'\xfe' + i.to_bytes(4, 'little')
     return b'\xff' + i.to_bytes(8, 'little')
+
 
 @dataclass
 class TxIn:
+    """Unsigned transaction input (for PSBT)."""
     prev_tx: bytes
     prev_index: int
-    sequence: int = 0xfffffffd   # Enable RBF
+    sequence: int = 0xfffffffd   # RBF enabled by default
 
     def serialize(self) -> bytes:
+        """Serialize input for unsigned tx (empty scriptSig)."""
         return (
-            self.prev_tx[::-1] +
+            self.prev_tx[::-1] +                     # txid reversed
             self.prev_index.to_bytes(4, 'little') +
-            b'\x00' +  # empty scriptSig length — critical for unsigned tx
+            b'\x00' +                                 # empty scriptSig length
             self.sequence.to_bytes(4, 'little')
         )
 
+
 @dataclass
 class TxOut:
+    """Transaction output."""
     amount: int
     script_pubkey: bytes
 
     def serialize(self) -> bytes:
+        """Serialize output (amount + scriptPubKey)."""
         return (
             self.amount.to_bytes(8, 'little') +
             encode_varint(len(self.script_pubkey)) +
             self.script_pubkey
         )
 
+
 @dataclass
 class Tx:
+    """Minimal unsigned transaction structure for PSBT creation."""
     version: int = 2
     tx_ins: List[TxIn] = field(default_factory=list)
     tx_outs: List[TxOut] = field(default_factory=list)
     locktime: int = 0
 
     def serialize_unsigned(self) -> bytes:
-        """Serialize in legacy format (no witness marker, no scriptSig/witness) for PSBT"""
+        """
+        Serialize transaction in legacy format (no witness marker, empty scriptSigs).
+        Required format for PSBT global unsigned transaction field.
+        """
         return (
             self.version.to_bytes(4, 'little') +
             encode_varint(len(self.tx_ins)) +
@@ -1291,23 +1350,26 @@ class Tx:
         )
 
 
+# =========================
+# PSBT Creation
+# =========================
+
 def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
     """
-    Build a hardware-signable PSBT (P2WPKH + Taproot).
-    Works with minimal UTXO data (txid/vout/value/scriptPubKey).
-    BIP32 derivation is optional — added only when available.
+    Build a hardware-signable PSBT (P2WPKH + Taproot only).
+    Uses minimal UTXO data (txid/vout/value/scriptPubKey).
+    BIP32 derivation is optional — added only when all fields are present.
     """
     import base64
 
     def encode_varint(i: int) -> bytes:
         if i < 0xfd:
-            return i.to_bytes(1, "little")
-        elif i <= 0xffff:
+            return bytes([i])
+        if i <= 0xffff:
             return b'\xfd' + i.to_bytes(2, "little")
-        elif i <= 0xffffffff:
+        if i <= 0xffffffff:
             return b'\xfe' + i.to_bytes(4, "little")
-        else:
-            return b'\xff' + i.to_bytes(8, "little")
+        return b'\xff' + i.to_bytes(8, "little")
 
     def write_kv(psbt: bytearray, key_type: int, key_data: bytes, value: bytes):
         key = bytes([key_type]) + key_data
@@ -1319,18 +1381,18 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
     def write_bip32_derivation(psbt: bytearray, pubkey: bytes, fingerprint: bytes, path_bytes: bytes):
         write_kv(psbt, 0x06, pubkey, fingerprint + path_bytes)
 
-    # ── Global validation ───────────────────────────────────────────────────────
+    # ── Validation ──────────────────────────────────────────────────────────────
     if not tx.tx_ins:
         raise ValueError("Transaction has no inputs")
     if not tx.tx_outs:
         raise ValueError("Transaction has no outputs")
     if len(tx.tx_ins) != len(utxos):
-        raise ValueError(f"Input count mismatch: {len(tx.tx_ins)} vs {len(utxos)}")
+        raise ValueError(f"Input count mismatch: tx has {len(tx.tx_ins)} inputs, but {len(utxos)} UTXOs provided")
 
     raw_tx = tx.serialize_unsigned()
     psbt = bytearray(b"psbt\xff")
 
-    # Global: unsigned tx
+    # Global: unsigned transaction
     write_kv(psbt, 0x00, b"", raw_tx)
     psbt += b"\x00"  # end global map
 
@@ -1338,38 +1400,39 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
     for u in utxos:
         stype = u.get("script_type", "").lower()
         if stype not in ("p2wpkh", "p2tr", "taproot"):
-            raise ValueError(f"Unsupported script type: {stype}")
+            raise ValueError(f"Unsupported script type for PSBT: {stype}")
 
-        # ── Per-UTXO sanity checks (early fail + better debugging) ─────────────
+        # ── Per-UTXO sanity checks ──────────────────────────────────────────────
         txid_short = (u.get("txid", "unknown")[:8] + "...") if u.get("txid") else "?"
         vout = u.get("vout", "?")
         ident = f"txid={txid_short} vout={vout}"
 
-        if u.get("value", 0) <= 0:
-            raise ValueError(f"Invalid UTXO value <= 0 detected ({ident})")
-        if u.get("value", 0) > 21_000_000 * 100_000_000:
-            raise ValueError(f"UTXO value impossibly large (> 21M BTC) ({ident})")
+        val = u.get("value", 0)
+        if val <= 0:
+            raise ValueError(f"Invalid UTXO value <= 0 sats ({ident})")
+        if val > 21_000_000 * 100_000_000:
+            raise ValueError(f"Impossible UTXO value > 21M BTC ({val:,} sats) ({ident})")
         if "scriptPubKey" not in u:
-            raise ValueError(f"Missing scriptPubKey in UTXO data ({ident})")
+            raise ValueError(f"Missing scriptPubKey ({ident})")
         if not isinstance(u["scriptPubKey"], (bytes, str)):
-            raise ValueError(f"scriptPubKey has invalid type (must be bytes or hex str) ({ident})")
+            raise ValueError(f"Invalid scriptPubKey type (must be bytes or hex str) ({ident})")
 
-        # Required: Witness UTXO
+        # Witness UTXO (required for segwit/taproot)
         spk = u["scriptPubKey"]
         if isinstance(spk, str):
             spk = bytes.fromhex(spk)
 
         witness_utxo = (
-            u["value"].to_bytes(8, "little") +
+            val.to_bytes(8, "little") +
             encode_varint(len(spk)) +
             spk
         )
         write_kv(psbt, 0x01, b"", witness_utxo)
 
-        # ALWAYS write SIGHASH_ALL (0x00000001) — critical for most hardware wallets
+        # ALWAYS write SIGHASH_ALL — required by most hardware wallets
         write_kv(psbt, 0x03, b"", bytes([0x01, 0x00, 0x00, 0x00]))
 
-        # Optional: BIP32 derivation path (only if all fields are present)
+        # Optional BIP-32 derivation (only if full data present)
         if all(k in u for k in ["pubkey", "fingerprint", "full_derivation_path"]):
             try:
                 pubkey = bytes.fromhex(u["pubkey"])
@@ -1385,26 +1448,30 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
 
                 write_bip32_derivation(psbt, pubkey, fingerprint, path_bytes)
             except Exception as e:
-                print(f"Warning: Failed to add BIP32 derivation ({ident}): {e}")
+                log.warning(f"Failed to add BIP32 derivation ({ident}): {e}")
 
-        psbt += b"\x00"  # end this input map
+        psbt += b"\x00"  # end input map
 
-    # ── Output maps (empty) ─────────────────────────────────────────────────────
+    # ── Output maps (empty for unsigned PSBT) ──────────────────────────────────
     for _ in tx.tx_outs:
         psbt += b"\x00"
 
-    # Final separator
+    # Final PSBT separator
     psbt += b"\x00"
 
     psbt_b64 = base64.b64encode(psbt).decode("ascii")
     return psbt_b64, ""
+
 
 # =========================
 # UTXO Fetching Functions
 # =========================
 
 def get_utxos(addr: str, dust: int = 546) -> List[dict]:
-    """Fetch UTXOs from multiple APIs with retries, timeouts, and rate limit backoff."""
+    """
+    Fetch confirmed UTXOs for a Bitcoin address from multiple public APIs.
+    Filters out dust below threshold. Returns early on first successful source.
+    """
     addr = addr.strip()
     if not addr:
         return []
@@ -1418,48 +1485,53 @@ def get_utxos(addr: str, dust: int = 546) -> List[dict]:
     for attempt in range(3):
         for url in apis:
             try:
-                r = safe_get(url, timeout=10)  # ← Add timeout to prevent hangs
-                if r and r.status_code == 200:
+                r = safe_get(url, timeout=8)
+                if not r:
+                    continue
+
+                if r.status_code == 200:
                     try:
                         data = r.json()
                         utxos = []
-                        iter_u = data if isinstance(data, list) else data.get("utxos", [])
-                        for u in iter_u:
-                            val = int(u.get("value", 0))
+                        items = data if isinstance(data, list) else data.get("utxos", [])
+                        for item in items:
+                            val = int(item.get("value", 0))
                             if val > dust:
                                 utxos.append({
-                                    "txid": u["txid"],
-                                    "vout": u["vout"],
+                                    "txid": item["txid"],
+                                    "vout": item["vout"],
                                     "value": val,
                                     "address": addr,
                                     "confirmed": (
-                                        u.get("status", {}).get("confirmed", True)
-                                        if isinstance(u.get("status"), dict) else True
+                                        item.get("status", {}).get("confirmed", True)
+                                        if isinstance(item.get("status"), dict) else True
                                     )
                                 })
                         if utxos:
+                            log.debug(f"Found {len(utxos)} UTXOs from {url}")
                             return utxos
                     except Exception as e:
-                        logger.warning(f"JSON parse error from {url}: {str(e)}")
-                elif r and r.status_code == 429:
-                    logger.warning(f"Rate limited on {url}, attempt {attempt+1}")
-                    time.sleep(5 * (attempt + 1))  # Exponential backoff
+                        log.warning(f"JSON parse error from {url}: {e}")
+
+                elif r.status_code == 429:
+                    log.warning(f"Rate limited (429) on {url}, attempt {attempt+1}")
+                    time.sleep(5 * (attempt + 1))
+
                 else:
-                    logger.warning(f"HTTP {r.status_code} from {url}")
+                    log.debug(f"Bad status {r.status_code} from {url}")
+
             except Exception as e:
-                logger.warning(f"Request error on {url}: {str(e)}")
-            time.sleep(1.0)  # Delay per request
+                log.warning(f"Request error on {url}: {type(e).__name__}: {e}")
 
-        time.sleep(5)  # Wait between full API cycles
+            time.sleep(1.0)  # polite delay between requests
 
-    logger.warning(f"No UTXOs after retries for {addr}")
+        time.sleep(5)  # longer delay between full API rotation
+
+    log.warning(f"No UTXOs found after retries for address: {addr}")
     return []
-
-
 # =================
 # Analyze functions
 # ================
-
 
 @dataclass(frozen=True)
 class AnalyzeParams:
@@ -1472,17 +1544,21 @@ class AnalyzeParams:
     manual_utxo_input: str
     scan_source: str
 
-def _sanitize_analyze_inputs(
-    addr_input,
-    strategy,
-    dust_threshold,
-    fee_rate_slider,
-    future_fee_slider,
-    offline_mode,
-    manual_utxo_input,
-) -> AnalyzeParams:
-    """Normalize and clamp all analyze() inputs into a deterministic parameter object."""
 
+def _sanitize_analyze_inputs(
+    addr_input: str,
+    strategy: str,
+    dust_threshold: Any,
+    fee_rate_slider: Any,
+    future_fee_slider: Any,
+    offline_mode: Any,
+    manual_utxo_input: str,
+) -> AnalyzeParams:
+    """
+    Normalize and clamp all analyze() inputs into a deterministic frozen params object.
+    Handles Gradio edge cases (None, empty strings, floats).
+    """
+    # Safe int conversion with fallback to default
     fee_rate = max(1, min(300, int(float(fee_rate_slider or 15))))
     future_fee_rate = max(5, min(500, int(float(future_fee_slider or 60))))
     dust_threshold = max(0, min(10000, int(float(dust_threshold or 546))))
@@ -1499,11 +1575,13 @@ def _sanitize_analyze_inputs(
         manual_utxo_input=(manual_utxo_input or "").strip(),
         scan_source=scan_source,
     )
-	
+
+
 def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
     """
-    Parse user-supplied offline UTXO lines into normalized dicts.
-    Format: txid:vout:value_in_sats[:change_address]
+    Parse offline/manual UTXO input lines into normalized dicts.
+    Format: txid:vout:value_in_sats[:address]
+    Skips invalid lines, dust, and comments (#).
     """
     if not params.manual_utxo_input:
         return []
@@ -1526,15 +1604,15 @@ def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
             vout = int(parts[1].strip())
             value = int(parts[2].strip())
 
-            # Optional address for change output or labeling
+            # Optional address (for change or labeling)
             addr = parts[3].strip() if len(parts) >= 4 else "unknown (manual)"
 
             if value <= params.dust_threshold:
                 continue
 
-            # Get scriptPubKey + metadata from address (fallback if no addr)
+            # Derive scriptPubKey + weight from address (fallback to P2WPKH)
             _, meta = address_to_script_pubkey(addr)
-            input_weight = meta.get("input_vb", 68) * 4  # Safe fallback to P2WPKH
+            input_weight = meta.get("input_vb", 68) * 4
 
             utxos.append({
                 "txid": txid,
@@ -1552,15 +1630,19 @@ def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
 
         except (ValueError, Exception) as e:
             skipped += 1
-
+            log.debug(f"Skipped invalid manual UTXO line {line_num}: {e}")
 
     if skipped:
-        print(f">>> Manual UTXO parse: skipped {skipped} invalid/malformed lines")
+        log.info(f"Manual UTXO parse: skipped {skipped} invalid/malformed lines")
 
     return utxos
 
 
 def _collect_online_utxos(params: AnalyzeParams) -> Tuple[List[Dict], str, List[Any]]:
+    """
+    Fetch UTXOs from online APIs for provided addresses.
+    Returns (utxos, debug_message, _unused).
+    """
     if not params.addr_input:
         return [], "No addresses provided", []
 
@@ -1578,27 +1660,31 @@ def _collect_online_utxos(params: AnalyzeParams) -> Tuple[List[Dict], str, List[
         count = len(entry_utxos)
 
         if count > 0:
-            # Use FULL entry as source label (no truncation)
-            source_label = entry  # ← full address
-            debug_lines.append(f"Address {entry}: {count} UTXOs found")  # full for debug
+            source_label = entry  # full address as source
+            debug_lines.append(f"Address {entry}: {count} UTXOs found")
 
             for u in entry_utxos:
-                u["source"] = source_label          # ← full value here
+                u["source"] = source_label
                 u["address"] = entry
 
             utxos.extend(entry_utxos)
         else:
             debug_lines.append(f"Address {entry}: no UTXOs")
 
-    debug = "\n".join(debug_lines) if debug_lines else "No valid addresses or UTXOs found"
-    return utxos, debug, []
-    
-def _classify_utxo(value: int, input_weight: int, script_type_from_meta: str = "") -> Tuple[str, str, str, bool]:
+    debug_msg = "\n".join(debug_lines) if debug_lines else "No valid addresses or UTXOs found"
+    return utxos, debug_msg, []
+
+
+def _classify_utxo(
+    value: int,
+    input_weight: int,
+    script_type_from_meta: str = ""
+) -> Tuple[str, str, str, bool]:
     """
-    Classify a UTXO based on weight + value.
-    Returns: (script_type, health, recommendation, is_legacy)
+    Classify UTXO health & recommendation based on weight + value.
+    Returns (script_type, health, recommendation, is_legacy).
     """
-    # Step 1: Determine base script type from weight (fallback)
+    # Step 1: Base classification from weight (fallback)
     if input_weight <= 228:
         script_type = "Taproot"
         default_health = "OPTIMAL"
@@ -1620,63 +1706,61 @@ def _classify_utxo(value: int, input_weight: int, script_type_from_meta: str = "
         default_rec = "PRUNE"
         is_legacy = True
 
-    # Step 2: Prefer script_type from metadata when available (more accurate)
-    if script_type_from_meta and script_type_from_meta in ("Taproot", "P2WPKH", "P2SH-P2WPKH", "P2PKH", "Legacy"):
+    # Step 2: Prefer metadata type (more accurate)
+    if script_type_from_meta and script_type_from_meta in (
+        "Taproot", "P2WPKH", "P2SH-P2WPKH", "P2PKH", "Legacy"
+    ):
         script_type = script_type_from_meta
         is_legacy = script_type in ("P2PKH", "Legacy")
 
-        # Re-assign defaults based on corrected type
-        if script_type == "Taproot":
-            default_health = "OPTIMAL"
-            default_rec = "KEEP"
-        elif script_type == "P2WPKH":
+        # Reset defaults based on corrected type
+        if script_type in ("Taproot", "P2WPKH"):
             default_health = "OPTIMAL"
             default_rec = "KEEP"
         elif script_type == "P2SH-P2WPKH":
             default_health = "MEDIUM"
             default_rec = "CAUTION"
-        else:  # Legacy / P2PKH
+        else:
             default_health = "HEAVY"
             default_rec = "PRUNE"
 
-    # Step 3: Value-based overrides (highest priority)
+    # Step 3: Value overrides (highest priority)
     if value < 10_000:
         return script_type, "DUST", "PRUNE", is_legacy
 
-    # Large legacy/nested UTXOs deserve caution
     if value > 100_000_000 and is_legacy:
         return script_type, "CAREFUL", "OPTIONAL", is_legacy
 
-    # Fall back to base classification
+    # Fallback to base classification
     return script_type, default_health, default_rec, is_legacy
+
 
 def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
     """
     Enrich raw UTXOs with script metadata, weight, health, recommendation,
-    scriptPubKey, Taproot internal key, and legacy flag.
+    scriptPubKey, optional Taproot internal key, and legacy flag.
     """
-    enriched: list[dict] = []
+    enriched = []
 
     for u in raw_utxos:
         addr = u.get("address", "")
 
-        # Get scriptPubKey + metadata from address
+        # Derive scriptPubKey + metadata
         script_pubkey, meta = address_to_script_pubkey(addr)
-        input_weight = meta.get("input_vb", 68) * 4  # fallback to P2WPKH size
+        input_weight = meta.get("input_vb", 68) * 4  # fallback to P2WPKH
 
-        # Prefer meta["type"] when available (more reliable than weight)
         script_type_from_meta = meta.get("type", "")
 
-        # Classify with both weight and meta type
+        # Classify
         script_type, health, recommend, is_legacy = _classify_utxo(
             u["value"], input_weight, script_type_from_meta
         )
 
-        # Normalize script_type for consistency
+        # Normalize Taproot naming
         if script_type.upper() in ("TAPROOT", "P2TR"):
             script_type = "Taproot"
 
-        # Taproot internal key (only if Taproot)
+        # Optional Taproot internal key
         tap_internal_key = None
         if script_type == "Taproot":
             candidate = meta.get("tap_internal_key")
@@ -1690,20 +1774,21 @@ def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
             "recommend": recommend,
             "script_type": script_type,
             "script_type_inferred": u.get("script_type_inferred", False),
-            "scriptPubKey": script_pubkey,          # bytes, needed for PSBT
-            "tap_internal_key": tap_internal_key,   # optional, only Taproot
-            "is_legacy": is_legacy,                 # NEW: for table styling / auto-unselect
-            # "selected" still handled later by strategy / user
+            "scriptPubKey": script_pubkey,          # bytes — needed for PSBT
+            "tap_internal_key": tap_internal_key,   # optional
+            "is_legacy": is_legacy,                 # for table styling / auto-disable
+            # "selected" set later by strategy or user
         })
 
     return enriched
-
+    
+# ── Apply pruning strategy to enriched UTXOs ────────────────────────────────────
 def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
     """
-    Apply deterministic pruning strategy.
+    Apply deterministic pruning strategy to enriched UTXOs.
     - Excludes legacy/unsupported from pruning calculation
-    - Prunes only supported UTXOs in priority order (dust → heavy → optimal)
-    - Returns list with supported first (pruned), unsupported last (always unselected)
+    - Prunes only supported UTXOs (priority: dust → heavy → optimal)
+    - Returns list with pruned supported first, unsupported last (always unselected)
     """
     ratio = PRUNING_RATIOS.get(strategy, 0.40)
 
@@ -1720,7 +1805,6 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
         else:
             supported.append(new_u)
 
-    # If no supported UTXOs, return unsupported only
     if not supported:
         return unsupported
 
@@ -1742,7 +1826,7 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
         key=lambda u: HEALTH_PRIORITY.get(u["health"], 999),  # DUST=0 first, OPTIMAL=4 last
     )
 
-    # Apply selection
+    # Apply selection flags
     result_supported = []
     for i, u in enumerate(by_health):
         new_u = dict(u)
@@ -1752,65 +1836,71 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
     # Step 3: Combine — supported (pruned) first, unsupported last
     result = result_supported + unsupported
 
-    # Debug
+    # Log summary (no print)
     legacy_skipped = len(unsupported)
     if legacy_skipped > 0:
-        print(f">>> Excluded {legacy_skipped} unsupported/legacy from pruning. "
-              f"Pruned {prune_count} of {total_supported} supported.")
+        log.info(
+            f"Excluded {legacy_skipped} legacy/unsupported from pruning. "
+            f"Pruned {prune_count} of {total_supported} supported UTXOs."
+        )
 
     return result
 
+
+# ── Build DataFrame rows from enriched UTXOs ────────────────────────────────────
 def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
     """
-    Convert enriched UTXOs into dataframe rows.
-    - Uses 'is_legacy' flag to disable selection and show strong warnings
-    - Handles unsupported script types by disabling selection
-    - Fully responsive health badges for mobile
-    - TXID shows full value (copyable on click)
+    Convert enriched UTXOs into Gradio DataFrame rows.
+    - Forces legacy/nested unselected with strong warnings
+    - Preserves 'selected' from strategy or restore
+    - Fully responsive health badges & type display
+    Returns (rows, has_unsupported)
     """
     rows: List[List] = []
     has_unsupported = False
 
     for u in enriched:
-        script_type = u.get("script_type", "").strip()
-        selected = bool(u.get("selected", False))           # From strategy/offline
-        inferred = bool(u.get("script_type_inferred", False))
-        is_legacy = bool(u.get("is_legacy", False))         # NEW: from _enrich_utxos
+        if not isinstance(u, dict):
+            continue
 
-        # Force legacy to be unselected (safety + UX)
+        script_type = u.get("script_type", "").strip()
+        selected = bool(u.get("selected", False))
+        inferred = bool(u.get("script_type_inferred", False))
+        is_legacy = bool(u.get("is_legacy", False))
+
+        # Force legacy unselected (safety + UX)
         if is_legacy:
             selected = False
             has_unsupported = True
 
-        supported_in_psbt = script_type in ("P2WPKH", "Taproot", "P2TR")
+        supported = script_type in ("P2WPKH", "Taproot", "P2TR")
 
-        # ── Health badge HTML ─────────────────────────────────────────────────
-        if not supported_in_psbt or is_legacy:
+        # Health badge HTML
+        if not supported or is_legacy:
             has_unsupported = True
-
             if is_legacy or script_type in ("P2PKH", "Legacy"):
                 health_html = (
                     '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;background:rgba(255,68,68,0.12);padding:6px;border-radius:6px;">'
-                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
-                    f'<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported in PSBT — migrate first</small>'
+                    '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
+                    '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported in PSBT — migrate first</small>'
                     '</div>'
                 )
             elif script_type in ("P2SH-P2WPKH", "Nested"):
                 health_html = (
                     '<div class="health health-nested" style="color:#ff9900;font-weight:bold;background:rgba(255,153,0,0.12);padding:6px;border-radius:6px;">'
-                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
-                    f'<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported yet</small>'
+                    '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
+                    '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported yet</small>'
                     '</div>'
                 )
             else:
+                health = u.get("health", "UNKNOWN")
                 health_html = (
-                    f'<div class="health health-{u.get("health", "unknown").lower()}" style="padding:6px;border-radius:6px;">'
-                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{u.get("health", "UNKNOWN")}</span><br>'
+                    f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
+                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
                     f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Cannot prune</small>'
                     '</div>'
                 )
         else:
-            # Modern & supported
             health = u.get("health", "OPTIMAL")
             recommend = u.get("recommend", "")
             health_html = (
@@ -1820,7 +1910,7 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
                 '</div>'
             )
 
-        # ── Friendly display name ─────────────────────────────────────────────
+        # Friendly type display
         display_type_map = {
             "P2WPKH": "Native SegWit",
             "Taproot": "Taproot",
@@ -1833,59 +1923,65 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
 
         if inferred:
             display_type += ' <span style="color:#00cc66;font-weight:bold;">[inferred]</span>'
-
         if is_legacy:
             display_type += ' <span style="color:#ff6666;font-weight:bold;">[legacy – disabled]</span>'
 
-        txid_full = u.get("txid", "unknown")
-
-        # Build row
         rows.append([
-            selected,                           # PRUNE checkbox (forced off for legacy)
-            u.get("source", "Single"),          # Now includes derivation group e.g. "xpub(...) — BIP84"
-            txid_full,
+            selected,
+            u.get("source", "Single"),
+            u.get("txid", "unknown"),
             health_html,
-            u["value"],
-            u["address"],
-            u["input_weight"],
+            u.get("value", 0),
+            u.get("address", "unknown"),
+            u.get("input_weight", 0),
             display_type,
-            u["vout"],
+            u.get("vout", 0),
         ])
 
     return rows, has_unsupported
-    
+
+
+# ── Freeze enriched state for immutability ──────────────────────────────────────
 def _freeze_enriched(
     enriched: List[Dict],
     *,
     strategy: str,
     scan_source: str,
 ) -> tuple:
-    """Freeze enriched UTXOs with immutable metadata."""
-
+    """
+    Freeze enriched UTXOs into immutable tuple + metadata.
+    Enforces your canonical state model: (meta, tuple[dict]).
+    """
     frozen_utxos = tuple(copy.deepcopy(u) for u in enriched)
 
     meta = {
         "strategy": strategy,
         "scan_source": scan_source,
-        "timestamp": int(time.time()),   # ← Fixed here
+        "timestamp": int(time.time()),
     }
 
     return (meta, frozen_utxos)
 
+# =================
+# Analyze functions
+# =================
 
 def analyze(
-    addr_input,
-    strategy,
-    dust_threshold,
-    fee_rate_slider,
-    future_fee_slider,
-    offline_mode,
-    manual_utxo_input,
+    addr_input: str,
+    strategy: str,
+    dust_threshold: Any,
+    fee_rate_slider: Any,
+    future_fee_slider: Any,
+    offline_mode: Any,
+    manual_utxo_input: str,
 ):
-    """Main entrypoint: sanitize, collect, enrich, prune, build UI outputs."""
+    """
+    Main entrypoint: sanitize inputs → collect UTXOs → enrich → prune → build UI outputs.
+    Enforces the canonical state model (immutable enriched_state tuple).
+    """
     log.info("analyze() started")
 
-    # 1. Sanitize inputs
+    # 1. Sanitize & normalize all inputs
     params = _sanitize_analyze_inputs(
         addr_input=addr_input,
         strategy=strategy,
@@ -1896,7 +1992,7 @@ def analyze(
         manual_utxo_input=manual_utxo_input,
     )
 
-    # 2. Collect UTXOs
+    # 2. Collect raw UTXOs (online or offline)
     if params.offline_mode:
         raw_utxos = _collect_manual_utxos(params)
         scan_debug = "Offline mode — manual UTXOs only"
@@ -1912,11 +2008,11 @@ def analyze(
         log.info("No UTXOs found — returning empty state")
         return _analyze_empty(params.scan_source)
 
-    # 3. Enrich UTXOs with metadata, health, etc.
+    # 3. Enrich UTXOs with metadata, health, script info
     enriched = _enrich_utxos(raw_utxos, params)
     log.debug(f"Enriched {len(enriched)} UTXOs")
 
-    # Safety: ensure every UTXO has script_type
+    # Invariant check: every UTXO must have script_type
     if any("script_type" not in u for u in enriched):
         log.error("Missing 'script_type' in enriched UTXOs — invariant violation")
         raise RuntimeError("Missing 'script_type' in enriched UTXOs — invariant violation")
@@ -1924,32 +2020,38 @@ def analyze(
     # 4. Apply pruning strategy (sets 'selected' flags)
     enriched_pruned = _apply_pruning_strategy(enriched, params.strategy)
     log.debug(
-        f"After pruning strategy: {len(enriched_pruned)} UTXOs, "
+        f"After pruning strategy: {len(enriched_pruned)} UTXOs total, "
         f"{sum(1 for u in enriched_pruned if u['selected'])} selected"
     )
 
-    # Safety assertions (keep these — they protect invariants)
-    assert len(enriched_pruned) >= MIN_KEEP_UTXOS
-    assert any(not u["selected"] for u in enriched_pruned)
-    assert params.strategy in PRUNING_RATIOS
+    # Safety assertions (protect canonical model invariants)
+    assert len(enriched_pruned) >= MIN_KEEP_UTXOS, "Too few UTXOs after pruning"
+    assert any(not u["selected"] for u in enriched_pruned), "All UTXOs selected — invalid prune"
+    assert params.strategy in PRUNING_RATIOS, f"Unknown strategy: {params.strategy}"
 
-    # 5. Build dataframe rows for display
+    # 5. Build DataFrame rows for display
     df_rows, has_unsupported = _build_df_rows(enriched_pruned)
     log.debug(f"Built {len(df_rows)} table rows, has_unsupported={has_unsupported}")
 
+    # Build warning banner if needed
     warning_banner = ""
     if has_unsupported:
-        warning_banner += (...)  # your existing legacy/nested HTML
+        # Legacy/nested warning — you can expand this later
+        warning_banner = (
+            "<div style='color:#ffdd88;padding:20px;background:#332200;border:3px solid #ff9900;border-radius:14px;text-align:center;'>"
+            "⚠️ Some inputs are legacy or nested — not included in PSBT<br>"
+            "Only Native SegWit (bc1q…) and Taproot (bc1p…) are supported for pruning."
+            "</div>"
+        )
 
-
-    # 6. Freeze the enriched state
+    # 6. Freeze the enriched state (immutable tuple)
     frozen_state = _freeze_enriched(
         enriched_pruned,
         strategy=params.strategy,
         scan_source=params.scan_source,
     )
 
-    # 97. Return unified success state
+    # Return unified success state (exactly 9 outputs for Gradio)
     return _analyze_success(
         df_rows=df_rows,
         frozen_state=frozen_state,
@@ -1957,22 +2059,29 @@ def analyze(
         warning_banner=warning_banner,
     )
 
-def _analyze_success(df_rows, frozen_state, scan_source, warning_banner=""):
-    """Unified success return for analyze() — exactly 9 outputs to match Gradio click handler"""
+
+def _analyze_success(
+    df_rows,
+    frozen_state,
+    scan_source,
+    warning_banner: str = ""
+):
+    """Unified success return — exactly 9 outputs to match Gradio .click() handler."""
     return (
-        gr.update(value=df_rows),              # 0: DataFrame rows for the UTXO table
-        frozen_state,                          # 1: enriched_state (frozen tuple: meta + utxos)
-        gr.update(value=warning_banner),       # 2: Combined warning banner HTML
-        gr.update(visible=True),               # 3: Show generate_row (PSBT button area)
+        gr.update(value=df_rows),              # 0: DataFrame rows (UTXO table)
+        frozen_state,                          # 1: enriched_state (frozen tuple)
+        gr.update(value=warning_banner),       # 2: Legacy/nested warning banner
+        gr.update(visible=True),               # 3: Show generate_row (PSBT button)
         gr.update(visible=True),               # 4: Show import_file (JSON load area)
-        scan_source,                           # 5: scan_source state (for later use)
-        "",                                    # 6: Reserved/placeholder — was debug/status, keep empty for now
+        scan_source,                           # 5: scan_source state
+        "",                                    # 6: Reserved/placeholder (was debug/status)
         gr.update(visible=True),               # 7: Show load_json_btn
         gr.update(visible=False),              # 8: Hide analyze_btn after success
     )
 
+
 def _analyze_empty(scan_source: str = ""):
-    """Empty/failure state return — exactly 9 outputs to match Gradio click handler"""
+    """Empty/failure state return — exactly 9 outputs to match Gradio .click() handler."""
     return (
         gr.update(value=[]),                   # 0: Empty DataFrame
         (),                                    # 1: Empty enriched_state
@@ -1985,19 +2094,18 @@ def _analyze_empty(scan_source: str = ""):
         gr.update(visible=True),               # 8: Keep analyze_btn visible (retry)
     )
 
-
 # ====================
 # generate_summary_safe() — Refactored for Clarity
 # ====================
 
 def _render_locked_state() -> Tuple[str, gr.update]:
-    """Early return when selection is locked — responsive on mobile."""
+    """Locked state message — shown after successful PSBT generation."""
     return (
         "<div style='"
         "text-align:center !important;"
-        "padding: clamp(40px, 10vw, 80px) !important;"   # Scales padding
-        "color:#aaaaaa !important;"                     # Slightly brighter gray
-        "font-size: clamp(1.2rem, 5vw, 1.8rem) !important;"  # Responsive title
+        "padding: clamp(40px, 10vw, 80px) !important;"
+        "color:#dddddd !important;"                     # Brighter gray for visibility
+        "font-size: clamp(1.2rem, 5vw, 1.8rem) !important;"
         "font-weight:700 !important;"
         "line-height:1.7 !important;"
         "max-width:90% !important;"
@@ -2011,6 +2119,7 @@ def _render_locked_state() -> Tuple[str, gr.update]:
         gr.update(visible=False)
     )
 
+
 def _validate_utxos_and_selection(
     df_rows: List[list],
     utxos: List[dict],
@@ -2018,79 +2127,68 @@ def _validate_utxos_and_selection(
     offline_mode: bool = False,
 ) -> Tuple[Optional[List[dict]], int, Optional[str]]:
     """
-    Resolve selected UTXOs from df_rows checkboxes.
-    
-    NEW: Prioritizes UI state (df_rows) over enriched_state flags.
-    - If df_rows present and matches utxos len → ALWAYS trust checkboxes, even if all unchecked
-    - Only fallback to enriched_state if df_rows is missing/mismatched (safety net)
-    - In offline_mode: even stricter, never fallback to avoid surprises
+    Resolve selected UTXOs from Gradio DataFrame checkboxes.
+    Prioritizes fresh UI state over frozen flags; strict in offline mode.
     """
     if not utxos:
         return None, 0, "NO_UTXOS"
 
-    # Filter to valid dicts (safety)
     utxos = [u for u in utxos if isinstance(u, dict)]
     if not utxos:
         return None, 0, "NO_UTXOS"
 
-    # Collect checked indices from df_rows
     selected_indices = []
     if isinstance(df_rows, list) and df_rows:
         for i, row in enumerate(df_rows):
             if not row or len(row) <= CHECKBOX_COL:
                 continue
-                
             checkbox_val = row[CHECKBOX_COL]
-            is_checked = (
-                checkbox_val in (True, 1, "true", "True", "1") 
-                or bool(checkbox_val)
-            )
+            is_checked = checkbox_val in (True, 1, "true", "True", "1") or bool(checkbox_val)
             if is_checked and i < len(utxos):
                 selected_indices.append(i)
 
-    # NEW LOGIC: trust df_rows if it matches utxos
     has_valid_df = df_rows and len(df_rows) == len(utxos)
-    
+
     if has_valid_df:
-        # We have fresh UI state → use it directly
-        # (even if selected_indices == [] → that's intentional "none selected")
         selected_utxos = [utxos[i] for i in selected_indices]
     else:
-        # Fallback only when df_rows missing/outdated
-        # (should be rare — mostly initial load)
         selected_utxos = [u for u in utxos if u.get("selected", False)]
 
-    # Offline: override fallback if needed
-    # (extra safety — users expect exact manual control)
     if offline_mode and not selected_indices:
-        selected_utxos = []  # Force empty if nothing checked
+        selected_utxos = []
 
     pruned_count = len(selected_utxos)
-
     if pruned_count == 0:
         return None, 0, "NO_SELECTION"
 
     return selected_utxos, pruned_count, None
 
+
 def _compute_privacy_metrics(selected_utxos: List[dict], total_utxos: int) -> Tuple[int, str]:
-    privacy_score = calculate_privacy_score(selected_utxos, total_utxos)
-    score_color = "#0f0" if privacy_score >= 70 else "#ff9900" if privacy_score >= 40 else "#ff3366"
-    return privacy_score, score_color
+    """Compute privacy score and UI color."""
+    score = calculate_privacy_score(selected_utxos, total_utxos)
+    color = "#0f0" if score >= 70 else "#ff9900" if score >= 40 else "#ff3366"
+    return score, color
+
 
 def _compute_economics_safe(selected_utxos: List[dict], fee_rate: int) -> Optional[TxEconomics]:
+    """Safe economics calculation — logs failure and returns None."""
     try:
         return estimate_tx_economics(selected_utxos, fee_rate)
-    except ValueError:
+    except ValueError as e:
+        log.warning(f"Economics failed: {e}")
         return None
 
+
 def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
-    remainder_after_fee = econ.total_in - econ.fee
+    """Warning when pruned value is too small for meaningful change output."""
+    remainder = econ.total_in - econ.fee
     current_fee = econ.fee
 
-    if remainder_after_fee >= 15000:
+    if remainder >= 15000:
         return ""
 
-    if remainder_after_fee < 8000:
+    if remainder < 8000:
         title = "⚠️ Warning: No change output expected"
         color = "#ff3366"
         bg = "#330000"
@@ -2127,8 +2225,8 @@ def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
       ">
         {title}
       </div>
-      Post-fee remainder (~{remainder_after_fee:,} sats) is small.<br>
-      The pruned value will likely be fully or partially absorbed into miner fees.<br><br>
+      Post-fee remainder (~{remainder:,} sats) is small.<br>
+      Pruned value will likely be fully or partially absorbed into miner fees.<br><br>
       <div style="
           color:#ffff88 !important;
           font-size: clamp(1.15rem, 4.5vw, 1.45rem) !important;
@@ -2142,19 +2240,22 @@ def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
         — not expecting significant change back.
       </div><br>
       <div style="color:#ffaaaa !important; font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important; line-height:1.7 !important;">
-        💡 For a reliable change output, aim for:<br>
-        • Value Pruned > ~5× Current Fee (good change back)<br>
+        💡 For reliable change output, aim for:<br>
+        • Value Pruned > ~5× Current Fee (good change)<br>
         • Value Pruned > ~10× Current Fee (very comfortable)<br><br>
-        This prune: <span style="color:#ffffff !important; font-weight:800 !important;">{sats_to_btc_str(econ.total_in)}</span> value and <span style="color:#ffffff !important; font-weight:800 !important;">{current_fee:,} sats</span> fee<br>
+        This prune: <span style="color:#ffffff !important; font-weight:800 !important;">{sats_to_btc_str(econ.total_in)}</span> value and 
+        <span style="color:#ffffff !important; font-weight:800 !important;">{current_fee:,} sats</span> fee<br>
         Ratio: <span style="color:#ffffff !important; font-weight:800 !important;">{ratio}×</span> current fee
       </div><br>
       <small style="color:#88ffcc !important; font-size: clamp(0.9rem, 3vw, 1rem) !important;">
-        💡 Pro tip: The bigger the prune (relative to fee), the more you get back as change. Small prunes = cleanup only.
+        💡 Pro tip: Bigger prune (relative to fee) → more change back. Small prunes = cleanup only.
       </small>
     </div>
     """
 
+
 def _render_pruning_explanation(pruned_count: int, remaining_utxos: int) -> str:
+    """Educational explanation of pruning benefits."""
     return f"""
 <div style="
     margin: clamp(24px, 8vw, 48px) 0 !important;
@@ -2215,6 +2316,7 @@ def _render_pruning_explanation(pruned_count: int, remaining_utxos: int) -> str:
 </div>
     """
 
+
 def generate_summary_safe(
     df,
     enriched_state,
@@ -2225,7 +2327,10 @@ def generate_summary_safe(
     dest_value,
     offline_mode,
 ) -> tuple:
-    """Generate the main status/summary HTML — no DAO logic anymore."""
+    """
+    Generate main status/summary HTML — the central UI feedback loop.
+    Returns (status_html, generate_row_visibility).
+    """
     if locked:
         return _render_locked_state()
 
@@ -2249,14 +2354,14 @@ def generate_summary_safe(
     if error == "NO_SELECTION":
         return select_msg, gr.update(visible=False)
 
-    # Only count supported inputs (offline-safe)
+    # Filter to supported inputs (offline-safe)
     supported_selected = [
         u for u in selected_utxos
-        if not u.get("script_type") or u.get("script_type") in ("P2WPKH", "Taproot", "P2TR")
+        if u.get("script_type") in ("P2WPKH", "Taproot", "P2TR")
     ]
 
     offline_inferred_count = sum(
-        1 for u in supported_selected if u.get("script_type_inferred")
+        1 for u in supported_selected if u.get("script_type_inferred", False)
     )
 
     pruned_count = len(supported_selected)
@@ -2277,7 +2382,7 @@ def generate_summary_safe(
             gr.update(visible=False)
         )
 
-    # Pre-prune full wallet size estimate
+    # Pre-prune wallet size estimate
     all_input_weight = sum(u["input_weight"] for u in utxos)
     pre_vsize = max(
         (all_input_weight + 172 + total_utxos) // 4 + 10,
@@ -2316,7 +2421,7 @@ def generate_summary_safe(
         if offline_mode and not any(u.get("address") for u in utxos):
             change_line = (
                 f"💧 <span style='color:#ff9900 !important;font-weight:800 !important;'>No change output</span> "
-                "(all remaining value absorbed into fees - full cleanup)"
+                "(all remaining value absorbed into fees — full cleanup)"
             )
         else:
             change_line = (
@@ -2324,24 +2429,43 @@ def generate_summary_safe(
                 "(remaining value below dust threshold — absorbed into fee)"
             )
 
-    # Offline address warning
+    # Offline address warning (fallback if no bc1q/bc1p address found)
     offline_address_warning = ""
     if offline_mode:
-        has_address = any(
+        has_modern_addr = any(
             u.get("address")
             and isinstance(u["address"], str)
             and u["address"].strip().startswith(('bc1q', 'bc1p'))
             for u in utxos
         )
-        if not has_address:
-            offline_address_warning = """[your existing offline warning HTML here — unchanged]"""
+        if not has_modern_addr:
+            offline_address_warning = (
+                "<div style='"
+                "color:#ffdd88 !important; background:#332200 !important; "
+                "padding:16px; margin:20px 0; border:3px solid #ff9900 !important; "
+                "border-radius:14px; text-align:center; font-weight:700;"
+                "'>"
+                "⚠️ Offline mode: No modern change address detected<br><br>"
+                "Include at least one bc1q… or bc1p… address in your pasted UTXOs to receive change.<br>"
+                "Without it, all remaining value will be absorbed into fees (full cleanup)."
+                "</div>"
+            )
 
-    # Offline inferred script types badge
+    # Offline inferred script badge (if any)
     offline_badge = ""
     if offline_mode and offline_inferred_count > 0:
-        offline_badge = f"""[your existing offline_badge HTML here — unchanged]"""
+        offline_badge = (
+            "<div style='"
+            "color:#bb86fc !important; background:rgba(187,134,252,0.15) !important; "
+            "padding:12px; margin:12px 0; border:2px solid #bb86fc !important; "
+            "border-radius:12px; text-align:center; font-weight:700;"
+            "'>"
+            f"⚠️ {offline_inferred_count} script type(s) inferred from offline input<br>"
+            "Review addresses carefully — accuracy depends on your paste."
+            "</div>"
+        )
 
-    # Main status box HTML (cleaned — no DAO)
+    # Main status box HTML
     status_box_html = offline_address_warning + f"""
     <div style="
         text-align:center !important;
@@ -2420,7 +2544,8 @@ def generate_summary_safe(
               <span style="color:#0f0 !important;font-weight:800 !important;">~{econ.vsize:,} vB</span>
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.6 !important;">
-              💡 After pruning: your full wallet spend size drops to roughly <span style="color:#aaffcc !important;font-weight:700 !important;">~{pre_vsize - econ.vsize + 200:,} vB</span>
+              💡 After pruning: your full wallet spend size drops to roughly 
+              <span style="color:#aaffcc !important;font-weight:700 !important;">~{pre_vsize - econ.vsize + 200:,} vB</span>
             </div>
             <div style="
                 margin:clamp(16px, 4vw, 28px) 0 !important;
@@ -2468,21 +2593,24 @@ def generate_summary_safe(
     """
 
     return status_box_html, gr.update(visible=pruned_count > 0)
-  
 # ====================
 # on_generate() & generate_psbt() — Refactored for Clarity
 # ====================
 
 def _extract_selected_utxos(enriched_state: tuple) -> List[dict]:
-    """Safely extract selected UTXOs from frozen enriched_state."""
-    # Extract the actual UTXOs list/tuple from the frozen state
-    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
-        _, utxos = enriched_state
-    else:
-        utxos = enriched_state or ()
+    """
+    Safely extract currently selected UTXOs from the frozen enriched_state.
+    Respects the canonical model: only uses 'selected' flags from immutable tuple.
+    """
+    if not enriched_state:
+        return []
+
+    # Unpack frozen state (invariant: always (meta, tuple[dict]))
+    _, utxos = enriched_state if isinstance(enriched_state, tuple) and len(enriched_state) == 2 else (None, enriched_state)
 
     return [u for u in utxos if u.get("selected", False)]
-    
+
+
 def _create_psbt_snapshot(
     selected_utxos: List[dict],
     scan_source: str,
@@ -2490,10 +2618,16 @@ def _create_psbt_snapshot(
     fee_rate: int,
     future_fee_rate: int,
 ) -> dict:
+    """
+    Create deterministic, audit-friendly JSON snapshot of user selection.
+    Used for export, reload, and fingerprint verification.
+    """
     if not selected_utxos:
-        raise ValueError("No UTXOs selected")
+        raise ValueError("No UTXOs selected for snapshot")
 
-    # Clean, JSON-serializable input list
+    # Sort for deterministic order
+    sorted_utxos = sorted(selected_utxos, key=lambda u: (u["txid"], u["vout"]))
+
     clean_inputs = [
         {
             "txid": u["txid"],
@@ -2504,7 +2638,7 @@ def _create_psbt_snapshot(
             "health": u.get("health"),
             "source": u.get("source"),
         }
-        for u in sorted(selected_utxos, key=lambda x: (x["txid"], x["vout"]))
+        for u in sorted_utxos
     ]
 
     snapshot = {
@@ -2517,7 +2651,7 @@ def _create_psbt_snapshot(
         "inputs": clean_inputs,
     }
 
-    # Deterministic fingerprint
+    # Deterministic fingerprint (SHA-256 of canonical JSON)
     canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
     fingerprint = hashlib.sha256(canonical.encode()).hexdigest()
     snapshot["fingerprint"] = fingerprint
@@ -2525,8 +2659,9 @@ def _create_psbt_snapshot(
 
     return snapshot
 
+
 def _persist_snapshot(snapshot: dict) -> str:
-    """Write snapshot to temporary file for download."""
+    """Write snapshot to temporary file for Gradio download."""
     date_str = datetime.now().strftime("%Y%m%d")
     fingerprint_short = snapshot["fingerprint_short"]
     filename_prefix = f"Ωmega_Prune_{date_str}_{fingerprint_short[:8]}"
@@ -2542,7 +2677,9 @@ def _persist_snapshot(snapshot: dict) -> str:
     tmp_file.write(json_str)
     tmp_file.close()
 
+    log.debug(f"Snapshot persisted to: {tmp_file.name}")
     return tmp_file.name
+
 
 def on_generate(
     dest_value: str,
@@ -2551,11 +2688,14 @@ def on_generate(
     enriched_state: tuple,
     scan_source: str,
 ) -> tuple:
-    """Freeze user intent and return both snapshot and full UTXOs for PSBT generation."""
+    """
+    Freeze user intent on "Generate" click.
+    Returns snapshot (for JSON export), selected UTXOs, locked flag, and file path.
+    """
     log.info("on_generate called")
 
     if not enriched_state:
-        log.info("enriched_state is empty")
+        log.info("enriched_state is empty — nothing to generate")
         return None, [], gr.update(value=False), None
 
     selected_utxos = _extract_selected_utxos(enriched_state)
@@ -2565,10 +2705,10 @@ def on_generate(
         log.info("Generate attempted with no UTXOs selected")
         return None, [], gr.update(value=False), None
 
-    log.info(f"dest_value: {dest_value!r}")
+    log.debug(f"Destination override: {dest_value!r}")
 
     try:
-        log.info("Creating snapshot...")
+        log.debug("Creating snapshot...")
         snapshot = _create_psbt_snapshot(
             selected_utxos=selected_utxos,
             scan_source=scan_source,
@@ -2577,11 +2717,10 @@ def on_generate(
             future_fee_rate=future_fee_rate,
         )
 
-        log.info("Snapshot created, persisting to file...")
+        log.debug("Snapshot created — persisting to file...")
         file_path = _persist_snapshot(snapshot)
 
-        log.info("Snapshot persisted — returning success")
-        # Return: snapshot, full_selected_utxos, locked_update, file_path
+        log.info("Snapshot persisted — locking UI")
         return snapshot, selected_utxos, gr.update(value=True), file_path
 
     except Exception as e:
@@ -2593,6 +2732,7 @@ def on_generate(
 # ====================
 
 def _render_no_snapshot() -> str:
+    """Error message when no snapshot exists (generate not clicked yet)."""
     return (
         "<div style='"
         "color:#ff6666 !important;"
@@ -2607,7 +2747,10 @@ def _render_no_snapshot() -> str:
         "No snapshot — run <strong style='color:#ffaa66 !important;'>Generate</strong> first."
         "</div>"
     )
+
+
 def _render_no_inputs() -> str:
+    """Error message when no UTXOs are selected for pruning."""
     return (
         "<div style='"
         "color:#ff6666 !important;"
@@ -2627,9 +2770,12 @@ def _render_no_inputs() -> str:
     )
 
 
-
 @dataclass(frozen=True)
 class PsbtParams:
+    """
+    Frozen parameters extracted from snapshot for PSBT generation.
+    Ensures deterministic, immutable config during tx building.
+    """
     inputs: List[dict]
     scan_source: str
     dest_override: Optional[str]
@@ -2639,6 +2785,7 @@ class PsbtParams:
 
 
 def _extract_psbt_params(snapshot: dict) -> PsbtParams:
+    """Extract frozen parameters from saved snapshot."""
     return PsbtParams(
         inputs=snapshot["inputs"],
         scan_source=snapshot["scan_source"],
@@ -2647,25 +2794,38 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
         fingerprint_short=snapshot["fingerprint_short"],
         full_spend_no_change=snapshot.get("full_spend_no_change", False),
     )
+
+
 def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Union[bytes, str]:
     """
-    Resolve final destination to scriptPubKey (bytes) or return error HTML.
-    Enforces modern output types only (P2WPKH or Taproot) to avoid high-fee legacy change.
+    Resolve final destination address to scriptPubKey (bytes) or return user-facing error HTML.
+
+    Logic:
+    - If override provided → use it
+    - Else → fall back to scan_source
+    - If neither → return empty bytes (absorb remainder to fee = full cleanup)
+    - Only allow modern outputs: P2WPKH (bc1q...) or Taproot (bc1p...)
+    - Legacy (1...) or Nested SegWit (3...) are rejected with clear error
+
+    Returns:
+        bytes: valid scriptPubKey if modern address
+        str: HTML error message if invalid / unsupported
     """
     override_clean = (dest_override or "").strip()
     source_clean = scan_source.strip()
 
     final_dest = override_clean if override_clean else source_clean
 
+    # No destination → full cleanup (absorb change into fee)
     if not final_dest:
-        # No destination → absorb remainder into fee (full cleanup mode)
         return b''
 
     try:
         spk, meta = address_to_script_pubkey(final_dest)
+
         typ = meta.get('type', 'unknown')
 
-        # Enforce modern types only
+        # Enforce modern change output only
         if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
             return (
                 "<div style='"
@@ -2682,26 +2842,31 @@ def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Unio
                 "<div style='font-size:clamp(1.3rem, 5vw, 1.7rem); font-weight:900;'>"
                 "Change address must be modern"
                 "</div><br>"
-                "Only <strong>bc1q… (Native SegWit)</strong> or <strong>bc1p… (Taproot)</strong> allowed.<br><br>"
-                f"Detected: <strong>{typ}</strong><br>"
+                "Only <span style='font-weight:900;'>bc1q… (Native SegWit)</span> or "
+                "<span style='font-weight:900;'>bc1p… (Taproot)</span> allowed.<br><br>"
+                f"Detected: <span style='font-weight:900;'>{typ}</span><br>"
                 "Legacy (1…) or Nested (3…) outputs create very expensive change in 2025+ fee environment.<br><br>"
                 "Please use a modern address for change output."
                 "</div>"
             )
 
+        # Success — log for traceability (can be removed later if desired)
+        log.info("Resolved change address %s → %s (spk len=%d)", final_dest, typ, len(spk))
+
         return spk
 
-    except Exception:
+    except Exception as e:
+        log.error("Failed to resolve destination '%s': %s", final_dest, str(e), exc_info=True)
         return (
             "<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
             "Invalid destination address<br><br>"
             "Must be a valid modern Bitcoin address:<br>"
-            "• <strong>bc1q…</strong> — Native SegWit<br>"
-            "• <strong>bc1p…</strong> — Taproot<br><br>"
+            "• <span style='font-weight:900;'>bc1q…</span> — Native SegWit<br>"
+            "• <span style='font-weight:900;'>bc1p…</span> — Taproot<br><br>"
             "Legacy (1…) and Nested (3…) are not allowed for change."
             "</div>"
         )
-    
+
 def _build_unsigned_tx(
     inputs: list[dict],
     econ: TxEconomics,
@@ -2709,66 +2874,80 @@ def _build_unsigned_tx(
     params: PsbtParams,
 ) -> tuple[Tx, list[dict], str, bool]:
     """
-    Construct unsigned transaction and return prepared UTXO info for PSBT.
+    Construct unsigned transaction and prepare UTXO info for PSBT.
 
     Returns:
-        tx: Unsigned Tx object.
-        utxos_for_psbt: Prepared UTXO info for PSBT.
-        no_change_warning: HTML warning string (empty if none).
-        has_change_output: True if a real change output was added.
+        tx: Unsigned Tx object
+        utxos_for_psbt: Prepared UTXO dicts for PSBT input maps
+        no_change_warning: HTML warning (if no change address or absorbed)
+        has_change_output: True if a real change output was added
     """
     tx = Tx()
-    utxos_for_psbt: list[dict[str, any]] = []
+    utxos_for_psbt: list[dict[str, Any]] = []
 
     for u in inputs:
-        tx.tx_ins.append(TxIn(bytes.fromhex(u["txid"]), int(u["vout"])))
+        try:
+            txid_bytes = bytes.fromhex(u["txid"])
+            vout = int(u["vout"])
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid txid/vout in input: {e}")
+
+        tx.tx_ins.append(TxIn(txid_bytes, vout))
+
+        # Prepare UTXO for PSBT witness data
+        _, meta = address_to_script_pubkey(u["address"])
+        spk = meta.get("scriptPubKey") or address_to_script_pubkey(u["address"])[0]
+
         utxos_for_psbt.append({
             "value": u["value"],
-            "scriptPubKey": address_to_script_pubkey(u["address"])[0],
+            "scriptPubKey": spk,
             "script_type": u.get("script_type", "unknown"),
         })
 
     # Change / remainder logic
     change_amt = econ.change_amt
-    if getattr(params, "full_spend_no_change", False):
-        change_amt = econ.total_in - econ.fee   # Force full spend (absorb everything)
+    if params.full_spend_no_change:
+        change_amt = econ.total_in - econ.fee  # Force full spend (absorb everything)
 
     no_change_warning = ""
     has_change_output = False
 
-    if change_amt <= 0:
-        # No remainder → no change output, no warning needed here
-        pass
-
-    elif not dest_spk:
-        # Remainder exists but no destination → absorbed into fees
-        no_change_warning = (
-            "<div style='"
-            "color:#ff9900 !important;"
-            "background:rgba(51,34,0,0.6) !important;"
-            "border:2px solid #ff9900 !important;"
-            "border-radius:12px !important;"
-            "padding:16px !important;"
-            "margin:16px 0 !important;"
-            "text-align:center !important;"
-            "font-weight:600 !important;"
-            "'>"
-            "⚠️ No change address provided<br>"
-            "All remaining value absorbed into fees (full wallet cleanup).<br><br>"
-            "To receive change, include at least one bc1q... or bc1p... address in your pasted UTXOs."
-            "</div>"
-        )
-
-    else:
-        # Normal change output
-        tx.tx_outs.append(TxOut(change_amt, dest_spk))
-        has_change_output = True
+    if change_amt > 0:
+        if dest_spk:
+            # Normal change output
+            tx.tx_outs.append(TxOut(change_amt, dest_spk))
+            has_change_output = True
+        else:
+            # No destination address — absorb remainder
+            no_change_warning = (
+                "<div style='"
+                "color:#ff9900 !important;"
+                "background:rgba(51,34,0,0.6) !important;"
+                "border:2px solid #ff9900 !important;"
+                "border-radius:12px !important;"
+                "padding:16px !important;"
+                "margin:16px 0 !important;"
+                "text-align:center !important;"
+                "font-weight:600 !important;"
+                "'>"
+                "⚠️ No change address provided<br>"
+                "All remaining value absorbed into fees (full wallet cleanup).<br><br>"
+                "To receive change, include at least one bc1q… or bc1p… address in your pasted UTXOs."
+                "</div>"
+            )
 
     return tx, utxos_for_psbt, no_change_warning, has_change_output
 	
+# ====================
+# QR & PSBT HTML composition
+# ====================
+
 def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
-    """Generate QR code for PSBT, with graceful fallback for large PSBTs."""
-    # Safe threshold — QR version 40 max ~2953 chars
+    """
+    Generate QR code HTML for PSBT with graceful fallback for large payloads.
+    Returns (qr_html, qr_warning).
+    """
+    # QR version 40 max ~2953 chars — safe threshold
     if len(psbt_b64) > 2900:
         qr_html = ""
         qr_warning = (
@@ -2786,34 +2965,27 @@ def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
             "margin-left:auto !important;"
             "margin-right:auto !important;"
             "'>"
-            "<span style='"
-            "color:#ffff66 !important;"
-            "font-size: clamp(1.4rem, 6vw, 1.8rem) !important;"
-            "font-weight:900 !important;"
-            "text-shadow:0 0 35px #ffff00 !important;"
-            "'>"
+            "<span style='color:#ffff66 !important; font-size: clamp(1.4rem, 6vw, 1.8rem) !important; font-weight:900 !important; text-shadow:0 0 35px #ffff00 !important;'>"
             "PSBT Too Large for QR Code"
             "</span><br><br>"
             f"<span style='color:#ffddaa !important; font-size: clamp(1rem, 3.8vw, 1.2rem) !important;'>"
             f"Size: {len(psbt_b64):,} characters"
             "</span><br><br>"
-            "Use the <span style='"
-            "color:#00ffff !important;"
-            "font-size: clamp(1.2rem, 5vw, 1.5rem) !important;"
-            "font-weight:900 !important;"
-            "text-shadow:0 0 30px #00ffff !important;"
-            "'>"
+            "Use the <span style='color:#00ffff !important; font-size: clamp(1.2rem, 5vw, 1.5rem) !important; font-weight:900 !important; text-shadow:0 0 30px #00ffff !important;'>"
             "COPY PSBT"
             "</span> button below and paste directly into your wallet.<br><br>"
             "<span style='color:#aaffff !important; font-size: clamp(0.95rem, 3.5vw, 1.1rem) !important;'>"
-            "Sparrow • Coldcard • Electrum • Most wallets support direct paste"
+            "Sparrow • Coldcard • Electrum • UniSat • Nunchuk • OKX"
             "</span>"
             "</div>"
         )
         return qr_html, qr_warning
 
     # Normal QR generation
-    error_correction = qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2600 else qrcode.constants.ERROR_CORRECT_M
+    error_correction = (
+        qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2600
+        else qrcode.constants.ERROR_CORRECT_M
+    )
     qr = qrcode.QRCode(
         version=None,
         error_correction=error_correction,
@@ -2857,7 +3029,8 @@ def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
         )
 
     return qr_html, qr_warning
-    
+
+
 def _compose_psbt_html(
     fingerprint: str,
     qr_html: str,
@@ -2865,14 +3038,15 @@ def _compose_psbt_html(
     psbt_b64: str,
     extra_note: str = "",
     has_change_output: bool = False,
-    no_change_warning: str = "",  # Big orange warning if no destination provided
+    no_change_warning: str = "",
 ) -> str:
-    """Compose full PSBT output HTML — no DAO elements remain."""
-
-    # Change status message (green success, subtle absorbed note, or skip if big warning)
+    """
+    Compose complete PSBT output HTML (fingerprint, QR, raw PSBT, wallet notes).
+    Handles change status, warnings, and large-PSBT fallbacks gracefully.
+    """
+    # Change status message
     change_message = ""
     if has_change_output:
-        # Green success: real change output was created
         change_message = """
         <div style="
             color:#aaffaa !important;
@@ -2888,13 +3062,9 @@ def _compose_psbt_html(
             💧 Change output sent to standard address
         </div>
         """
-
     elif no_change_warning:
-        # Big orange warning already present → no extra subtle note needed
-        change_message = ""
-
+        change_message = ""  # Big warning already present — no extra note
     else:
-        # Remainder absorbed (dust or full cleanup) — subtle gray note
         change_message = """
         <div style="
             color:#ffcc88 !important;
@@ -2907,7 +3077,7 @@ def _compose_psbt_html(
         </div>
         """
 
-    # QR section (only if QR was generated)
+    # QR section (only if QR generated)
     qr_section = ""
     if qr_html:
         qr_section = f"""
@@ -2929,7 +3099,7 @@ def _compose_psbt_html(
 
     qr_feedback = qr_warning if qr_warning else ""
 
-    # Full HTML output
+    # Full PSBT output HTML
     return f"""
     <div style="height: clamp(60px, 15vw, 100px) !important;"></div>
 
@@ -3085,29 +3255,35 @@ def _compose_psbt_html(
     </div>
     """
 
-def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows) -> str:
-    """Orchestrate PSBT generation using both snapshot (params) and full enriched UTXOs."""
+# ====================
+# Final PSBT Generation & Summary Bridge
+# ====================
 
+def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows) -> str:
+    """
+    Orchestrate PSBT generation using snapshot (params) and full enriched UTXOs.
+    Returns full PSBT HTML output (QR, raw text, warnings, fingerprint).
+    """
     if not psbt_snapshot:
         return _render_no_snapshot()
 
     if not full_selected_utxos:
         return _render_no_inputs()
 
-    # Safety check: nothing actually selected for pruning
-    if not any(row[0] for row in df_rows if row):
+    # Safety check: nothing actually selected
+    if not any(row and row[CHECKBOX_COL] for row in df_rows if row):
         return (
             "<div style='"
-            "    color:#ff9900 !important;"
-            "    background:rgba(51,34,0,0.6) !important;"
-            "    border:3px solid #ff9900 !important;"
-            "    border-radius:14px !important;"
-            "    padding: clamp(24px,6vw,40px) !important;"
-            "    margin:20px 0 !important;"
-            "    text-align:center !important;"
-            "    font-size: clamp(1.1rem,4vw,1.3rem) !important;"
-            "    font-weight:700 !important;"
-            "    box-shadow:0 0 25px rgba(255,153,0,0.5) !important;"
+            "color:#ff9900 !important;"
+            "background:rgba(51,34,0,0.6) !important;"
+            "border:3px solid #ff9900 !important;"
+            "border-radius:14px !important;"
+            "padding: clamp(24px,6vw,40px) !important;"
+            "margin:20px 0 !important;"
+            "text-align:center !important;"
+            "font-size: clamp(1.1rem,4vw,1.3rem) !important;"
+            "font-weight:700 !important;"
+            "box-shadow:0 0 25px rgba(255,153,0,0.5) !important;"
             "'>"
             "⚠️ Nothing selected yet<br><br>"
             "Start over and check at least one UTXO in the table to generate the PSBT.<br>"
@@ -3115,35 +3291,35 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
             "</div>"
         )
 
-    # Safe param extraction — critical guard
+    # Safe param extraction
     try:
         params = _extract_psbt_params(psbt_snapshot)
     except Exception as e:
         log.error(f"Failed to extract PSBT params: {e}", exc_info=True)
         return (
             "<div style='"
-            "    color:#ff6666 !important;"
-            "    text-align:center !important;"
-            "    padding: clamp(30px, 8vw, 60px) !important;"
-            "    background:#440000 !important;"
-            "    border-radius:18px !important;"
-            "    box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
-            "    font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
-            "    line-height:1.7 !important;"
-            "    max-width:90% !important;"
-            "    margin:0 auto !important;"
+            "color:#ff6666 !important;"
+            "text-align:center !important;"
+            "padding: clamp(30px, 8vw, 60px) !important;"
+            "background:#440000 !important;"
+            "border-radius:18px !important;"
+            "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
+            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+            "line-height:1.7 !important;"
+            "max-width:90% !important;"
+            "margin:0 auto !important;"
             "'>"
-            "    <span style='color:#ff3366 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;font-weight:900 !important;'>"
-            "        Invalid or corrupted snapshot"
-            "    </span><br><br>"
-            "    Please click <strong style='color:#ffaa66 !important;'>GENERATE</strong> again."
+            "<span style='color:#ff3366 !important;font-size: clamp(1.4rem, 5vw, 1.8rem) !important;font-weight:900 !important;'>"
+            "Invalid or corrupted snapshot"
+            "</span><br><br>"
+            "Please click <strong style='color:#ffaa66 !important;'>GENERATE</strong> again."
             "</div>"
         )
 
-    # Use the full enriched UTXOs
+    # Use full enriched UTXOs
     all_inputs = full_selected_utxos
 
-    # Filter to supported types
+    # Filter to supported types only
     supported_inputs = [
         u for u in all_inputs
         if u.get("script_type") in ("P2WPKH", "Taproot")
@@ -3167,14 +3343,15 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
             "<strong style='color:#ffff66 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;'>"
             "No supported inputs selected"
             "</strong><br><br>"
-            "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q…)</strong> and <strong style='color:#00ffff !important;'>Taproot (bc1p…)</strong> inputs can be pruned.<br><br>"
+            "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q…)</strong> and "
+            "<strong style='color:#00ffff !important;'>Taproot (bc1p…)</strong> inputs can be pruned.<br><br>"
             "Legacy and Nested inputs were automatically skipped."
             "</div>"
         )
 
     legacy_excluded = len(supported_inputs) < len(all_inputs)
 
-    # ── NEW: Strict input value sanity checks (protect against dust attacks / bad data) ──
+    # Strict input value sanity checks (protect against dust attacks / bad data)
     MAX_BTC = 21_000_000
     MAX_SATS = MAX_BTC * 100_000_000
 
@@ -3202,7 +3379,7 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
                 "</div>"
             )
 
-        if "scriptPubKey" not in u or not u["scriptPubKey"]:
+        if "scriptPubKey" not in u or not u.get("scriptPubKey"):
             return (
                 f"<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
                 f"Missing or empty scriptPubKey for input<br>"
@@ -3211,7 +3388,7 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
                 "</div>"
             )
 
-    # If we reach here, all inputs look sane → proceed
+    # Proceed — inputs look sane
     dest_result = _resolve_destination(params.dest_override, params.scan_source)
     if isinstance(dest_result, str):
         return dest_result
@@ -3219,14 +3396,15 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
 
     try:
         econ = estimate_tx_economics(supported_inputs, params.fee_rate)
-    except ValueError:
+    except ValueError as e:
+        log.warning(f"Economics failed in generate_psbt: {e}")
         return (
-            "<div style='color:#ff6666 !important; text-align:center !important; padding:30px; background:#440000 !important; border-radius:18px; box-shadow:0 0 50px rgba(255,51,102,0.5) !important;'>"
+            "<div style='color:#ff6666 !important; text-align:center; padding:30px; background:#440000; border-radius:18px; box-shadow:0 0 50px rgba(255,51,102,0.5) !important;'>"
             "Invalid transaction economics — please re-analyze."
             "</div>"
         )
 
-    # Build unsigned transaction
+    # Build unsigned tx
     tx, utxos_for_psbt, no_change_warning, has_change_output = _build_unsigned_tx(
         supported_inputs,
         econ,
@@ -3236,18 +3414,17 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
 
     if len(utxos_for_psbt) != len(tx.tx_ins):
         return (
-            "<div style='color:#ff6666 !important; text-align:center !important; padding:30px; font-size:1.2rem; font-weight:700;'>"
+            "<div style='color:#ff6666 !important; text-align:center; padding:30px; font-size:1.2rem; font-weight:700;'>"
             "Internal error: Input/UTXO count mismatch — please report this bug."
             "</div>"
         )
 
-    # Generate PSBT
+    # Generate PSBT & QR
     psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
     qr_html, qr_warning = _generate_qr(psbt_b64)
 
-    # Warnings only (NO success state here)
+    # Additional warnings
     extra_note = ""
-
     if legacy_excluded:
         extra_note += (
             "<div style='color:#ffdd88 !important; background:#332200 !important; "
@@ -3261,7 +3438,7 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
             "</div>"
         )
 
-    # Final render
+    # Final HTML composition
     return _compose_psbt_html(
         fingerprint=params.fingerprint_short,
         qr_html=qr_html,
@@ -3269,8 +3446,10 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
         psbt_b64=psbt_b64,
         extra_note=extra_note,
         has_change_output=has_change_output,
+        no_change_warning=no_change_warning,
     )
-    
+
+
 def analyze_and_show_summary(
     addr_input,
     strategy,
@@ -3282,8 +3461,10 @@ def analyze_and_show_summary(
     locked,
     dest_value,
 ):
-    print(">>> analyze_and_show_summary STARTED")
+    """Bridge analyze() → summary rendering for UI update."""
+    log.debug("analyze_and_show_summary STARTED")
 
+    # Run core analyze
     df_update, enriched_new, warning_banner, gen_row_vis, import_vis, scan_source_new, status_box_html, load_btn_vis, analyze_btn_vis = analyze(
         addr_input,
         strategy,
@@ -3291,19 +3472,24 @@ def analyze_and_show_summary(
         fee_rate_slider,
         future_fee_slider,
         offline_mode,
-        manual_utxo_input,  
+        manual_utxo_input,
     )
-    # Extract fresh rows from the update payload
-    if isinstance(df_update, dict):
-        df_rows = df_update.get("value", [])
-    elif hasattr(df_update, "value"):
+
+    # Extract fresh rows from Gradio DataFrame update payload
+    df_rows = []
+    if hasattr(df_update, "value"):
         df_rows = df_update.value
-    else:
+    elif isinstance(df_update, dict):
+        df_rows = df_update.get("value", [])
+    
+    # Safety net: always ensure list
+    if not isinstance(df_rows, list):
+        log.warning(f"df_rows from analyze() was not a list: {type(df_rows).__name__}")
         df_rows = []
 
-    print(f">>> rows built: {len(df_rows)} UTXOs")
-
-    # Call generate_summary_safe with fresh data
+    log.debug(f">>> rows built: {len(df_rows)} UTXOs")
+    
+    # Generate summary with fresh data
     status_box_html, generate_row_visibility = generate_summary_safe(
         df_rows,
         enriched_new,
@@ -3312,10 +3498,10 @@ def analyze_and_show_summary(
         locked,
         strategy,
         dest_value,
-		offline_mode,
+        offline_mode,
     )
 
-    # Return in correct order matching your .click() outputs
+    # Return in exact order expected by Gradio .click()
     return (
         df_update,
         enriched_new,
@@ -3324,11 +3510,16 @@ def analyze_and_show_summary(
         import_vis,
         scan_source_new,
         status_box_html,
-        load_btn_vis,   # ← This controls load_json_btn visibility
-		analyze_btn_vis, 
+        load_btn_vis,
+        analyze_btn_vis,
     )
 
+# ====================
+# UI Helper Functions
+# ====================
+
 def fresh_empty_dataframe():
+    """Return a fresh, truly empty Gradio DataFrame with correct headers & settings."""
     return gr.DataFrame(
         value=[],                      # Truly empty — no dummy rows
         headers=[
@@ -3346,40 +3537,59 @@ def fresh_empty_dataframe():
         type="array",
         interactive=True,              # Enables checkbox interaction
         wrap=True,
-        row_count=(5, "dynamic"),
+        row_count=(5, "dynamic"),      # Start with 5 rows, grow dynamically
         max_height=500,
         max_chars=None,
         label=" ",
-        static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # ← VERY IMPORTANT: keeps non-PRUNE columns fixed
+        static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # Keep non-PRUNE columns fixed
         column_widths=["120px", "360px", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
     )
 
 
 def process_uploaded_file(file):
+    """
+    Process uploaded JSON selection file.
+    Returns parsed dict or empty {} on failure.
+    """
     if not file:
-        print(">>> process_uploaded_file: No file provided on button click")
-        return {}
-    try:
-        print(">>> Opening file on button click:", file.name)
-        with open(file.name, "r", encoding="utf-8") as f:
-            content = f.read()
-            print(">>> Raw content length on button:", len(content))
-            if len(content) == 0:
-                print(">>> File is empty on button click!")
-                return {}
-            parsed = json.loads(content)
-            print(">>> Parsed OK on button - inputs count:", len(parsed.get("inputs", [])))
-            return parsed
-    except json.JSONDecodeError as e:
-        print(">>> JSON decode error on button:", str(e))
-        return {}
-    except Exception as e:
-        print(">>> File process error on button:", type(e).__name__, str(e))
+        log.debug("No file provided for upload")
         return {}
 
-# =================================================================
-# ========================= HANDLER FUNCTIONS (MUST BE TOP LEVEL) =
-def update_status_and_ui(offline, dark):
+    # Quick safety: reject very large files to prevent hangs / memory issues
+    MAX_FILE_SIZE = 1_000_000  # 1 MB — more than enough for any realistic selection snapshot
+    try:
+        file_size = os.path.getsize(file.name)
+        if file_size > MAX_FILE_SIZE:
+            log.warning(f"Uploaded file rejected — too large ({file_size:,} bytes > {MAX_FILE_SIZE:,})")
+            return {}
+    except Exception as e:
+        log.warning(f"Failed to check file size: {e}")
+        return {}
+
+    try:
+        log.debug(f"Processing uploaded file: {file.name} ({file_size:,} bytes)")
+        with open(file.name, "r", encoding="utf-8") as f:
+            content = f.read()
+            if not content.strip():
+                log.warning("Uploaded file is empty")
+                return {}
+            parsed = json.loads(content)
+            log.debug(f"JSON parsed OK — inputs count: {len(parsed.get('inputs', []))}")
+            return parsed
+    except json.JSONDecodeError as e:
+        log.warning(f"JSON decode error in uploaded file: {e}")
+        return {}
+    except FileNotFoundError:
+        log.error(f"File not found: {file.name}")
+        return {}
+    except Exception as e:
+        log.error(f"Error processing uploaded file: {type(e).__name__}: {e}", exc_info=True)
+        return {}
+
+
+# ── UI status banner (theme + offline mode) ─────────────────────────────────────
+def update_status_and_ui(offline: bool, dark: bool) -> str:
+    """Generate responsive status banner showing theme & connection mode."""
     theme_icon = "🌙" if dark else "☀️"
     theme_text = "Dark" if dark else "Light"
     connection = "Offline 🔒 • No API calls • Fully air-gapped" if offline else "Online • API calls enabled"
@@ -3412,26 +3622,26 @@ def update_status_and_ui(offline, dark):
     </div>
     """
 
-def offline_toggle_handler(offline, dark):
-    manual_box = gr.update(visible=offline)
-    warning_visible = gr.update(visible=offline)
 
-    addr_clear = gr.update(value="") if offline else gr.update()
-    addr_ui = gr.update(
-        interactive=not offline,
-        placeholder=(
-            "Offline mode active — paste raw UTXOs below (txid:vout:value[:address])\n"
-			"Include at least one bc1q... or bc1p... address for change output."
-            if offline
-            else "Paste a single Bitcoin address (bc1q..., bc1p..., 1..., or 3...)\n"
-			    "Only the first valid address is used."
-        )
+def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
+    """
+    Handler for offline/air-gapped mode toggle.
+    Updates manual input visibility, address field interactivity, and status banner.
+    """
+    manual_box_vis = gr.update(visible=offline)
+    addr_interactive = not offline
+    addr_placeholder = (
+        "Offline mode active — paste raw UTXOs below (txid:vout:value[:address])\n"
+        "Include at least one bc1q… or bc1p… address for change output."
+        if offline
+        else "Paste a single Bitcoin address (bc1q…, bc1p…, 1…, or 3…)\n"
+             "Only the first valid address is used."
     )
+    addr_value = "" if offline else gr.update()  # clear on toggle to offline
 
     status_html = update_status_and_ui(offline, dark)
 
-    return manual_box, addr_ui, status_html
-
+    return manual_box_vis, addr_value, addr_interactive, addr_placeholder, status_html
 # --------------------------
 # Gradio UI
 # --------------------------
@@ -3439,7 +3649,7 @@ with gr.Blocks(
     title="Ωmega Pruner v11 — Forged Anew"
 ) as demo:
     
-   # Full-screen animated Ωmega background + Hero Banner
+    # ── Full-screen animated background + Hero Banner ───────────────────────────────
     gr.HTML("""
     <div id="omega-bg" style="
         position: fixed;
@@ -3478,452 +3688,460 @@ with gr.Blocks(
         </span>
     </div>
 
-   <div style="
-    display: flex;
-    justify-content: center;
-    margin: clamp(8px, 2.5vw, 20px) auto 30px auto;
-">
-
-  <div style="
-      text-align: center;
-      padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px);
-      background: rgba(0,0,0,0.42);
-      backdrop-filter: blur(10px);
-      border: clamp(4px, 2vw, 8px) solid #f7931a;
-      border-radius: clamp(16px, 5vw, 24px);
-      box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08);
-      max-width: 1200px;
-      width: 95vw;
-  ">
-
-    <!-- Reclaim Sovereignty -->
     <div style="
-        color: #ffcc00;
-        font-size: clamp(2.8rem, 11vw, 5.2rem);
-        font-weight: 900;
-        letter-spacing: clamp(2px, 1.8vw, 12px);
-        text-shadow:
-            0 0 50px #ffcc00,
-            0 0 100px #ffaa00,
-            0 0 150px rgba(255,204,0,0.9),
-            -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
-            -2px  2px 0 #ffffff, 2px  2px 0 #ffffff;
-        line-height: 1;
-        margin: 0 auto clamp(28px, 5.5vw, 44px) auto;
-        transform: translateX(-0.03em); /* optical centering */
+        display: flex;
+        justify-content: center;
+        margin: clamp(8px, 2.5vw, 20px) auto 30px auto;
     ">
-      Reclaim Sovereignty
+        <div style="
+            text-align: center;
+            padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px);
+            background: rgba(0,0,0,0.42);
+            backdrop-filter: blur(10px);
+            border: clamp(4px, 2vw, 8px) solid #f7931a;
+            border-radius: clamp(16px, 5vw, 24px);
+            box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08);
+            max-width: 1200px;
+            width: 95vw;
+        ">
+            <!-- Reclaim Sovereignty -->
+            <div style="
+                color: #ffcc00;
+                font-size: clamp(2.8rem, 11vw, 5.2rem);
+                font-weight: 900;
+                letter-spacing: clamp(2px, 1.8vw, 12px);
+                text-shadow:
+                    0 0 50px #ffcc00,
+                    0 0 100px #ffaa00,
+                    0 0 150px rgba(255,204,0,0.9),
+                    -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
+                    -2px  2px 0 #ffffff, 2px  2px 0 #ffffff;
+                line-height: 1;
+                margin: 0 auto clamp(28px, 5.5vw, 44px) auto;
+                transform: translateX(-0.03em); /* optical centering */
+            ">
+                Reclaim Sovereignty
+            </div>
+
+            <!-- ΩMEGA PRUNER -->
+            <div style="
+                color: #e65c00;
+                font-size: clamp(2.4rem, 9vw, 4.8rem);
+                font-weight: 900;
+                letter-spacing: clamp(2px, 1.5vw, 12px);
+                text-shadow:
+                    0 0 25px #e65c00,
+                    0 0 50px #c94a00,
+                    0 0 75px rgba(230,92,0,0.7),
+                    -2px -2px 0 #000000, 2px -2px 0 #000000,
+                    -2px  2px 0 #000000, 2px  2px 0 #000000;
+                margin: 4px auto clamp(26px, 5.5vw, 44px) auto;
+            ">
+                ΩMEGA PRUNER
+            </div>
+
+            <!-- NUCLEAR COIN CONTROL -->
+            <div style="
+                color: #0f0;
+                font-size: clamp(1.8rem, 7vw, 3.2rem);
+                font-weight: 900;
+                letter-spacing: clamp(3px, 1.2vw, 6px);
+                text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
+                margin: clamp(20px, 5vw, 35px) 0;
+            ">
+                NUCLEAR COIN CONTROL
+            </div>
+
+            <!-- Version -->
+            <div style="
+                color: #00ffaa;
+                font-size: clamp(1rem, 3.5vw, 1.2rem);
+                letter-spacing: clamp(1px, 0.8vw, 3px);
+                text-shadow: 0 0 12px #00ffaa;
+                margin: clamp(15px, 4vw, 25px) 0;
+            ">
+                FORGED ANEW — v11
+            </div>
+
+            <!-- Body text -->
+            <div style="
+                color:#ddd;
+                font-size: clamp(1.1rem, 3.8vw, 1.4rem);
+                line-height: 1.6;
+                max-width: 900px;
+                margin: clamp(30px, 6vw, 45px) auto;
+                padding: 0 clamp(10px, 3vw, 20px);
+            ">
+                Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
+                <strong style="color:#0f0;">full strategic control</strong> of your Bitcoin.<br><br>
+
+                By pruning inefficient UTXOs, you:<br>
+                • <strong style="color:#00ff9d;">Slash fees</strong> during high-congestion periods<br>
+                • <strong style="color:#00ff9d;">Reduce future costs</strong> with a cleaner UTXO set<br>
+                • <strong style="color:#00ff9d;">Optimize your stack</strong> for speed, savings and privacy<br><br>
+
+                <strong style="color:#f7931a; font-size: clamp(1.3rem, 4.5vw, 1.7rem); font-weight:900;">
+                    Prune smarter. Win forever.
+                </strong><br><br>
+
+                Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
+            </div>
+
+            <!-- Arrow -->
+            <div style="
+                font-size: clamp(2.5rem, 7vw, 4rem);
+                color:#f7931a;
+                opacity:0.9;
+                margin-top: clamp(20px, 5vw, 40px);
+            ">
+                ↓
+            </div>
+        </div>
     </div>
 
-    <!-- ΩMEGA PRUNER -->
-    <div style="
-        color: #e65c00;
-        font-size: clamp(2.4rem, 9vw, 4.8rem);
-        font-weight: 900;
-        letter-spacing: clamp(2px, 1.5vw, 12px);
-        text-shadow:
-            0 0 25px #e65c00,
-            0 0 50px #c94a00,
-            0 0 75px rgba(230,92,0,0.7),
-            -2px -2px 0 #000000, 2px -2px 0 #000000,
-            -2px  2px 0 #000000, 2px  2px 0 #000000;
-        margin: 4px auto clamp(26px, 5.5vw, 44px) auto;
-    ">
-      ΩMEGA PRUNER
-    </div>
+    <style>
+        @keyframes pulse {
+            0%, 100% { transform: translateY(0); opacity: 0.8; }
+            50% { transform: translateY(20px); opacity: 1; }
+        }
 
-    <!-- NUCLEAR COIN CONTROL -->
-    <div style="
-        color: #0f0;
-        font-size: clamp(1.8rem, 7vw, 3.2rem);
-        font-weight: 900;
-        letter-spacing: clamp(3px, 1.2vw, 6px);
-        text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
-        margin: clamp(20px, 5vw, 35px) 0;
-    ">
-      NUCLEAR COIN CONTROL
-    </div>
+        @keyframes omega-breath {
+            0%, 100% { opacity: 0.78; transform: scale(0.97); }
+            50% { opacity: 1.0; transform: scale(1.03); }
+        }
 
-    <!-- Version -->
-    <div style="
-        color: #00ffaa;
-        font-size: clamp(1rem, 3.5vw, 1.2rem);
-        letter-spacing: clamp(1px, 0.8vw, 3px);
-        text-shadow: 0 0 12px #00ffaa;
-        margin: clamp(15px, 4vw, 25px) 0;
-    ">
-      FORGED ANEW — v11
-    </div>
+        @keyframes gradient-pulse {
+            0%, 100% { transform: scale(0.97); }
+            50% { transform: scale(1.03); }
+        }
 
-    <!-- Body -->
-    <div style="
-        color:#ddd;
-        font-size: clamp(1.1rem, 3.8vw, 1.4rem);
-        line-height: 1.6;
-        max-width: 900px;
-        margin: clamp(30px, 6vw, 45px) auto;
-        padding: 0 clamp(10px, 3vw, 20px);
-    ">
-      Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
-      <strong style="color:#0f0;">full strategic control</strong> of your Bitcoin.<br><br>
+        @keyframes omega-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
 
-      By pruning inefficient UTXOs, you:<br>
-      • <strong style="color:#00ff9d;">Slash fees</strong> during high-congestion periods<br>
-      • <strong style="color:#00ff9d;">Reduce future costs</strong> with a cleaner UTXO set<br>
-      • <strong style="color:#00ff9d;">Optimize your stack</strong> for speed, savings and privacy<br><br>
+        .gradio-container {
+            position: relative;
+            z-index: 1;
+            background: transparent !important;
+        }
 
-      <strong style="color:#f7931a; font-size: clamp(1.3rem, 4.5vw, 1.7rem); font-weight:900;">
-        Prune smarter. Win forever.
-      </strong><br><br>
+        #omega-bg {
+            isolation: isolate;
+        }
 
-      Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
-    </div>
+        .omega-wrap {
+            will-change: transform;
+            animation-timing-function: linear;
+            transform-origin: 50% 52%;
+        }
 
-    <!-- Arrow -->
-    <div style="
-        font-size: clamp(2.5rem, 7vw, 4rem);
-        color:#f7931a;
-        opacity:0.9;
-        margin-top: clamp(20px, 5vw, 40px);
-    ">
-      ↓
-    </div>
+        .omega-symbol {
+            will-change: opacity;
+        }
 
-  </div>
-	
-      <style>
-    @keyframes pulse {
-        0%, 100% { transform: translateY(0); opacity: 0.8; }
-        50% { transform: translateY(20px); opacity: 1; }
-    }
+        /* Fee preset buttons glow */
+        .fee-btn button:not(:disabled) {
+            box-shadow: 0 0 20px rgba(247,147,26,0.6);
+            animation: fee-glow 3s infinite alternate;
+        }
 
-    @keyframes omega-breath {
-        0%, 100% { opacity: 0.78; transform: scale(0.97); }
-        50% { opacity: 1.0; transform: scale(1.03); }
-    }
+        .fee-btn button:disabled {
+            box-shadow: none;
+            animation: none;
+            opacity: 0.35;
+        }
 
-    @keyframes gradient-pulse {
-        0%, 100% { transform: scale(0.97); }
-        50% { transform: scale(1.03); }
-    }
+        @keyframes fee-glow {
+            from { box-shadow: 0 0 20px rgba(247,147,26,0.6); }
+            to { box-shadow: 0 0 40px rgba(247,147,26,0.9); }
+        }
 
-    @keyframes omega-spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
+        /* Slider halo effect */
+        .gr-slider::after {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border-radius: 12px;
+            pointer-events: none;
+            opacity: 0;
+            box-shadow: 0 0 30px rgba(247,147,26,0.8);
+            animation: slider-halo 3.5s infinite alternate;
+            transition: opacity 0.5s;
+        }
 
-    .gradio-container {
-        position: relative;
-        z-index: 1;
-        background: transparent !important;
-		
-    }
+        .gr-slider:not(:has(input:disabled))::after { opacity: 1; }
+        .gr-slider:has(input:disabled)::after { opacity: 0; animation: none; }
 
-    #omega-bg { 
-        isolation: isolate;
-    }
-    .omega-wrap {
-    will-change: transform;
-    animation-timing-function: linear;
-    transform-origin: 50% 52%;
-    transform-origin: 49.5% 52.3%;
-}
-    .omega-symbol {
-    will-change: opacity;
-}
+        @keyframes slider-halo {
+            from { box-shadow: 0 0 25px rgba(247,147,26,0.7); }
+            to { box-shadow: 0 0 45px rgba(247,147,26,1); }
+        }
 
-    /* Fee preset glow */
-    .fee-btn button:not(:disabled) {
-        box-shadow: 0 0 20px rgba(247,147,26,0.6);
-        animation: fee-glow 3s infinite alternate;
-    }
+        /* Locked badge animation */
+        @keyframes badge-pulse {
+            0%   { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
+            50%  { transform: scale(1.15); box-shadow: 0 0 160px rgba(0,255,0,1); }
+            100% { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
+        }
 
-    .fee-btn button:disabled {
-        box-shadow: none;
-        animation: none;
-        opacity: 0.35;
-    }
+        @keyframes badge-entry {
+            0%   { opacity: 0; transform: scale(0.4) translateY(-40px); }
+            70%  { transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
 
-    @keyframes fee-glow {
-        from { box-shadow: 0 0 20px rgba(247,147,26,0.6); }
-        to { box-shadow: 0 0 40px rgba(247,147,26,0.9); }
-    }
-
-    /* Slider halo */
-    .gr-slider::after {
-        content: '';
-        position: absolute;
-        inset: -8px;
-        border-radius: 12px;
-        pointer-events: none;
-        opacity: 0;
-        box-shadow: 0 0 30px rgba(247,147,26,0.8);
-        animation: slider-halo 3.5s infinite alternate;
-        transition: opacity 0.5s;
-    }
-
-    .gr-slider:not(:has(input:disabled))::after { opacity: 1; }
-    .gr-slider:has(input:disabled)::after { opacity: 0; animation: none; }
-
-    @keyframes slider-halo {
-        from { box-shadow: 0 0 25px rgba(247,147,26,0.7); }
-        to { box-shadow: 0 0 45px rgba(247,147,26,1); }
-    }
-
-    /* Locked badge — more dramatic */
-    @keyframes badge-pulse {
-        0%   { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
-        50%  { transform: scale(1.15); box-shadow: 0 0 160px rgba(0,255,0,1); }
-        100% { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
-    }
-
-    @keyframes badge-entry {
-        0%   { opacity: 0; transform: scale(0.4) translateY(-40px); }
-        70%  { transform: scale(1.2); }
-        100% { opacity: 1; transform: scale(1) translateY(0); }
-    }
-
-    .locked-badge {
-        position: fixed;
-        top: 24px;
-        right: 24px;
-        z-index: 9999;
-        padding: 20px 56px;
-        background: #000;
-        border: 8px solid #f7931a;
-        border-radius: 32px;
-        box-shadow: 0 0 160px rgba(247,147,26,1);
-        color: #ffaa00;
-        text-shadow: 0 0 10px #ffaa00, 0 0 20px #ffaa00, 0 0 40px #ffaa00, 0 0 80px #ffaa00;
-        font-weight: 900;
-        font-size: 2.8rem;
-        letter-spacing: 14px;
-        pointer-events: none;
-        opacity: 0;
-        animation: badge-entry 1s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
-                   badge-pulse 2.8s infinite alternate 1s;
-    }
+        .locked-badge {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 9999;
+            padding: 20px 56px;
+            background: #000;
+            border: 8px solid #f7931a;
+            border-radius: 32px;
+            box-shadow: 0 0 160px rgba(247,147,26,1);
+            color: #ffaa00;
+            text-shadow: 0 0 10px #ffaa00, 0 0 20px #ffaa00, 0 0 40px #ffaa00, 0 0 80px #ffaa00;
+            font-weight: 900;
+            font-size: 2.8rem;
+            letter-spacing: 14px;
+            pointer-events: none;
+            opacity: 0;
+            animation: badge-entry 1s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
+                       badge-pulse 2.8s infinite alternate 1s;
+        }
     </style>
     """)
 
-    # Health badges + disabled textbox styling
+    # ── Health badge & legacy row styling ───────────────────────────────────────────
     gr.HTML("""
     <style>
-    .health {
-        font-weight: 900;
-        text-align: center;
-        padding: 6px 10px;
-        border-radius: 4px;
-        min-width: 70px;
-        display: inline-block;
-    }
-    .health-dust     { color: #ff3366; background: rgba(255, 51, 102, 0.12); }
-    .health-heavy    { color: #ff6600; background: rgba(255, 102, 0, 0.12); }
-    .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.12); }
-    .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
-    .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.12); }
-    .health-manual   { color: #bb86fc; background: rgba(187, 134, 252, 0.12); }
+        .health {
+            font-weight: 900;
+            text-align: center;
+            padding: 6px 10px;
+            border-radius: 4px;
+            min-width: 70px;
+            display: inline-block;
+        }
+        .health-dust     { color: #ff3366; background: rgba(255, 51, 102, 0.12); }
+        .health-heavy    { color: #ff6600; background: rgba(255, 102, 0, 0.12); }
+        .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.12); }
+        .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
+        .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.12); }
+        .health-manual   { color: #bb86fc; background: rgba(187, 134, 252, 0.12); }
 
-    .health small {
-        display: block;
-        color: #aaa;
-        font-weight: normal;
-        font-size: 0.8em;
-        margin-top: 2px;
-    }
+        .health small {
+            display: block;
+            color: #aaa;
+            font-weight: normal;
+            font-size: 0.8em;
+            margin-top: 2px;
+        }
 
-    .gr-textbox input:disabled {
-        background-color: #111 !important;
-        color: #555 !important;
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
+        .gr-textbox input:disabled {
+            background-color: #111 !important;
+            color: #555 !important;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
 
-    /* Legacy row styling */
-.health-legacy {
-    color: #ff4444 !important;
-    font-weight: bold;
-}
+        /* Legacy row styling */
+        .health-legacy {
+            color: #ff4444 !important;
+            font-weight: bold;
+        }
 
-tr:has(.health-legacy) {
-    background-color: #330000 !important;
-    opacity: 0.65;
-}
+        tr:has(.health-legacy) {
+            background-color: #330000 !important;
+            opacity: 0.65;
+        }
 
-tr:has(.health-legacy) td {
-    color: #ffaaaa !important;
-}
+        tr:has(.health-legacy) td {
+            color: #ffaaaa !important;
+        }
 
-tr:has(.health-legacy) input[type="checkbox"],
-tr:has(.health-nested) input[type="checkbox"] {
-    opacity: 0.3 !important;
-    cursor: not-allowed !important;
-    accent-color: #666 !important;
-}
+        tr:has(.health-legacy) input[type="checkbox"],
+        tr:has(.health-nested) input[type="checkbox"] {
+            opacity: 0.3 !important;
+            cursor: not-allowed !important;
+            accent-color: #666 !important;
+        }
     </style>
     """)
 
-  # Global CSS for dark mode (pure black)
+    # ── Global dark mode + checkbox styling ─────────────────────────────────────────
     gr.HTML("""
-<style>
-    /* Force dark mode on body and all Gradio containers */
-    .dark-mode,
-    .dark-mode .gradio-container,
-    .dark-mode .gr-panel,
-    .dark-mode .gr-form,
-    .dark-mode .gr-box,
-    .dark-mode .gr-group,
-    .dark-mode textarea,
-    .dark-mode input,
-    .dark-mode .gr-button,
-    .dark-mode .gr-textbox,
-    .dark-mode .gr-dropdown {
-        background: #000 !important;
-        color: #0f0 !important;
-        border-color: #f7931a !important;
-    }
+    <style>
+        /* Force dark mode on body and all Gradio containers */
+        .dark-mode,
+        .dark-mode .gradio-container,
+        .dark-mode .gr-panel,
+        .dark-mode .gr-form,
+        .dark-mode .gr-box,
+        .dark-mode .gr-group,
+        .dark-mode textarea,
+        .dark-mode input,
+        .dark-mode .gr-button,
+        .dark-mode .gr-textbox,
+        .dark-mode .gr-dropdown {
+            background: #000 !important;
+            color: #0f0 !important;
+            border-color: #f7931a !important;
+        }
 
-    /* Buttons in dark mode */
-    .dark-mode .gr-button {
-        background: #000 !important;
-        color: #0f0 !important;
-        border: 2px solid #f7931a !important;
-    }
-    .dark-mode .gr-button:hover {
-        background: #f7931a !important;
-        color: #000 !important;
-    }
+        /* Buttons in dark mode */
+        .dark-mode .gr-button {
+            background: #000 !important;
+            color: #0f0 !important;
+            border: 2px solid #f7931a !important;
+        }
+        .dark-mode .gr-button:hover {
+            background: #f7931a !important;
+            color: #000 !important;
+        }
 
-    /* Nuclear checkbox — bigger and more visible */
-    input[type="checkbox"] {
-        width: clamp(28px, 6vw, 36px) !important;
-        height: clamp(28px, 6vw, 36px) !important;
-        accent-color: #0f0 !important;
-        background: #000 !important;
-        border: clamp(2px, 0.5vw, 3px) solid #f7931a !important;
-        border-radius: 8px !important;
-        cursor: pointer;
-        box-shadow: 0 0 20px rgba(247,147,26,0.6) !important;
-        appearance: none;
-        position: relative;
-    }
+        /* Nuclear checkbox — bigger and more visible */
+        input[type="checkbox"] {
+            width: clamp(28px, 6vw, 36px) !important;
+            height: clamp(28px, 6vw, 36px) !important;
+            accent-color: #0f0 !important;
+            background: #000 !important;
+            border: clamp(2px, 0.5vw, 3px) solid #f7931a !important;
+            border-radius: 8px !important;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(247,147,26,0.6) !important;
+            appearance: none;
+            position: relative;
+        }
 
-    input[type="checkbox"]:checked {
-        background: #0f0 !important;
-        box-shadow: 0 0 30px #0f0 !important;
-    }
+        input[type="checkbox"]:checked {
+            background: #0f0 !important;
+            box-shadow: 0 0 30px #0f0 !important;
+        }
 
-    input[type="checkbox"]:checked::after {
-        content: '✓';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: #000;
-        font-size: clamp(18px, 4vw, 24px) !important;
-        font-weight: 900;
-        pointer-events: none;
-    }
+        input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #000;
+            font-size: clamp(18px, 4vw, 24px) !important;
+            font-weight: 900;
+            pointer-events: none;
+        }
 
-    /* Light mode fallback */
-    :not(.dark-mode) input[type="checkbox"] {
-        accent-color: #f7931a !important;
-        background: #fff !important;
-        border-color: #0f0 !important;
-    }
-    :not(.dark-mode) input[type="checkbox"]:checked {
-        background: #f7931a !important;
-    }
+        /* Light mode fallback */
+        :not(.dark-mode) input[type="checkbox"] {
+            accent-color: #f7931a !important;
+            background: #fff !important;
+            border-color: #0f0 !important;
+        }
+        :not(.dark-mode) input[type="checkbox"]:checked {
+            background: #f7931a !important;
+        }
 
-    /* Empty state messages */
-    .empty-state-msg {
-        color: #aaffcc !important;
-        background: rgba(0, 30, 20, 0.6) !important;
-        padding: clamp(30px, 8vw, 50px) !important;
-        border-radius: 18px !important;
-        border: 2px solid #00ff88 !important;
-        box-shadow: 0 0 50px rgba(0, 255, 136, 0.4) !important;
-    }
+        /* Empty state messages */
+        .empty-state-msg {
+            color: #aaffcc !important;
+            background: rgba(0, 30, 20, 0.6) !important;
+            padding: clamp(30px, 8vw, 50px) !important;
+            border-radius: 18px !important;
+            border: 2px solid #00ff88 !important;
+            box-shadow: 0 0 50px rgba(0, 255, 136, 0.4) !important;
+        }
 
-    body:not(.dark-mode) .empty-state-msg {
-        color: #003322 !important;
-        background: rgba(200, 255, 220, 0.25) !important;
-        border: 2px solid #006644 !important;
-        box-shadow: 0 0 30px rgba(0, 100, 68, 0.3) !important;
-    }
+        body:not(.dark-mode) .empty-state-msg {
+            color: #003322 !important;
+            background: rgba(200, 255, 220, 0.25) !important;
+            border: 2px solid #006644 !important;
+            box-shadow: 0 0 30px rgba(0, 100, 68, 0.3) !important;
+        }
 
-    body:not(.dark-mode) .empty-state-msg > div:first-child {
-        color: #004d33 !important;
-    }
-.gr-dataframe th:nth-child(1) {
-    white-space: normal !important;
-    word-wrap: break-word !important;
-    overflow: visible !important;
-    line-height: 1.2 !important;
-    padding: 8px 4px !important;
-    font-size: clamp(0.9rem, 3vw, 1rem) !important;
-}
-/* Make sure these columns can wrap + break long strings */
-.gr-dataframe td:nth-child(2),  /* Source */
-.gr-dataframe td:nth-child(3),  /* TXID */
-.gr-dataframe td:nth-child(6) { /* Address */
-    white-space: normal !important;
-    word-break: break-all !important;     /* critical for hex & bech32 */
-    overflow-wrap: break-word !important; /* fallback + better looking */
-    hyphens: auto;                        /* optional: nicer breaks on some browsers */
-    font-family: monospace !important;
-    font-size: 0.95rem !important;
-    line-height: 1.35 !important;
-    padding: 8px 6px !important;          /* give a bit more breathing room */
-}
+        body:not(.dark-mode) .empty-state-msg > div:first-child {
+            color: #004d33 !important;
+        }
 
-/* Make sure the parent doesn't fight us */
-.gr-dataframe td:nth-child(2),
-.gr-dataframe td:nth-child(3),
-.gr-dataframe td:nth-child(6) {
-    max-width: none !important;           /* prevent artificial width caps */
-    overflow: visible !important;         /* let it grow vertically */
-}
+        /* DataFrame column wrapping for long strings (TXID, address, source) */
+        .gr-dataframe th:nth-child(1) {
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow: visible !important;
+            line-height: 1.2 !important;
+            padding: 8px 4px !important;
+            font-size: clamp(0.9rem, 3vw, 1rem) !important;
+        }
 
-/* Hover feedback for copy-ability */
-.gr-dataframe td:nth-child(2):hover,
-.gr-dataframe td:nth-child(3):hover,
-.gr-dataframe td:nth-child(6):hover {
-    background: rgba(0, 255, 136, 0.12) !important;
-    cursor: pointer !important;
-}
+        .gr-dataframe td:nth-child(2),  /* Source */
+        .gr-dataframe td:nth-child(3),  /* TXID */
+        .gr-dataframe td:nth-child(6) { /* Address */
+            white-space: normal !important;
+            word-break: break-all !important;
+            overflow-wrap: break-word !important;
+            hyphens: auto;
+            font-family: monospace !important;
+            font-size: 0.95rem !important;
+            line-height: 1.35 !important;
+            padding: 8px 6px !important;
+        }
 
-/* Optional: slightly reduce ellipsis aggression globally (safety net) */
-.gr-dataframe td {
-    white-space: normal !important;       /* try to weaken global nowrap */
-    overflow: visible !important;
-}
-</style>
-""")
+        .gr-dataframe td:nth-child(2),
+        .gr-dataframe td:nth-child(3),
+        .gr-dataframe td:nth-child(6) {
+            max-width: none !important;
+            overflow: visible !important;
+        }
 
+        .gr-dataframe td:nth-child(2):hover,
+        .gr-dataframe td:nth-child(3):hover,
+        .gr-dataframe td:nth-child(6):hover {
+            background: rgba(0, 255, 136, 0.12) !important;
+            cursor: pointer !important;
+        }
+
+        .gr-dataframe td {
+            white-space: normal !important;
+            overflow: visible !important;
+        }
+    </style>
+    """)
+
+    # Placeholder for dynamic prune conditions badge (populated by load or timer)
     prune_badge = gr.HTML("")
    
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
     # =============================
     def refresh_fees_periodically():
+        """Background daemon thread to keep fee cache warm every 30 seconds."""
         while True:
             time.sleep(30)
             try:
-                get_live_fees()  # Keeps the internal cache warm
+                get_live_fees()  # Refresh cache without blocking main thread
             except Exception as e:
-                log.warning(f"Error during background fee refresh: {e}")
+                log.warning(f"Background fee refresh error: {e}")
 
-    # Start the daemon thread immediately on import — with guard against multiple starts (e.g., hot-reload)
+    # Start daemon thread only once (guard against hot-reload / multiple imports)
     if not hasattr(threading, "_fee_refresh_started"):
-        fee_refresh_thread = threading.Thread(target=refresh_fees_periodically, daemon=True)
+        fee_refresh_thread = threading.Thread(
+            target=refresh_fees_periodically,
+            daemon=True,
+            name="FeeCacheRefresher"
+        )
         fee_refresh_thread.start()
         threading._fee_refresh_started = True
+        log.info("Background fee cache refresher thread started")
 
     # =============================
     # — LOCK-SAFE FEE PRESET FUNCTION —
     # =============================
     def apply_fee_preset_locked(locked: bool, preset: str):
+        """
+        Apply a fee preset (fastest, half_hour, hour, economy) to the current fee slider.
+        Safe to call when UI is locked — returns no-op updates.
+        """
         if locked:
             return gr.update(), gr.update()
 
@@ -3935,21 +4153,23 @@ tr:has(.health-nested) input[type="checkbox"] {
         }
 
         rate_map = {
-            "fastest": fees.get("fastestFee", 10),
-            "half_hour": fees.get("halfHourFee", 6),
-            "hour": fees.get("hourFee", 3),
-            "economy": fees.get("economyFee", 1),
+            "fastest":   fees.get("fastestFee",   10),
+            "half_hour": fees.get("halfHourFee",  6),
+            "hour":      fees.get("hourFee",      3),
+            "economy":   fees.get("economyFee",   1),
         }
 
-        new_rate = rate_map.get(preset, 3)
+        new_rate = rate_map.get(preset, 3)  # Default to 3 s/vB if preset unknown
 
         return gr.update(value=new_rate), gr.update()
 
+
     def finalize_generate_ui():
         """
-        Lock the UI completely after generating PSBT.
-        Disables all inputs, toggles, sliders, and buttons.
-        Hides unnecessary rows/elements.
+        Completely lock the UI after successful PSBT generation.
+        Disables inputs/sliders/toggles/buttons, hides unnecessary elements,
+        shows export area and locked badge.
+        Returns 22-tuple matching Gradio output order.
         """
         return (
             gr.update(visible=False),                    # 0: gen_btn
@@ -3976,9 +4196,7 @@ tr:has(.health-nested) input[type="checkbox"] {
         )
 
     with gr.Column():
-        theme_js = gr.HTML("")
-
-        # ← Modern Bitcoin Optimization Note
+        # Modern Bitcoin Optimization Note
         gr.HTML(
             value="""
             <div style="
@@ -4013,7 +4231,7 @@ tr:has(.health-nested) input[type="checkbox"] {
                 <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
                 and <strong style="color:#00ffff !important;font-weight:900 !important;">hardware-wallet compatibility</strong>.
                 <br><br>
-                
+
                 This tool is intentionally <strong style="color:#00ffff !important; font-weight:900 !important;">non-interactive at the transaction level</strong> —  
                 it optimizes wallet structure and future spend efficiency,  
                 not counterparty-dependent transaction negotiation.
@@ -4026,11 +4244,11 @@ tr:has(.health-nested) input[type="checkbox"] {
 
                 PSBTs generated here include all required metadata
                 (<span style="font-weight:900 !important; color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
-				UTXO data, derivation paths, fingerprints
-				</span>)
+                UTXO data, derivation paths, fingerprints
+                </span>)
                 and can be signed either online or fully offline / air-gapped
                 using <strong style="color:#00ffcc !important;">Sparrow</strong>,
-               	<strong style="color:#00ffcc !important;">Coldcard</strong>,
+                <strong style="color:#00ffcc !important;">Coldcard</strong>,
                 <strong style="color:#00ffcc !important;">Ledger</strong>, 
                 <strong style="color:#00ffcc !important;">Trezor</strong>, 
                 <strong style="color:#00ffcc !important;">Jade</strong>, 
@@ -4042,10 +4260,10 @@ tr:has(.health-nested) input[type="checkbox"] {
                 and Nested SegWit inputs
                 (<strong style="color:#ffaa00 !important;font-weight:900 !important;">3…</strong>)
                 are shown for transparency only and
-				<strong style="color:#ff6666 !important;font-weight:900 !important;">
-				cannot be included in the generated PSBT
-				</strong>.
-				<br>
+                <strong style="color:#ff6666 !important;font-weight:900 !important;">
+                cannot be included in the generated PSBT
+                </strong>.
+                <br>
                 To spend or consolidate these inputs, use a compatible wallet or migrate them separately.
             </div>
             """
@@ -4286,7 +4504,6 @@ No API calls • Fully air-gapped safe""",
         locked = gr.State(False)
         psbt_snapshot = gr.State(None)
         locked_badge = gr.HTML("")  # Starts hidden
-        selection_snapshot_state = gr.State({})
         warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
         selected_utxos_for_psbt = gr.State([])
 
@@ -5119,4 +5336,4 @@ No API calls • Fully air-gapped safe""",
 	
 if __name__ == "__main__":
     demo.queue(default_concurrency_limit=None, max_size=40)
-    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)), share=False, debug=False)
+    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)), share=False, debug=False, allowed_paths=["/"],)
