@@ -3672,14 +3672,14 @@ with gr.Blocks(
             <span class="omega-symbol" style="
                 font-size: 100vh !important;
                 font-weight: 900;
-                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(247,147,26,0.15));
+                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(0, 120, 255,0.12));
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 background-clip: text;
                 color: transparent;
                 text-shadow:
                     0 0 80px rgba(247,147,26,0.55),
-                    0 0 140px rgba(247,147,26,0.35);
+                    0 0 140px rgba(0, 120, 255,0.35);
                 animation: omega-breath 28s infinite ease-in-out;
                 user-select: none;
                 line-height: 1;
@@ -3696,11 +3696,14 @@ with gr.Blocks(
         <div style="
             text-align: center;
             padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px);
-            background: rgba(0,0,0,0.42);
+            background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
             backdrop-filter: blur(10px);
             border: clamp(4px, 2vw, 8px) solid #f7931a;
+            box-shadow: 
+                inset 0 0 80px rgba(0, 100, 255, 0.25),
+                inset 0 0 20px rgba(0, 120, 255, 0.15),
+                0 0 80px rgba(247,147,26,0.4);
             border-radius: clamp(16px, 5vw, 24px);
-            box-shadow: 0 0 80px rgba(247,147,26,0.4), inset 0 0 60px rgba(247,147,26,0.08);
             max-width: 1200px;
             width: 95vw;
         ">
@@ -3714,8 +3717,10 @@ with gr.Blocks(
                     0 0 50px #ffcc00,
                     0 0 100px #ffaa00,
                     0 0 150px rgba(255,204,0,0.9),
-                    -2px -2px 0 #ffffff, 2px -2px 0 #ffffff,
-                    -2px  2px 0 #ffffff, 2px  2px 0 #ffffff;
+                    -2px -2px 0 #ffffff,
+                    2px -2px 0 #ffffff,
+                    -2px  2px 0 #ffffff,
+                    2px  2px 0 #ffffff;
                 line-height: 1;
                 margin: 0 auto clamp(28px, 5.5vw, 44px) auto;
                 transform: translateX(-0.03em); /* optical centering */
@@ -3732,9 +3737,10 @@ with gr.Blocks(
                 text-shadow:
                     0 0 25px #e65c00,
                     0 0 50px #c94a00,
-                    0 0 75px rgba(230,92,0,0.7),
-                    -2px -2px 0 #000000, 2px -2px 0 #000000,
-                    -2px  2px 0 #000000, 2px  2px 0 #000000;
+                    0 0 75px rgba(230,92,0,0.9),
+                    0 130px rgba(220, 0, 60, 0.85),   /* very strong red core */
+                    0 0 170px rgba(200, 0, 0, 0.7),     /* intense crimson mid */
+					0 0 220px rgba(180, 0, 0, 0.5);     /* wide red outer glow */
                 margin: 4px auto clamp(26px, 5.5vw, 44px) auto;
             ">
                 ΩMEGA PRUNER
@@ -3765,7 +3771,7 @@ with gr.Blocks(
 
             <!-- Body text -->
             <div style="
-                color:#ddd;
+                color: #ddd;
                 font-size: clamp(1.1rem, 3.8vw, 1.4rem);
                 line-height: 1.6;
                 max-width: 900px;
@@ -3790,8 +3796,8 @@ with gr.Blocks(
             <!-- Arrow -->
             <div style="
                 font-size: clamp(2.5rem, 7vw, 4rem);
-                color:#f7931a;
-                opacity:0.9;
+                color: #f7931a;
+                opacity: 0.9;
                 margin-top: clamp(20px, 5vw, 40px);
             ">
                 ↓
