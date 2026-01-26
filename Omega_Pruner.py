@@ -1183,7 +1183,7 @@ def address_to_script_pubkey(addr: str) -> tuple[bytes, dict]:
             log.debug("Valid Bech32m (v1+) checksum for: %s", addr)
         else:
             polymod_val = bech32_polymod(bech32_hrp_expand(hrp) + data)
-            log.warning("Checksum failed for both Bech32 and Bech32m: %s (polymod=0x%08x)", addr, polymod_val)
+            log.debug(f"Checksum failed for both Bech32 and Bech32m: {addr} (polymod=0x{polymod_val:08x})")
             return fallback_spk, fallback_meta
 
         if len(data) < 7:
@@ -1595,9 +1595,13 @@ def _sanitize_analyze_inputs(
     )
 
 
-def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
+def _collect_manual_utxos(params: AnalyzeParams) -> Tuple[List[Dict], int]:
+    """
+    Parse offline/manual UTXO input lines into normalized dicts.
+    Returns (utxos, skipped_count) for feedback.
+    """
     if not params.manual_utxo_input:
-        return []
+        return [], 0
 
     utxos = []
     skipped = 0
@@ -1627,13 +1631,14 @@ def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
             addr = parts[3].strip() if len(parts) >= 4 else "unknown (manual)"
 
             if value <= params.dust_threshold:
+                skipped += 1
                 continue
 
             _, meta = address_to_script_pubkey(addr)
             input_weight = meta.get("input_vb", 68) * 4
 
             utxos.append({
-                "txid": txid,  # cleaned hex string
+                "txid": txid,
                 "vout": vout,
                 "value": value,
                 "address": addr,
@@ -1653,7 +1658,7 @@ def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
     if skipped:
         log.info(f"Manual UTXO parse: skipped {skipped} invalid/malformed lines")
 
-    return utxos
+    return utxos, skipped
 
 
 def _collect_online_utxos(params: AnalyzeParams) -> Tuple[List[Dict], str, List[Any]]:
@@ -2010,9 +2015,11 @@ def analyze(
         manual_utxo_input=manual_utxo_input,
     )
 
+    skipped = 0  # default for online mode
+
     # 2. Collect raw UTXOs (online or offline)
     if params.offline_mode:
-        raw_utxos = _collect_manual_utxos(params)
+        raw_utxos, skipped = _collect_manual_utxos(params)  # now returns tuple
         scan_debug = "Offline mode — manual UTXOs only"
         log.debug(f"Offline mode: collected {len(raw_utxos)} manual UTXOs")
     else:
@@ -2117,13 +2124,21 @@ def analyze(
     # Build warning banner if needed
     warning_banner = ""
     if has_unsupported:
-        # Legacy/nested warning — you can expand this later
         warning_banner = (
             "<div style='color:#ffdd88;padding:20px;background:#332200;border:3px solid #ff9900;border-radius:14px;text-align:center;'>"
             "⚠️ Some inputs are legacy or nested — not included in PSBT<br>"
             "Only Native SegWit (bc1q…) and Taproot (bc1p…) are supported for pruning."
             "</div>"
         )
+
+    # Add skipped warning (top banner only)
+    if skipped > 0:
+        warning_banner += f"""
+        <div style='color:#ff9900 !important; padding:12px; background:#331100 !important; border:2px solid #ff9900 !important; border-radius:10px !important; text-align:center; margin:16px 0;'>
+            Warning: {skipped} line(s) skipped during paste (invalid format, dust, or checksum error).<br>
+            Review table for missing UTXOs and start over if needed.
+        </div>
+        """
 
     # 6. Freeze the enriched state (immutable tuple)
     frozen_state = _freeze_enriched(
@@ -2132,6 +2147,7 @@ def analyze(
         scan_source=params.scan_source,
     )
 
+
     # Return unified success state (exactly 9 outputs for Gradio)
     return _analyze_success(
         df_rows=df_rows,
@@ -2139,6 +2155,7 @@ def analyze(
         scan_source=params.scan_source,
         warning_banner=warning_banner,
     )
+
 
 
 def _analyze_success(
@@ -2495,7 +2512,7 @@ def generate_summary_safe(
     )
 
     # Hard errors
-    if error == "NO_UTXOS":
+    if error == "NO_UTXOs":
         return no_utxos_msg, gr.update(visible=False)
     if error == "NO_SELECTION":
         return select_msg, gr.update(visible=False)
@@ -3736,7 +3753,7 @@ def analyze_and_show_summary(
     """Bridge analyze() → summary rendering for UI update."""
     log.debug("analyze_and_show_summary STARTED")
 
-    # Run core analyze
+    # Run core analyze — returns exactly 9 items
     df_update, enriched_new, warning_banner, gen_row_vis, import_vis, scan_source_new, status_box_html, load_btn_vis, analyze_btn_vis = analyze(
         addr_input,
         strategy,
@@ -3747,21 +3764,20 @@ def analyze_and_show_summary(
         manual_utxo_input,
     )
 
-    # Extract fresh rows from Gradio DataFrame update payload
+    # Extract fresh rows
     df_rows = []
     if hasattr(df_update, "value"):
         df_rows = df_update.value
     elif isinstance(df_update, dict):
         df_rows = df_update.get("value", [])
     
-    # Safety net: always ensure list
     if not isinstance(df_rows, list):
         log.warning(f"df_rows from analyze() was not a list: {type(df_rows).__name__}")
         df_rows = []
 
     log.debug(f">>> rows built: {len(df_rows)} UTXOs")
     
-    # Generate summary with fresh data
+    # Generate summary with fresh data (no skipped param needed)
     status_box_html, generate_row_visibility = generate_summary_safe(
         df_rows,
         enriched_new,
@@ -3773,7 +3789,7 @@ def analyze_and_show_summary(
         offline_mode,
     )
 
-    # Return in exact order expected by Gradio .click()
+    # Return the original 9 outputs (Gradio expects exactly 9)
     return (
         df_update,
         enriched_new,
@@ -4828,7 +4844,7 @@ No API calls • Fully air-gapped safe""",
         locked = gr.State(False)
         psbt_snapshot = gr.State(None)
         locked_badge = gr.HTML("")  # Starts hidden
-        warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
+        
         selected_utxos_for_psbt = gr.State([])
         loaded_fingerprint = gr.State(None)  # Holds fingerprint from loaded snapshot (or None)
         selection_changed_after_load = gr.State(False)    # True if user modified after load
@@ -4850,6 +4866,8 @@ No API calls • Fully air-gapped safe""",
 
         load_json_btn = gr.Button("Load Selection from JSON", variant="primary", visible=False)
         json_parsed_state = gr.State({})  # ← dict instead of str
+
+        warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
 
         gr.HTML("""
             <div style="width: 100%; margin-top: 25px;"></div>
