@@ -51,6 +51,7 @@ import base64
 import io
 import qrcode
 import json
+import zipfile
 import os
 from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Any, Optional, Union
@@ -598,23 +599,18 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
 
 
 # ── Load saved selection from JSON snapshot ─────────────────────────────────────
-def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, str]:
-    """
-    Restore checkbox selection from a saved JSON snapshot into the current enriched state.
-    Returns updated enriched_state tuple + user-facing HTML message.
-    """
+def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, str, Optional[str], bool]:
     log.debug(f"load_selection called - snapshot type: {type(parsed_snapshot)}")
 
     if not parsed_snapshot or not isinstance(parsed_snapshot, dict):
         log.debug("No valid parsed snapshot provided")
-        return current_enriched, "No valid parsed JSON loaded"
+        return current_enriched, "No valid parsed JSON loaded", None, False
 
     try:
         if "inputs" not in parsed_snapshot:
             log.warning("Invalid snapshot format: missing 'inputs'")
-            return current_enriched, "Invalid Ωmega Pruner selection file"
+            return current_enriched, "Invalid Ωmega Pruner selection file", None, False
 
-        # Build case-insensitive set of (txid.lower(), vout) keys
         selected_keys = set()
         for inp in parsed_snapshot.get("inputs", []):
             if not isinstance(inp, dict) or "txid" not in inp or "vout" not in inp:
@@ -630,7 +626,6 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
 
         log.debug(f"Loaded {len(selected_keys)} selected keys from snapshot")
 
-        # Normalize current enriched state
         if isinstance(current_enriched, tuple) and len(current_enriched) == 2:
             meta, utxos = current_enriched
             utxos = list(utxos)
@@ -649,9 +644,8 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
                 "3. Upload JSON again — checkboxes will restore<br><br>"
                 "If table stays empty, check your address input."
                 "</div>"
-            )
+            ), parsed_snapshot.get("fingerprint"), False
 
-        # Restore selection flags
         updated = []
         matched = 0
         for u in utxos:
@@ -691,11 +685,15 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
                 "</div>"
             )
 
-        return return_tuple, message
+        loaded_fp = parsed_snapshot.get("fingerprint")
+        if loaded_fp:
+            message += f"<br><small style='color:#88ffcc;'>Loaded fingerprint: {loaded_fp[:16]}...</small>"
+
+        return return_tuple, message, loaded_fp, False  # reset change flag
 
     except Exception as e:
         log.error(f"Error processing selection snapshot: {e}", exc_info=True)
-        return current_enriched, f"Failed to process selection: {str(e)}"
+        return current_enriched, f"Failed to process selection: {str(e)}", None, False
 
 
 # ── Rebuild DataFrame rows from enriched state (for restore / refresh) ───────────
@@ -2768,12 +2766,10 @@ def _create_psbt_snapshot(
 ) -> dict:
     """
     Create deterministic, audit-friendly JSON snapshot of user selection.
-    Used for export, reload, and fingerprint verification.
     """
     if not selected_utxos:
         raise ValueError("No UTXOs selected for snapshot")
 
-    # Sort for deterministic order
     sorted_utxos = sorted(selected_utxos, key=lambda u: (u["txid"], u["vout"]))
 
     clean_inputs = [
@@ -2789,44 +2785,88 @@ def _create_psbt_snapshot(
         for u in sorted_utxos
     ]
 
+    dest_override_clean = dest_override.strip() if dest_override else None
+    if dest_override_clean and any(phrase in dest_override_clean.lower() for phrase in ["offline mode", "change address set", "locked", "manual utxo"]):
+        dest_override_clean = None
+
     snapshot = {
         "version": 1,
         "timestamp": int(time.time()),
         "scan_source": scan_source.strip(),
-        "dest_addr_override": dest_override.strip() if dest_override else None,
+        "dest_addr_override": dest_override_clean,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
+        "pruned_count": len(clean_inputs),
         "inputs": clean_inputs,
     }
 
-    # Deterministic fingerprint (SHA-256 of canonical JSON)
-    canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
-    fingerprint = hashlib.sha256(canonical.encode()).hexdigest()
+    # Fingerprint: exclude variable fields
+    canonical_data = {
+        k: v for k, v in snapshot.items()
+        if k not in ["timestamp", "scan_source", "dest_addr_override"]
+    }
+    canonical_json = json.dumps(canonical_data, sort_keys=True, separators=(",", ":"))
+    fingerprint = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
     snapshot["fingerprint"] = fingerprint
     snapshot["fingerprint_short"] = fingerprint[:16].upper()
 
     return snapshot
 
-
 def _persist_snapshot(snapshot: dict) -> str:
-    """Write snapshot to temporary file for Gradio download."""
-    date_str = datetime.now().strftime("%Y%m%d")
-    fingerprint_short = snapshot["fingerprint_short"]
-    filename_prefix = f"Ωmega_Prune_{date_str}_{fingerprint_short[:8]}"
-
+    """
+    Persist snapshot to temp file:
+    - Plain .json if small (< 1 MB raw)
+    - Compressed .zip if large (> 1 MB raw)
+    
+    Returns path to downloadable file.
+    """
+    # Serialize pretty JSON
+    json_str = json.dumps(snapshot, indent=2, ensure_ascii=False, sort_keys=True)
+    raw_size_bytes = len(json_str.encode('utf-8'))
+    
+    # Filename components
+    date_str = datetime.utcnow().strftime("%Y%m%d")
+    version = snapshot.get("version", 1)
+    fingerprint_short = snapshot.get("fingerprint_short", "UNKNOWN")[:16].upper()
+    base_name = f"Ωmega_Prune_v{version}_{date_str}_{fingerprint_short}"
+    
+    # Decide format
+    is_large = raw_size_bytes > 1_000_000  # 1 MB threshold — tune if needed
+    
+    suffix = ".zip" if is_large else ".json"
     tmp_file = tempfile.NamedTemporaryFile(
-        mode="w",
-        encoding="utf-8",
-        suffix=".json",
-        prefix=filename_prefix,
-        delete=False,
+        mode="wb" if is_large else "w",
+        encoding="utf-8" if not is_large else None,
+        suffix=suffix,
+        prefix="omega_prune_",
+        delete=False
     )
-    json_str = json.dumps(snapshot, indent=2, ensure_ascii=False)
-    tmp_file.write(json_str)
-    tmp_file.close()
-
-    log.debug(f"Snapshot persisted to: {tmp_file.name}")
-    return tmp_file.name
+    
+    try:
+        if is_large:
+            # ZIP compression
+            with zipfile.ZipFile(tmp_file, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(f"{base_name}.json", json_str)
+            final_size = tmp_file.tell()
+            log.info(f"Large snapshot ZIP saved: {base_name}.zip ({raw_size_bytes:,} → {final_size:,} bytes)")
+        else:
+            # Plain JSON
+            tmp_file.write(json_str)
+            tmp_file.flush()
+            final_size = tmp_file.tell()
+            log.info(f"Snapshot JSON saved: {base_name}.json ({final_size:,} bytes)")
+        
+        os.fsync(tmp_file.fileno())
+        return tmp_file.name
+    
+    except Exception as e:
+        log.error(f"Failed to save snapshot: {e}", exc_info=True)
+        os.unlink(tmp_file.name)
+        raise
+    
+    finally:
+        tmp_file.close()
 
 
 def on_generate(
@@ -2841,7 +2881,10 @@ def on_generate(
     Freeze user intent on "Generate" click.
     Returns snapshot (for JSON export), selected UTXOs, locked flag, and file path.
     """
-    log.info("on_generate called")
+    # Clean dest_value — ignore placeholder nonsense
+    cleaned_dest = dest_value.strip()
+    if "offline mode" in cleaned_dest.lower() or len(cleaned_dest) < 10 or "change address set" in cleaned_dest.lower():
+        cleaned_dest = ""  # treat as no override
 
     if not enriched_state:
         log.info("enriched_state is empty — nothing to generate")
@@ -2861,7 +2904,7 @@ def on_generate(
         snapshot = _create_psbt_snapshot(
             selected_utxos=selected_utxos,
             scan_source=scan_source,
-            dest_override=dest_value,
+            dest_override=cleaned_dest,
             fee_rate=fee_rate,
             future_fee_rate=future_fee_rate,
         )
@@ -2929,17 +2972,18 @@ class PsbtParams:
     scan_source: str
     dest_override: Optional[str]
     fee_rate: int
+    future_fee_rate: int
     fingerprint_short: str
     full_spend_no_change: bool = False
 
 
 def _extract_psbt_params(snapshot: dict) -> PsbtParams:
-    """Extract frozen parameters from saved snapshot."""
     return PsbtParams(
         inputs=snapshot["inputs"],
         scan_source=snapshot["scan_source"],
         dest_override=snapshot.get("dest_addr_override"),
         fee_rate=snapshot["fee_rate"],
+        future_fee_rate=snapshot["future_fee_rate"],  # NEW
         fingerprint_short=snapshot["fingerprint_short"],
         full_spend_no_change=snapshot.get("full_spend_no_change", False),
     )
@@ -3218,10 +3262,10 @@ def _compose_psbt_html(
     extra_note: str = "",
     has_change_output: bool = False,
     no_change_warning: str = "",
+    fp_banner: str = ""  # NEW param — pass the fingerprint banner here
 ) -> str:
     """
     Compose complete PSBT output HTML (fingerprint, QR, raw PSBT, wallet notes).
-    Handles change status, warnings, and large-PSBT fallbacks gracefully.
     """
     # Change status message
     change_message = ""
@@ -3242,7 +3286,7 @@ def _compose_psbt_html(
         </div>
         """
     elif no_change_warning:
-        change_message = ""  # Big warning already present — no extra note
+        change_message = no_change_warning  # big warning already present
     else:
         change_message = """
         <div style="
@@ -3294,7 +3338,6 @@ def _compose_psbt_html(
         padding: clamp(40px, 10vw, 70px) !important;
         background: rgba(0, 0, 0, 0.42) !important;
         backdrop-filter: blur(14px) !important;
-        -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
         border: clamp(10px, 3vw, 14px) solid #f7931a !important;
         border-radius: clamp(24px, 6vw, 36px) !important;
         box-shadow: 
@@ -3350,6 +3393,9 @@ def _compose_psbt_html(
             </button>
         </div>
 
+        <!-- NEW: Insert fingerprint banner RIGHT HERE, below the fingerprint box -->
+        {fp_banner}
+
         {extra_note}
         {change_message}
         {qr_section}
@@ -3401,7 +3447,7 @@ def _compose_psbt_html(
                 </button>
             </div>
             <div style="text-align:center !important;margin-top: clamp(10px, 3vw, 16px) !important;">
-                <span style="color:#00f0ff !important;font-weight:700 !important;font-size: clamp(1rem, 3.5vw, 1.2rem) !important;">RBF enabled</span>
+                <span style="color:#00f0ff !important;font-weight:700 !important;">RBF enabled</span>
                 <span style="color:#888 !important;font-size: clamp(0.9rem, 3vw, 1rem) !important;"> • Raw PSBT • </span>
                 <span style="color:#666 !important;font-size: clamp(0.85rem, 2.8vw, 0.95rem) !important;">Inspect before signing</span>
             </div>
@@ -3442,8 +3488,10 @@ def generate_psbt(
     psbt_snapshot: dict,
     full_selected_utxos: list[dict],
     df_rows,
-    offline_mode: bool = False,      # NEW
-    enriched_state: tuple = None     # NEW
+    offline_mode: bool = False,
+    enriched_state: tuple = None,
+    loaded_fingerprint: Optional[str] = None,
+    selection_changed_after_load: bool = False
 ) -> str:
     """
     Orchestrate PSBT generation using snapshot (params) and full enriched UTXOs.
@@ -3536,7 +3584,7 @@ def generate_psbt(
 
     legacy_excluded = len(supported_inputs) < len(all_inputs)
 
-    # Strict input value sanity checks (protect against dust attacks / bad data)
+    # Strict input value sanity checks
     MAX_BTC = 21_000_000
     MAX_SATS = MAX_BTC * 100_000_000
 
@@ -3573,18 +3621,18 @@ def generate_psbt(
                 "</div>"
             )
 
-      # Proceed — inputs look sane
+    # Proceed — inputs look sane
     dest_result = _resolve_destination(
         dest_override=params.dest_override,
-        scan_source=params.scan_source,
-        enriched_state=enriched_state,      # NEW: pass enriched_state for offline preference
-        offline_mode=offline_mode           # NEW: pass offline_mode flag
+        scan_source=params.scan_source if hasattr(params, 'scan_source') else "unknown",
+        enriched_state=enriched_state,
+        offline_mode=offline_mode
     )
     
     if isinstance(dest_result, str):
-        return dest_result                  # error HTML banner
+        return dest_result
     
-    dest_spk = dest_result                  # bytes — proceed
+    dest_spk = dest_result
 
     try:
         econ = estimate_tx_economics(supported_inputs, params.fee_rate)
@@ -3630,15 +3678,47 @@ def generate_psbt(
             "</div>"
         )
 
+    # Create temp snapshot for fingerprint comparison (always before banners)
+    temp_snapshot = _create_psbt_snapshot(
+        selected_utxos=full_selected_utxos,
+        scan_source=params.scan_source if hasattr(params, 'scan_source') else "unknown",
+        dest_override=params.dest_override,
+        fee_rate=params.fee_rate,
+        future_fee_rate=params.future_fee_rate,
+    )
+
+    # Fingerprint comparison banner
+    fp_banner = ""
+    if loaded_fingerprint:
+        if temp_snapshot["fingerprint"] == loaded_fingerprint:
+            fp_banner = """
+            <div style='color:#00ff88 !important; padding:16px; background:#001100 !important; border:2px solid #00ff88 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important; font-weight:700 !important;'>
+                ✓ Fingerprint matches loaded snapshot — selection identical.
+            </div>
+            """
+        elif not selection_changed_after_load:
+            fp_banner = """
+            <div style='color:#ff9900 !important; padding:16px; background:#331100 !important; border:2px solid #ff9900 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important;'>
+                ⚠️ Fingerprint mismatch without selection change — verify UTXOs manually (possible restore glitch).
+            </div>
+            """
+        else:
+            fp_banner = """
+            <div style='color:#88ffcc !important; padding:16px; background:#001122 !important; border:2px solid #88ffcc !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important;'>
+                Note: Selection modified after load — new fingerprint expected.
+            </div>
+            """
+
     # Final HTML composition
     return _compose_psbt_html(
-        fingerprint=params.fingerprint_short,
+        fingerprint=temp_snapshot["fingerprint_short"],
         qr_html=qr_html,
         qr_warning=qr_warning,
         psbt_b64=psbt_b64,
         extra_note=extra_note,
         has_change_output=has_change_output,
         no_change_warning=no_change_warning,
+        fp_banner=fp_banner
     )
 
 
@@ -4750,6 +4830,8 @@ No API calls • Fully air-gapped safe""",
         locked_badge = gr.HTML("")  # Starts hidden
         warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
         selected_utxos_for_psbt = gr.State([])
+        loaded_fingerprint = gr.State(None)  # Holds fingerprint from loaded snapshot (or None)
+        selection_changed_after_load = gr.State(False)    # True if user modified after load
 
         # Capture destination changes for downstream use
         dest.change(
@@ -4993,13 +5075,18 @@ No API calls • Fully air-gapped safe""",
     # — Import File (pure state mutation) — Now with Button for stability
     # =============================
     load_json_btn.click(
-        fn=process_uploaded_file,  # ← This one reads + parses
-        inputs=[import_file],      # ← Directly from the file component
+        fn=process_uploaded_file,
+        inputs=[import_file],
         outputs=[json_parsed_state],
     ).then(
         fn=load_selection,
         inputs=[json_parsed_state, enriched_state],
-        outputs=[enriched_state, warning_banner],
+        outputs=[
+            enriched_state,
+            warning_banner,
+            loaded_fingerprint,
+            selection_changed_after_load  # NEW
+        ],
         js="() => { console.log('LOAD_JSON_BUTTON_CLICKED'); return true; }"
     ).then(
         fn=rebuild_df_rows,
@@ -5074,7 +5161,9 @@ No API calls • Fully air-gapped safe""",
             selected_utxos_for_psbt,
             df,
             offline_toggle,          # NEW: pass to generate_psbt
-            enriched_state           # NEW: pass enriched_state for offline change preference
+            enriched_state,           # NEW: pass enriched_state for offline change preference
+            loaded_fingerprint,
+            selection_changed_after_load
         ],
         outputs=[psbt_output],
     ).then(
@@ -5187,13 +5276,16 @@ No API calls • Fully air-gapped safe""",
         ),
         outputs=[status_output, generate_row, analyze_btn]
     )
-    # =============================
+      # =============================
     # — LIVE INTERPRETATION (single source of truth) —
     # =============================
     df.change(
         fn=update_enriched_from_df,
         inputs=[df, enriched_state, locked],
         outputs=enriched_state,
+    ).then(
+        fn=lambda: True,  # user changed selection
+        outputs=selection_changed_after_load
     ).then(
         fn=generate_summary_safe,
         inputs=[
@@ -5206,10 +5298,13 @@ No API calls • Fully air-gapped safe""",
             dest_value,
             offline_toggle,
         ],
-        outputs=[status_output, generate_row],
+        outputs=[status_output, generate_row]
     )
 
     fee_rate_slider.change(
+        fn=lambda: True,
+        outputs=selection_changed_after_load
+    ).then(
         fn=generate_summary_safe,
         inputs=[
             df,
@@ -5221,10 +5316,13 @@ No API calls • Fully air-gapped safe""",
             dest_value,
             offline_toggle,
         ],
-        outputs=[status_output, generate_row],
+        outputs=[status_output, generate_row]
     )
 
     future_fee_slider.change(
+        fn=lambda: True,
+        outputs=selection_changed_after_load
+    ).then(
         fn=generate_summary_safe,
         inputs=[
             df,
@@ -5236,9 +5334,8 @@ No API calls • Fully air-gapped safe""",
             dest_value,
             offline_toggle,
         ],
-        outputs=[status_output, generate_row],
+        outputs=[status_output, generate_row]
     )
-
 
     demo.load(
         fn=generate_summary_safe,
