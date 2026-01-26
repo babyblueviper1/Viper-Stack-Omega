@@ -3912,18 +3912,8 @@ def update_status_and_ui(offline: bool, dark: bool) -> str:
 
 
 def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
-    """
-    Handle offline toggle:
-    - Show/hide manual UTXO box
-    - Lock/unlock addr_input + dest
-    - Update addr placeholder
-    - Update dest placeholder (new: offline message)
-    - Clear values when going offline
-    - Update status banner
-    """
     manual_box_vis = gr.update(visible=offline)
     
-    # Explicitly lock both when offline is ON
     addr_interactive = gr.update(interactive=not offline)
     dest_interactive = gr.update(interactive=not offline)
     
@@ -3941,21 +3931,66 @@ def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
         else "Paste Bitcoin address for change output (optional)"
     )
     
-    # Clear values when switching to offline
     addr_value = "" if offline else gr.update()
-    dest_value = "" if offline else gr.update()
+    dest_value_update = "" if offline else gr.update()
+    
+    # Disable fee preset buttons in offline mode
+    fee_btn_interactive = gr.update(interactive=not offline)
     
     status_html = update_status_and_ui(offline, dark)
+
+    fee_info_update = gr.update(
+        value="""
+        <div style="
+            color: #ffcc88;
+            font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+            line-height: 1.5;
+            font-weight: 600;
+            margin: clamp(8px, 2vw, 16px) 0 clamp(12px, 3vw, 20px) 0;
+            padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px);
+            background: rgba(50, 20, 0, 0.4);
+            border: 1px solid #ff9900;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255, 153, 0, 0.3);
+            transition: all 0.3s ease;
+        ">
+            Offline mode — use sliders to set fees (preset buttons disabled)
+        </div>
+        """ if offline else """
+        <div style="
+            color: #88ffcc;
+            font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+            line-height: 1.5;
+            font-weight: 600;
+            margin: clamp(8px, 2vw, 16px) 0 clamp(12px, 3vw, 20px) 0;
+            padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px);
+            background: rgba(0, 50, 30, 0.4);
+            border: 1px solid #00cc88;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0, 204, 136, 0.3);
+            transition: all 0.3s ease;
+        ">
+            Use sliders or fee preset buttons to choose fees (API calls enabled)
+        </div>
+        """
+    )
 
     return (
         manual_box_vis,         # 0
         addr_value,             # 1
         addr_interactive,       # 2
         addr_placeholder,       # 3
-        dest_value,             # 4
+        dest_value_update,      # 4
         dest_interactive,       # 5
-        dest_placeholder,       # 6: NEW - dest placeholder
-        status_html             # 7
+        dest_placeholder,       # 6
+        status_html,            # 7
+        fee_btn_interactive,    # 8: economy_btn interactive
+        fee_btn_interactive,    # 9: hour_btn interactive
+        fee_btn_interactive,    # 10: halfhour_btn interactive
+        fee_btn_interactive,    # 11: fastest_btn interactive
+        fee_info_update         # 12: fee preset info text
     )
 # --------------------------
 # Gradio UI
@@ -3963,8 +3998,7 @@ def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
 with gr.Blocks(
     title="Ωmega Pruner v11 — Forged Anew"
 ) as demo:
-    
-    # ── Full-screen animated background + Hero Banner ───────────────────────────────
+	# ── Full-screen animated background + Hero Banner ───────────────────────────────
     gr.HTML("""
     <div id="omega-bg" style="
         position: fixed;
@@ -4253,6 +4287,8 @@ with gr.Blocks(
         }
     </style>
     """)
+    
+
 
     # ── Health badge & legacy row styling ───────────────────────────────────────────
     gr.HTML("""
@@ -4311,7 +4347,7 @@ with gr.Blocks(
     </style>
     """)
 
-    # ── Global dark mode, nuclear checkboxes ────────────────
+	    # ── Global dark mode, nuclear checkboxes + disabled fee buttons + fee info styling ────────────────
     gr.HTML("""
     <style>
         /* Force dark mode on body and all Gradio containers */
@@ -4445,9 +4481,19 @@ with gr.Blocks(
             white-space: normal !important;
             overflow: visible !important;
         }
+
+        /* Disabled fee preset buttons */
+        .fee-btn button:disabled {
+            opacity: 0.4 !important;
+            cursor: not-allowed !important;
+            background: #222 !important;
+            border-color: #444 !important;
+            color: #666 !important;
+        }
     </style>
     """)
 
+	
     # Placeholder for dynamic prune conditions badge (populated by load or timer)
     prune_badge = gr.HTML("")
    
@@ -4477,14 +4523,12 @@ with gr.Blocks(
     # =============================
     # — LOCK-SAFE FEE PRESET FUNCTION —
     # =============================
-    def apply_fee_preset_locked(locked: bool, preset: str):
-        """
-        Apply a fee preset (fastest, half_hour, hour, economy) to the current fee slider.
-        Safe to call when UI is locked — returns no-op updates.
-        """
+    def apply_fee_preset_locked(locked: bool, preset: str, offline_mode: bool):
+        if offline_mode:
+            return gr.update(), gr.update()  # no-op
         if locked:
             return gr.update(), gr.update()
-
+        
         fees = get_live_fees() or {
             "fastestFee": 10,
             "halfHourFee": 6,
@@ -4493,15 +4537,14 @@ with gr.Blocks(
         }
 
         rate_map = {
-            "fastest":   fees.get("fastestFee",   10),
-            "half_hour": fees.get("halfHourFee",  6),
-            "hour":      fees.get("hourFee",      3),
-            "economy":   fees.get("economyFee",   1),
+            "fastest": fees.get("fastestFee", 10),
+            "half_hour": fees.get("halfHourFee", 6),
+            "hour": fees.get("hourFee", 3),
+            "economy": fees.get("economyFee", 1),
         }
 
-        new_rate = rate_map.get(preset, 3)  # Default to 3 s/vB if preset unknown
-
-        return gr.update(value=new_rate), gr.update()
+        new_rate = rate_map.get(preset, 3)
+        return gr.update(value=new_rate)
 
 
     def finalize_generate_ui():
@@ -4817,7 +4860,30 @@ No API calls • Fully air-gapped safe""",
                 value="Recommended — ~40% pruned (balanced savings & privacy)",
                 label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
             )
-            dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
+        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
+
+        # Fee preset info (above sliders — dynamic via offline toggle)
+        fee_preset_info = gr.HTML(
+            """
+            <div style="
+                color: #88ffcc;
+                font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+                line-height: 1.5;
+                font-weight: 600;
+                margin: clamp(8px, 2vw, 16px) 0 clamp(12px, 3vw, 20px) 0;
+                padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px);
+                background: rgba(0, 50, 30, 0.4);
+                border: 1px solid #00cc88;
+                border-radius: 10px;
+                text-align: center;
+                box-shadow: 0 0 20px rgba(0, 204, 136, 0.3);
+                transition: all 0.3s ease;
+            ">
+                Use sliders or fee preset buttons to choose fees (API calls enabled)
+            </div>
+            """,
+            visible=True
+        )
 
         # Fee sliders
         with gr.Row():
@@ -4828,12 +4894,11 @@ No API calls • Fully air-gapped safe""",
                 5, 500, value=60, step=1, label="Future fee rate in 3–6 months (sat/vB)", scale=3,
             )
 
-        # Fee preset buttons
         with gr.Row():
-            economy_btn = gr.Button("Economy", size="sm", elem_classes="fee-btn")
-            hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn")
-            halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn")
-            fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn")
+            economy_btn = gr.Button("Economy", size="sm", elem_classes="fee-btn", interactive=True)
+            hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn", interactive=True)
+            halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn", interactive=True)
+            fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn", interactive=True)
 
         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
 
@@ -5055,7 +5120,12 @@ No API calls • Fully air-gapped safe""",
                 dest,                  # 4: NEW - dest value
                 dest,                  # 5: NEW - dest interactive
                 dest,                  # 6 placeholder
-                mode_status            # 7 banner
+                mode_status,           # 7 banner
+				economy_btn,           # 8 interactive
+				hour_btn,              # 9 interactive
+				halfhour_btn,          # 10 interactive
+				fastest_btn,           # 11 interactive
+				fee_preset_info        # 12: info text + classes
             ],
         )
 
@@ -5085,8 +5155,8 @@ No API calls • Fully air-gapped safe""",
     ]:
         btn.click(
             fn=partial(apply_fee_preset_locked, preset=preset),
-            inputs=[locked],
-            outputs=[fee_rate_slider, gr.State()],  # current fee rate slider
+            inputs=[locked, offline_toggle],
+            outputs=fee_rate_slider, # current fee rate slider
         )
 
     # =============================
