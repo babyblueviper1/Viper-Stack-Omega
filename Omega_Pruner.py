@@ -63,6 +63,7 @@ from datetime import datetime
 import copy
 import pandas as pd
 import statistics
+import concurrent.futures
 
 # ── Logging ─────────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -1467,6 +1468,25 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
 # UTXO Fetching Functions
 # =========================
 
+def get_utxos_with_timeout(addr: str, dust: int, timeout_sec: int = 60) -> List[dict]:
+    """
+    Fetch UTXOs with a hard per-address timeout to prevent indefinite hangs
+    on large/rate-limited addresses.
+    """
+    def inner_fetch():
+        return get_utxos(addr, dust)  # your existing function
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(inner_fetch)
+        try:
+            return future.result(timeout=timeout_sec)
+        except concurrent.futures.TimeoutError:
+            log.warning(f"UTXO fetch timed out after {timeout_sec}s for address: {addr}")
+            return []
+        except Exception as e:
+            log.error(f"Unexpected error fetching UTXOs for {addr}: {e}")
+            return []
+	
 def get_utxos(addr: str, dust: int = 546) -> List[dict]:
     """
     Fetch confirmed UTXOs for a Bitcoin address from multiple public APIs.
@@ -1656,7 +1676,7 @@ def _collect_online_utxos(params: AnalyzeParams) -> Tuple[List[Dict], str, List[
             debug_lines.append(f"Skipped invalid entry: {entry[:20]}...")
             continue
 
-        entry_utxos = get_utxos(entry, params.dust_threshold)
+        entry_utxos = get_utxos_with_timeout(entry, params.dust_threshold, timeout_sec=60)
         count = len(entry_utxos)
 
         if count > 0:
@@ -2006,7 +2026,70 @@ def analyze(
     # Early exit if nothing found
     if not raw_utxos:
         log.info("No UTXOs found — returning empty state")
-        return _analyze_empty(params.scan_source)
+        
+        addr = params.addr_input.strip()
+        is_legacy_attempt = bool(addr and addr[0] in ('1', '3'))
+        
+        if is_legacy_attempt:
+            # Legacy/nested case — use the orange legacy-specific banner
+            return _analyze_empty(
+                scan_source=params.scan_source,
+                is_legacy_attempt=True
+            )
+        
+        else:
+            # Non-legacy case: probably timeout, rate-limit, or empty modern address
+            timeout_msg = """
+            <div style='
+                color:#aaffcc !important;
+                padding: clamp(24px, 5vw, 40px) !important;
+                background:#001122 !important;
+                border:3px solid #00ccff !important;
+                border-radius:16px !important;
+                text-align:center !important;
+                max-width:95% !important;
+                margin: clamp(20px, 5vw, 40px) auto !important;
+                box-shadow:0 0 40px rgba(0,204,255,0.4) !important;
+            '>
+                <div style='
+                    color:#00ccff !important;
+                    font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+                    font-weight:900 !important;
+                    margin-bottom: clamp(12px, 3vw, 20px) !important;
+                '>
+                    ⚠️ Fetch timed out or rate-limited
+                </div>
+                
+                <div style='
+                    color:#88ffdd !important;
+                    font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+                    line-height:1.6 !important;
+                '>
+                    The address may be very large, or public APIs are currently rate-limiting / slow.<br><br>
+                    
+                    <span style='font-weight:900 !important; color:#ffffff !important;'>Options:</span><br>
+                    • Try again in a few minutes (APIs often recover)<br>
+                    • Use offline mode and paste raw UTXOs manually<br>
+                    • Check the address on a block explorer first<br><br>
+                    
+                    <small style='color:#66ccff !important;'>
+                        Tip: For very large wallets, offline mode is usually faster and more reliable.
+                    </small>
+                </div>
+            </div>
+            """
+            
+            return (
+                gr.update(value=[]),                   # 0: Empty DataFrame
+                (),                                    # 1: Empty enriched_state
+                gr.update(value=timeout_msg),          # 2: Timeout/rate-limit warning
+                gr.update(visible=False),              # 3
+                gr.update(visible=False),              # 4
+                params.scan_source,                    # 5
+                "",                                    # 6
+                gr.update(visible=False),              # 7
+                gr.update(visible=True),               # 8: Keep analyze button
+            )
 
     # 3. Enrich UTXOs with metadata, health, script info
     enriched = _enrich_utxos(raw_utxos, params)
@@ -2080,12 +2163,56 @@ def _analyze_success(
     )
 
 
-def _analyze_empty(scan_source: str = ""):
-    """Empty/failure state return — exactly 9 outputs to match Gradio .click() handler."""
+def _analyze_empty_legacy_warning(scan_source: str = "") -> tuple:
+    """Special empty state for legacy/nested addresses that failed to load UTXOs."""
+    legacy_msg = """
+    <div style='
+        color:#ffdd88 !important;
+        padding: clamp(24px, 5vw, 40px) !important;
+        background:#332200 !important;
+        border:3px solid #ff9900 !important;
+        border-radius:16px !important;
+        text-align:center !important;
+        max-width:95% !important;
+        margin: clamp(20px, 5vw, 40px) auto !important;
+        box-shadow:0 0 40px rgba(255,153,0,0.5) !important;
+    '>
+        <div style='
+            color:#ffff66 !important;
+            font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+            font-weight:900 !important;
+            margin-bottom: clamp(12px, 3vw, 20px) !important;
+        '>
+            ⚠️ Large Legacy / Nested Address Detected (1… or 3…)
+        </div>
+        
+        <div style='
+            color:#ffcc88 !important;
+            font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+            line-height:1.6 !important;
+        '>
+            This address appears to have thousands of UTXOs (common for old wallets or exchanges).<br><br>
+            
+            Public block explorers usually refuse, timeout, or rate-limit queries for such large legacy/nested addresses.<br><br>
+            
+            <strong style='color:#ffffff !important;'>Important:</strong><br>
+            Even if the full list loaded, <strong>legacy (1…) and nested (3…) inputs cannot be pruned</strong> with this tool — they are not supported in the generated PSBT.<br><br>
+            
+            To prune or consolidate:<br>
+            • Migrate to a modern address first (bc1q… Native SegWit or bc1p… Taproot)<br>
+            • Then re-analyze here<br><br>
+            
+            <small style='color:#ffaa66 !important;'>
+                Tip: Use offline mode and paste even one example UTXO line to see the legacy warning and table styling.
+            </small>
+        </div>
+    </div>
+    """
+    
     return (
         gr.update(value=[]),                   # 0: Empty DataFrame
         (),                                    # 1: Empty enriched_state
-        gr.update(value=""),                   # 2: No warning banner
+        gr.update(value=legacy_msg),           # 2: Special legacy warning banner
         gr.update(visible=False),              # 3: Hide generate_row
         gr.update(visible=False),              # 4: Hide import_file
         scan_source,                           # 5: Preserve scan_source
@@ -2093,7 +2220,28 @@ def _analyze_empty(scan_source: str = ""):
         gr.update(visible=False),              # 7: Hide load_json_btn on failure
         gr.update(visible=True),               # 8: Keep analyze_btn visible (retry)
     )
+    
 
+def _analyze_empty(scan_source: str = "", is_legacy_attempt: bool = False) -> tuple:
+    """
+    Empty/failure state return — exactly 9 outputs.
+    Can show legacy-specific warning if we suspect it's a large legacy/nested address.
+    """
+    if is_legacy_attempt and scan_source.strip().startswith(('1', '3')):
+        return _analyze_empty_legacy_warning(scan_source)
+    
+    # Default generic empty state (your original)
+    return (
+        gr.update(value=[]),                   # 0
+        (),                                    # 1
+        gr.update(value=""),                   # 2: No warning banner
+        gr.update(visible=False),              # 3
+        gr.update(visible=False),              # 4
+        scan_source,                           # 5
+        "",                                    # 6
+        gr.update(visible=False),              # 7
+        gr.update(visible=True),               # 8
+    )
 # ====================
 # generate_summary_safe() — Refactored for Clarity
 # ====================
@@ -3740,7 +3888,7 @@ with gr.Blocks(
                     0 0 75px rgba(230,92,0,0.9),
                     0 130px rgba(220, 0, 60, 0.85),   /* very strong red core */
                     0 0 170px rgba(200, 0, 0, 0.7),     /* intense crimson mid */
-					0 0 220px rgba(180, 0, 0, 0.5);     /* wide red outer glow */
+                    0 0 220px rgba(180, 0, 0, 0.5);     /* wide red outer glow */
                 margin: 4px auto clamp(26px, 5.5vw, 44px) auto;
             ">
                 ΩMEGA PRUNER
@@ -3769,47 +3917,67 @@ with gr.Blocks(
                 FORGED ANEW — v11
             </div>
 
-            <!-- Body text -->
-            <div style="
-                color: #ddd;
-                font-size: clamp(1.1rem, 3.8vw, 1.4rem);
-                line-height: 1.6;
-                max-width: 900px;
-                margin: clamp(30px, 6vw, 45px) auto;
-                padding: 0 clamp(10px, 3vw, 20px);
-            ">
-                Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
-                <strong style="color:#0f0;">full strategic control</strong> of your Bitcoin.<br><br>
+        <!-- Body text -->
+        <div style="
+            color: #ddd;
+            font-size: clamp(1.1rem, 3.8vw, 1.4rem);
+            line-height: 1.6;
+            max-width: 900px;
+            margin: clamp(30px, 6vw, 45px) auto;
+            padding: 0 clamp(10px, 3vw, 20px);
+        ">
+            Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
+            <strong style="color:#0f0;">full strategic control</strong> of your Bitcoin.<br><br>
 
-                By pruning inefficient UTXOs, you:<br>
-                • <strong style="color:#00ff9d;">Slash fees</strong> during high-congestion periods<br>
-                • <strong style="color:#00ff9d;">Reduce future costs</strong> with a cleaner UTXO set<br>
-                • <strong style="color:#00ff9d;">Optimize your stack</strong> for speed, savings and privacy<br><br>
+            By pruning inefficient UTXOs, you:<br>
+            • <strong style="color:#00ff9d;">Slash fees</strong> during high-congestion periods<br>
+            • <strong style="color:#00ff9d;">Reduce future costs</strong> with a cleaner UTXO set<br>
+            • <strong style="color:#00ff9d;">Optimize your stack</strong> for speed, savings and privacy<br><br>
 
-                <strong style="color:#f7931a; font-size: clamp(1.3rem, 4.5vw, 1.7rem); font-weight:900;">
-                    Prune smarter. Win forever.
-                </strong><br><br>
+            <strong style="color:#f7931a; font-size: clamp(1.3rem, 4.5vw, 1.7rem); font-weight:900;">
+                Prune smarter. Win forever.
+            </strong>
+        </div>
 
-                Paste your address below → click <strong style="color:#f7931a;">ANALYZE</strong>.
-            </div>
-
-            <!-- Arrow -->
-            <div style="
-                font-size: clamp(2.5rem, 7vw, 4rem);
-                color: #f7931a;
-                opacity: 0.9;
-                margin-top: clamp(20px, 5vw, 40px);
-            ">
-                ↓
-            </div>
+        <!-- Arrow -->
+        <div id="hero-arrow" style="
+            font-size: clamp(2.5rem, 7vw, 4rem);
+            color: #f7931a;
+            opacity: 0;
+            margin-top: clamp(20px, 5vw, 40px);
+            animation: 
+                arrow-fade-in 1.8s ease-out forwards,
+                arrow-pulse-bounce 5s ease-in-out infinite 2s;
+            text-shadow: 0 0 30px #f7931a, 0 0 60px #f7931a;
+        ">
+            ↓
         </div>
     </div>
+</div>
 
-    <style>
-        @keyframes pulse {
-            0%, 100% { transform: translateY(0); opacity: 0.8; }
-            50% { transform: translateY(20px); opacity: 1; }
+<style>
+    @keyframes arrow-fade-in {
+        0%   { opacity: 0; transform: translateY(-40px) scale(0.8); }
+        100% { opacity: 0.92; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes arrow-pulse-bounce {
+        0%, 100% { 
+            transform: translateY(0) scale(1); 
+            opacity: 0.92; 
+            text-shadow: 0 0 30px #f7931a, 0 0 60px #f7931a; 
         }
+        50% { 
+            transform: translateY(12px) scale(1.08); 
+            opacity: 1.0; 
+            text-shadow: 0 0 50px #f7931a, 0 0 100px #f7931a; 
+        }
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: translateY(0); opacity: 0.8; }
+        50% { transform: translateY(20px); opacity: 1; }
+    }
 
         @keyframes omega-breath {
             0%, 100% { opacity: 0.78; transform: scale(0.97); }
