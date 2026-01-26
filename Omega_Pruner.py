@@ -1598,11 +1598,6 @@ def _sanitize_analyze_inputs(
 
 
 def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
-    """
-    Parse offline/manual UTXO input lines into normalized dicts.
-    Format: txid:vout:value_in_sats[:address]
-    Skips invalid lines, dust, and comments (#).
-    """
     if not params.manual_utxo_input:
         return []
 
@@ -1620,22 +1615,27 @@ def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
             continue
 
         try:
-            txid = parts[0].strip()
+            txid_raw = parts[0].strip()
+            # Validate txid is exactly 64 hex chars
+            if len(txid_raw) != 64 or not all(c in '0123456789abcdefABCDEF' for c in txid_raw):
+                log.warning(f"Invalid txid format on line {line_num}: {txid_raw}")
+                skipped += 1
+                continue
+
+            txid = txid_raw.lower()  # normalize to lowercase hex
             vout = int(parts[1].strip())
             value = int(parts[2].strip())
 
-            # Optional address (for change or labeling)
             addr = parts[3].strip() if len(parts) >= 4 else "unknown (manual)"
 
             if value <= params.dust_threshold:
                 continue
 
-            # Derive scriptPubKey + weight from address (fallback to P2WPKH)
             _, meta = address_to_script_pubkey(addr)
             input_weight = meta.get("input_vb", 68) * 4
 
             utxos.append({
-                "txid": txid,
+                "txid": txid,  # cleaned hex string
                 "vout": vout,
                 "value": value,
                 "address": addr,
@@ -1649,8 +1649,8 @@ def _collect_manual_utxos(params: AnalyzeParams) -> List[Dict]:
             })
 
         except (ValueError, Exception) as e:
-            skipped += 1
             log.debug(f"Skipped invalid manual UTXO line {line_num}: {e}")
+            skipped += 1
 
     if skipped:
         log.info(f"Manual UTXO parse: skipped {skipped} invalid/malformed lines")
@@ -2835,6 +2835,7 @@ def on_generate(
     future_fee_rate: int,
     enriched_state: tuple,
     scan_source: str,
+	offline_mode: bool = False
 ) -> tuple:
     """
     Freeze user intent on "Generate" click.
@@ -2944,33 +2945,62 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
     )
 
 
-def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Union[bytes, str]:
+def _resolve_destination(
+    dest_override: Optional[str],
+    scan_source: str,
+    enriched_state: Optional[tuple] = None,
+    offline_mode: bool = False
+) -> Union[bytes, str]:
     """
     Resolve final destination address to scriptPubKey (bytes) or return user-facing error HTML.
 
     Logic:
-    - If override provided → use it
-    - Else → fall back to scan_source
-    - If neither → return empty bytes (absorb remainder to fee = full cleanup)
+    - Offline mode priority: use first bc1q… or bc1p… from enriched UTXOs (manual paste)
+    - Else: override → scan_source
+    - No destination → return empty bytes (absorb to fee = full cleanup)
     - Only allow modern outputs: P2WPKH (bc1q...) or Taproot (bc1p...)
-    - Legacy (1...) or Nested SegWit (3...) are rejected with clear error
+    - Legacy/Nested rejected with clear error
 
     Returns:
-        bytes: valid scriptPubKey if modern address
-        str: HTML error message if invalid / unsupported
+        bytes: valid scriptPubKey if modern
+        str: HTML error message if invalid/unsupported
     """
     override_clean = (dest_override or "").strip()
+    if "offline mode" in override_clean.lower() or len(override_clean) < 10:
+        override_clean = ""  # ignore placeholder / empty
     source_clean = scan_source.strip()
 
-    final_dest = override_clean if override_clean else source_clean
+    final_dest = ""
+
+    # Offline priority: scan enriched UTXOs for first VALID modern address
+    if offline_mode and enriched_state and len(enriched_state) == 2:
+        _, utxos = enriched_state
+        for u in utxos:
+            addr = u.get("address", "").strip()
+            if addr.startswith(("bc1q", "bc1p")):
+                try:
+                    spk_test, meta_test = address_to_script_pubkey(addr)
+                    if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
+                        final_dest = addr
+                        log.debug(f"Offline mode: using valid change addr from paste: {final_dest}")
+                        break
+                except Exception:
+                    log.debug(f"Skipping invalid addr in paste: {addr}")
+        else:
+            log.debug("Offline mode: no valid modern address found in pasted UTXOs")
+
+    # Fallback to override or scan_source
+    if not final_dest:
+        final_dest = override_clean if override_clean else source_clean
 
     # No destination → full cleanup (absorb change into fee)
     if not final_dest:
         return b''
 
+    log.debug(f"Final destination resolved to: '{final_dest}' (offline={offline_mode})")
+
     try:
         spk, meta = address_to_script_pubkey(final_dest)
-
         typ = meta.get('type', 'unknown')
 
         # Enforce modern change output only
@@ -2994,13 +3024,11 @@ def _resolve_destination(dest_override: Optional[str], scan_source: str) -> Unio
                 "<span style='font-weight:900;'>bc1p… (Taproot)</span> allowed.<br><br>"
                 f"Detected: <span style='font-weight:900;'>{typ}</span><br>"
                 "Legacy (1…) or Nested (3…) outputs create very expensive change in 2025+ fee environment.<br><br>"
-                "Please use a modern address for change output."
+                "In offline mode: include at least one valid bc1q… or bc1p… in your pasted UTXOs."
                 "</div>"
             )
 
-        # Success — log for traceability (can be removed later if desired)
         log.info("Resolved change address %s → %s (spk len=%d)", final_dest, typ, len(spk))
-
         return spk
 
     except Exception as e:
@@ -3035,10 +3063,13 @@ def _build_unsigned_tx(
 
     for u in inputs:
         try:
-            txid_bytes = bytes.fromhex(u["txid"])
+            txid_str = u["txid"]
+            if not isinstance(txid_str, str) or len(txid_str) != 64 or not all(c in '0123456789abcdefABCDEF' for c in txid_str):
+                raise ValueError(f"Invalid txid format: {txid_str}")
+            txid_bytes = bytes.fromhex(txid_str)
             vout = int(u["vout"])
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"Invalid txid/vout in input: {e}")
+        except (ValueError, TypeError, KeyError) as e:
+            raise ValueError(f"Invalid txid/vout in input: {e} - UTXO: {u}")
 
         tx.tx_ins.append(TxIn(txid_bytes, vout))
 
@@ -3407,7 +3438,13 @@ def _compose_psbt_html(
 # Final PSBT Generation & Summary Bridge
 # ====================
 
-def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows) -> str:
+def generate_psbt(
+    psbt_snapshot: dict,
+    full_selected_utxos: list[dict],
+    df_rows,
+    offline_mode: bool = False,      # NEW
+    enriched_state: tuple = None     # NEW
+) -> str:
     """
     Orchestrate PSBT generation using snapshot (params) and full enriched UTXOs.
     Returns full PSBT HTML output (QR, raw text, warnings, fingerprint).
@@ -3536,11 +3573,18 @@ def generate_psbt(psbt_snapshot: dict, full_selected_utxos: list[dict], df_rows)
                 "</div>"
             )
 
-    # Proceed — inputs look sane
-    dest_result = _resolve_destination(params.dest_override, params.scan_source)
+      # Proceed — inputs look sane
+    dest_result = _resolve_destination(
+        dest_override=params.dest_override,
+        scan_source=params.scan_source,
+        enriched_state=enriched_state,      # NEW: pass enriched_state for offline preference
+        offline_mode=offline_mode           # NEW: pass offline_mode flag
+    )
+    
     if isinstance(dest_result, str):
-        return dest_result
-    dest_spk = dest_result
+        return dest_result                  # error HTML banner
+    
+    dest_spk = dest_result                  # bytes — proceed
 
     try:
         econ = estimate_tx_economics(supported_inputs, params.fee_rate)
@@ -5021,11 +5065,18 @@ No API calls • Fully air-gapped safe""",
             future_fee_slider,
             enriched_state,
             scan_source,
+            offline_toggle,          # NEW: pass offline mode state
         ],
         outputs=[psbt_snapshot, selected_utxos_for_psbt, locked, export_file],
     ).then(
         fn=generate_psbt,
-        inputs=[psbt_snapshot, selected_utxos_for_psbt,df],
+        inputs=[
+            psbt_snapshot,
+            selected_utxos_for_psbt,
+            df,
+            offline_toggle,          # NEW: pass to generate_psbt
+            enriched_state           # NEW: pass enriched_state for offline change preference
+        ],
         outputs=[psbt_output],
     ).then(
         fn=finalize_generate_ui,
@@ -5043,7 +5094,7 @@ No API calls • Fully air-gapped safe""",
             fee_rate_slider,
             future_fee_slider,
             offline_toggle,
-			theme_toggle,
+            theme_toggle,
             manual_utxo_input,
             economy_btn,
             hour_btn,
