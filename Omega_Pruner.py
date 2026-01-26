@@ -3773,23 +3773,50 @@ def update_status_and_ui(offline: bool, dark: bool) -> str:
 
 def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
     """
-    Handler for offline/air-gapped mode toggle.
-    Updates manual input visibility, address field interactivity, and status banner.
+    Handle offline toggle:
+    - Show/hide manual UTXO box
+    - Lock/unlock addr_input + dest
+    - Update addr placeholder
+    - Update dest placeholder (new: offline message)
+    - Clear values when going offline
+    - Update status banner
     """
     manual_box_vis = gr.update(visible=offline)
-    addr_interactive = not offline
+    
+    # Explicitly lock both when offline is ON
+    addr_interactive = gr.update(interactive=not offline)
+    dest_interactive = gr.update(interactive=not offline)
+    
     addr_placeholder = (
         "Offline mode active — paste raw UTXOs below (txid:vout:value[:address])\n"
         "Include at least one bc1q… or bc1p… address for change output."
         if offline
-        else "Paste a single Bitcoin address (bc1q…, bc1p…, 1…, or 3…)\n"
+        else "Paste a single modern Bitcoin address (bc1q…, bc1p…, 1…, or 3…)\n"
              "Only the first valid address is used."
     )
-    addr_value = "" if offline else gr.update()  # clear on toggle to offline
-
+    
+    dest_placeholder = (
+        "Offline mode active — change address set via manual UTXO paste"
+        if offline
+        else "Paste Bitcoin address for change output (optional)"
+    )
+    
+    # Clear values when switching to offline
+    addr_value = "" if offline else gr.update()
+    dest_value = "" if offline else gr.update()
+    
     status_html = update_status_and_ui(offline, dark)
 
-    return manual_box_vis, addr_value, addr_interactive, addr_placeholder, status_html
+    return (
+        manual_box_vis,         # 0
+        addr_value,             # 1
+        addr_interactive,       # 2
+        addr_placeholder,       # 3
+        dest_value,             # 4
+        dest_interactive,       # 5
+        dest_placeholder,       # 6: NEW - dest placeholder
+        status_html             # 7
+    )
 # --------------------------
 # Gradio UI
 # --------------------------
@@ -4145,7 +4172,7 @@ with gr.Blocks(
     </style>
     """)
 
-    # ── Global dark mode + checkbox styling ─────────────────────────────────────────
+    # ── Global dark mode, nuclear checkboxes ────────────────
     gr.HTML("""
     <style>
         /* Force dark mode on body and all Gradio containers */
@@ -4207,7 +4234,7 @@ with gr.Blocks(
             pointer-events: none;
         }
 
-        /* Light mode fallback */
+        /* Light mode fallback for checkboxes */
         :not(.dark-mode) input[type="checkbox"] {
             accent-color: #f7931a !important;
             background: #fff !important;
@@ -4878,9 +4905,14 @@ No API calls • Fully air-gapped safe""",
             fn=offline_toggle_handler,
             inputs=[offline_toggle, theme_toggle],
             outputs=[
-                manual_box_row,
-                addr_input,
-                mode_status,
+                manual_box_row,        # 0: manual visibility
+                addr_input,            # 1: addr value
+                addr_input,            # 2: addr interactive
+                addr_input,            # 3: addr placeholder
+                dest,                  # 4: NEW - dest value
+                dest,                  # 5: NEW - dest interactive
+                dest,                  # 6 placeholder
+                mode_status            # 7 banner
             ],
         )
 
