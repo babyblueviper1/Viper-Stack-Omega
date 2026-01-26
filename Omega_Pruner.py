@@ -3957,9 +3957,8 @@ with gr.Blocks(
                     0 0 25px #e65c00,
                     0 0 50px #c94a00,
                     0 0 75px rgba(230,92,0,0.9),
-                    0 130px rgba(220, 0, 60, 0.85),   /* very strong red core */
-                    0 0 170px rgba(200, 0, 0, 0.7),     /* intense crimson mid */
-                    0 0 220px rgba(180, 0, 0, 0.5);     /* wide red outer glow */
+                    0 4px 12px rgba(220, 0, 60, 0.6),   /* small vertical drop for subtle depth */
+                    0 0 120px rgba(200, 0, 0, 0.4);
                 margin: 4px auto clamp(26px, 5.5vw, 44px) auto;
             ">
                 ΩMEGA PRUNER
