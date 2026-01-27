@@ -184,6 +184,9 @@ _last_medians = {"24h": None, "1w": None, "1m": None}
 _last_fetch_time = 0
 _CACHE_TTL = 300  # 5 minutes
 
+# Global flag — updated when offline toggle changes
+_is_offline = False  # default: assume online at startup
+
 
 # ===========================
 # Selection resolver
@@ -268,8 +271,15 @@ def _selection_fingerprint(selected_utxos: List[dict]) -> str:
 # Utility Functions
 # =========================
 
-def safe_get(url: str, timeout: int = 8) -> Optional[requests.Response]:
-    """Robust GET with 3 retries, exponential backoff, and strict timeout."""
+def safe_get(url: str, timeout: int = 8, offline_mode: bool = False) -> Optional[requests.Response]:
+    """
+    Robust GET with 3 retries, exponential backoff, and strict timeout.
+    Completely blocked in offline mode — returns None immediately.
+    """
+    if offline_mode:
+        log.debug(f"safe_get blocked — offline mode active for {url}")
+        return None  # Immediate return — no network attempt
+
     for attempt in range(3):
         try:
             log.debug(f"safe_get attempt {attempt+1}: {url} (timeout={timeout}s)")
@@ -294,11 +304,25 @@ def safe_get(url: str, timeout: int = 8) -> Optional[requests.Response]:
     log.warning(f"safe_get failed after 3 attempts: {url}")
     return None
 
-def get_live_fees() -> Dict[str, int]:
-    """Fetch recommended fees from mempool.space with 30-second caching."""
-    # Safe cache check
+def get_live_fees(offline_mode: bool = False) -> Dict[str, int]:
+    """
+    Fetch recommended fees from mempool.space with 30-second caching.
+    Completely skipped in offline mode — returns conservative fallback instantly.
+    """
+    if offline_mode:
+        log.debug("get_live_fees skipped — offline mode active")
+        return {
+            "fastest":   10,
+            "half_hour": 6,
+            "hour":      3,
+            "economy":   1,
+            "minimum":   1,
+        }
+
+    # Cache check — only for online
     if hasattr(get_live_fees, "cache") and hasattr(get_live_fees, "cache_time"):
         if time.time() - get_live_fees.cache_time < 30:
+            log.debug("Returning cached fees (still valid)")
             return get_live_fees.cache
 
     try:
@@ -323,24 +347,28 @@ def get_live_fees() -> Dict[str, int]:
     except requests.exceptions.RequestException as e:
         log.warning(f"Failed to fetch live fees: {e}")
 
-    # Conservative fallback
-    return {
+    # Fallback on any failure
+    fallback = {
         "fastest":   10,
         "half_hour": 6,
         "hour":      3,
         "economy":   1,
         "minimum":   1,
     }
+    log.debug("Returning fallback fees due to fetch/cache failure")
+    return fallback
 
 def get_prune_score(offline_mode: bool = False) -> str:
     """
     Generate the pruning conditions badge HTML.
-    Returns empty string or fallback in offline mode to prevent any network calls.
+    Completely skipped in offline mode — returns empty string instantly.
+    All network calls guarded with offline_mode.
     """
     if offline_mode:
-        return ""  # Silent return — caller (update_prune_badge) handles fallback
+        log.debug("get_prune_score skipped — offline mode active")
+        return ""  # Silent return — caller handles fallback
 
-    # ── All network calls are now protected behind the offline check ──
+    # All network calls protected
     urls = {
         '24h': "https://mempool.space/api/v1/mining/blocks/fee-rates/24h",
         '1w': "https://mempool.space/api/v1/mining/blocks/fee-rates/1w",
@@ -350,8 +378,8 @@ def get_prune_score(offline_mode: bool = False) -> str:
 
     try:
         for period, url in urls.items():
-            r = session.get(url, timeout=12)
-            if r.status_code == 200:
+            r = safe_get(url, timeout=12, offline_mode=offline_mode)
+            if r and r.status_code == 200:
                 data = r.json()
                 if len(data) > 5:
                     p90_fees = [block.get('avgFee_90', 1) for block in data if 'avgFee_90' in block]
@@ -367,8 +395,8 @@ def get_prune_score(offline_mode: bool = False) -> str:
         log.warning(f"Failed to fetch fee-rates: {e}")
         avgs = {'24h': None, '1w': None, '1m': None}
 
-    # Current economy fee
-    current_fees = get_live_fees() or {'economy': 1}
+    # Current economy fee — guarded
+    current_fees = get_live_fees(offline_mode=offline_mode) or {'economy': 1}
     current = current_fees['economy']
 
     # Primary avg: 1w preferred
@@ -1497,11 +1525,12 @@ def get_utxos(addr: str, dust: int = 546, offline_mode: bool = False) -> List[di
     Filters out dust. Returns early on first successful source (online only).
     """
     if offline_mode:
-        log.info(f"get_utxos called but skipped — offline mode active for address: {addr}")
-        return []  # Immediate return — zero network activity
+        log.info(f"get_utxos skipped — offline mode active for address: {addr}")
+        return []  # Zero network activity
 
     addr = addr.strip()
     if not addr:
+        log.debug("Empty address — returning empty list")
         return []
 
     apis = [
@@ -1513,7 +1542,7 @@ def get_utxos(addr: str, dust: int = 546, offline_mode: bool = False) -> List[di
     for attempt in range(3):
         for url in apis:
             try:
-                r = safe_get(url, timeout=8)
+                r = safe_get(url, timeout=8, offline_mode=offline_mode)  # Pass guard to safe_get too
                 if not r:
                     continue
 
@@ -2029,10 +2058,12 @@ def analyze(
 
     # 2. Collect raw UTXOs (online or offline)
     if params.offline_mode:
-        raw_utxos, skipped = _collect_manual_utxos(params)  # now returns tuple
+        log.debug("Offline mode active — skipping all network fetches")
+        raw_utxos, skipped = _collect_manual_utxos(params)
         scan_debug = "Offline mode — manual UTXOs only"
         log.debug(f"Offline mode: collected {len(raw_utxos)} manual UTXOs")
     else:
+        log.debug("Online mode — proceeding with UTXO fetch")
         raw_utxos, scan_debug, _ = _collect_online_utxos(params)
         log.debug(f"Online mode: collected {len(raw_utxos)} raw UTXOs")
         if raw_utxos:
@@ -2041,59 +2072,102 @@ def analyze(
     # Early exit if nothing found
     if not raw_utxos:
         log.info("No UTXOs found — returning empty state")
-        
+
         addr = params.addr_input.strip()
         is_legacy_attempt = bool(addr and addr[0] in ('1', '3'))
-        
+
         if is_legacy_attempt:
             # Legacy/nested case — use the orange legacy-specific banner
             return _analyze_empty(
                 scan_source=params.scan_source,
                 is_legacy_attempt=True
             )
-        
+
         else:
-            # Non-legacy case: probably timeout, rate-limit, or empty modern address
-            timeout_msg = """
-            <div style='
-                color:#aaffcc !important;
-                padding: clamp(24px, 5vw, 40px) !important;
-                background:#001122 !important;
-                border:3px solid #00ccff !important;
-                border-radius:16px !important;
-                text-align:center !important;
-                max-width:95% !important;
-                margin: clamp(20px, 5vw, 40px) auto !important;
-                box-shadow:0 0 40px rgba(0,204,255,0.4) !important;
-            '>
+            # Non-legacy case: timeout, rate-limit, or empty modern address
+            if params.offline_mode:
+                # Offline: no API was even attempted → different message
+                timeout_msg = """
                 <div style='
-                    color:#00ccff !important;
-                    font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
-                    font-weight:900 !important;
-                    margin-bottom: clamp(12px, 3vw, 20px) !important;
+                    color:#aaffcc !important;
+                    padding: clamp(24px, 5vw, 40px) !important;
+                    background:#001122 !important;
+                    border:3px solid #00ccff !important;
+                    border-radius:16px !important;
+                    text-align:center !important;
+                    max-width:95% !important;
+                    margin: clamp(20px, 5vw, 40px) auto !important;
+                    box-shadow:0 0 40px rgba(0,204,255,0.4) !important;
                 '>
-                    ⚠️ Fetch timed out or rate-limited
+                    <div style='
+                        color:#00ccff !important;
+                        font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+                        font-weight:900 !important;
+                        margin-bottom: clamp(12px, 3vw, 20px) !important;
+                    '>
+                        ⚠️ Offline Mode — No UTXOs Found
+                    </div>
+                    
+                    <div style='
+                        color:#88ffdd !important;
+                        font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+                        line-height:1.6 !important;
+                    '>
+                        No UTXOs were pasted or they were invalid/dust.<br><br>
+                        
+                        <span style='font-weight:900 !important; color:#ffffff !important;'>Next steps:</span><br>
+                        • Paste valid raw UTXOs in the offline box (txid:vout:value[:address])<br>
+                        • Make sure at least one line has a value > dust threshold<br>
+                        • Include a bc1q… or bc1p… address if you want change output<br><br>
+                        
+                        <small style='color:#66ccff !important;'>
+                            Tip: Use a block explorer offline to export UTXOs first.
+                        </small>
+                    </div>
                 </div>
-                
+                """
+            else:
+                # Online: original timeout/rate-limit message
+                timeout_msg = """
                 <div style='
-                    color:#88ffdd !important;
-                    font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
-                    line-height:1.6 !important;
+                    color:#aaffcc !important;
+                    padding: clamp(24px, 5vw, 40px) !important;
+                    background:#001122 !important;
+                    border:3px solid #00ccff !important;
+                    border-radius:16px !important;
+                    text-align:center !important;
+                    max-width:95% !important;
+                    margin: clamp(20px, 5vw, 40px) auto !important;
+                    box-shadow:0 0 40px rgba(0,204,255,0.4) !important;
                 '>
-                    The address may be very large, or public APIs are currently rate-limiting / slow.<br><br>
+                    <div style='
+                        color:#00ccff !important;
+                        font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+                        font-weight:900 !important;
+                        margin-bottom: clamp(12px, 3vw, 20px) !important;
+                    '>
+                        ⚠️ Fetch timed out or rate-limited
+                    </div>
                     
-                    <span style='font-weight:900 !important; color:#ffffff !important;'>Options:</span><br>
-                    • Try again in a few minutes (APIs often recover)<br>
-                    • Use offline mode and paste raw UTXOs manually<br>
-                    • Check the address on a block explorer first<br><br>
-                    
-                    <small style='color:#66ccff !important;'>
-                        Tip: For very large wallets, offline mode is usually faster and more reliable.
-                    </small>
+                    <div style='
+                        color:#88ffdd !important;
+                        font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+                        line-height:1.6 !important;
+                    '>
+                        The address may be very large, or public APIs are currently rate-limiting / slow.<br><br>
+                        
+                        <span style='font-weight:900 !important; color:#ffffff !important;'>Options:</span><br>
+                        • Try again in a few minutes (APIs often recover)<br>
+                        • Use offline mode and paste raw UTXOs manually<br>
+                        • Check the address on a block explorer first<br><br>
+                        
+                        <small style='color:#66ccff !important;'>
+                            Tip: For very large wallets, offline mode is usually faster and more reliable.
+                        </small>
+                    </div>
                 </div>
-            </div>
-            """
-            
+                """
+
             return (
                 gr.update(value=[]),                   # 0: Empty DataFrame
                 (),                                    # 1: Empty enriched_state
@@ -2107,6 +2181,7 @@ def analyze(
             )
 
     # 3. Enrich UTXOs with metadata, health, script info
+    # (no network calls here — already safe)
     enriched = _enrich_utxos(raw_utxos, params)
     log.debug(f"Enriched {len(enriched)} UTXOs")
 
@@ -2116,6 +2191,7 @@ def analyze(
         raise RuntimeError("Missing 'script_type' in enriched UTXOs — invariant violation")
 
     # 4. Apply pruning strategy (sets 'selected' flags)
+    # (pure computation — safe)
     enriched_pruned = _apply_pruning_strategy(enriched, params.strategy)
     log.debug(
         f"After pruning strategy: {len(enriched_pruned)} UTXOs total, "
@@ -2128,6 +2204,7 @@ def analyze(
     assert params.strategy in PRUNING_RATIOS, f"Unknown strategy: {params.strategy}"
 
     # 5. Build DataFrame rows for display
+    # (pure UI — safe)
     df_rows, has_unsupported = _build_df_rows(enriched_pruned)
     log.debug(f"Built {len(df_rows)} table rows, has_unsupported={has_unsupported}")
 
@@ -2156,7 +2233,6 @@ def analyze(
         strategy=params.strategy,
         scan_source=params.scan_source,
     )
-
 
     # Return unified success state (exactly 9 outputs for Gradio)
     return _analyze_success(
@@ -3937,6 +4013,9 @@ def update_status_and_ui(offline: bool | None, dark: bool | None) -> str:
 	
 # ── Offline toggle handler ─────────────────────────────────────
 def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
+    global _is_offline
+    _is_offline = bool(offline)  # sync global flag
+    
     manual_box_vis = gr.update(visible=offline)
     
     addr_interactive = gr.update(interactive=not offline)
@@ -4560,11 +4639,15 @@ with gr.Blocks(
     # — BACKGROUND FEE CACHE REFRESH —
     # =============================
     def refresh_fees_periodically():
-        """Background daemon thread to keep fee cache warm every 30 seconds."""
+        """Background daemon thread to keep fee cache warm every 30 seconds — offline-safe."""
+        global _is_offline
         while True:
             time.sleep(30)
+            if _is_offline:
+                # log.debug("Fee refresh skipped — offline mode active")  # uncomment if you want logs
+                continue
             try:
-                get_live_fees()  # Refresh cache without blocking main thread
+                get_live_fees()  # only called if online
             except Exception as e:
                 log.warning(f"Background fee refresh error: {e}")
 
@@ -4584,15 +4667,25 @@ with gr.Blocks(
     # 🔒 LOCK-SAFE FEE PRESET HANDLER
     # =============================
     def apply_fee_preset_locked(locked: bool, offline_mode: bool, preset: str):
+        """Apply a fee preset to the slider — completely safe in offline mode."""
         if offline_mode or locked:
-            return gr.update()  # no-op — don't touch the slider
+            return gr.update()  # no-op — don't touch the slider, safe in both modes
 
-        fees = get_live_fees() or {
-            "fastestFee": 10,
-            "halfHourFee": 6,
-            "hourFee": 3,
-            "economyFee": 1,
-        }
+        # Only reach here if online and not locked
+        try:
+            fees = get_live_fees()  # safe: we've already guarded get_live_fees itself
+        except Exception as e:
+            log.warning(f"Live fee fetch failed in preset handler: {e}")
+            fees = None
+
+        # Use live if successful, else hardcoded fallback
+        if fees is None:
+            fees = {
+                "fastestFee":   10,
+                "halfHourFee":  6,
+                "hourFee":      3,
+                "economyFee":   1,
+            }
 
         rate_map = {
             "fastest":   fees.get("fastestFee", 10),
@@ -4612,7 +4705,7 @@ with gr.Blocks(
     def update_fee_buttons_state(offline_mode: bool, locked: bool):
         interactive = not (offline_mode or locked)
         return [gr.update(interactive=interactive)] * 4  # shorthand for all 4 buttons
-
+		
 
     # =============================
     # 🛡️ OFFLINE-AWARE PRUNE CONDITIONS BADGE
@@ -5575,17 +5668,17 @@ No API calls • Fully air-gapped safe""",
     # — Initial UI state & dark mode (always run on page load / restart)
     # =============================
 
-    # 2. Force initial banner (online + dark by default)
+    # 2. Force initial banner (online + dark by default) — pure UI, safe
     demo.load(
         fn=lambda: update_status_and_ui(False, True),
         outputs=[mode_status]
     )
 
-    # 3. Force initial dark mode (client-side, instant)
+    # 3. Force initial dark mode (client-side, instant) — JS only, no network
     demo.load(
         fn=update_status_and_ui,
         inputs=[offline_toggle, theme_checkbox],
-        outputs=mode_status,
+        outputs=[mode_status],
         js="""
         (offline, isDark) => {
             console.log("[Ω Initial Load] isDark from checkbox:", isDark);
@@ -5594,20 +5687,20 @@ No API calls • Fully air-gapped safe""",
         """
     )
 
-    # 4. Fee preset buttons initial state (disabled if offline or locked)
+    # 4. Fee preset buttons initial state — disable if offline/locked, pure UI
     demo.load(
         fn=update_fee_buttons_state,
         inputs=[offline_toggle, locked],
         outputs=[economy_btn, hour_btn, halfhour_btn, fastest_btn]
     )
 
-    # 5. Prune conditions badge — offline-safe from first load
+    # 5. Prune conditions badge — already offline-safe, but reinforce guard
     demo.load(
-        fn=update_prune_badge,
+        fn=lambda offline: update_prune_badge(offline),
         inputs=[offline_toggle],
         outputs=[prune_badge]
     )
-	
+
     # 5. FOOTER
     gr.HTML(
         """
