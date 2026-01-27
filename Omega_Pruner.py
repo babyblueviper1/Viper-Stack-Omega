@@ -332,13 +332,15 @@ def get_live_fees() -> Dict[str, int]:
         "minimum":   1,
     }
 
-def get_prune_score() -> str:
+def get_prune_score(offline_mode: bool = False) -> str:
     """
-    Display current fee vs recent medians with color-coded badge.
-    No explicit score — colors reflect relative conditions.
-    Uses real medians from mempool.space (avgFee_90 mean).
-    Includes price, block height, hashrate, difficulty adjustment, and halving in context.
+    Generate the pruning conditions badge HTML.
+    Returns empty string or fallback in offline mode to prevent any network calls.
     """
+    if offline_mode:
+        return ""  # Silent return — caller (update_prune_badge) handles fallback
+
+    # ── All network calls are now protected behind the offline check ──
     urls = {
         '24h': "https://mempool.space/api/v1/mining/blocks/fee-rates/24h",
         '1w': "https://mempool.space/api/v1/mining/blocks/fee-rates/1w",
@@ -1466,13 +1468,16 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
 # UTXO Fetching Functions
 # =========================
 
-def get_utxos_with_timeout(addr: str, dust: int, timeout_sec: int = 60) -> List[dict]:
+def get_utxos_with_timeout(addr: str, dust: int, offline_mode: bool = False, timeout_sec: int = 60) -> List[dict]:
     """
-    Fetch UTXOs with a hard per-address timeout to prevent indefinite hangs
-    on large/rate-limited addresses.
+    Fetch UTXOs with a hard per-address timeout — completely skipped in offline mode.
     """
+    if offline_mode:
+        log.info(f"UTXO fetch skipped — offline mode active for address: {addr}")
+        return []  # No network calls ever in offline mode
+
     def inner_fetch():
-        return get_utxos(addr, dust)  # your existing function
+        return get_utxos(addr, dust, offline_mode=False)  # Explicitly pass offline=False
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(inner_fetch)
@@ -1484,12 +1489,17 @@ def get_utxos_with_timeout(addr: str, dust: int, timeout_sec: int = 60) -> List[
         except Exception as e:
             log.error(f"Unexpected error fetching UTXOs for {addr}: {e}")
             return []
-	
-def get_utxos(addr: str, dust: int = 546) -> List[dict]:
+
+
+def get_utxos(addr: str, dust: int = 546, offline_mode: bool = False) -> List[dict]:
     """
-    Fetch confirmed UTXOs for a Bitcoin address from multiple public APIs.
-    Filters out dust below threshold. Returns early on first successful source.
+    Fetch confirmed UTXOs from public APIs — completely disabled in offline mode.
+    Filters out dust. Returns early on first successful source (online only).
     """
+    if offline_mode:
+        log.info(f"get_utxos called but skipped — offline mode active for address: {addr}")
+        return []  # Immediate return — zero network activity
+
     addr = addr.strip()
     if not addr:
         return []
@@ -3876,15 +3886,30 @@ def process_uploaded_file(file):
 
 
 # ── UI status banner (theme + offline mode) ─────────────────────────────────────
-def update_status_and_ui(offline: bool, dark: bool) -> str:
+def update_status_and_ui(offline: bool | None, dark: bool | None) -> str:
     """Generate responsive status banner showing theme & connection mode."""
-    theme_icon = "🌙" if dark else "☀️"
-    theme_text = "Dark" if dark else "Light"
-    connection = "Offline 🔒 • No API calls • Fully air-gapped" if offline else "Online • API calls enabled"
+    is_dark = dark if dark is not None else True
+    is_offline = offline if offline is not None else False
 
-    color = "#00ff88" if dark else "#006644"
-    text_shadow = "0 0 20px #00ff88" if dark else "none"
-    bg = "rgba(0, 30, 0, 0.5)" if dark else "rgba(200, 255, 220, 0.35)"
+    log.debug(
+        "[Banner] Called | offline=%s | dark=%s | rendering %s",
+        is_offline,
+        is_dark,
+        'DARK' if is_dark else 'LIGHT'
+    )
+
+    theme_icon = "🌙" if is_dark else "☀️"
+    theme_text = "Dark" if is_dark else "Light"
+
+    connection = (
+        '<span style="color:#ff4444; font-weight:900;">Offline 🔒 Air-gapped</span>'
+        if is_offline
+        else '<span style="color:#00ff88; font-weight:900;">Online</span> • API calls enabled'
+    )
+
+    glow = "0 0 20px #00ff88" if is_dark else "none"
+    bg = "rgba(0, 30, 0, 0.6)" if is_dark else "rgba(220, 255, 220, 0.4)"
+    color = "#00ff88" if is_dark else "#006644"
 
     return f"""
     <div style="
@@ -3894,7 +3919,7 @@ def update_status_and_ui(offline: bool, dark: bool) -> str:
         font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;
         font-weight: 900 !important;
         color: {color} !important;
-        text-shadow: {text_shadow} !important;
+        text-shadow: {glow} !important;
         background: {bg} !important;
         border-radius: 16px !important;
         box-shadow: 0 12px 40px rgba(0,0,0,0.5),
@@ -3909,8 +3934,8 @@ def update_status_and_ui(offline: bool, dark: bool) -> str:
         {theme_text} • {connection}
     </div>
     """
-
-
+	
+# ── Offline toggle handler ─────────────────────────────────────
 def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
     manual_box_vis = gr.update(visible=offline)
     
@@ -3976,6 +4001,8 @@ def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
         </div>
         """
     )
+    
+    badge_update = update_prune_badge(offline)
 
     return (
         manual_box_vis,         # 0
@@ -3990,7 +4017,8 @@ def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
         fee_btn_interactive,    # 9: hour_btn interactive
         fee_btn_interactive,    # 10: halfhour_btn interactive
         fee_btn_interactive,    # 11: fastest_btn interactive
-        fee_info_update         # 12: fee preset info text
+        fee_info_update,        # 12: fee preset info text
+        badge_update,           # 13: prune_badge
     )
 # --------------------------
 # Gradio UI
@@ -3998,9 +4026,10 @@ def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
 with gr.Blocks(
     title="Ωmega Pruner v11 — Forged Anew"
 ) as demo:
-	# ── Full-screen animated background + Hero Banner ───────────────────────────────
+
+    # ── Full-screen animated background + Hero Banner ───────────────────────────────
     gr.HTML("""
-    <div id="omega-bg" style="
+        <div id="omega-bg" style="
         position: fixed;
         inset: 0;
         width: 100vw;
@@ -4292,109 +4321,143 @@ with gr.Blocks(
 
     # ── Health badge & legacy row styling ───────────────────────────────────────────
     gr.HTML("""
-    <style>
-        .health {
-            font-weight: 900;
-            text-align: center;
-            padding: 6px 10px;
-            border-radius: 4px;
-            min-width: 70px;
-            display: inline-block;
-        }
-        .health-dust     { color: #ff3366; background: rgba(255, 51, 102, 0.12); }
-        .health-heavy    { color: #ff6600; background: rgba(255, 102, 0, 0.12); }
-        .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.12); }
-        .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
-        .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.12); }
-        .health-manual   { color: #bb86fc; background: rgba(187, 134, 252, 0.12); }
+        <style>
+            .health {
+                font-weight: 900;
+                text-align: center;
+                padding: 6px 10px;
+                border-radius: 4px;
+                min-width: 70px;
+                display: inline-block;
+            }
+            .health-dust     { color: #ff3366; background: rgba(255, 51, 102, 0.12); }
+            .health-heavy    { color: #ff6600; background: rgba(255, 102, 0, 0.12); }
+            .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.12); }
+            .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
+            .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.12); }
+            .health-manual   { color: #bb86fc; background: rgba(187, 134, 252, 0.12); }
 
-        .health small {
-            display: block;
-            color: #aaa;
-            font-weight: normal;
-            font-size: 0.8em;
-            margin-top: 2px;
-        }
+            .health small {
+                display: block;
+                color: #aaa;
+                font-weight: normal;
+                font-size: 0.8em;
+                margin-top: 2px;
+            }
 
-        .gr-textbox input:disabled {
-            background-color: #111 !important;
-            color: #555 !important;
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
+            .gr-textbox input:disabled {
+                background-color: #111 !important;
+                color: #555 !important;
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
 
-        /* Legacy row styling */
-        .health-legacy {
-            color: #ff4444 !important;
-            font-weight: bold;
-        }
+            /* Legacy row styling */
+            .health-legacy {
+                color: #ff4444 !important;
+                font-weight: bold;
+            }
 
-        tr:has(.health-legacy) {
-            background-color: #330000 !important;
-            opacity: 0.65;
-        }
+            tr:has(.health-legacy) {
+                background-color: #330000 !important;
+                opacity: 0.65;
+            }
 
-        tr:has(.health-legacy) td {
-            color: #ffaaaa !important;
-        }
+            tr:has(.health-legacy) td {
+                color: #ffaaaa !important;
+            }
 
-        tr:has(.health-legacy) input[type="checkbox"],
-        tr:has(.health-nested) input[type="checkbox"] {
-            opacity: 0.3 !important;
-            cursor: not-allowed !important;
-            accent-color: #666 !important;
-        }
-    </style>
+            tr:has(.health-legacy) input[type="checkbox"],
+            tr:has(.health-nested) input[type="checkbox"] {
+                opacity: 0.3 !important;
+                cursor: not-allowed !important;
+                accent-color: #666 !important;
+            }
+        </style>
     """)
-
-	    # ── Global dark mode, nuclear checkboxes + disabled fee buttons + fee info styling ────────────────
+	
     gr.HTML("""
-    <style>
-        /* Force dark mode on body and all Gradio containers */
+        <style id="omega-dark-nuke">
+
+       
+           /* ── Root & global fixes ──────────────────────────────────────────────── */
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: 100% !important;
+            background: #000000 !important;          /* default black – dark mode base */
+        }
+
+        /* Force dark mode root when .dark-mode is active */
+        .dark-mode html,
+        .dark-mode body,
+        .dark-mode .gradio-container {
+            background: #000000 !important;
+            color: #00cc00 !important;
+        }
+
+        /* ── Centered content (keeps padding black in dark mode) ──────────────── */
+        .gradio-container,
+        .gr-container,
+        .gr-panel,
+        .gr-form,
+        .gr-box,
+        .gr-group,
+        .gr-column,
+        .gr-row {
+            max-width: 1200px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            padding: 0 clamp(16px, 4vw, 32px) !important;
+            box-sizing: border-box !important;
+            background: inherit !important;          /* inherit black from body in dark mode */
+        }
+
+        /* ── Dark mode (nuclear green + orange) ───────────────────────────────── */
         .dark-mode,
-        .dark-mode .gradio-container,
-        .dark-mode .gr-panel,
-        .dark-mode .gr-form,
-        .dark-mode .gr-box,
-        .dark-mode .gr-group,
+        .dark-mode .gr-textbox,
+        .dark-mode .gr-dropdown,
         .dark-mode textarea,
         .dark-mode input,
-        .dark-mode .gr-button,
-        .dark-mode .gr-textbox,
-        .dark-mode .gr-dropdown {
-            background: #000 !important;
-            color: #0f0 !important;
+        .dark-mode .gr-button {
+            background: #000000 !important;
+            color: #00cc00 !important;
             border-color: #f7931a !important;
         }
 
-        /* Buttons in dark mode */
-        .dark-mode .gr-button {
-            background: #000 !important;
-            color: #0f0 !important;
-            border: 2px solid #f7931a !important;
-        }
+        /* Dark mode button hover */
         .dark-mode .gr-button:hover {
             background: #f7931a !important;
-            color: #000 !important;
+            color: #000000 !important;
+            box-shadow: 0 0 25px rgba(247, 147, 26, 0.7);
         }
 
-        /* Nuclear checkbox — bigger and more visible */
+        /* Dark mode input focus glow */
+        .dark-mode input:focus,
+        .dark-mode textarea:focus,
+        .dark-mode .gr-textbox:focus-within {
+            box-shadow: 0 0 12px rgba(0, 204, 0, 0.4) !important;
+            border-color: #00ff88 !important;
+        }
+
+        /* ── Checkbox (shared) ────────────────────────────────────────────────── */
         input[type="checkbox"] {
             width: clamp(28px, 6vw, 36px) !important;
             height: clamp(28px, 6vw, 36px) !important;
-            accent-color: #0f0 !important;
-            background: #000 !important;
+            accent-color: #00ff00 !important;
+            background: #000000 !important;
             border: clamp(2px, 0.5vw, 3px) solid #f7931a !important;
             border-radius: 8px !important;
             cursor: pointer;
-            box-shadow: 0 0 20px rgba(247,147,26,0.6) !important;
+            box-shadow: 0 0 20px rgba(247, 147, 26, 0.6) !important;
             appearance: none;
             position: relative;
+            transition: all 0.15s ease;
         }
 
         input[type="checkbox"]:checked {
-            background: #0f0 !important;
-            box-shadow: 0 0 30px #0f0 !important;
+            background: #00ff00 !important;
+            box-shadow: 0 0 30px #00ff00 !important;
         }
 
         input[type="checkbox"]:checked::after {
@@ -4403,100 +4466,96 @@ with gr.Blocks(
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: #000;
+            color: #000000;
             font-size: clamp(18px, 4vw, 24px) !important;
             font-weight: 900;
             pointer-events: none;
         }
 
-        /* Light mode fallback for checkboxes */
         :not(.dark-mode) input[type="checkbox"] {
             accent-color: #f7931a !important;
-            background: #fff !important;
-            border-color: #0f0 !important;
+            background: #ffffff !important;
+            border-color: #00ff00 !important;
         }
+
         :not(.dark-mode) input[type="checkbox"]:checked {
             background: #f7931a !important;
         }
 
-        /* Empty state messages */
-        .empty-state-msg {
-            color: #aaffcc !important;
-            background: rgba(0, 30, 20, 0.6) !important;
-            padding: clamp(30px, 8vw, 50px) !important;
-            border-radius: 18px !important;
-            border: 2px solid #00ff88 !important;
-            box-shadow: 0 0 50px rgba(0, 255, 136, 0.4) !important;
+        /* ── Light mode (high contrast) ───────────────────────────────────────── */
+        body:not(.dark-mode),
+        body:not(.dark-mode) .gradio-container,
+        body:not(.dark-mode) .gr-textbox,
+        body:not(.dark-mode) .gr-textbox input,
+        body:not(.dark-mode) .gr-textbox textarea,
+        body:not(.dark-mode) label,
+        body:not(.dark-mode) .gr-label,
+        body:not(.dark-mode) p,
+        body:not(.dark-mode) div,
+        body:not(.dark-mode) span {
+            color: #0f0f0f !important;
+            background: #ffffff !important;          /* force white bg in light mode */
         }
 
+        body:not(.dark-mode) .gr-button {
+            color: #000000 !important;
+            background: #f5f5f5 !important;
+            border-color: #888888 !important;
+        }
+
+        body:not(.dark-mode) .gr-button:hover {
+            background: #e8e8e8 !important;
+        }
+
+        /* Light mode placeholders – now very dark & readable */
+        body:not(.dark-mode) input::placeholder,
+        body:not(.dark-mode) textarea::placeholder,
+        body:not(.dark-mode) .gr-textbox::placeholder {
+            color: #111111 !important;                /* almost black */
+            opacity: 0.95 !important;
+            font-weight: 500 !important;
+        }
+
+        /* Light mode status boxes */
         body:not(.dark-mode) .empty-state-msg {
             color: #003322 !important;
-            background: rgba(200, 255, 220, 0.25) !important;
+            background: rgba(220, 255, 220, 0.35) !important;
             border: 2px solid #006644 !important;
-            box-shadow: 0 0 30px rgba(0, 100, 68, 0.3) !important;
         }
 
-        body:not(.dark-mode) .empty-state-msg > div:first-child {
-            color: #004d33 !important;
-        }
-
-        /* DataFrame column wrapping for long strings (TXID, address, source) */
-        .gr-dataframe th:nth-child(1) {
-            white-space: normal !important;
-            word-wrap: break-word !important;
-            overflow: visible !important;
-            line-height: 1.2 !important;
-            padding: 8px 4px !important;
-            font-size: clamp(0.9rem, 3vw, 1rem) !important;
-        }
-
-        .gr-dataframe td:nth-child(2),  /* Source */
-        .gr-dataframe td:nth-child(3),  /* TXID */
-        .gr-dataframe td:nth-child(6) { /* Address */
-            white-space: normal !important;
-            word-break: break-all !important;
-            overflow-wrap: break-word !important;
-            hyphens: auto;
-            font-family: monospace !important;
-            font-size: 0.95rem !important;
-            line-height: 1.35 !important;
-            padding: 8px 6px !important;
-        }
-
+        /* ── DataFrame (shared) ───────────────────────────────────────────────── */
         .gr-dataframe td:nth-child(2),
         .gr-dataframe td:nth-child(3),
         .gr-dataframe td:nth-child(6) {
-            max-width: none !important;
-            overflow: visible !important;
+            white-space: normal !important;
+            word-break: break-all !important;
+            overflow-wrap: break-word !important;
+            font-family: 'Courier New', monospace !important;
+            font-size: 0.95rem !important;
+            line-height: 1.4 !important;
+            padding: 10px 8px !important;
         }
 
         .gr-dataframe td:nth-child(2):hover,
         .gr-dataframe td:nth-child(3):hover,
         .gr-dataframe td:nth-child(6):hover {
-            background: rgba(0, 255, 136, 0.12) !important;
-            cursor: pointer !important;
+            background: rgba(0, 255, 136, 0.08) !important;
         }
 
-        .gr-dataframe td {
-            white-space: normal !important;
-            overflow: visible !important;
-        }
-
-        /* Disabled fee preset buttons */
+        /* Disabled fee buttons */
         .fee-btn button:disabled {
-            opacity: 0.4 !important;
-            cursor: not-allowed !important;
-            background: #222 !important;
-            border-color: #444 !important;
-            color: #666 !important;
+            opacity: 0.38 !important;
+            background: #222222 !important;
+            border-color: #444444 !important;
+            color: #888888 !important;
         }
-    </style>
-    """)
 
+    </style>
+""")
 	
-    # Placeholder for dynamic prune conditions badge (populated by load or timer)
+    # Dynamic prune conditions badge (populated by load or timer)
     prune_badge = gr.HTML("")
-   
+
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
     # =============================
@@ -4520,15 +4579,14 @@ with gr.Blocks(
         threading._fee_refresh_started = True
         log.info("Background fee cache refresher thread started")
 
+
     # =============================
-    # — LOCK-SAFE FEE PRESET FUNCTION —
+    # 🔒 LOCK-SAFE FEE PRESET HANDLER
     # =============================
-    def apply_fee_preset_locked(locked: bool, preset: str, offline_mode: bool):
-        if offline_mode:
-            return gr.update(), gr.update()  # no-op
-        if locked:
-            return gr.update(), gr.update()
-        
+    def apply_fee_preset_locked(locked: bool, offline_mode: bool, preset: str):
+        if offline_mode or locked:
+            return gr.update()  # no-op — don't touch the slider
+
         fees = get_live_fees() or {
             "fastestFee": 10,
             "halfHourFee": 6,
@@ -4537,16 +4595,69 @@ with gr.Blocks(
         }
 
         rate_map = {
-            "fastest": fees.get("fastestFee", 10),
+            "fastest":   fees.get("fastestFee", 10),
             "half_hour": fees.get("halfHourFee", 6),
-            "hour": fees.get("hourFee", 3),
-            "economy": fees.get("economyFee", 1),
+            "hour":      fees.get("hourFee", 3),
+            "economy":   fees.get("economyFee", 1),
         }
 
         new_rate = rate_map.get(preset, 3)
         return gr.update(value=new_rate)
 
 
+    # =============================
+    # 🔘 FEE PRESET BUTTONS STATE HELPER
+    # Disables buttons on load/offline/locked — improves UX
+    # =============================
+    def update_fee_buttons_state(offline_mode: bool, locked: bool):
+        interactive = not (offline_mode or locked)
+        return [gr.update(interactive=interactive)] * 4  # shorthand for all 4 buttons
+
+
+    # =============================
+    # 🛡️ OFFLINE-AWARE PRUNE CONDITIONS BADGE
+    # Shows live fee/prune context online, safe fallback in air-gapped mode
+    # =============================
+    def update_prune_badge(offline_mode: bool):
+        if offline_mode:
+            return gr.update(
+                value="""
+                <div style="
+                    text-align:center; padding:20px; background:#001122; 
+                    border:2px solid #00ccff; border-radius:12px; color:#88ddff;
+                    max-width:600px; margin:20px auto; font-weight:600;
+                ">
+                    <strong>Offline Mode Active</strong><br>
+                    Live pruning conditions & fee data unavailable<br>
+                    <small>(zero network calls in air-gapped mode)</small>
+                </div>
+                """,
+                visible=True
+            )
+        else:
+            try:
+                # Pass the flag — now safe even if someone calls this function directly
+                return gr.update(value=get_prune_score(offline_mode=offline_mode), visible=True)
+            except Exception as e:
+                return gr.update(
+                    value=f"""
+                    <div style="
+                        text-align:center; padding:16px; background:#220000; 
+                        border:2px solid #ff4444; border-radius:12px; color:#ffaaaa;
+                        max-width:600px; margin:20px auto;
+                    ">
+                        <strong>Failed to load live fees</strong><br>
+                        {str(e)}
+                    </div>
+                    """,
+                    visible=True
+                )
+
+
+    # =============================
+    # 🔐 FINALIZE & LOCK UI AFTER PSBT GENERATION
+    # Freezes all inputs, shows export area, displays LOCKED badge — irreversible until reset
+    # =============================
     def finalize_generate_ui():
         """
         Completely lock the UI after successful PSBT generation.
@@ -4568,7 +4679,7 @@ with gr.Blocks(
             gr.update(interactive=False),                # 10: fee_rate_slider
             gr.update(interactive=False),                # 11: future_fee_slider
             gr.update(interactive=False),                # 13: offline_toggle
-            gr.update(interactive=False),                # 14: theme_toggle
+            gr.update(interactive=False),                # 14: theme_checkbox
             gr.update(interactive=False),                # 15: manual_utxo_input
             gr.update(interactive=False),                # 16: economy_btn
             gr.update(interactive=False),                # 17: hour_btn
@@ -4578,6 +4689,11 @@ with gr.Blocks(
             gr.update(visible=False),                    # 21: file uploader (optional extra hide)
         )
 
+    # =============================
+    # 🖥️ MAIN INPUT & UI LAYOUT
+    # Address input, destination, toggles, notes, and core controls
+    # =============================
+     
     with gr.Column():
         # Modern Bitcoin Optimization Note
         gr.HTML(
@@ -4652,17 +4768,16 @@ with gr.Blocks(
             """
         )
         mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
-
         # ── Theme Toggle ──
         with gr.Row():
             with gr.Column(scale=1, min_width=220):
-                theme_toggle = gr.Checkbox(
-                    label="🌙 Dark Mode (pure black)",
-                    value=True,
-                    interactive=True,
-                    info="Retinal protection • Nuclear glow preserved • Recommended",
+                theme_checkbox = gr.Checkbox(
+                    label="🌙 Dark Mode (pure black + neon)",
+                    value=True,                           # start in dark mode
+                    info="Retinal protection • Recommended • Preserved glow",
+                    elem_id="theme-checkbox",             # optional: for targeted styling
+                    interactive=True
                 )
-
            # ── Main Input Fields ──
         with gr.Row():
             addr_input = gr.Textbox(
@@ -5104,46 +5219,54 @@ No API calls • Fully air-gapped safe""",
         # Reset button (final control)
         with gr.Column():
             reset_btn = gr.Button("NUCLEAR RESET — START OVER — NO FUNDS AFFECTED", variant="secondary")
-
+			
     # =============================
     # — Handlers —
     # =============================
 
-        offline_toggle.change(
-            fn=offline_toggle_handler,
-            inputs=[offline_toggle, theme_toggle],
-            outputs=[
-                manual_box_row,        # 0: manual visibility
-                addr_input,            # 1: addr value
-                addr_input,            # 2: addr interactive
-                addr_input,            # 3: addr placeholder
-                dest,                  # 4: NEW - dest value
-                dest,                  # 5: NEW - dest interactive
-                dest,                  # 6 placeholder
-                mode_status,           # 7 banner
-				economy_btn,           # 8 interactive
-				hour_btn,              # 9 interactive
-				halfhour_btn,          # 10 interactive
-				fastest_btn,           # 11 interactive
-				fee_preset_info        # 12: info text + classes
-            ],
-        )
+    theme_checkbox.change(
+        fn=update_status_and_ui,
+        inputs=[offline_toggle, theme_checkbox],
+        outputs=mode_status,
+        js="""
+        () => {
+            const toggle = document.getElementById('theme-checkbox');
+            const isDark = toggle ? toggle.checked : true;
+            document.body.classList.toggle('dark-mode', isDark);
+        }
+        """
+    )
 
-        theme_toggle.change(
-            fn=update_status_and_ui,
-            inputs=[offline_toggle, theme_toggle],
-            outputs=mode_status,
-            js="""
-            (offline, dark) => {
-                if (dark) {
-                    document.body.classList.add("dark-mode");
-                } else {
-                    document.body.classList.remove("dark-mode");
-                }
-            }
-            """
-        )
+    # 2. Pure Python handler: ONLY banner text update (runs reliably)
+    theme_checkbox.change(
+        fn=update_status_and_ui,
+        inputs=[offline_toggle, theme_checkbox],
+        outputs=[mode_status]
+    )
 	
+    # Also update banner when offline toggle changes (no JS needed here)
+    offline_toggle.change(
+        fn=offline_toggle_handler,
+        inputs=[offline_toggle, theme_checkbox],  # fixed: use theme_checkbox
+        outputs=[
+            manual_box_row,        # 0: manual visibility
+            addr_input,            # 1: addr value
+            addr_input,            # 2: addr interactive
+            addr_input,            # 3: addr placeholder
+            dest,                  # 4: NEW - dest value
+            dest,                  # 5: NEW - dest interactive
+            dest,                  # 6 placeholder
+            mode_status,           # 7 banner
+            economy_btn,           # 8 interactive
+            hour_btn,              # 9 interactive
+            halfhour_btn,          # 10 interactive
+            fastest_btn,           # 11 interactive
+            fee_preset_info,       # 12: info text + classes
+			prune_badge,           # 13: prune_badge
+			
+        ],
+    )
+
     # =============================
     # — FEE PRESET BUTTONS (pure parameter change) —
     # =============================
@@ -5270,7 +5393,7 @@ No API calls • Fully air-gapped safe""",
             fee_rate_slider,
             future_fee_slider,
             offline_toggle,
-            theme_toggle,
+            theme_checkbox,
             manual_utxo_input,
             economy_btn,
             hour_btn,
@@ -5309,7 +5432,7 @@ No API calls • Fully air-gapped safe""",
             gr.update(value=False, interactive=True),                # offline_toggle
             gr.update(value="", interactive=True),                    # manual_utxo_input
             gr.update(visible=False),                                # manual_box_row 
-            gr.update(interactive=True),                             # theme_toggle — RE-ENABLE DARK MODE
+            gr.update(value= True, interactive=True),                 # theme_checkbox
             gr.update(interactive=True),                             # fastest_btn
             gr.update(interactive=True),                             # halfhour_btn
             gr.update(interactive=True),                             # hour_btn
@@ -5342,8 +5465,8 @@ No API calls • Fully air-gapped safe""",
             future_fee_slider,
             offline_toggle,
             manual_utxo_input,
-            manual_box_row,             
-            theme_toggle,
+            manual_box_row,
+            theme_checkbox,               # ← added: reset theme to default (dark on)
             fastest_btn,
             halfhour_btn,
             hour_btn,
@@ -5353,16 +5476,19 @@ No API calls • Fully air-gapped safe""",
             export_file,
             import_file,
             psbt_output,
-			load_json_btn,
-
+            load_json_btn,
         ],
     ).then(
         fn=lambda: (
-            "", 
+            "",                          # status_output cleared
             gr.update(visible=False),    # generate_row hidden
             gr.update(visible=True)      # analyze_btn re-shown
         ),
         outputs=[status_output, generate_row, analyze_btn]
+    ).then(
+        fn=update_status_and_ui,
+        inputs=[offline_toggle, theme_checkbox],   # ← changed to theme_checkbox
+        outputs=[mode_status]
     )
       # =============================
     # — LIVE INTERPRETATION (single source of truth) —
@@ -5424,7 +5550,12 @@ No API calls • Fully air-gapped safe""",
         ],
         outputs=[status_output, generate_row]
     )
+    # =============================
+    # INITIAL PAGE LOAD HANDLERS
+    # Sets up main summary, theme/banner, fee buttons, and prune badge on first render / refresh
+    # =============================
 
+    # 1. Main summary (status box + generate row visibility)
     demo.load(
         fn=generate_summary_safe,
         inputs=[
@@ -5440,20 +5571,43 @@ No API calls • Fully air-gapped safe""",
         outputs=[status_output, generate_row]
     )
 
+    # =============================
+    # — Initial UI state & dark mode (always run on page load / restart)
+    # =============================
+
+    # 2. Force initial banner (online + dark by default)
     demo.load(
         fn=lambda: update_status_and_ui(False, True),
+        outputs=[mode_status]
+    )
+
+    # 3. Force initial dark mode (client-side, instant)
+    demo.load(
+        fn=update_status_and_ui,
+        inputs=[offline_toggle, theme_checkbox],
         outputs=mode_status,
         js="""
-        () => {
-            document.body.classList.add("dark-mode");
+        (offline, isDark) => {
+            console.log("[Ω Initial Load] isDark from checkbox:", isDark);
+            document.body.classList.toggle('dark-mode', isDark);
         }
         """
     )
+
+    # 4. Fee preset buttons initial state (disabled if offline or locked)
     demo.load(
-        fn=get_prune_score,
-        outputs=prune_badge
+        fn=update_fee_buttons_state,
+        inputs=[offline_toggle, locked],
+        outputs=[economy_btn, hour_btn, halfhour_btn, fastest_btn]
     )
-    
+
+    # 5. Prune conditions badge — offline-safe from first load
+    demo.load(
+        fn=update_prune_badge,
+        inputs=[offline_toggle],
+        outputs=[prune_badge]
+    )
+	
     # 5. FOOTER
     gr.HTML(
         """
@@ -5511,7 +5665,7 @@ No API calls • Fully air-gapped safe""",
                         background: rgba(0, 40, 20, 0.4);
                         box-shadow: 0 0 20px rgba(0, 255, 157, 0.4);
                     ">
-                        This build is engineered for speed and clarity.
+                        This is a demo. Treat it as such.
                     </div>
                     <br>
                     <div style="
