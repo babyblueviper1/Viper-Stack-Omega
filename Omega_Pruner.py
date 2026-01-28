@@ -4456,10 +4456,9 @@ with gr.Blocks(
     """)
 	
     gr.HTML("""
-        <style id="omega-dark-nuke">
+      <style id="omega-dark-nuke">
 
-       
-           /* ── Root & global fixes ──────────────────────────────────────────────── */
+        /* ── Root & global fixes ──────────────────────────────────────────────── */
         html, body {
             margin: 0 !important;
             padding: 0 !important;
@@ -4629,7 +4628,63 @@ with gr.Blocks(
             color: #888888 !important;
         }
 
-    </style>
+        /* ── Footer donation section - default for dark mode ───────────────────── */
+        .footer-donation,
+        .footer-donation * {
+            color: #e6e6e6 !important;          /* light gray default for dark mode */
+        }
+
+        .footer-donation strong {
+            color: #f7931a !important;          /* orange header - keep in dark */
+        }
+
+        .footer-donation span {
+            color: #ccc !important;             /* lighter gray text */
+        }
+
+        /* Light mode: force dark text for entire footer donation section */
+        body:not(.dark-mode) .footer-donation,
+        body:not(.dark-mode) .footer-donation * {
+            color: #0f0f0f !important;          /* deep near-black – excellent readability */
+        }
+
+        /* Keep accent colors visible in light mode */
+        body:not(.dark-mode) .footer-donation strong {
+            color: #c77c00 !important;          /* darker orange for light mode */
+        }
+
+            body:not(.dark-mode) .footer-donation button {
+                color: #c77c00 !important;          /* button text */
+            }
+
+            /* Donation address text */
+            .donation-address {
+                color: #ffffff !important;              /* white in dark mode */
+                opacity: 1 !important;
+            }
+
+            /* Optional: slightly darker if pure black feels too stark */
+            body:not(.dark-mode) .donation-address {
+                color: #111111 !important;              /* very dark gray – still excellent contrast */
+            }
+			.footer-donation {
+                background: rgba(0,0,0,0.5) !important;  /* dark mode semi-transparent black */
+                border-top: 2px solid #f7931a !important;
+            }
+
+            body:not(.dark-mode) .footer-donation {
+                background: rgba(255,255,255,0.9) !important;  /* light mode near-white */
+                border-top: 2px solid #c77c00 !important;     /* matching darker orange */
+            }
+            /* copy button text */
+            .footer-donation button {
+                    color: #f7931a !important;  /* orange in dark */
+            }
+
+            body:not(.dark-mode) .footer-donation button {
+                color: #c77c00 !important;  /* darker orange in light */
+            }
+        </style>
 """)
 	
     # Dynamic prune conditions badge (populated by load or timer)
@@ -5779,27 +5834,20 @@ No API calls • Fully air-gapped safe""",
                 </a>
             </div>
 
-<!-- Donation section – centered QRs + copy buttons (FINAL FIXED) -->
-<div style="
+<!-- Donation section – centered QRs + copy buttons -->
+<div class="footer-donation" style="
     text-align: center !important;
     margin: clamp(40px, 10vw, 80px) auto 60px auto !important;
     padding: clamp(20px, 5vw, 40px) !important;
-    background: rgba(0,0,0,0.5) !important;
-    border-top: 2px solid #f7931a !important;
     max-width: 95vw !important;
-    color: #ddd !important;
-    font-size: clamp(0.9rem, 3vw, 1.1rem) !important;
 ">
 
     <!-- Header -->
     <div style="margin-bottom: 14px !important;">
-        <strong style="
-            color:#f7931a !important;
-            font-size: clamp(1.1rem, 4vw, 1.3rem) !important;
-        ">
+        <strong style="font-size: clamp(1.1rem, 4vw, 1.3rem) !important;">
             Support Ωmega Pruner
         </strong><br>
-        <span style="color:#ccc !important;">
+		    <span>
             If this tool saved you sats or helped your stack — show your love.
         </span>
     </div>
@@ -5813,180 +5861,171 @@ No API calls • Fully air-gapped safe""",
         flex-wrap: wrap;
     ">
 
-        <!-- On-chain -->
-        <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 180px;
+ <!-- On-chain -->
+<div style="
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 180px;
+">
+    <img
+        src="https://api.qrserver.com/v1/create-qr-code/?data=bitcoin:bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj&size=300x300&color=247-147-26&bgcolor=0-0-0"
+        alt="Donate On-chain"
+        style="
+            width: 180px;
+            height: 180px;
+            border: 2px solid #f7931a;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(247,147,26,0.5);
+            max-width: 45vw;
+        "
+    />
+
+    <div style="
+        font-weight: 700;
+        margin: 8px 0 6px 0;
+        font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+    ">
+        On-chain Bitcoin
+    </div>
+
+    <div style="
+        display: block;
+        font-family: monospace;
+        max-width: 180px;
+        font-size: 0.9rem;
+        opacity: 1 !important;
+        filter: none !important;
+        isolation: isolate;
+    ">
+        <span class="donation-address" style="
+            display: inline-block;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: bottom;
+            opacity: 1 !important;
+            text-decoration: none !important;
+            filter: none !important;
         ">
-            <img
-                src="https://api.qrserver.com/v1/create-qr-code/?data=bitcoin:bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj&size=300x300&color=247-147-26&bgcolor=0-0-0"
-                alt="Donate On-chain"
-                style="
-                    width: 180px;
-                    height: 180px;
-                    border: 2px solid #f7931a;
-                    border-radius: 12px;
-                    box-shadow: 0 0 20px rgba(247,147,26,0.5);
-                    max-width: 45vw;
-                "
-            />
+            bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
+        </span>
 
-            <div style="
-                font-weight: 700;
-                color: #f7931a !important;
-                margin: 8px 0 6px 0;
-                font-size: clamp(0.95rem, 3.2vw, 1.1rem);
-            ">
-                On-chain Bitcoin
-            </div>
+        <button
+            onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {
+                this.innerText='COPIED';
+                this.style.color='#00ff88';
+                this.style.fontWeight='900';
+                this.style.textShadow='0 0 10px #00ff88';
+                setTimeout(() => {
+                    this.innerText='Copy';
+                    this.style.color='#f7931a';
+                    this.style.fontWeight='normal';
+                    this.style.textShadow='none';
+                }, 1500);
+            })"
+            style="
+                background:none !important;
+                border:none !important;
+                cursor:pointer !important;
+                font-size:0.9rem !important;
+                margin-left:8px !important;
+                padding:0 !important;
+                line-height:1.4 !important;
+                opacity:1 !important;
+            "
+        >
+            Copy
+        </button>
+    </div>
+</div>
 
-            <div style="
-                display: block;
-                font-family: monospace;
-                max-width: 180px;
-                font-size: 0.9rem;
-                color: #ffffff !important;
-                opacity: 1 !important;
-                filter: none !important;
-                isolation: isolate;
-            ">
-                <span style="
-                    display: inline-block;
-                    max-width: 130px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    vertical-align: bottom;
-                    color: #ffffff !important;
-                    opacity: 1 !important;
-                    text-decoration: none !important;
-                    filter: none !important;
-                ">
-                    bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj
-                </span>
+<!-- Lightning (same pattern - remove color inline) -->
+<div style="
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 180px;
+">
+    <img
+        src="https://api.qrserver.com/v1/create-qr-code/?data=lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c&size=300x300&color=0-255-136&bgcolor=0-0-0"
+        alt="Donate Lightning (Bolt 12)"
+        style="
+            width: 180px;
+            height: 180px;
+            border: 2px solid #00ff88;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0,255,136,0.5);
+            max-width: 45vw;
+        "
+    />
 
-                <button
-                    onclick="navigator.clipboard.writeText('bc1q8jyzxmdad3t9emwfcc5x6gj2j00ncw05sz3xrj').then(() => {
-                        this.innerText='COPIED';
-                        this.style.color='#00ff88';
-                        this.style.fontWeight='900';
-                        this.style.textShadow='0 0 10px #00ff88';
-                        setTimeout(() => {
-                            this.innerText='Copy';
-                            this.style.color='#f7931a';
-                            this.style.fontWeight='normal';
-                            this.style.textShadow='none';
-                        }, 1500);
-                    })"
-                    style="
-                        background:none !important;
-                        border:none !important;
-                        color:#f7931a !important;
-                        cursor:pointer !important;
-                        font-size:0.9rem !important;
-                        margin-left:8px !important;
-                        padding:0 !important;
-                        line-height:1.4 !important;
-                        opacity:1 !important;
-                    "
-                >
-                    Copy
-                </button>
-            </div>
-        </div>
+    <div style="
+        font-weight: 700;
+        margin: 8px 0 6px 0;
+        font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+    ">
+        Lightning (Bolt 12)
+    </div>
 
-        <!-- Lightning -->
-        <div style="
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 180px;
+    <div style="
+        display: block;
+        font-family: monospace;
+        max-width: 180px;
+        font-size: 0.9rem;
+        opacity: 1 !important;
+        filter: none !important;
+        isolation: isolate;
+    ">
+        <span class="donation-address" style="
+            display: inline-block;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: bottom;
+            opacity: 1 !important;
+            text-decoration: none !important;
+            filter: none !important;
         ">
-            <img
-                src="https://api.qrserver.com/v1/create-qr-code/?data=lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c&size=300x300&color=0-255-136&bgcolor=0-0-0"
-                alt="Donate Lightning (Bolt 12)"
-                style="
-                    width: 180px;
-                    height: 180px;
-                    border: 2px solid #00ff88;
-                    border-radius: 12px;
-                    box-shadow: 0 0 20px rgba(0,255,136,0.5);
-                    max-width: 45vw;
-                "
-            />
+            lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c
+        </span>
 
-            <div style="
-                font-weight: 700;
-                color: #00ff88 !important;
-                margin: 8px 0 6px 0;
-                font-size: clamp(0.95rem, 3.2vw, 1.1rem);
-            ">
-                Lightning (Bolt 12)
-            </div>
-
-            <div style="
-                display: block;
-                font-family: monospace;
-                max-width: 180px;
-                font-size: 0.9rem;
-                color: #ffffff !important;
-                opacity: 1 !important;
-                filter: none !important;
-                isolation: isolate;
-            ">
-                <span style="
-                    display: inline-block;
-                    max-width: 130px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                    vertical-align: bottom;
-                    color: #ffffff !important;
-                    opacity: 1 !important;
-                    text-decoration: none !important;
-                    filter: none !important;
-                ">
-                    lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c
-                </span>
-
-                <button
-                    onclick="navigator.clipboard.writeText('lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c').then(() => {
-                        this.innerText='COPIED';
-                        this.style.color='#f7931a';
-                        this.style.fontWeight='900';
-                        this.style.textShadow='0 0 10px #f7931a';
-                        setTimeout(() => {
-                            this.innerText='Copy';
-                            this.style.color='#00ff88';
-                            this.style.fontWeight='normal';
-                            this.style.textShadow='none';
-                        }, 1500);
-                    })"
-                    style="
-                        background:none !important;
-                        border:none !important;
-                        color:#00ff88 !important;
-                        cursor:pointer !important;
-                        font-size:0.9rem !important;
-                        margin-left:8px !important;
-                        padding:0 !important;
-                        line-height:1.4 !important;
-                        opacity:1 !important;
-                    "
-                >
-                    Copy
-                </button>
-            </div>
-        </div>
+        <button
+            onclick="navigator.clipboard.writeText('lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtj23mz69jm4duvpls79sak9um7pnarjzx5an0ggp9l9vpev2z8vqqsrnu7g8he7v8kphskcr2pxzgtp3saegcr7s6tx6qtzv9rk7mf46ngqqve0ewwdpupy07sswdf4lefwj4hm7r0rj3d4ckwt88e6h4zla3vlx7leegmyp03s8uph5f34atdkh7qkalp2q0qqkc9e82rrwrqfe9f3zm7yqmagnphm352u6kdwddrwalr0lefmjqqsm2trc6zazz083var6dulkm7w8c').then(() => {
+                this.innerText='COPIED';
+                this.style.color='#00ff88';
+                this.style.fontWeight='900';
+                this.style.textShadow='0 0 10px #00ff88';
+                setTimeout(() => {
+                    this.innerText='Copy';
+                    this.style.color='#f7931a';
+                    this.style.fontWeight='normal';
+                    this.style.textShadow='none';
+                }, 1500);
+            })"
+            style="
+                background:none !important;
+                border:none !important;
+                cursor:pointer !important;
+                font-size:0.9rem !important;
+                margin-left:8px !important;
+                padding:0 !important;
+                line-height:1.4 !important;
+                opacity:1 !important;
+            "
+        >
+            Copy
+        </button>
+    </div>
+</div>
     </div>
 
     <!-- Footer line -->
     <div style="
         margin-top: 24px;
         font-size: 0.9rem;
-        color: #e6e6e6 !important;
         font-weight: 500;
     ">
         Thank you for supporting open-source Bitcoin tools.
