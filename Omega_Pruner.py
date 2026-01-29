@@ -4129,18 +4129,18 @@ with gr.Blocks(
             <span class="omega-symbol" style="
                 font-size: 100vh !important;
                 font-weight: 900;
-                background: linear-gradient(135deg, rgba(247,147,26,0.28), rgba(0, 120, 255,0.12));
+                background: linear-gradient(135deg, rgba(247,147,26,0.34), rgba(0, 120, 255,0.18));
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 background-clip: text;
                 color: transparent;
                 text-shadow:
-                    0 0 80px rgba(247,147,26,0.55),
-                    0 0 140px rgba(0, 120, 255,0.35);
+                    0 0 95px rgba(247,147,26,0.65),
+                    0 0 165px rgba(0, 120, 255,0.42);
                 animation: omega-breath 28s infinite ease-in-out;
                 user-select: none;
                 line-height: 1;
-                opacity: 0.96;
+                opacity: 0.985;
             ">Ω</span>
         </span>
     </div>
@@ -4150,7 +4150,7 @@ with gr.Blocks(
         justify-content: center;
         margin: clamp(8px, 2.5vw, 20px) auto 30px auto;
     ">
-        <div style="
+        <div class="hero-panel" style="
             text-align: center;
             padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px);
             background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
@@ -4456,235 +4456,270 @@ with gr.Blocks(
     """)
 	
     gr.HTML("""
-      <style id="omega-dark-nuke">
+<style id="omega-dark-nuke">
 
-        /* ── Root & global fixes ──────────────────────────────────────────────── */
-        html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-            height: 100% !important;
-            background: #000000 !important;          /* default black – dark mode base */
-        }
+/* ── Absolute dark-mode background nuke ───────────────────────────── */
+.dark-mode html,
+.dark-mode body,
+.dark-mode body > div,
+.dark-mode #root,
+.dark-mode .app {
+    background: #000000 !important;
+}
 
-        /* Force dark mode root when .dark-mode is active */
-        .dark-mode html,
-        .dark-mode body,
-        .dark-mode .gradio-container {
-            background: #000000 !important;
-            color: #00cc00 !important;
-        }
+/* ── Root canvas ─────────────────────────────────────────────────────────── */
+html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100% !important;
+    background: #000000 !important;
+}
 
-        /* ── Centered content (keeps padding black in dark mode) ──────────────── */
-        .gradio-container,
-        .gr-container,
-        .gr-panel,
-        .gr-form,
-        .gr-box,
-        .gr-group,
-        .gr-column,
-        .gr-row {
-            max-width: 1200px !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            padding: 0 clamp(16px, 4vw, 32px) !important;
-            box-sizing: border-box !important;
-            background: inherit !important;          /* inherit black from body in dark mode */
-        }
+/* ── Dark mode root ───────────────────────────────────────────────────────── */
+.dark-mode body,
+.dark-mode .gradio-container {
+    background: #000000 !important;
+    color: #00cc00 !important;
+}
 
-        /* ── Dark mode (nuclear green + orange) ───────────────────────────────── */
-        .dark-mode,
-        .dark-mode .gr-textbox,
-        .dark-mode .gr-dropdown,
-        .dark-mode textarea,
-        .dark-mode input,
-        .dark-mode .gr-button {
-            background: #000000 !important;
-            color: #00cc00 !important;
-            border-color: #f7931a !important;
-        }
+/* ── Layout containers (STRUCTURE ONLY — NO PAINT) ───────────────────────── */
+.gradio-container,
+.gr-container,
+.gr-panel,
+.gr-form,
+.gr-box,
+.gr-group,
+.gr-column,
+.gr-row {
+    max-width: 1200px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding: 0 clamp(16px, 4vw, 32px) !important;
+    box-sizing: border-box !important;
+    background: transparent !important; /* ← critical fix */
+}
 
-        /* Dark mode button hover */
-        .dark-mode .gr-button:hover {
-            background: #f7931a !important;
-            color: #000000 !important;
-            box-shadow: 0 0 25px rgba(247, 147, 26, 0.7);
-        }
+/* ── Dark mode elements ───────────────────────────────────────────────────── */
+.dark-mode,
+.dark-mode .gr-textbox,
+.dark-mode .gr-dropdown,
+.dark-mode textarea,
+.dark-mode input,
+.dark-mode .gr-button {
+    background: #000000 !important;
+    color: #00cc00 !important;
+    border-color: #f7931a !important;
+}
 
-        /* Dark mode input focus glow */
-        .dark-mode input:focus,
-        .dark-mode textarea:focus,
-        .dark-mode .gr-textbox:focus-within {
-            box-shadow: 0 0 12px rgba(0, 204, 0, 0.4) !important;
-            border-color: #00ff88 !important;
-        }
+/* Dark mode button hover */
+.dark-mode .gr-button:hover {
+    background: #f7931a !important;
+    color: #000000 !important;
+    box-shadow: 0 0 25px rgba(247, 147, 26, 0.7);
+}
 
-        /* ── Checkbox (shared) ────────────────────────────────────────────────── */
-        input[type="checkbox"] {
-            width: clamp(28px, 6vw, 36px) !important;
-            height: clamp(28px, 6vw, 36px) !important;
-            accent-color: #00ff00 !important;
-            background: #000000 !important;
-            border: clamp(2px, 0.5vw, 3px) solid #f7931a !important;
-            border-radius: 8px !important;
-            cursor: pointer;
-            box-shadow: 0 0 20px rgba(247, 147, 26, 0.6) !important;
-            appearance: none;
-            position: relative;
-            transition: all 0.15s ease;
-        }
+/* Dark mode input focus */
+.dark-mode input:focus,
+.dark-mode textarea:focus,
+.dark-mode .gr-textbox:focus-within {
+    box-shadow: 0 0 12px rgba(0, 204, 0, 0.4) !important;
+    border-color: #00ff88 !important;
+}
 
-        input[type="checkbox"]:checked {
-            background: #00ff00 !important;
-            box-shadow: 0 0 30px #00ff00 !important;
-        }
+/* ── Checkbox (shared) ────────────────────────────────────────────────────── */
+input[type="checkbox"] {
+    width: clamp(28px, 6vw, 36px) !important;
+    height: clamp(28px, 6vw, 36px) !important;
+    appearance: none;
+    cursor: pointer;
+    border-radius: 8px !important;
+    border: 2px solid #f7931a !important;
+    background: #000000 !important;
+    box-shadow: 0 0 20px rgba(247, 147, 26, 0.6) !important;
+    position: relative;
+    transition: all 0.15s ease;
+}
 
-        input[type="checkbox"]:checked::after {
-            content: '✓';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #000000;
-            font-size: clamp(18px, 4vw, 24px) !important;
-            font-weight: 900;
-            pointer-events: none;
-        }
+input[type="checkbox"]:checked {
+    background: #00ff00 !important;
+    box-shadow: 0 0 30px #00ff00 !important;
+}
 
-        :not(.dark-mode) input[type="checkbox"] {
-            accent-color: #f7931a !important;
-            background: #ffffff !important;
-            border-color: #00ff00 !important;
-        }
+input[type="checkbox"]:checked::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #000000;
+    font-size: clamp(18px, 4vw, 24px) !important;
+    font-weight: 900;
+}
 
-        :not(.dark-mode) input[type="checkbox"]:checked {
-            background: #f7931a !important;
-        }
+/* Light mode checkbox */
+body:not(.dark-mode) input[type="checkbox"] {
+    background: #ffffff !important;
+    border-color: #00aa55 !important;
+}
 
-        /* ── Light mode (high contrast) ───────────────────────────────────────── */
-        body:not(.dark-mode),
-        body:not(.dark-mode) .gradio-container,
-        body:not(.dark-mode) .gr-textbox,
-        body:not(.dark-mode) .gr-textbox input,
-        body:not(.dark-mode) .gr-textbox textarea,
-        body:not(.dark-mode) label,
-        body:not(.dark-mode) .gr-label,
-        body:not(.dark-mode) p,
-        body:not(.dark-mode) div,
-        body:not(.dark-mode) span {
-            color: #0f0f0f !important;
-            background: #ffffff !important;          /* force white bg in light mode */
-        }
+body:not(.dark-mode) input[type="checkbox"]:checked {
+    background: #f7931a !important;
+}
+/* ───────────────────────────────────────────────────────────────
+   LIGHT MODE — CLEAN & FINAL
+   ─────────────────────────────────────────────────────────────── */
 
-        body:not(.dark-mode) .gr-button {
-            color: #000000 !important;
-            background: #f5f5f5 !important;
-            border-color: #888888 !important;
-        }
+/* ── Canvas ──────────────────────────────────────────────────── */
+body:not(.dark-mode),
+body:not(.dark-mode) .gradio-container,
+body:not(.dark-mode) .gr-container,
+body:not(.dark-mode) .gr-panel {
+    background: #f6f7f8 !important;
+}
 
-        body:not(.dark-mode) .gr-button:hover {
-            background: #e8e8e8 !important;
-        }
+/* ── Inputs, dropdowns, numbers ─────────────────────────────── */
+body:not(.dark-mode) input,
+body:not(.dark-mode) textarea,
+body:not(.dark-mode) select,
+body:not(.dark-mode) .gr-input,
+body:not(.dark-mode) .gr-textbox,
+body:not(.dark-mode) .gr-dropdown,
+body:not(.dark-mode) .gr-number {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
 
-        /* Light mode placeholders – now very dark & readable */
-        body:not(.dark-mode) input::placeholder,
-        body:not(.dark-mode) textarea::placeholder,
-        body:not(.dark-mode) .gr-textbox::placeholder {
-            color: #111111 !important;                /* almost black */
-            opacity: 0.95 !important;
-            font-weight: 500 !important;
-        }
+/* ── Inner Gradio wrappers (kill gray) ───────────────────────── */
+body:not(.dark-mode) .gr-dropdown > div,
+body:not(.dark-mode) .gr-number > div,
+body:not(.dark-mode) .gr-input > div,
+body:not(.dark-mode) .gr-textbox > div {
+    background-color: #ffffff !important;
+}
 
-        /* Light mode status boxes */
-        body:not(.dark-mode) .empty-state-msg {
-            color: #003322 !important;
-            background: rgba(220, 255, 220, 0.35) !important;
-            border: 2px solid #006644 !important;
-        }
+/* ── Dropdown options ───────────────────────────────────────── */
+body:not(.dark-mode) select option {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
 
-        /* ── DataFrame (shared) ───────────────────────────────────────────────── */
-        .gr-dataframe td:nth-child(2),
-        .gr-dataframe td:nth-child(3),
-        .gr-dataframe td:nth-child(6) {
-            white-space: normal !important;
-            word-break: break-all !important;
-            overflow-wrap: break-word !important;
-            font-family: 'Courier New', monospace !important;
-            font-size: 0.95rem !important;
-            line-height: 1.4 !important;
-            padding: 10px 8px !important;
-        }
+/* ── Placeholders ───────────────────────────────────────────── */
+body:not(.dark-mode) input::placeholder,
+body:not(.dark-mode) textarea::placeholder {
+    color: #000000 !important;
+    opacity: 1;
+}
 
-        .gr-dataframe td:nth-child(2):hover,
-        .gr-dataframe td:nth-child(3):hover,
-        .gr-dataframe td:nth-child(6):hover {
-            background: rgba(0, 255, 136, 0.08) !important;
-        }
+/* ── Focus ──────────────────────────────────────────────────── */
+body:not(.dark-mode) input:focus,
+body:not(.dark-mode) textarea:focus,
+body:not(.dark-mode) select:focus {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    outline: none !important;
+}
 
-        /* Disabled fee buttons */
-        .fee-btn button:disabled {
-            opacity: 0.38 !important;
-            background: #222222 !important;
-            border-color: #444444 !important;
-            color: #888888 !important;
-        }
 
-        /* ── Footer donation section - default for dark mode ───────────────────── */
-        .footer-donation,
-        .footer-donation * {
-            color: #e6e6e6 !important;          /* light gray default for dark mode */
-        }
+/* ── Buttons ─────────────────────────────────────────────────── */
+body:not(.dark-mode) .gr-button {
+    background: #ededed !important;
+    color: #111111 !important;
+    border-color: #9a9a9a !important;
+}
 
-        .footer-donation strong {
-            color: #f7931a !important;          /* orange header - keep in dark */
-        }
+body:not(.dark-mode) .gr-button:hover {
+    background: #e2e2e2 !important;
+}
 
-        .footer-donation span {
-            color: #ccc !important;             /* lighter gray text */
-        }
+/* ── Hero readability fixes (LIGHT MODE ONLY) ─────────────────────── */
+body:not(.dark-mode) #omega-bg {
+    opacity: 0.55; /* let the Ω breathe but not overpower */
+}
 
-        /* Light mode: force dark text for entire footer donation section */
-        body:not(.dark-mode) .footer-donation,
-        body:not(.dark-mode) .footer-donation * {
-            color: #0f0f0f !important;          /* deep near-black – excellent readability */
-        }
+body:not(.dark-mode) .hero-panel {
+    background: linear-gradient(
+        rgba(0, 0, 0, 0.55),
+        rgba(0, 0, 0, 0.35)
+    ) !important;
 
-        /* Keep accent colors visible in light mode */
-        body:not(.dark-mode) .footer-donation strong {
-            color: #c77c00 !important;          /* darker orange for light mode */
-        }
+    backdrop-filter: blur(14px) !important;
+}
 
-            body:not(.dark-mode) .footer-donation button {
-                color: #c77c00 !important;          /* button text */
-            }
+/* Reduce white edge glow in light mode */
+body:not(.dark-mode) .hero-panel * {
+    text-shadow:
+        0 0 20px rgba(0,0,0,0.6),
+        0 0 40px rgba(0,0,0,0.4) !important;
+}
+/* ── DataFrame readability ────────────────────────────────────────────────── */
+.gr-dataframe td:nth-child(2),
+.gr-dataframe td:nth-child(3),
+.gr-dataframe td:nth-child(6) {
+    white-space: normal !important;
+    word-break: break-all !important;
+    font-family: "Courier New", monospace !important;
+    font-size: 0.95rem !important;
+    line-height: 1.4 !important;
+    padding: 10px 8px !important;
+}
 
-            /* Donation address text */
-            .donation-address {
-                color: #ffffff !important;              /* white in dark mode */
-                opacity: 1 !important;
-            }
+.gr-dataframe td:hover {
+    background: rgba(0, 255, 136, 0.08) !important;
+}
 
-            /* Optional: slightly darker if pure black feels too stark */
-            body:not(.dark-mode) .donation-address {
-                color: #111111 !important;              /* very dark gray – still excellent contrast */
-            }
-			.footer-donation {
-                background: rgba(0,0,0,0.5) !important;  /* dark mode semi-transparent black */
-                border-top: 2px solid #f7931a !important;
-            }
+/* ── Input surface (readability anchor) ───────────────────────── */
+.input-surface {
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin: 20px auto;
+}
 
-            body:not(.dark-mode) .footer-donation {
-                background: rgba(255,255,255,0.9) !important;  /* light mode near-white */
-                border-top: 2px solid #c77c00 !important;     /* matching darker orange */
-            }
-            /* copy button text */
-            .footer-donation button {
-                    color: #f7931a !important;  /* orange in dark */
-            }
+/* ── Footer donation section ──────────────────────────────────────────────── */
+.footer-donation {
+    background: rgba(0, 0, 0, 0.45) !important;
+	backdrop-filter: blur(10px);
+    border-top: 2px solid #f7931a !important;
+}
 
-            body:not(.dark-mode) .footer-donation button {
-                color: #c77c00 !important;  /* darker orange in light */
-            }
-        </style>
+.footer-donation,
+.footer-donation * {
+    color: #e6e6e6 !important;
+}
+
+.footer-donation strong {
+    color: #f7931a !important;
+}
+
+.footer-donation span {
+    color: #cccccc !important;
+}
+
+/* Light mode footer */
+body:not(.dark-mode) .footer-donation {
+    background: rgba(255, 255, 255, 0.86) !important;
+    backdrop-filter: blur(4px);
+	box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    border-top: 2px solid #c77c00 !important;
+}
+
+body:not(.dark-mode) .footer-donation,
+body:not(.dark-mode) .footer-donation * {
+    color: #111111 !important;
+}
+
+body:not(.dark-mode) .footer-donation strong {
+    color: #c77c00 !important;
+}
+
+.footer-donation button {
+    color: #f7931a !important;
+}
+
+body:not(.dark-mode) .footer-donation button {
+    color: #c77c00 !important;
+}
+
+</style>
 """)
 	
     # Dynamic prune conditions badge (populated by load or timer)
@@ -4916,7 +4951,8 @@ with gr.Blocks(
             """
         )
         mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
-        # ── Theme Toggle ──
+        
+         # ── Theme Toggle ──
         with gr.Row():
             with gr.Column(scale=1, min_width=220):
                 theme_checkbox = gr.Checkbox(
@@ -4926,7 +4962,8 @@ with gr.Blocks(
                     elem_id="theme-checkbox",             # optional: for targeted styling
                     interactive=True
                 )
-           # ── Main Input Fields ──
+
+        # ── Main Input Fields ──
         with gr.Row():
             addr_input = gr.Textbox(
                 label="Enter Bitcoin Address",
@@ -4948,9 +4985,9 @@ with gr.Blocks(
                 ),
                 scale=1,
             )
+
         # === AIR-GAPPED / OFFLINE MODE HEADER ===
-        gr.HTML(
-            value="""
+        gr.HTML("""
             <div style="
                 text-align:center !important;
                 padding: clamp(20px, 6vw, 32px) !important;
