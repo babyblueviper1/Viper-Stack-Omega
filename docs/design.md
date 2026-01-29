@@ -9,11 +9,14 @@ Rather than treating pruning as a one-time cleanup operation, the project frames
 > System flow and threat-model diagrams are included in the full README:  
 > https://github.com/babyblueviper1/Viper-Stack-Omega/blob/main/docs/README.md
 
+> **Terminology note:**  
+> Ωmega Pruner uses the term *“pruning”* in the **user-side sense of intentional UTXO reduction via consolidation**, not in the consensus or node-level pruning sense.
+
 ---
 
 ## Core Question
 
-Can pruning decisions be modeled as **economic and time-dependent choices**—rather than static cleanup—**without increasing linkage risk**?
+Can pruning decisions be modeled as **economic and time-dependent choices**—rather than a static cleanup operation—**without increasing linkage risk**?
 
 ---
 
@@ -36,7 +39,7 @@ Can pruning decisions be modeled as **economic and time-dependent choices**—ra
 - Deterministic input selection → predictable signing behavior
 - Results are reproducible given identical inputs and fee context
 
-This constraint is intentional. Reducing scope is treated as a **security feature**, minimizing CIOH amplification and avoiding false certainty derived from inferred wallet structure.
+This constraint is intentional. Reducing scope is treated as a **security feature**, minimizing CIOH amplification and avoiding false certainty derived from inferred or *assumed* wallet structure.
 
 ---
 
@@ -87,6 +90,7 @@ This condition is surfaced early in the UI and does **not** block transaction co
 - No state mutation
 - Offline / air-gapped operation supported via raw UTXO input
 - Deterministic export (JSON + cryptographic fingerprint)
+- Source-available, locally executed, and reviewable prior to use
 
 ---
 
