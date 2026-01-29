@@ -1,9 +1,13 @@
 # Ωmega Pruner v11.1 — Forged Anew  
 **Reclaim Sovereignty**
 
-Ωmega Pruner is a fee-aware UTXO pruning tool designed to help users make
-**economically informed and privacy-conscious pruning decisions** under
-changing network conditions.
+Ωmega Pruner is a fee-aware **UTXO consolidation analysis and PSBT construction tool**
+designed to help users make **economically informed and privacy-conscious wallet cleanup decisions**
+under changing network conditions.
+
+> **Terminology note:**  
+> “Pruning” here refers to *wallet-side UTXO consolidation*,  
+> **not** Bitcoin Core’s node-level UTXO set pruning.
 
 > **Design note:**  
 > For a formal overview of the fee model, scope, and CIOH tradeoffs, see  
@@ -15,7 +19,7 @@ changing network conditions.
 ---
 ### New in v11.1
 
-- **Pruning Conditions Badge** — real-time 1–10 score with glowing nuclear design  
+- **Pruning Conditions Badge** — fee-context snapshot
 - Current economy fee vs 1-day / 1-week / 1-month medians (mempool.space mining data)  
 - Clear vertical layout: **current fee → VS → medians** (1-day → 1-week → 1-month)  
 - Live BTC price + block height + hashrate  
@@ -56,7 +60,7 @@ Spend or convert them separately before consolidation.
 - Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
 - **Privacy Score (0–100)** — linkage, merge exposure, CIOH risk  
 - Tiered CIOH warnings — color-coded and impossible to miss  
-- “Prune now vs later” fee delta — see future regret in sats  
+- “Consolidate now vs later” fee delta — see future regret in sats
 - Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
 - Live wallet footprint comparison — before / after cleanup  
 - **NUCLEAR WALLET CLEANUP** confirmation step  
