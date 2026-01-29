@@ -2,12 +2,16 @@
 
 **Reclaim Sovereignty**
 
-The purest UTXO consolidator ever built.  
-Reborn in fire — stripped of pretense, refined to essence, honest to the core.
+A precision UTXO consolidation analysis tool.  
+Stripped of pretense, refined to essence, honest to the core.
 
 Ωmega Pruner is an **unsigned, non-custodial PSBT generator** designed for  
-**fee-aware UTXO consolidation and long-term coin control** under real network  
-conditions.
+**fee-aware UTXO consolidation analysis and long-term coin control**  
+under real network conditions.
+
+> **Terminology note:**  
+> “Pruning” in Ωmega Pruner refers to *wallet-side UTXO consolidation*,  
+> **not** Bitcoin Core’s node-level UTXO set pruning.
 
 > **Design note:**  
 > A technical overview of the fee model, scope, and CIOH tradeoffs is available in  
@@ -22,7 +26,7 @@ conditions.
 ## What’s New in v11.1
 
 - **Pruning Conditions Badge — LIVE**  
-  Real-time 1–10 score reflecting current pruning conditions
+  Fee-context snapshot of current network conditions
 - Current economy fee vs dynamic medians:
   - 1-day
   - 1-week **(primary benchmark)**
@@ -59,6 +63,7 @@ Spend or migrate them separately before consolidation.
 - **No** cross-wallet or multi-wallet mixing
 - **No** hidden aggregation — ever
 - Deterministic selection → predictable signing → minimized CIOH risk
+- Wallet-side analysis only — no node state, mempool authority, or broadcast role
 
 This constraint is intentional and central to the tool’s safety guarantees.
 
@@ -95,7 +100,7 @@ This preserves flexibility while remaining explicit about hardware limitations.
 - Live mempool fee oracle — Economy / 1h / 30m / Fastest presets
 - **Privacy Score (0–100)** — linkage, merge exposure, CIOH risk
 - Tiered CIOH warnings — color-coded and impossible to miss
-- “Prune now vs later” fee delta — see future regret in sats
+- “Consolidate now vs later” fee delta — see future regret in sats
 - Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked
 - Live wallet footprint comparison — before / after cleanup
 - **NUCLEAR WALLET CLEANUP** confirmation step
@@ -278,7 +283,7 @@ Reducing scope is treated as a **security feature**, not a limitation.
 
 ## Philosophy
 
-Most consolidators hide complexity or paper over tradeoffs.
+Most consolidators hide complexity or compress tradeoffs into automation.
 Ωmega Pruner does neither.
 
 **No keys. No signing. No silent failures. No fake privacy.**
