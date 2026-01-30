@@ -2574,7 +2574,7 @@ def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
 
 
 def _render_pruning_explanation(pruned_count: int, remaining_utxos: int) -> str:
-    """Educational explanation of pruning benefits."""
+    """Educational explanation of UTXO consolidation benefits."""
     return f"""
 <div style="
     margin: clamp(24px, 8vw, 48px) 0 !important;
@@ -2599,27 +2599,28 @@ def _render_pruning_explanation(pruned_count: int, remaining_utxos: int) -> str:
       text-shadow:0 0 20px #00ff9d !important;
       margin-bottom: clamp(12px, 4vw, 18px) !important;
   ">
-    🧹 WHAT PRUNING ACTUALLY DOES
+    🧩 WHAT UTXO CONSOLIDATION ACTUALLY DOES
   </div>
 
-  Pruning removes <span style="color:#aaffff !important;font-weight:700 !important;">inefficient UTXOs</span>
-  (dust, legacy, or heavy) from your address.<br><br>
+  Consolidation reorganizes
+  span style="color:#aaffff !important;font-weight:700 !important;">inefficient UTXOs</span>
+  (dust, legacy, or high-weight inputs) into a smaller, cleaner set.<br><br>
 
-  • You pay a fee now to delete
+  • You pay a fee now to consolidate
     <span style="color:#00ffff !important;font-weight:800 !important;">{pruned_count}</span>
-    inefficient inputs<br>
+    inefficient inputs into fewer outputs<br>
 
   • The remaining
     <span style="color:#00ffff !important;font-weight:800 !important;">{remaining_utxos}</span>
-    UTXOs become cheaper and easier to spend later<br>
+    UTXOs become cheaper, simpler, and more private to spend in future transactions<br>
 
-  • If no change output is created, the pruned value is absorbed into fees —
-    but your wallet structure is
-    <span style="color:#aaffff !important;">permanently cleaner</span><br><br>
+  • If no change output is created, some value is absorbed into fees —
+    but your wallet structure becomes
+    <span style="color:#aaffff !important;">permanently more efficient</span><br><br>
 
   <span style="color:#00ffaa !important;font-weight:800 !important;">Goal:</span>
-  a healthier address and lower future fees.<br>
-  Pruning is often worth doing during low-fee periods.
+  a healthier UTXO set and lower future fees.<br>
+  Consolidation is often most effective during low-fee periods.
 
   <small style="
       display:block !important;
@@ -2629,7 +2630,7 @@ def _render_pruning_explanation(pruned_count: int, remaining_utxos: int) -> str:
       font-size: clamp(0.9rem, 3vw, 1rem) !important;
       opacity:0.85 !important;
   ">
-    💡 Tip (optional): If your goal is to receive change, prune only when total value pruned exceeds
+    💡 Tip (optional): If your goal is to receive change, consolidate when the total value consolidated
     ~10–20× the expected fee.
   </small>
 </div>
@@ -3719,7 +3720,7 @@ def generate_psbt(
             "'>"
             "⚠️ Nothing selected yet<br><br>"
             "Start over and check at least one UTXO in the table to generate the PSBT.<br>"
-            "Your coins are waiting — just pick which ones to prune!"
+            "Your coins are waiting — just pick which ones to consolidate."
             "</div>"
         )
 
@@ -5085,7 +5086,7 @@ body:not(.dark-mode) .footer-donation button {
         # Only wrap the upload + button in the toggle-able area
         with gr.Row(visible=False) as restore_area:
             import_file = gr.File(
-                label="Upload saved Ωmega Pruner session (.json)",
+                label="Upload saved Ωmega session (.json)",
                 file_types=[".json"],
                 type="filepath",
             )
@@ -5270,7 +5271,7 @@ No API calls • Fully air-gapped safe""",
                   text-shadow:0 0 30px #00ff88 !important;
                   margin-bottom: clamp(10px, 3vw, 16px) !important;
               ">
-                Pruning Strategy & Fee Dynamics
+                Consolidation Strategy & Fee Dynamics
               </div>
 
               <div style="
@@ -5289,13 +5290,13 @@ No API calls • Fully air-gapped safe""",
         with gr.Row():
             strategy = gr.Dropdown(
                 choices=[
-                    "Privacy First — ~30% pruned (lowest CIOH risk)",
-                    "Recommended — ~40% pruned (balanced savings & privacy)",
-                    "More Savings — ~50% pruned (stronger fee reduction)",
-                    "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)",
+                    "Privacy First — ~30% consolidated (lowest CIOH risk)",
+                    "Recommended — ~40% consolidated (balanced savings & privacy)",
+                    "More Savings — ~50% consolidated (stronger fee reduction)",
+                    "NUCLEAR — ~90% consolidated (maximum savings, highest CIOH)",
                 ],
-                value="Recommended — ~40% pruned (balanced savings & privacy)",
-                label="Pruning Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
+                value="Recommended — ~40% consolidated (balanced savings & privacy)",
+                label="Consolidation Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
             )
         dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
 
@@ -5361,8 +5362,8 @@ No API calls • Fully air-gapped safe""",
         gr.HTML("""
             <div style="width: 100%; margin-top: 25px;"></div>
             <div class="check-to-prune-header">
-                <div class="header-title">CHECK TO PRUNE</div>
-                <div class="header-subtitle">Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = prune</div>
+                <div class="header-title">CHECK TO CONSOLIDATE</div>
+                <div class="header-subtitle">Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = consolidate</div>
             </div>
 
             <style>
@@ -5404,7 +5405,7 @@ No API calls • Fully air-gapped safe""",
 
         df = gr.Dataframe(
             headers=[
-                "PRUNE",
+                "CONSOLIDATE",
                 "Source",
                 "TXID",
                 "Health",
