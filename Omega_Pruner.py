@@ -5018,13 +5018,13 @@ body:not(.dark-mode) .footer-donation button {
                     Optimized for Modern Bitcoin
                 </div>
 
-                Ωmega Pruner is built for <strong style="color:#00ffff !important;font-weight:900 !important;">modern single-signature wallets</strong>,
+                Ωmega Pruner is built <strong style="color:#00ffff !important;font-weight:900 !important;">specifically for modern single-signature wallets</strong>,
                 prioritizing <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>,
                 <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
                 and <strong style="color:#00ffff !important;font-weight:900 !important;">hardware-wallet compatibility</strong>.
                 <br><br>
 
-                This tool is intentionally <strong style="color:#00ffff !important; font-weight:900 !important;">non-interactive at the transaction level</strong> —  
+                This tool is intentionally <strong style="color:#00ffff !important; font-weight:900 !important;">non-interactive with counterparties</strong> —  
                 it optimizes wallet structure and future spend efficiency,  
                 not counterparty-dependent transaction negotiation.
                 <br><br>
@@ -5053,7 +5053,7 @@ body:not(.dark-mode) .footer-donation button {
                 (<strong style="color:#ffaa00 !important;font-weight:900 !important;">3…</strong>)
                 are shown for transparency only and
                 <strong style="color:#ff6666 !important;font-weight:900 !important;">
-                cannot be included in the generated PSBT
+                cannot be included in PSBTs generated here
                 </strong>.
                 <br>
                 To spend or consolidate these inputs, use a compatible wallet or migrate them separately.
