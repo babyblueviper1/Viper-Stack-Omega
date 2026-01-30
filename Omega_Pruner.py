@@ -3,7 +3,7 @@ CANONICAL STATE MODEL (AUTHORITATIVE — DO NOT VIOLATE)
 
 User Inputs (mutable via UI):
 - addr_input
-- strategy (pruning strategy dropdown)
+- strategy (consolidation strategy dropdown)
 - dust_threshold
 - dest_addr
 - fee_rate_slider
@@ -82,7 +82,7 @@ HEALTH_PRIORITY = {
     "HEAVY":   1,
     "CAREFUL": 2,
     "MEDIUM":  3,
-    "MANUAL":  3,     # Neutral — no strong prune/keep bias
+    "MANUAL":  3,     # Neutral — no strong consolidation/keep bias
     "OPTIMAL": 4,
 }
 
@@ -147,7 +147,7 @@ select_msg = (
     "text-shadow: 0 0 30px #00ffdd !important;"
     "margin-bottom: clamp(16px, 4vw, 24px) !important;"
     "'>"
-    "Select UTXOs to begin pruning"
+    "Select UTXOs to begin consolidating"
     "</div>"
     "<div style='"
     "color:#88ffcc !important;"
@@ -162,11 +162,11 @@ select_msg = (
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
-PRUNING_RATIOS = {
-    "Privacy First — ~30% pruned (lowest CIOH risk)": 0.30,
-    "Recommended — ~40% pruned (balanced savings & privacy)": 0.40,
-    "More Savings — ~50% pruned (stronger fee reduction)": 0.50,
-    "NUCLEAR PRUNE — ~90% pruned (maximum savings, highest CIOH)": 0.90,
+CONSOLIDATION_RATIOS = {
+    "Privacy First — ~30% consolidated (lowest CIOH risk, minimal linkage)": 0.30,
+    "Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)": 0.40,
+    "More Savings — ~50% consolidated (higher linkage risk, best when fees are below recent medians)": 0.50,
+    "NUCLEAR — ~90% consolidated (maximum linkage, deep cleanup during exceptionally low fees)": 0.90,
 }
 
 # ── Global HTTP session ─────────────────────────────────────────────────────────
@@ -229,7 +229,7 @@ def _selection_snapshot(
     selected_utxos: List[dict],
     scan_source: str = "",
     dest_addr: str = "",
-    strategy: str = "Recommended — ~40% pruned (balanced savings & privacy)",
+    strategy: str = "Recommended — ~40% consolidated (balanced savings & privacy)",
     fee_rate: int = 15,
     future_fee_rate: int = 60,
     dust_threshold: int = 546,
@@ -382,21 +382,21 @@ def get_live_fees(offline_mode: bool = False) -> Dict[str, int]:
     log.debug("Returning fallback fees due to fetch/cache failure")
     return fallback
 
-def get_prune_score(offline_mode: bool = False) -> str:
+def get_consolidation_score(offline_mode: bool = False) -> str:
     """
-    Generate the pruning conditions badge HTML.
+    Generate the network conditions badge HTML.
     Completely skipped in offline mode — returns empty string instantly.
     All network calls guarded with offline_mode.
     """
     if offline_mode:
-        log.debug("get_prune_score skipped — offline mode active")
+        log.debug("get_consolidation_score skipped — offline mode active")
         return ""  # Silent return — caller handles fallback
 
     # All network calls protected
     urls = {
         '24h': "https://mempool.space/api/v1/mining/blocks/fee-rates/24h",
-        '1w': "https://mempool.space/api/v1/mining/blocks/fee-rates/1w",
-        '1m': "https://mempool.space/api/v1/mining/blocks/fee-rates/1m"
+        '1w':  "https://mempool.space/api/v1/mining/blocks/fee-rates/1w",
+        '1m':  "https://mempool.space/api/v1/mining/blocks/fee-rates/1m"
     }
     avgs = {}
 
@@ -433,13 +433,13 @@ def get_prune_score(offline_mode: bool = False) -> str:
 
     # Badge color based on ratio
     if ratio < 0.5:
-        color = "#00ff88"  # Excellent green
+        color = "#00ff88"   # Excellent green
     elif ratio < 0.8:
-        color = "#00ffdd"  # Good cyan
+        color = "#00ffdd"   # Good cyan
     elif ratio < 1.2:
-        color = "#ff9900"  # Fair orange
+        color = "#ff9900"   # Fair orange
     else:
-        color = "#ff3366"  # Poor red
+        color = "#ff3366"   # Poor red
 
     fee_unit = "sat/vB" if current == 1 else "sats/vB"
 
@@ -472,7 +472,7 @@ def get_prune_score(offline_mode: bool = False) -> str:
                     current_hashrate = hr_data['currentHashrate'].get('avgHashrate')
                 else:
                     current_hashrate = hr_data.get('currentHashrate')
-                
+
                 if isinstance(current_hashrate, (int, float)) and current_hashrate > 0:
                     if current_hashrate > 1e18:
                         hr_formatted = f"{current_hashrate / 1e18:.0f} EH/s"
@@ -518,105 +518,117 @@ def get_prune_score(offline_mode: bool = False) -> str:
 
     # Final HTML
     return f"""
+<div style="
+    text-align:center !important;
+    padding: clamp(20px, 5vw, 30px) !important;
+    margin: clamp(20px, 5vw, 40px) auto !important;
+    background: rgba(0, 20, 10, 0.7) !important;
+    border: 3px solid {color} !important;
+    border-radius: 20px !important;
+    box-shadow: 0 0 60px {color} !important;
+    max-width: 600px !important;
+">
     <div style="
-        text-align:center !important;
-        padding: clamp(20px, 5vw, 30px) !important;
-        margin: clamp(20px, 5vw, 40px) auto !important;
-        background: rgba(0, 20, 10, 0.7) !important;
-        border: 3px solid {color} !important;
-        border-radius: 20px !important;
-        box-shadow: 0 0 60px {color} !important;
-        max-width: 600px !important;
+        color: {color} !important;
+        font-size: clamp(1.6rem, 6vw, 2rem) !important;
+        font-weight: 900 !important;
+        text-shadow: 0 0 35px {color} !important;
+        margin-bottom: 8px !important;
     ">
-        <div style="
-            color: {color} !important;
-            font-size: clamp(1.6rem, 6vw, 2rem) !important;
-            font-weight: 900 !important;
-            text-shadow: 0 0 35px {color} !important;
-            margin-bottom: 8px !important;
-        ">
-            Pruning Conditions
-        </div>
+        Network Conditions
+    </div>
 
-        <div style="
-            color: #00ffff !important;
-            font-size: clamp(2.2rem, 8vw, 3rem) !important;
-            font-weight: 900 !important;
-            text-shadow: 0 0 40px #00ffff, 0 0 80px #00ffff !important;
-            margin: 16px 0 !important;
-        ">
-            {current} {fee_unit}
-        </div>
-        <div style="
-            color: #88ffcc !important;
-            font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
-            margin-bottom: 20px !important;
-        ">
-            Current economy fee
-        </div>
+    <div style="
+        color: #88ffaa !important;
+        font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px !important;
+        margin-bottom: 12px !important;
+    ">
+        Context for consolidation decisions
+    </div>
 
-        <div style="
-            color: #f7931a !important;
-            font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
-            font-weight: 900 !important;
-            text-shadow: 0 0 30px #f7931a !important;
-            margin: 20px 0 !important;
-            letter-spacing: 2px !important;
-        ">
-            VS
-        </div>
+    <div style="
+        color: #00ffff !important;
+        font-size: clamp(2.2rem, 8vw, 3rem) !important;
+        font-weight: 900 !important;
+        text-shadow: 0 0 40px #00ffff, 0 0 80px #00ffff !important;
+        margin: 16px 0 !important;
+    ">
+        {current} {fee_unit}
+    </div>
 
-        <div style="
-            display: flex !important;
-            justify-content: center !important;
-            flex-wrap: wrap !important;
-            gap: clamp(16px, 4vw, 32px) !important;
-            margin: 16px 0 !important;
-            color: #aaffcc !important;
-            font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
-            font-weight: 700 !important;
-        ">
-            <div style="text-align: center !important;">
-                <div style="color: #00ddff !important; font-size: clamp(1.3rem, 5vw, 1.7rem) !important; font-weight: 900 !important;">
-                    {f"{day_avg:.1f}" if day_avg is not None else "—"} sats/vB
-                </div>
-                <div style="color: #88ccff !important; font-size: clamp(0.9rem, 3.2vw, 1.1rem) !important;">
-                    1-day median
-                </div>
+    <div style="
+        color: #88ffcc !important;
+        font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+        margin-bottom: 20px !important;
+    ">
+        Current economy entry rate
+    </div>
+
+    <div style="
+        color: #f7931a !important;
+        font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+        font-weight: 900 !important;
+        text-shadow: 0 0 30px #f7931a !important;
+        margin: 20px 0 !important;
+        letter-spacing: 1.5px !important;
+    ">
+        VS recent block history
+    </div>
+
+    <div style="
+        display: flex !important;
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+        gap: clamp(16px, 4vw, 32px) !important;
+        margin: 16px 0 !important;
+        color: #aaffcc !important;
+        font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+        font-weight: 700 !important;
+    ">
+        <div style="text-align: center !important;">
+            <div style="color: #00ddff !important; font-size: clamp(1.3rem, 5vw, 1.7rem) !important; font-weight: 900 !important;">
+                {f"{day_avg:.1f}" if day_avg is not None else "—"} sats/vB
             </div>
-
-            <div style="text-align: center !important;">
-                <div style="color: #00ff88 !important; font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important; font-weight: 900 !important; text-shadow: 0 0 20px #00ff88 !important;">
-                    {f"{primary_avg:.1f}" if primary_avg is not None else "—"} sats/vB
-                </div>
-                <div style="color: #88ffaa !important; font-size: clamp(0.95rem, 3.4vw, 1.15rem) !important;">
-                    1-week median
-                </div>
-            </div>
-
-            <div style="text-align: center !important;">
-                <div style="color: #aaff88 !important; font-size: clamp(1.3rem, 5vw, 1.7rem) !important; font-weight: 900 !important;">
-                    {f"{month_avg:.1f}" if month_avg is not None else "—"} sats/vB
-                </div>
-                <div style="color: #99ffbb !important; font-size: clamp(0.9rem, 3.2vw, 1.1rem) !important;">
-                    1-month median
-                </div>
+            <div style="color: #88ccff !important; font-size: clamp(0.9rem, 3.2vw, 1.1rem) !important;">
+                24h mined median
             </div>
         </div>
 
-        <div style="
-            color: #88ffaa !important;
-            font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
-            font-weight: 600 !important;
-            line-height: 1.5 !important;
-            margin-top: 20px !important;
-        ">
-            <small style="color: #66cc99 !important; font-weight: normal !important;">
-                {context_line}
-            </small>
+        <div style="text-align: center !important;">
+            <div style="color: #00ff88 !important; font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important; font-weight: 900 !important; text-shadow: 0 0 20px #00ff88 !important;">
+                {f"{primary_avg:.1f}" if primary_avg is not None else "—"} sats/vB
+            </div>
+            <div style="color: #88ffaa !important; font-size: clamp(0.95rem, 3.4vw, 1.15rem) !important;">
+                7d mined median
+            </div>
+        </div>
+
+        <div style="text-align: center !important;">
+            <div style="color: #aaff88 !important; font-size: clamp(1.3rem, 5vw, 1.7rem) !important; font-weight: 900 !important;">
+                {f"{month_avg:.1f}" if month_avg is not None else "—"} sats/vB
+            </div>
+            <div style="color: #99ffbb !important; font-size: clamp(0.9rem, 3.2vw, 1.1rem) !important;">
+                30d mined median
+            </div>
         </div>
     </div>
-    """
+
+    <div style="
+        color: #88ffaa !important;
+        font-size: clamp(1rem, 3.5vw, 1.2rem) !important;
+        font-weight: 600 !important;
+        line-height: 1.5 !important;
+        margin-top: 20px !important;
+    ">
+        <small style="color: #66cc99 !important; font-weight: normal !important;">
+            Context: economy-tier entry today vs median fees the network has recently cleared
+            <br>{context_line}
+        </small>
+    </div>
+</div>
+"""
 	
 # ── Update enriched state from UI checkbox changes ──────────────────────────────
 def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: bool) -> tuple:
@@ -661,12 +673,12 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any, offline_mode: b
 
     if not parsed_snapshot or not isinstance(parsed_snapshot, dict):
         log.warning("[RESTORE] Invalid snapshot: empty or not dict")
-        return current_enriched, "No valid parsed JSON loaded", None, False, False, "failed", "", "", "Recommended — ~40% pruned (balanced savings & privacy)", 546
+        return current_enriched, "No valid parsed JSON loaded", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
 
     try:
         if "inputs" not in parsed_snapshot or not parsed_snapshot["inputs"]:
             log.warning("[RESTORE] Snapshot missing or empty 'inputs'")
-            return current_enriched, "Invalid snapshot — no UTXOs found in file", None, False, False, "failed", "", "", "Recommended — ~40% pruned (balanced savings & privacy)", 546
+            return current_enriched, "Invalid snapshot — no UTXOs found in file", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
 
         # ── Build fresh UTXOs directly from JSON ───────────────────────────────
         log.info("[RESTORE] Building table directly from snapshot JSON (authoritative)")
@@ -740,22 +752,22 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any, offline_mode: b
 
         if not restored_utxos:
             log.warning("[RESTORE] No valid UTXOs could be built from JSON")
-            return current_enriched, "Snapshot contains no usable UTXOs", None, False, False, "failed", "", "", "Recommended — ~40% pruned (balanced savings & privacy)", 546
+            return current_enriched, "Snapshot contains no usable UTXOs", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
 
-        # ── SORT by pruning priority ────────────────────────────────────────────
+        # ── SORT by consolidation priority ────────────────────────────────────────────
         # DUST/HEAVY first (lowest HEALTH_PRIORITY), then highest value
         restored_utxos.sort(
             key=lambda u: (
-                HEALTH_PRIORITY.get(u.get("health", "UNKNOWN"), 999),  # low number = prune first
+                HEALTH_PRIORITY.get(u.get("health", "UNKNOWN"), 999),  # low number = consolidate first
                 -u.get("value", 0)                                     # descending value
             )
         )
-        log.info("[RESTORE] Sorted %d UTXOs: pruning priority (DUST/HEAVY top), then value descending", len(restored_utxos))
+        log.info("[RESTORE] Sorted %d UTXOs: consolidation priority (DUST/HEAVY top), then value descending", len(restored_utxos))
 
         # Metadata from snapshot
         scan_source_restored = parsed_snapshot.get("scan_source", "")
         dest_restored = parsed_snapshot.get("dest_addr_override", "")
-        strategy_restored = parsed_snapshot.get("strategy", "Recommended — ~40% pruned (balanced savings & privacy)")
+        strategy_restored = parsed_snapshot.get("strategy", "Recommended — ~40% consolidated (balanced savings & privacy)")
         dust_threshold_restored = parsed_snapshot.get("dust_threshold", 546)
         fingerprint = parsed_snapshot.get("fingerprint")
 
@@ -795,7 +807,7 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any, offline_mode: b
 
     except Exception as e:
         log.error("[RESTORE] Failed to process snapshot: %s", str(e), exc_info=True)
-        return current_enriched, f"Restore failed: {str(e)}", None, False, False, "failed", "", "", "Recommended — ~40% pruned (balanced savings & privacy)", 546
+        return current_enriched, f"Restore failed: {str(e)}", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
 		
 # ── Rebuild DataFrame rows from enriched state (for restore / refresh) ───────────
 def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
@@ -858,7 +870,7 @@ def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
                 health_html = (
                     f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
                     f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
-                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Cannot prune</small>'
+                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Cannot consolidate</small>'
                     '</div>'
                 )
         else:
@@ -1008,155 +1020,163 @@ def get_cioh_warning(
     recovery_note = ""
     if privacy_score <= 70:
         recovery_note = f"""
-        <div style="
-            margin-top:20px !important;
-            padding:16px !important;
-            background:#001100 !important;
-            border:2px solid #00ff88 !important;
-            border-radius:12px !important;
-            color:#aaffcc !important;
-            font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
-            line-height:1.6 !important;
-            box-shadow:0 0 40px rgba(0,255,136,0.4) !important;
-        ">
-            💧 <span style="
-                color:#00ffdd !important;
-                font-size:clamp(1rem, 3.5vw, 1.2rem)!important;
-                font-weight:900 !important;
-                text-shadow:0 0 20px #00ffdd !important;
-            ">Recovery Plan</span>:<br>
-            Break address linkage using transactions that involve other participants<br>
-            <small style="color:#88ffcc !important;">
-                (~{min_mixes}–{max_mixes} coordinated rounds typically needed)
-            </small><br>
-            <small style="color:#66ffaa !important;">
-                Examples: CoinJoin (Whirlpool), PayJoin, Silent Payments
-            </small>
-        </div>
-        """
+<div style="
+    margin-top:20px !important;
+    padding:16px !important;
+    background:#001100 !important;
+    border:2px solid #00ff88 !important;
+    border-radius:12px !important;
+    color:#aaffcc !important;
+    font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
+    line-height:1.6 !important;
+    box-shadow:0 0 40px rgba(0,255,136,0.4) !important;
+">
+    💧 <span style="
+        color:#00ffdd !important;
+        font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
+        font-weight:900 !important;
+        text-shadow:0 0 20px #00ffdd !important;
+    ">Recovery Plan</span>:<br>
+    Break address linkage using transactions that involve other participants<br>
+    <small style="color:#88ffcc !important;">
+        (~{min_mixes}–{max_mixes} coordinated rounds typically needed)
+    </small><br>
+    <small style="color:#66ffaa !important;">
+        Examples: CoinJoin (Whirlpool), PayJoin, Silent Payments
+    </small>
+</div>
+"""
 
     # ── Extreme linkage (≤30) ───────────────────────────────────────────────────
     if privacy_score <= 30:
         return f"""
-        <div style="
-            margin-top:16px !important;
-            padding:16px !important;
-            background:#440000 !important;
-            border:3px solid #ff3366 !important;
-            border-radius:14px !important;
-            box-shadow:0 0 50px rgba(255,51,102,0.9) !important;
-            font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
-            line-height:1.7 !important;
-            color:#ffcccc !important;
-        ">
-            <div style="color:#ff3366 !important; font-size:clamp(1.3rem, 5vw, 1.6rem) !important; font-weight:900 !important; text-shadow:0 0 30px #ff3366 !important;">
-                EXTREME CIOH LINKAGE
-            </div><br>
-            <div style="color:#ff6688 !important; font-size:clamp(1rem, 3.5vw, 1.2rem)!important;">
-                Common Input Ownership Heuristic (CIOH)
-            </div><br>
-            This consolidation strongly proves common ownership of many inputs and addresses.<br><br>
-            <div style="color:#ffaaaa !important;">Privacy state: Severely compromised</div><br>
-            Maximum fee efficiency — but analysts will confidently cluster these addresses as yours.<br><br>
-            <div style="color:#ffbbbb !important;">
-                <span style="font-weight:900 !important;">Best practices after this point:</span><br>
-                • Do not consolidate these addresses again<br>
-                • Avoid direct spending to KYC or identity-linked services<br>
-                • Restore privacy only via transactions involving other participants
-            </div>
-            <div style="margin-top:10px;color:#ff9999 !important;font-size:0.95em;">
-                Examples include CoinJoin, PayJoin, or Silent Payments —
-                which require wallet support or coordination and cannot be added after the fact.
-            </div>
-            {recovery_note}
-        </div>
-        """
+<div style="
+    margin-top:16px !important;
+    padding:16px !important;
+    background:#440000 !important;
+    border:3px solid #ff3366 !important;
+    border-radius:14px !important;
+    box-shadow:0 0 50px rgba(255,51,102,0.9) !important;
+    font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
+    line-height:1.7 !important;
+    color:#ffcccc !important;
+">
+    <div style="color:#ff3366 !important; font-size:clamp(1.3rem, 5vw, 1.6rem) !important; font-weight:900 !important; text-shadow:0 0 30px #ff3366 !important;">
+        EXTREME CIOH LINKAGE
+    </div><br>
+    <div style="color:#ff6688 !important; font-size:clamp(1rem, 3.5vw, 1.2rem) !important;">
+        Common Input Ownership Heuristic (CIOH)
+    </div><br>
+    This consolidation strongly proves common ownership of many inputs and addresses
+    <strong style="color:#ffcccc !important;">for this transaction</strong>.<br><br>
+    
+    <div style="color:#ffaaaa !important;">
+        Privacy state (this transaction): Severely compromised
+    </div><br>
+    
+    Maximum fee efficiency achieved —
+    however analysts will confidently cluster these addresses as yours
+    <strong style="color:#ffcccc !important;">in this spend</strong>.<br><br>
+    <div style="color:#ffbbbb !important;">
+        <span style="color: #fff5f5 !important; font-weight:900 !important;">Best practices after this point:</span><br>
+        • Do not consolidate these addresses again<br>
+        • Avoid direct spending to KYC or identity-linked services<br>
+        • Restore privacy only via transactions involving other participants
+    </div>
+    <div style="margin-top:10px; color:#ff9999 !important; font-size:0.95em;">
+        Examples include CoinJoin, PayJoin, or Silent Payments —
+        which require wallet support or coordination and cannot be added after the fact.
+    </div>
+    {recovery_note}
+</div>
+"""
 
     # ── High risk (≤50) ─────────────────────────────────────────────────────────
     elif privacy_score <= 50:
         return f"""
-        <div style="
-            margin-top:14px !important;
-            padding:14px !important;
-            background:#331100 !important;
-            border:2px solid #ff8800 !important;
-            border-radius:12px !important;
-            font-size:clamp(1rem, 3.5vw, 1.2rem)!important;
-            line-height:1.6 !important;
-            color:#ffddaa !important;
-        ">
-            <div style="color:#ff9900 !important; font-size:clamp(1.3rem, 5vw, 1.6rem) !important; font-weight:900 !important; text-shadow:0 0 30px #ff9900 !important;">
-                HIGH CIOH RISK
-            </div><br>
-            <div style="color:#ffaa44 !important; font-size:clamp(1rem, 3.5vw, 1.2rem)!important;">
-                Common Input Ownership Heuristic (CIOH)
-            </div><br>
-            Merging {input_count} inputs from {distinct_addrs} address(es) → analysts will cluster them as belonging to the same entity.<br><br>
-            <div style="color:#ffcc88 !important;">Privacy state: Significantly reduced</div><br>
-            Good fee savings, but a real privacy trade-off.<br>
-            Further consolidation will worsen linkage — consider restoring privacy before your next spend.
-            {recovery_note}
-        </div>
-        """
+<div style="
+    margin-top:14px !important;
+    padding:14px !important;
+    background:#331100 !important;
+    border:2px solid #ff8800 !important;
+    border-radius:12px !important;
+    font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
+    line-height:1.6 !important;
+    color:#ffddaa !important;
+">
+    <div style="color:#ff9900 !important; font-size:clamp(1.3rem, 5vw, 1.6rem) !important; font-weight:900 !important; text-shadow:0 0 30px #ff9900 !important;">
+        HIGH CIOH RISK
+    </div><br>
+    <div style="color:#ffaa44 !important; font-size:clamp(1rem, 3.5vw, 1.2rem) !important;">
+        Common Input Ownership Heuristic (CIOH)
+    </div><br>
+    Merging {input_count} inputs from {distinct_addrs} address(es) → analysts can reliably cluster them as belonging to the same entity.<br><br>
+    <div style="color:#ffcc88 !important;">Privacy state: Significantly reduced</div><br>
+    Good fee savings, but a real privacy trade-off.<br>
+    Further consolidation will worsen linkage — consider restoring privacy before your next spend.
+    {recovery_note}
+</div>
+"""
 
     # ── Moderate risk (≤70) ─────────────────────────────────────────────────────
     elif privacy_score <= 70:
         return f"""
-        <div style="
-            margin-top:12px !important;
-            padding:12px !important;
-            background:#113300 !important;
-            border:1px solid #00ff9d !important;
-            border-radius:10px !important;
-            color:#aaffaa !important;
-            font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
-            line-height:1.6 !important;
-        ">
-            <div style="color:#00ff9d !important; font-size:clamp(1.3rem, 5vw, 1.6rem)!important; font-weight:900 !important; text-shadow:0 0 30px #00ff9d !important;">
-                MODERATE CIOH
-            </div><br>
-            <div style="color:#66ffaa !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem)!important;">
-                Common Input Ownership Heuristic (CIOH)
-            </div><br>
-            Spending multiple inputs together creates some on-chain linkage.<br>
-            Analysts may assume common ownership — but it is not definitive.<br><br>
-            Privacy impact is moderate.<br>
-            Avoid repeating this pattern if long-term privacy is a priority.
-            {recovery_note}
-        </div>
-        """
+<div style="
+    margin-top:12px !important;
+    padding:12px !important;
+    background:#113300 !important;
+    border:1px solid #00ff9d !important;
+    border-radius:10px !important;
+    color:#aaffaa !important;
+    font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
+    line-height:1.6 !important;
+">
+    <div style="color:#00ff9d !important; font-size:clamp(1.3rem, 5vw, 1.6rem) !important; font-weight:900 !important; text-shadow:0 0 30px #00ff9d !important;">
+        MODERATE CIOH
+    </div><br>
+    <div style="color:#66ffaa !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;">
+        Common Input Ownership Heuristic (CIOH)
+    </div><br>
+    Spending multiple inputs together creates some on-chain linkage.<br>
+    Analysts may assume common ownership — but it is not definitive.<br>
+    Repeated use of this spending pattern increases analyst confidence over time.<br><br>
+    Privacy impact is moderate.<br>
+    Avoid repeating this pattern if long-term privacy is a priority.
+    {recovery_note}
+</div>
+"""
 
     # ── Low impact (>70) ────────────────────────────────────────────────────────
     else:
         return f"""
-        <div style="
-            margin-top:10px !important;
-            padding:12px !important;
-            background:#001a00 !important;
-            border:1px solid #00ff88 !important;
-            border-radius:10px !important;
-            color:#aaffcc !important;
-            font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
-            line-height:1.6 !important;
-            box-shadow:0 0 20px rgba(0,255,136,0.2) !important;
-        ">
-            <div style="
-                color:#00ffdd !important;
-                font-size:clamp(1.3rem, 4vw, 1.6rem) !important;
-                font-weight:900 !important;
-                text-shadow:0 0 20px #00ffdd !important;
-            ">
-                LOW CIOH IMPACT
-            </div><br>
-            <span style="color:#00ffdd !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem)!important;">
-                (Common Input Ownership Heuristic)
-            </span><br><br>
-            Few inputs spent together — minimal new linkage created.<br>
-            Address separation remains strong.<br>
-            Privacy preserved.
-            {recovery_note}
-        </div>
-        """
+<div style="
+    margin-top:10px !important;
+    padding:12px !important;
+    background:#001a00 !important;
+    border:1px solid #00ff88 !important;
+    border-radius:10px !important;
+    color:#aaffcc !important;
+    font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
+    line-height:1.6 !important;
+    box-shadow:0 0 20px rgba(0,255,136,0.2) !important;
+">
+    <div style="
+        color:#00ffdd !important;
+        font-size:clamp(1.3rem, 4vw, 1.6rem) !important;
+        font-weight:900 !important;
+        text-shadow:0 0 20px #00ffdd !important;
+    ">
+        LOW CIOH IMPACT
+    </div><br>
+    <span style="color:#00ffdd !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;">
+        (Common Input Ownership Heuristic)
+    </span><br><br>
+    Few inputs spent together — minimal new linkage created.<br>
+    Address separation remains strong.<br>
+    Privacy preserved.
+    {recovery_note}
+</div>
+"""
 # =========================
 # Helper Functions for Bitcoin Addresses
 # =========================
@@ -1835,7 +1855,7 @@ def _classify_utxo(
     else:
         script_type = "Legacy"
         default_health = "HEAVY"
-        default_rec = "PRUNE"
+        default_rec = "CONSOLIDATE"
         is_legacy = True
 
     # Step 2: Prefer metadata type (more accurate)
@@ -1854,11 +1874,11 @@ def _classify_utxo(
             default_rec = "CAUTION"
         else:
             default_health = "HEAVY"
-            default_rec = "PRUNE"
+            default_rec = "CONSOLIDATE"
 
     # Step 3: Value overrides (highest priority)
     if value < 10_000:
-        return script_type, "DUST", "PRUNE", is_legacy
+        return script_type, "DUST", "CONSOLIDATE", is_legacy
 
     if value > 100_000_000 and is_legacy:
         return script_type, "CAREFUL", "OPTIONAL", is_legacy
@@ -1914,15 +1934,15 @@ def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
 
     return enriched
     
-# ── Apply pruning strategy to enriched UTXOs ────────────────────────────────────
-def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
+# ── Apply consolidation strategy to enriched UTXOs ────────────────────────────────────
+def _apply_consolidation_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
     """
-    Apply deterministic pruning strategy to enriched UTXOs.
-    - Excludes legacy/unsupported from pruning calculation
-    - Prunes only supported UTXOs (priority: dust → heavy → optimal)
-    - Returns list with pruned supported first, unsupported last (always unselected)
+    Apply deterministic consolidation strategy to enriched UTXOs.
+    - Excludes legacy/unsupported from consolidation calculation
+    - Consolidates only supported UTXOs (priority: dust → heavy → optimal)
+    - Returns list with consolidated supported first, unsupported last (always unselected)
     """
-    ratio = PRUNING_RATIOS.get(strategy, 0.40)
+    ratio = CONSOLIDATION_RATIOS.get(strategy, 0.40)
 
     # Step 1: Split supported vs unsupported
     supported = []
@@ -1940,7 +1960,7 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
     if not supported:
         return unsupported
 
-    # Step 2: Sort & prune ONLY supported
+    # Step 2: Sort & consolidate ONLY supported
     # Primary sort: value descending (stable base)
     sorted_supported = sorted(
         supported,
@@ -1950,9 +1970,9 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
 
     total_supported = len(sorted_supported)
     keep_count = max(MIN_KEEP_UTXOS, int(total_supported * (1 - ratio)))
-    prune_count = total_supported - keep_count
+    consolidate_count = total_supported - keep_count
 
-    # Secondary sort: prune priority (lowest HEALTH_PRIORITY first = dust → heavy → optimal)
+    # Secondary sort: consolidate priority (lowest HEALTH_PRIORITY first = dust → heavy → optimal)
     by_health = sorted(
         sorted_supported,
         key=lambda u: HEALTH_PRIORITY.get(u["health"], 999),  # DUST=0 first, OPTIMAL=4 last
@@ -1962,18 +1982,18 @@ def _apply_pruning_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
     result_supported = []
     for i, u in enumerate(by_health):
         new_u = dict(u)
-        new_u["selected"] = i < prune_count
+        new_u["selected"] = i < consolidate_count
         result_supported.append(new_u)
 
-    # Step 3: Combine — supported (pruned) first, unsupported last
+    # Step 3: Combine — supported (consolidated) first, unsupported last
     result = result_supported + unsupported
 
     # Log summary (no print)
     legacy_skipped = len(unsupported)
     if legacy_skipped > 0:
         log.info(
-            f"Excluded {legacy_skipped} legacy/unsupported from pruning. "
-            f"Pruned {prune_count} of {total_supported} supported UTXOs."
+            f"Excluded {legacy_skipped} legacy/unsupported from consolidation. "
+            f"Consolidated {consolidate_count} of {total_supported} supported UTXOs."
         )
 
     return result
@@ -2029,7 +2049,7 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
                 health_html = (
                     f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
                     f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
-                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Cannot prune</small>'
+                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Cannot consolidate</small>'
                     '</div>'
                 )
         else:
@@ -2108,7 +2128,7 @@ def analyze(
     manual_utxo_input: str,
 ):
     """
-    Main entrypoint: sanitize inputs → collect UTXOs → enrich → prune → build UI outputs.
+    Main entrypoint: sanitize inputs → collect UTXOs → enrich → consolidate → build UI outputs.
     Enforces the canonical state model (immutable enriched_state tuple).
     """
     log.info("analyze() started")
@@ -2260,22 +2280,22 @@ def analyze(
         log.error("Missing 'script_type' in enriched UTXOs — invariant violation")
         raise RuntimeError("Missing 'script_type' in enriched UTXOs — invariant violation")
 
-    # 4. Apply pruning strategy (sets 'selected' flags)
+    # 4. Apply consolidation strategy (sets 'selected' flags)
     # (pure computation — safe)
-    enriched_pruned = _apply_pruning_strategy(enriched, params.strategy)
+    enriched_consolidated = _apply_consolidation_strategy(enriched, params.strategy)
     log.debug(
-        f"After pruning strategy: {len(enriched_pruned)} UTXOs total, "
-        f"{sum(1 for u in enriched_pruned if u['selected'])} selected"
+        f"After consolidation strategy: {len(enriched_consolidated)} UTXOs total, "
+        f"{sum(1 for u in enriched_consolidated if u['selected'])} selected"
     )
 
     # Safety assertions (protect canonical model invariants)
-    assert len(enriched_pruned) >= MIN_KEEP_UTXOS, "Too few UTXOs after pruning"
-    assert any(not u["selected"] for u in enriched_pruned), "All UTXOs selected — invalid prune"
-    assert params.strategy in PRUNING_RATIOS, f"Unknown strategy: {params.strategy}"
+    assert len(enriched_consolidated) >= MIN_KEEP_UTXOS, "Too few UTXOs after consolidation"
+    assert any(not u["selected"] for u in enriched_consolidated), "All UTXOs selected — invalid consolidation"
+    assert params.strategy in CONSOLIDATION_RATIOS, f"Unknown strategy: {params.strategy}"
 
     # 5. Build DataFrame rows for display
     # (pure UI — safe)
-    df_rows, has_unsupported = _build_df_rows(enriched_pruned)
+    df_rows, has_unsupported = _build_df_rows(enriched_consolidated)
     log.debug(f"Built {len(df_rows)} table rows, has_unsupported={has_unsupported}")
 
     # Build warning banner if needed
@@ -2284,7 +2304,7 @@ def analyze(
         warning_banner = (
             "<div style='color:#ffdd88;padding:20px;background:#332200;border:3px solid #ff9900;border-radius:14px;text-align:center;'>"
             "⚠️ Some inputs are legacy or nested — not included in PSBT<br>"
-            "Only Native SegWit (bc1q…) and Taproot (bc1p…) are supported for pruning."
+            "Only Native SegWit (bc1q…) and Taproot (bc1p…) are supported for consolidation."
             "</div>"
         )
 
@@ -2299,7 +2319,7 @@ def analyze(
 
     # 6. Freeze the enriched state (immutable tuple)
     frozen_state = _freeze_enriched(
-        enriched_pruned,
+        enriched_consolidated,
         strategy=params.strategy,
         scan_source=params.scan_source,
     )
@@ -2367,9 +2387,9 @@ def _analyze_empty_legacy_warning(scan_source: str = "") -> tuple:
             Public block explorers usually refuse, timeout, or rate-limit queries for such large legacy/nested addresses.<br><br>
             
             <strong style='color:#ffffff !important;'>Important:</strong><br>
-            Even if the full list loaded, <strong>legacy (1…) and nested (3…) inputs cannot be pruned</strong> with this tool — they are not supported in the generated PSBT.<br><br>
+            Even if the full list loaded, <strong>legacy (1…) and nested (3…) inputs cannot be consolidated</strong> with this tool — they are not supported in the generated PSBT.<br><br>
             
-            To prune or consolidate:<br>
+            To consolidate:<br>
             • Migrate to a modern address first (bc1q… Native SegWit or bc1p… Taproot)<br>
             • Then re-analyze here<br><br>
             
@@ -2476,11 +2496,11 @@ def _validate_utxos_and_selection(
     if offline_mode and not selected_indices:
         selected_utxos = []
 
-    pruned_count = len(selected_utxos)
-    if pruned_count == 0:
+    consolidate_count = len(selected_utxos)
+    if consolidate_count == 0:
         return None, 0, "NO_SELECTION"
 
-    return selected_utxos, pruned_count, None
+    return selected_utxos, consolidate_count, None
 
 
 def _compute_privacy_metrics(selected_utxos: List[dict], total_utxos: int) -> Tuple[int, str]:
@@ -2499,8 +2519,8 @@ def _compute_economics_safe(selected_utxos: List[dict], fee_rate: int) -> Option
         return None
 
 
-def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
-    """Warning when pruned value is too small for meaningful change output."""
+def _render_small_consolidation_warning(econ: TxEconomics, fee_rate: int) -> str:
+    """Warning when consolidation value is too small for meaningful change output."""
     remainder = econ.total_in - econ.fee
     current_fee = econ.fee
 
@@ -2545,7 +2565,7 @@ def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
         {title}
       </div>
       Post-fee remainder (~{remainder:,} sats) is small.<br>
-      Pruned value will likely be fully or partially absorbed into miner fees.<br><br>
+      Consolidated value will likely be fully or partially absorbed into miner fees.<br><br>
       <div style="
           color:#ffff88 !important;
           font-size: clamp(1.15rem, 4.5vw, 1.45rem) !important;
@@ -2560,81 +2580,81 @@ def _render_small_prune_warning(econ: TxEconomics, fee_rate: int) -> str:
       </div><br>
       <div style="color:#ffaaaa !important; font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important; line-height:1.7 !important;">
         💡 For reliable change output, aim for:<br>
-        • Value Pruned > ~5× Current Fee (good change)<br>
-        • Value Pruned > ~10× Current Fee (very comfortable)<br><br>
-        This prune: <span style="color:#ffffff !important; font-weight:800 !important;">{sats_to_btc_str(econ.total_in)}</span> value and 
+        • Value consolidated > ~5× Current Fee (good change)<br>
+        • Value consolidated > ~10× Current Fee (very comfortable)<br><br>
+        This consolidation: <span style="color:#ffffff !important; font-weight:800 !important;">{sats_to_btc_str(econ.total_in)}</span> value and 
         <span style="color:#ffffff !important; font-weight:800 !important;">{current_fee:,} sats</span> fee<br>
         Ratio: <span style="color:#ffffff !important; font-weight:800 !important;">{ratio}×</span> current fee
       </div><br>
       <small style="color:#88ffcc !important; font-size: clamp(0.9rem, 3vw, 1rem) !important;">
-        💡 Pro tip: Bigger prune (relative to fee) → more change back. Small prunes = cleanup only.
+        💡 Pro tip: Bigger consolidation (relative to fee) → more change back. Small consolidations = cleanup only.
       </small>
     </div>
     """
 
 
-def _render_pruning_explanation(pruned_count: int, remaining_utxos: int) -> str:
+def _render_consolidation_explanation(consolidate_count: int, remaining_utxos: int) -> str:
     """Educational explanation of UTXO consolidation benefits."""
     return f"""
 <div style="
     margin: clamp(24px, 8vw, 48px) 0 !important;
     padding: clamp(20px, 6vw, 36px) !important;
-    background:#001a00 !important;
-    border:3px solid #00ff9d !important;
-    border-radius:18px !important;
+    background: #001a00 !important;
+    border: 3px solid #00ff9d !important;
+    border-radius: 18px !important;
     box-shadow:
         0 0 50px rgba(0,255,157,0.6) !important,
         inset 0 0 30px rgba(0,255,157,0.08) !important;
     font-size: clamp(1.05rem, 3.8vw, 1.25rem) !important;
-    line-height:1.85 !important;
-    color:#ccffe6 !important;
-    max-width:95% !important;
-    margin-left:auto !important;
-    margin-right:auto !important;
+    line-height: 1.85 !important;
+    color: #ccffe6 !important;
+    max-width: 95% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
 ">
-  <div style="
-      color:#00ff9d !important;
-      font-size: clamp(1.35rem, 5vw, 1.7rem) !important;
-      font-weight:900 !important;
-      text-shadow:0 0 20px #00ff9d !important;
-      margin-bottom: clamp(12px, 4vw, 18px) !important;
-  ">
-    🧩 WHAT UTXO CONSOLIDATION ACTUALLY DOES
-  </div>
+    <div style="
+        color: #00ff9d !important;
+        font-size: clamp(1.35rem, 5vw, 1.7rem) !important;
+        font-weight: 900 !important;
+        text-shadow: 0 0 20px #00ff9d !important;
+        margin-bottom: clamp(12px, 4vw, 18px) !important;
+    ">
+        🧩 WHAT UTXO CONSOLIDATION ACTUALLY DOES
+    </div>
 
-  Consolidation reorganizes
-  span style="color:#aaffff !important;font-weight:700 !important;">inefficient UTXOs</span>
-  (dust, legacy, or high-weight inputs) into a smaller, cleaner set.<br><br>
+    Consolidation reorganizes
+    <span style="color:#aaffff !important; font-weight:700 !important;">inefficient UTXOs</span>
+    (dust, legacy, or high-weight inputs) into a smaller, cleaner set.<br><br>
 
-  • You pay a fee now to consolidate
-    <span style="color:#00ffff !important;font-weight:800 !important;">{pruned_count}</span>
-    inefficient inputs into fewer outputs<br>
+    • You pay a fee now to consolidate
+      <span style="color:#00ffff !important; font-weight:800 !important;">{consolidate_count}</span>
+      inefficient inputs into fewer outputs<br>
 
-  • The remaining
-    <span style="color:#00ffff !important;font-weight:800 !important;">{remaining_utxos}</span>
-    UTXOs become cheaper, simpler, and more private to spend in future transactions<br>
+    • The remaining
+      <span style="color:#00ffff !important; font-weight:800 !important;">{remaining_utxos}</span>
+      UTXOs become cheaper, simpler, and more private to spend in future transactions<br>
 
-  • If no change output is created, some value is absorbed into fees —
-    but your wallet structure becomes
-    <span style="color:#aaffff !important;">permanently more efficient</span><br><br>
+    • If no change output is created, some value is absorbed into fees —
+      but your wallet structure becomes
+      <span style="color:#aaffff !important;">permanently more efficient</span><br><br>
 
-  <span style="color:#00ffaa !important;font-weight:800 !important;">Goal:</span>
-  a healthier UTXO set and lower future fees.<br>
-  Consolidation is often most effective during low-fee periods.
+    <span style="color:#00ffaa !important; font-weight:800 !important;">Goal:</span>
+    a healthier UTXO set and lower future fees.<br>
+    Consolidation is often most effective during low-fee periods.
 
-  <small style="
-      display:block !important;
-      margin-top:18px !important;
-      color:#88ffcc !important;
-      font-style:italic !important;
-      font-size: clamp(0.9rem, 3vw, 1rem) !important;
-      opacity:0.85 !important;
-  ">
-    💡 Tip (optional): If your goal is to receive change, consolidate when the total value consolidated
-    ~10–20× the expected fee.
-  </small>
+    <small style="
+        display: block !important;
+        margin-top: 18px !important;
+        color: #88ffcc !important;
+        font-style: italic !important;
+        font-size: clamp(0.9rem, 3vw, 1rem) !important;
+        opacity: 0.85 !important;
+    ">
+        💡 Tip (optional): If your goal is to receive change, consolidate when the total value consolidated
+        ~10–20× the expected fee.
+    </small>
 </div>
-    """
+"""
 
 
 def generate_summary_safe(
@@ -2664,7 +2684,7 @@ def generate_summary_safe(
     if total_utxos == 0:
         return no_utxos_msg, gr.update(visible=False)
 
-    selected_utxos, pruned_count, error = _validate_utxos_and_selection(
+    selected_utxos, consolidate_count, error = _validate_utxos_and_selection(
         df, utxos, offline_mode=offline_mode
     )
 
@@ -2684,11 +2704,11 @@ def generate_summary_safe(
         1 for u in supported_selected if u.get("script_type_inferred", False)
     )
 
-    pruned_count = len(supported_selected)
-    if pruned_count == 0:
+    consolidate_count = len(supported_selected)
+    if consolidate_count == 0:
         return select_msg, gr.update(visible=False)
 
-    remaining_utxos = total_utxos - pruned_count
+    remaining_utxos = total_utxos - consolidate_count
 
     privacy_score, score_color = _compute_privacy_metrics(supported_selected, total_utxos)
     econ = _compute_economics_safe(supported_selected, fee_rate)
@@ -2702,7 +2722,7 @@ def generate_summary_safe(
             gr.update(visible=False)
         )
 
-    # Pre-prune wallet size estimate
+    # Pre-consolidation wallet size estimate
     all_input_weight = sum(u["input_weight"] for u in utxos)
     pre_vsize = max(
         (all_input_weight + 172 + total_utxos) // 4 + 10,
@@ -2720,13 +2740,13 @@ def generate_summary_safe(
     sats_saved = max(0, econ.vsize * (future_fee_rate - fee_rate))
 
     # Render components
-    small_warning = _render_small_prune_warning(econ, fee_rate)
+    small_warning = _render_small_consolidation_warning(econ, fee_rate)
     cioh_warning = get_cioh_warning(
-        pruned_count,
+        consolidate_count,
         len({u["address"] for u in supported_selected}),
         privacy_score
     )
-    pruning_explanation = _render_pruning_explanation(pruned_count, remaining_utxos)
+    consolidation_explanation = _render_consolidation_explanation(consolidate_count, remaining_utxos)
 
     strategy_label = strategy.split(" — ")[0] if " — " in strategy else "Recommended"
 
@@ -2827,7 +2847,7 @@ def generate_summary_safe(
             font-weight:700 !important;
             margin:clamp(12px, 3vw, 20px) 0 !important;
         ">
-            Pruning <span style="color:#ff6600 !important;font-weight:900 !important;">{pruned_count:,}</span> inputs
+            Consolidating <span style="color:#ff6600 !important;font-weight:900 !important;">{consolidate_count:,}</span> inputs
         </div>
         <div style="
             color:#88ffcc !important;
@@ -2856,15 +2876,15 @@ def generate_summary_safe(
         <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:clamp(24px, 6vw, 40px) 0 !important;">
         <div style="font-size:clamp(1rem, 3.5vw, 1.15rem) !important;line-height:2.1 !important;">
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;">
-              <b style="color:#fff !important;">Full wallet spend size today (before pruning):</b> 
+              <b style="color:#fff !important;">Full wallet spend size today (before consolidating):</b> 
               <span style="color:#ff9900 !important;font-weight:800 !important;">~{pre_vsize:,} vB</span>
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;">
-              <b style="color:#fff !important;">Size of this one-time pruning cleanup transaction:</b> 
+              <b style="color:#fff !important;">Size of this one-time consolidation:</b> 
               <span style="color:#0f0 !important;font-weight:800 !important;">~{econ.vsize:,} vB</span>
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.6 !important;">
-              💡 After pruning: your full wallet spend size drops to roughly 
+              💡 After consolidating: your full wallet spend size drops to roughly 
               <span style="color:#aaffcc !important;font-weight:700 !important;">~{pre_vsize - econ.vsize + 200:,} vB</span>
             </div>
             <div style="
@@ -2885,7 +2905,7 @@ def generate_summary_safe(
               {change_line}
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.7 !important;">
-              💡 Pruning now saves you <span style="color:#0f0 !important;font-weight:800 !important;">+{sats_saved:,} sats</span> versus pruning later if fees reach
+              💡 Consolidating now saves you <span style="color:#0f0 !important;font-weight:800 !important;">+{sats_saved:,} sats</span> versus consolidating later if fees reach
               <span style="
                   color:#ff3366 !important;
                   font-weight:900 !important;
@@ -2906,13 +2926,13 @@ def generate_summary_safe(
             border-radius:18px !important;
             box-shadow:0 0 60px rgba(0,255,157,0.5) !important;
         ">
-            {pruning_explanation}
+            {consolidation_explanation}
         </div>
         {small_warning}
     </div>
     """
 
-    return status_box_html, gr.update(visible=pruned_count > 0)
+    return status_box_html, gr.update(visible=consolidate_count > 0)
 # ====================
 # on_generate() & generate_psbt() — Refactored for Clarity
 # ====================
@@ -3003,7 +3023,7 @@ def _create_psbt_snapshot(
         "future_fee_rate": future_fee_rate,
         "strategy": strategy,                 # NEW — full strategy string
         "dust_threshold": dust_threshold,     # NEW — dust slider value
-        "pruned_count": len(clean_inputs),
+        "consolidate_count": len(clean_inputs),
         "inputs": clean_inputs,
     }
 
@@ -3036,7 +3056,7 @@ def _persist_snapshot(snapshot: dict) -> str:
     date_str = datetime.utcnow().strftime("%Y%m%d")
     version = snapshot.get("version", 1)
     fingerprint_short = snapshot.get("fingerprint_short", "UNKNOWN")[:16].upper()
-    base_name = f"Ωmega_Prune_v{version}_{date_str}_{fingerprint_short}"
+    base_name = f"Ωmega_Session_v{version}_{date_str}_{fingerprint_short}"
     
     # Decide format
     is_large = raw_size_bytes > 1_000_000  # 1 MB threshold — tune if needed
@@ -3046,7 +3066,7 @@ def _persist_snapshot(snapshot: dict) -> str:
         mode="wb" if is_large else "w",
         encoding="utf-8" if not is_large else None,
         suffix=suffix,
-        prefix="omega_prune_",
+        prefix="omega_session_",
         delete=False
     )
     
@@ -3166,7 +3186,7 @@ def _render_no_snapshot() -> str:
 
 
 def _render_no_inputs() -> str:
-    """Error message when no UTXOs are selected for pruning."""
+    """Error message when no UTXOs are selected for consolidation."""
     return (
         "<div style='"
         "color:#ff6666 !important;"
@@ -3178,9 +3198,9 @@ def _render_no_inputs() -> str:
         "max-width:90% !important;"
         "margin:0 auto !important;"
         "'>"
-        "No UTXOs selected for pruning!<br><br>"
+        "No UTXOs selected for consolidation.<br><br>"
         "<span style='font-size: clamp(1rem, 3.5vw, 1.2rem) !important; color:#ffaa88 !important;'>"
-        "Check the boxes next to inputs you want to prune."
+        "Check the boxes next to inputs you want to consolidate."
         "</span>"
         "</div>"
     )
@@ -3210,7 +3230,7 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
         dest_override=snapshot.get("dest_addr_override"),
         fee_rate=snapshot["fee_rate"],
         future_fee_rate=snapshot["future_fee_rate"],
-        strategy=snapshot.get("strategy", "Recommended — ~40% pruned (balanced savings & privacy)"),
+        strategy=snapshot.get("strategy", "Recommended — ~40% consolidated (balanced savings & privacy)"),
         dust_threshold=snapshot.get("dust_threshold", 546),
         fingerprint_short=snapshot["fingerprint_short"],
         full_spend_no_change=snapshot.get("full_spend_no_change", False),
@@ -3357,23 +3377,23 @@ def _build_unsigned_tx(
             tx.tx_outs.append(TxOut(change_amt, dest_spk))
             has_change_output = True
         else:
-            # No valid destination → burn to OP_RETURN
-            op_return_script = b"\x6a\x14Prune: no change addr"  # OP_RETURN + 20-byte message
+            # No valid destination → absorb into fee + marker
+            op_return_script = b"\x6a\x0eNo change"
             tx.tx_outs.append(TxOut(0, op_return_script))
             no_change_warning = (
                 "<div style='color:#ff9900;padding:16px;background:#331100;border:2px solid #ff9900;border-radius:12px;text-align:center;margin:16px 0;'>"
-                "⚠️ No valid change address provided → value absorbed into fee + tiny OP_RETURN burn<br>"
-                "<small>All remaining sats sent to miners (full consolidation mode)</small>"
+                "⚠️ No valid change address provided<br>"
+                "<small>Remaining value absorbed into the transaction fee</small>"
                 "</div>"
             )
     else:
-        # Full absorption / cleanup — add marker OP_RETURN for validity & clarity
-        op_return_script = b"\x6a\x0fFull prune cleanup"  # OP_RETURN + short message
+        # Full consolidation — informational marker only
+        op_return_script = b"\x6a\x0eNo change"
         tx.tx_outs.append(TxOut(0, op_return_script))
         no_change_warning = (
             "<div style='color:#88ffcc;padding:16px;background:#001100;border:2px solid #00ff88;border-radius:12px;text-align:center;margin:16px 0;'>"
-            "Full consolidation — all value sent to fee + OP_RETURN marker<br>"
-            "<small>No change output created (normal for deep cleanups)</small>"
+            "Full consolidation mode<br>"
+            "<small>No change output created — all value absorbed into fees</small>"
             "</div>"
         )
 
@@ -3404,9 +3424,14 @@ def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
             f"Length: {psbt_len:,} characters ({psbt_len/1024:.1f} KB)<br>"
             f"Max QR capacity: ~{MAX_QR_CHARS} characters (version 40)"
             "</span><br><br>"
-            "<strong>Use COPY PSBT below</strong> and paste directly into your wallet.<br>"
-            "<small style='color:#aaffff;'>Sparrow, Coldcard, Electrum, UniSat, Nunchuk, OKX all support raw PSBT paste.</small>"
-            "</div>"
+            "<span style='color:#ffdd44; font-weight:900; font-size:1.15rem;'>"
+			"Use COPY PSBT below"
+			"</span>"
+			" and paste directly into your wallet.<br>"
+			"<small style='color:#aaffff;'>"
+            "Sparrow, Coldcard, Electrum, UniSat, Nunchuk, OKX all support raw PSBT paste."
+            "</small>"
+			"</div>"
         )
         log.warning("[QR] PSBT too large (%d chars > %d) — QR skipped", psbt_len, MAX_QR_CHARS)
         return qr_html, qr_warning
@@ -3584,7 +3609,7 @@ def _compose_psbt_html(
                 line-height:1.6 !important;
                 font-weight:800 !important;
             ">
-                Cryptographic proof of your pruning selection<br>
+                Cryptographic proof of your consolidation selection<br>
                 Deterministic • Audit-proof • Never changes
             </div>
             <button onclick="navigator.clipboard.writeText('{fingerprint}').then(() => {{this.innerText='COPIED';setTimeout(()=>this.innerText='COPY FINGERPRINT',1500);}})"
@@ -3777,7 +3802,7 @@ def generate_psbt(
             "No supported inputs selected"
             "</strong><br><br>"
             "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q…)</strong> and "
-            "<strong style='color:#00ffff !important;'>Taproot (bc1p…)</strong> inputs can be pruned.<br><br>"
+            "<strong style='color:#00ffff !important;'>Taproot (bc1p…)</strong> inputs can be consolidated.<br><br>"
             "Legacy and Nested inputs were automatically skipped."
             "</div>"
         )
@@ -4002,7 +4027,7 @@ def fresh_empty_dataframe():
     return gr.DataFrame(
         value=[],                      # Truly empty — no dummy rows
         headers=[
-            "PRUNE",
+            "CONSOLIDATE",
             "Source",
             "TXID",
             "Health",
@@ -4020,7 +4045,7 @@ def fresh_empty_dataframe():
         max_height=500,
         max_chars=None,
         label=" ",
-        static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # Keep non-PRUNE columns fixed
+        static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # Keep non-CONSOLIDATE columns fixed
         column_widths=["120px", "360px", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
     )
 
@@ -4191,7 +4216,7 @@ def ui_toggle_handler(offline: bool, restore: bool, dark: bool) -> tuple:
         </div>
         """
     )
-    prune_badge_update = update_prune_badge(offline)
+    network_badge_update = update_network_badge(offline)
 
     status_update = update_status_and_ui(offline, dark)
 
@@ -4201,7 +4226,7 @@ def ui_toggle_handler(offline: bool, restore: bool, dark: bool) -> tuple:
         addr_update,
         dest_update,
         fee_info_update,
-        prune_badge_update,
+        network_badge_update,
         status_update,
         gr.update(value=offline),   
         gr.update(value=restore)
@@ -4829,8 +4854,8 @@ body:not(.dark-mode) .footer-donation button {
 </style>
 """)
 	
-    # Dynamic prune conditions badge (populated by load or timer)
-    prune_badge = gr.HTML("")
+    # Dynamic network conditions badge (populated by load or timer)
+    network_badge = gr.HTML("")
 
     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
@@ -4905,10 +4930,10 @@ body:not(.dark-mode) .footer-donation button {
 		
 
     # =============================
-    # 🛡️ OFFLINE-AWARE PRUNE CONDITIONS BADGE
-    # Shows live fee/prune context online, safe fallback in air-gapped mode
+    # 🛡️ OFFLINE-AWARE NETWORK CONDITIONS BADGE
+    # Shows live fee/consolidate context online, safe fallback in air-gapped mode
     # =============================
-    def update_prune_badge(offline_mode: bool):
+    def update_network_badge(offline_mode: bool):
         if offline_mode:
             return gr.update(
                 value="""
@@ -4918,7 +4943,7 @@ body:not(.dark-mode) .footer-donation button {
                     max-width:600px; margin:20px auto; font-weight:600;
                 ">
                     <strong>Offline Mode Active</strong><br>
-                    Live pruning conditions & fee data unavailable<br>
+                    Live network conditions & fee data unavailable<br>
                     <small>(zero network calls in air-gapped mode)</small>
                 </div>
                 """,
@@ -4927,7 +4952,7 @@ body:not(.dark-mode) .footer-donation button {
         else:
             try:
                 # Pass the flag — now safe even if someone calls this function directly
-                return gr.update(value=get_prune_score(offline_mode=offline_mode), visible=True)
+                return gr.update(value=get_consolidation_score(offline_mode=offline_mode), visible=True)
             except Exception as e:
                 return gr.update(
                     value=f"""
@@ -5246,7 +5271,7 @@ No API calls • Fully air-gapped safe""",
                     lines=10,
                 )
 
-        # === Pruning Strategy & Economic Controls Header ===
+        # === Consolidation Strategy & Economic Controls Header ===
         gr.HTML(
             value="""
             <div style="
@@ -5291,14 +5316,15 @@ No API calls • Fully air-gapped safe""",
             strategy = gr.Dropdown(
                 choices=[
                     "Privacy First — ~30% consolidated (lowest CIOH risk)",
-                    "Recommended — ~40% consolidated (balanced savings & privacy)",
-                    "More Savings — ~50% consolidated (stronger fee reduction)",
-                    "NUCLEAR — ~90% consolidated (maximum savings, highest CIOH)",
+                    "Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)",
+                    "More Savings — ~50% consolidated (higher linkage risk, best when fees are below recent medians)",
+                    "NUCLEAR — ~90% consolidated (maximum linkage, deep cleanup during exceptionally low fees)",
                 ],
-                value="Recommended — ~40% consolidated (balanced savings & privacy)",
+                value="Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)",
                 label="Consolidation Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
+				info="Use the Network Conditions panel above to judge how aggressive consolidation should be today."
             )
-        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)")
+        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)", info="Inputs below this value are treated as inefficient to spend individually.")
 
         # Fee preset info (above sliders — dynamic via offline toggle)
         fee_preset_info = gr.HTML(
@@ -5361,19 +5387,19 @@ No API calls • Fully air-gapped safe""",
 
         gr.HTML("""
             <div style="width: 100%; margin-top: 25px;"></div>
-            <div class="check-to-prune-header">
+            <div class="check-to-consolidate-header">
                 <div class="header-title">CHECK TO CONSOLIDATE</div>
                 <div class="header-subtitle">Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = consolidate</div>
             </div>
 
             <style>
-            .check-to-prune-header {
+            .check-to-consolidate-header {
                 text-align: center;
                 margin-bottom: 8px;
             }
 
             /* Dark mode */
-            .dark-mode .check-to-prune-header .header-title {
+            .dark-mode .check-to-consolidate-header .header-title {
                 color: #00ff88;
                 font-size: clamp(1.2rem, 5vw, 1.4rem);
                 font-weight: 900;
@@ -5381,21 +5407,21 @@ No API calls • Fully air-gapped safe""",
                 letter-spacing: 1px;
             }
 
-            .dark-mode .check-to-prune-header .header-subtitle {
+            .dark-mode .check-to-consolidate-header .header-subtitle {
                 color: #aaffaa;
                 font-size: clamp(0.95rem, 3.5vw, 1.1rem);
                 margin-top: 8px;
             }
 
             /* Light mode — softer, readable colors */
-            body:not(.dark-mode) .check-to-prune-header .header-title {
+            body:not(.dark-mode) .check-to-consolidate-header .header-title {
                 color: #008844;
                 font-size: clamp(1.2rem, 5vw, 1.4rem);
                 font-weight: 900;
                 letter-spacing: 1px;
             }
 
-            body:not(.dark-mode) .check-to-prune-header .header-subtitle {
+            body:not(.dark-mode) .check-to-consolidate-header .header-subtitle {
                 color: #006633;
                 font-size: clamp(0.95rem, 3.5vw, 1.1rem);
                 margin-top: 8px;
@@ -5423,7 +5449,7 @@ No API calls • Fully air-gapped safe""",
             max_height=500,
             max_chars=None,
             label=" ",
-            static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # 0-based index — PRUNE is editable
+            static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # 0-based index — CONSOLIDATION is editable
             column_widths=["120px", "380", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
         )
 
@@ -5486,7 +5512,7 @@ No API calls • Fully air-gapped safe""",
                       margin:0 auto clamp(12px, 3vw, 20px) auto !important;
                       line-height:1.7 !important;
                   ">
-                    Your pruning intent is now immutable • Permanent audit trail secured
+                    Your consolidation intent is now immutable • Permanent audit trail secured
                   </div>
                   
                   <!-- Extra reassurance — bright cyan -->
@@ -5552,7 +5578,7 @@ No API calls • Fully air-gapped safe""",
             addr_input,
             dest,
             fee_preset_info,
-            prune_badge,
+            network_badge,
             mode_status,
             offline_toggle,
             restore_toggle,
@@ -5569,7 +5595,7 @@ No API calls • Fully air-gapped safe""",
             addr_input,
             dest,
             fee_preset_info,
-            prune_badge,
+            network_badge,
             mode_status,
             offline_toggle,
             restore_toggle,
@@ -5629,7 +5655,7 @@ No API calls • Fully air-gapped safe""",
             addr_input,
             dest,
             fee_preset_info,
-            prune_badge,
+            network_badge,
             mode_status,
             offline_toggle,
             restore_toggle,
@@ -5684,7 +5710,7 @@ No API calls • Fully air-gapped safe""",
         fn=lambda s, src, d, st, du: [
             gr.update(value=src or ""),
             gr.update(value=d or ""),
-            gr.update(value=st or "Recommended — ~40% pruned (balanced savings & privacy)"),
+            gr.update(value=st or "Recommended — ~40% consolidated (balanced savings & privacy)"),
             gr.update(value=du or 546),
             gr.update(visible=not s)   # hide analyze if success
         ],
@@ -5948,7 +5974,7 @@ No API calls • Fully air-gapped safe""",
     )
     # =============================
     # INITIAL PAGE LOAD HANDLERS
-    # Sets up main summary, theme/banner, fee buttons, and prune badge on first render / refresh
+    # Sets up main summary, theme/banner, fee buttons, and consolidate badge on first render / refresh
     # =============================
 
     # 1. Main summary (status box + generate row visibility)
@@ -5997,11 +6023,11 @@ No API calls • Fully air-gapped safe""",
         outputs=[economy_btn, hour_btn, halfhour_btn, fastest_btn]
     )
 
-    # 5. Prune conditions badge — already offline-safe, but reinforce guard
+    # 5. Consolidation conditions badge — already offline-safe, but reinforce guard
     demo.load(
-        fn=lambda offline: update_prune_badge(offline),
+        fn=lambda offline: update_network_badge(offline),
         inputs=[offline_toggle],
-        outputs=[prune_badge]
+        outputs=[network_badge]
     )
 
     # 5. FOOTER
