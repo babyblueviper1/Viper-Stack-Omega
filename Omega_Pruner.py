@@ -4340,16 +4340,16 @@ with gr.Blocks(
             margin: clamp(30px, 6vw, 45px) auto;
             padding: 0 clamp(10px, 3vw, 20px);
         ">
-            Pruning isn’t just about saving sats today — it’s a deliberate step toward taking
+            Consolidating isn’t just about saving sats today — it’s a deliberate step toward taking
             <strong style="color:#0f0;">full strategic control</strong> of your Bitcoin.<br><br>
 
-            By pruning inefficient UTXOs, you:<br>
+            By consolidating inefficient UTXOs, you:<br>
             • <strong style="color:#00ff9d;">Slash fees</strong> during high-congestion periods<br>
             • <strong style="color:#00ff9d;">Reduce future costs</strong> with a cleaner UTXO set<br>
             • <strong style="color:#00ff9d;">Optimize your stack</strong> for speed, savings and privacy<br><br>
 
             <strong style="color:#f7931a; font-size: clamp(1.3rem, 4.5vw, 1.7rem); font-weight:900;">
-                Prune smarter. Win forever.
+                Consolidate smarter. Win forever.
             </strong>
         </div>
 
@@ -5075,17 +5075,17 @@ body:not(.dark-mode) .footer-donation button {
 
         # ── Restore Previous Selection (toggle to show upload area) ──
         restore_toggle = gr.Checkbox(
-            label="Restore Previous Pruning Session from JSON?",
+            label="Restore previous session",
             value=False,
             interactive=True,
-            info="Load saved selection to skip re-analyzing. Offline-safe (no API calls).",
+            info="Resume a saved UTXO selection without re-analysis. Offline-safe (no API calls).",
 			elem_id="restore-toggle"
         )
 
         # Only wrap the upload + button in the toggle-able area
         with gr.Row(visible=False) as restore_area:
             import_file = gr.File(
-                label="Upload your saved Ωmega Pruner .json file",
+                label="Upload saved Ωmega Pruner session (.json)",
                 file_types=[".json"],
                 type="filepath",
             )
@@ -5446,7 +5446,7 @@ No API calls • Fully air-gapped safe""",
         # Generate row — hidden until analysis complete
         with gr.Row(visible=False) as generate_row:
             gen_btn = gr.Button(
-                "2. GENERATE NUCLEAR PSBT",
+                "2. GENERATE PSBT + SAVE SESSION",
                 variant="primary",
                 elem_id="generate-btn"
             )
@@ -5513,7 +5513,8 @@ No API calls • Fully air-gapped safe""",
                       margin:0 auto clamp(30px, 8vw, 50px) auto !important;
                       line-height:1.7 !important;
                   ">
-                    Download for backup, offline verification, or future reference
+                    Download to safely pause or archive your work.<br>
+					You can restore this session later and continue exactly where you left off.
                   </div>
 
                 </div>
@@ -6298,7 +6299,7 @@ No API calls • Fully air-gapped safe""",
         opacity: 1 !important;
         filter: none !important;
     ">
-        Prune smarter. Win forever. • Ω
+        Consolidate smarter. Win forever. • Ω
     </span>
 </div>
 
