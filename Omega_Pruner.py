@@ -179,6 +179,8 @@ session.headers.update({
 
 _fee_cache_lock = threading.Lock()
 
+# ── Globals ─────────────────────────────────────────────────────────
+
 # Globals for simple in-memory cache
 _last_medians = {"24h": None, "1w": None, "1m": None}
 _last_fetch_time = 0
@@ -187,15 +189,18 @@ _CACHE_TTL = 300  # 5 minutes
 # Global flag — updated when offline toggle changes
 _is_offline = False  # default: assume online at startup
 
-
 # ===========================
 # Selection resolver
 # ===========================
-def _resolve_selected(df_rows: List[list], enriched_state: tuple) -> List[dict]:
+def _resolve_selected(df_rows: List[list], enriched_state: tuple, offline_mode: bool = False) -> List[dict]:
     """
     Resolve selected UTXOs from Gradio DataFrame checkbox state.
     Uses row-order matching — safe for Gradio's mutable UI representation.
     """
+    if offline_mode:
+        log.debug("_resolve_selected skipped — offline mode (pure computation allowed)")
+        # Could early-return [] if desired, but no need — keep normal flow
+
     if not df_rows:
         return []
 
@@ -217,14 +222,22 @@ def _resolve_selected(df_rows: List[list], enriched_state: tuple) -> List[dict]:
         if is_checked:
             selected.append(utxos[idx])
 
-    log.debug(f"_resolve_selected: {len(selected)} UTXOs selected via checkboxes")
     return selected
 
 
-def _selection_snapshot(selected_utxos: List[dict]) -> dict:
+def _selection_snapshot(
+    selected_utxos: List[dict],
+    scan_source: str = "",
+    dest_addr: str = "",
+    strategy: str = "Recommended — ~40% pruned (balanced savings & privacy)",
+    fee_rate: int = 15,
+    future_fee_rate: int = 60,
+    dust_threshold: int = 546,
+) -> dict:
     """
     Deterministic, audit-friendly snapshot of the current user selection.
     This is the canonical representation saved to JSON.
+    Includes all key user choices for full session restore.
     """
     if not selected_utxos:
         return {
@@ -232,6 +245,12 @@ def _selection_snapshot(selected_utxos: List[dict]) -> dict:
             "count": 0,
             "total_value": 0,
             "utxos": [],
+            "scan_source": scan_source.strip(),
+            "dest_addr": dest_addr.strip(),
+            "strategy": strategy,
+            "fee_rate": fee_rate,
+            "future_fee_rate": future_fee_rate,
+            "dust_threshold": dust_threshold,
         }
 
     sorted_utxos = sorted(selected_utxos, key=lambda u: (u["txid"], u["vout"]))
@@ -240,6 +259,12 @@ def _selection_snapshot(selected_utxos: List[dict]) -> dict:
         "fingerprint": _selection_fingerprint(sorted_utxos),
         "count": len(sorted_utxos),
         "total_value": sum(u["value"] for u in sorted_utxos),
+        "scan_source": scan_source.strip(),
+        "dest_addr": dest_addr.strip(),
+        "strategy": strategy,
+        "fee_rate": fee_rate,
+        "future_fee_rate": future_fee_rate,
+        "dust_threshold": dust_threshold,
         "utxos": [
             {
                 "txid": u["txid"],
@@ -254,11 +279,10 @@ def _selection_snapshot(selected_utxos: List[dict]) -> dict:
         ],
     }
 
-
 def _selection_fingerprint(selected_utxos: List[dict]) -> str:
     """
     Deterministic short hash of selected inputs (sorted by txid:vout).
-    Used for audit trail and duplicate detection.
+    Excludes user-specific fields like strategy, fees, addresses.
     """
     if not selected_utxos:
         return "none"
@@ -628,104 +652,151 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
     return (meta, tuple(updated_utxos))
 
 
-# ── Load saved selection from JSON snapshot ─────────────────────────────────────
-def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, str, Optional[str], bool]:
-    log.debug(f"load_selection called - snapshot type: {type(parsed_snapshot)}")
+def load_selection(parsed_snapshot: dict, current_enriched: Any, offline_mode: bool = False) -> Tuple[Any, str, Optional[str], bool, bool, str, str, str, str, int]:
+    """
+    Load saved selection from JSON snapshot — JSON is authoritative.
+    Builds fresh enriched_state directly from snapshot inputs when possible.
+    """
+    log.info("[RESTORE] load_selection called | offline_mode=%s", offline_mode)
 
     if not parsed_snapshot or not isinstance(parsed_snapshot, dict):
-        log.debug("No valid parsed snapshot provided")
-        return current_enriched, "No valid parsed JSON loaded", None, False
+        log.warning("[RESTORE] Invalid snapshot: empty or not dict")
+        return current_enriched, "No valid parsed JSON loaded", None, False, False, "failed", "", "", "Recommended — ~40% pruned (balanced savings & privacy)", 546
 
     try:
-        if "inputs" not in parsed_snapshot:
-            log.warning("Invalid snapshot format: missing 'inputs'")
-            return current_enriched, "Invalid Ωmega Pruner selection file", None, False
+        if "inputs" not in parsed_snapshot or not parsed_snapshot["inputs"]:
+            log.warning("[RESTORE] Snapshot missing or empty 'inputs'")
+            return current_enriched, "Invalid snapshot — no UTXOs found in file", None, False, False, "failed", "", "", "Recommended — ~40% pruned (balanced savings & privacy)", 546
 
-        selected_keys = set()
+        # ── Build fresh UTXOs directly from JSON ───────────────────────────────
+        log.info("[RESTORE] Building table directly from snapshot JSON (authoritative)")
+        restored_utxos = []
+        missing_address_count = 0
+        MAX_SATS = 21_000_000 * 100_000_000  # 21 million BTC cap
+
         for inp in parsed_snapshot.get("inputs", []):
             if not isinstance(inp, dict) or "txid" not in inp or "vout" not in inp:
-                log.debug(f"Skipping invalid input in JSON: {inp}")
+                log.debug("[RESTORE] Skipping invalid entry in inputs")
                 continue
+
             try:
                 txid = str(inp["txid"]).lower().strip()
                 vout = int(inp["vout"])
-                selected_keys.add((txid, vout))
-            except (ValueError, TypeError):
-                log.debug(f"Skipping invalid txid/vout: {inp}")
+
+                # Safe value parsing
+                value_raw = inp.get("value", 0)
+                log.debug("[RESTORE] Raw 'value' from JSON for %s:%d → %s (type=%s)", txid[:12], vout, value_raw, type(value_raw))
+
+                if isinstance(value_raw, str):
+                    value_raw = value_raw.replace(",", "").strip()
+                    if "E" in value_raw.upper() or "e" in value_raw:
+                        try:
+                            value = int(float(value_raw))
+                        except Exception as e:
+                            log.warning("[RESTORE] Invalid scientific value '%s': %s", value_raw, e)
+                            value = 0
+                    else:
+                        value = int(value_raw)
+                else:
+                    value = int(value_raw)
+
+                if value <= 0:
+                    log.warning("[RESTORE] Skipping UTXO with invalid/zero value: %s", value_raw)
+                    continue
+
+                # Sanity cap — prevent insane numbers from breaking everything
+                if value > MAX_SATS * 10:
+                    log.error("[RESTORE] Impossible UTXO value: %d sats (txid=%s vout=%d) — skipping", value, txid[:12], vout)
+                    continue
+
+                utxo = {
+                    "txid": txid,
+                    "vout": vout,
+                    "value": value,
+                    "address": inp.get("address", ""),
+                    "script_type": inp.get("script_type", "unknown"),
+                    "health": inp.get("health", "UNKNOWN"),
+                    "source": inp.get("source", "Restored from snapshot"),
+                    "selected": True,
+                    "scriptPubKey": b"",  # default — filled below if possible
+                }
+
+                # Derive scriptPubKey, weight, corrected type if address present
+                addr = utxo["address"].strip()
+                if addr:
+                    script_pubkey, meta = address_to_script_pubkey(addr)
+                    utxo["scriptPubKey"] = script_pubkey
+                    utxo["input_weight"] = meta.get("input_vb", 68) * 4
+                    utxo["script_type"] = meta.get("type", utxo["script_type"])
+                else:
+                    missing_address_count += 1
+                    log.warning("[RESTORE] UTXO missing address (no scriptPubKey): %s:%d", txid[:12], vout)
+
+                restored_utxos.append(utxo)
+
+            except (ValueError, TypeError) as e:
+                log.warning("[RESTORE] Skipping malformed UTXO in snapshot: %s", e)
                 continue
 
-        log.debug(f"Loaded {len(selected_keys)} selected keys from snapshot")
+        if not restored_utxos:
+            log.warning("[RESTORE] No valid UTXOs could be built from JSON")
+            return current_enriched, "Snapshot contains no usable UTXOs", None, False, False, "failed", "", "", "Recommended — ~40% pruned (balanced savings & privacy)", 546
 
-        if isinstance(current_enriched, tuple) and len(current_enriched) == 2:
-            meta, utxos = current_enriched
-            utxos = list(utxos)
-        else:
-            meta = {}
-            utxos = list(current_enriched or [])
-
-        if not utxos:
-            log.info("Current enriched state empty — restore deferred until analysis")
-            return (), (
-                "<div style='color:#aaffcc;padding:30px;background:#001100;border:2px solid #00ff88;border-radius:16px;text-align:center;'>"
-                "<span style='color:#00ffdd;font-size:1.6rem;font-weight:900;'>Selection file loaded!</span><br><br>"
-                "<strong>Table is empty — restore will happen after:</strong><br>"
-                "1. Paste the same addresses/xpubs<br>"
-                "2. Click ANALYZE (table must load first)<br>"
-                "3. Upload JSON again — checkboxes will restore<br><br>"
-                "If table stays empty, check your address input."
-                "</div>"
-            ), parsed_snapshot.get("fingerprint"), False
-
-        updated = []
-        matched = 0
-        for u in utxos:
-            new_u = dict(u)
-            txid_lower = str(u.get("txid", "")).lower().strip()
-            vout = None
-            try:
-                vout_raw = u.get("vout")
-                vout = int(vout_raw) if vout_raw is not None else None
-            except (ValueError, TypeError):
-                pass
-
-            is_selected = (txid_lower, vout) in selected_keys if vout is not None else False
-            new_u["selected"] = is_selected
-            if is_selected:
-                matched += 1
-            updated.append(new_u)
-
-        log.debug(f"Restore complete - matched {matched}/{len(selected_keys)}")
-
-        return_tuple = (meta, tuple(updated)) if meta else tuple(updated)
-
-        if matched == 0:
-            message = (
-                "<div style='color:#ffddaa;padding:30px;background:#332200;border:2px solid #ff9900;border-radius:16px;text-align:center;'>"
-                "<span style='color:#ffff66;font-size:1.6rem;font-weight:900;'>Selection loaded — no matching UTXOs found</span><br><br>"
-                f"File contains {len(selected_keys)} UTXOs.<br>"
-                "They don't match current analysis (different addresses? UTXOs spent? txid case?).<br>"
-                "Checkboxes not restored."
-                "</div>"
+        # ── SORT by pruning priority ────────────────────────────────────────────
+        # DUST/HEAVY first (lowest HEALTH_PRIORITY), then highest value
+        restored_utxos.sort(
+            key=lambda u: (
+                HEALTH_PRIORITY.get(u.get("health", "UNKNOWN"), 999),  # low number = prune first
+                -u.get("value", 0)                                     # descending value
             )
-        else:
-            message = (
-                "<div style='color:#aaffff;padding:30px;background:#001122;border:2px solid #00ffff;border-radius:16px;text-align:center;'>"
-                f"<span style='color:#00ffff;font-size:1.6rem;font-weight:900;'>Selection loaded — {matched}/{len(selected_keys)} UTXOs restored "
-                f"({len(utxos)} total in current table)</span>"
+        )
+        log.info("[RESTORE] Sorted %d UTXOs: pruning priority (DUST/HEAVY top), then value descending", len(restored_utxos))
+
+        # Metadata from snapshot
+        scan_source_restored = parsed_snapshot.get("scan_source", "")
+        dest_restored = parsed_snapshot.get("dest_addr_override", "")
+        strategy_restored = parsed_snapshot.get("strategy", "Recommended — ~40% pruned (balanced savings & privacy)")
+        dust_threshold_restored = parsed_snapshot.get("dust_threshold", 546)
+        fingerprint = parsed_snapshot.get("fingerprint")
+
+        log.info("[RESTORE] Successfully restored %d UTXOs from JSON (missing addresses: %d)",
+                 len(restored_utxos), missing_address_count)
+
+        meta = {
+            "strategy": strategy_restored,
+            "scan_source": scan_source_restored,
+            "timestamp": int(time.time()),
+            "restored_from": "snapshot"
+        }
+
+        return_tuple = (meta, tuple(restored_utxos))
+
+        message = (
+            "<div style='color:#aaffff;padding:30px;background:#001122;border:2px solid #00ffff;border-radius:16px;text-align:center;'>"
+            f"<span style='color:#00ffff;font-size:1.6rem;font-weight:900;'>Table restored from snapshot — {len(restored_utxos)} UTXOs loaded!</span><br>"
+            "<small>Selection, strategy, dust threshold and metadata fully recovered.<br>"
+            "Ready to generate PSBT — no ANALYZE needed.</small>"
+            "</div>"
+        )
+
+        if missing_address_count:
+            message += (
+                "<br><br><div style='color:#ff9900; font-weight:900; background:rgba(255,153,0,0.1); padding:12px; border-radius:8px;'>"
+                f"Warning: {missing_address_count} UTXO(s) missing address → no scriptPubKey.<br>"
+                "PSBT generation may fail or exclude those inputs. "
+                "Re-analyze with original addresses to fix."
                 "</div>"
             )
 
-        loaded_fp = parsed_snapshot.get("fingerprint")
-        if loaded_fp:
-            message += f"<br><small style='color:#88ffcc;'>Loaded fingerprint: {loaded_fp[:16]}...</small>"
+        if fingerprint:
+            message += f"<br><small style='color:#88ffcc;'>Fingerprint: {fingerprint[:16]}...</small>"
 
-        return return_tuple, message, loaded_fp, False  # reset change flag
+        return return_tuple, message, fingerprint, False, True, "success", scan_source_restored, dest_restored, strategy_restored, dust_threshold_restored
 
     except Exception as e:
-        log.error(f"Error processing selection snapshot: {e}", exc_info=True)
-        return current_enriched, f"Failed to process selection: {str(e)}", None, False
-
-
+        log.error("[RESTORE] Failed to process snapshot: %s", str(e), exc_info=True)
+        return current_enriched, f"Restore failed: {str(e)}", None, False, False, "failed", "", "", "Recommended — ~40% pruned (balanced savings & privacy)", 546
+		
 # ── Rebuild DataFrame rows from enriched state (for restore / refresh) ───────────
 def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
     """
@@ -744,7 +815,6 @@ def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
     elif isinstance(enriched_state, (list, tuple)):
         state_list = list(enriched_state)
     else:
-        log.warning(f"Invalid enriched_state type: {type(enriched_state)}")
         return [], False
 
     rows = []
@@ -2851,13 +2921,41 @@ def _extract_selected_utxos(enriched_state: tuple) -> List[dict]:
     Safely extract currently selected UTXOs from the frozen enriched_state.
     Respects the canonical model: only uses 'selected' flags from immutable tuple.
     """
+    log.info("[EXTRACT] _extract_selected_utxos called")
+
     if not enriched_state:
+        log.info("[EXTRACT] enriched_state is empty or None — returning []")
         return []
 
     # Unpack frozen state (invariant: always (meta, tuple[dict]))
-    _, utxos = enriched_state if isinstance(enriched_state, tuple) and len(enriched_state) == 2 else (None, enriched_state)
+    if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
+        meta, utxos = enriched_state
+        log.info(f"[EXTRACT] Unpacked tuple: meta={meta}, utxos type={type(utxos)}, length={len(utxos)}")
+    else:
+        meta = None
+        utxos = enriched_state
+        log.info(f"[EXTRACT] Non-tuple enriched_state: type={type(enriched_state)}, length={len(utxos) if isinstance(utxos, (list, tuple)) else 'N/A'}")
 
-    return [u for u in utxos if u.get("selected", False)]
+    # Convert to list if needed (safety)
+    utxos = list(utxos) if isinstance(utxos, (tuple, list)) else []
+
+    if not utxos:
+        log.info("[EXTRACT] No UTXOs after unpacking — returning []")
+        return []
+
+    # Log sample to see 'selected' flags
+    sample_selected = sum(1 for u in utxos[:5] if u.get("selected", False))
+    log.info(f"[EXTRACT] Sample (first 5 UTXOs) — selected count: {sample_selected}")
+    if sample_selected == 0:
+        log.warning("[EXTRACT] No selected flags in first 5 UTXOs — checking full list")
+
+    selected = [u for u in utxos if u.get("selected", False)]
+    log.info(f"[EXTRACT] Final selected UTXOs count: {len(selected)}")
+
+    if len(selected) == 0:
+        log.warning("[EXTRACT] Zero selected UTXOs returned — possible checkbox sync issue")
+
+    return selected
 
 
 def _create_psbt_snapshot(
@@ -2866,9 +2964,12 @@ def _create_psbt_snapshot(
     dest_override: Optional[str],
     fee_rate: int,
     future_fee_rate: int,
+    strategy: str,             # NEW
+    dust_threshold: int,       # NEW
 ) -> dict:
     """
     Create deterministic, audit-friendly JSON snapshot of user selection.
+    Now includes strategy and dust_threshold for full restore.
     """
     if not selected_utxos:
         raise ValueError("No UTXOs selected for snapshot")
@@ -2899,11 +3000,13 @@ def _create_psbt_snapshot(
         "dest_addr_override": dest_override_clean,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
+        "strategy": strategy,                 # NEW — full strategy string
+        "dust_threshold": dust_threshold,     # NEW — dust slider value
         "pruned_count": len(clean_inputs),
         "inputs": clean_inputs,
     }
 
-    # Fingerprint: exclude variable fields
+    # Fingerprint: exclude variable/user-specific fields
     canonical_data = {
         k: v for k, v in snapshot.items()
         if k not in ["timestamp", "scan_source", "dest_addr_override"]
@@ -2915,7 +3018,7 @@ def _create_psbt_snapshot(
     snapshot["fingerprint_short"] = fingerprint[:16].upper()
 
     return snapshot
-
+	
 def _persist_snapshot(snapshot: dict) -> str:
     """
     Persist snapshot to temp file:
@@ -2978,7 +3081,9 @@ def on_generate(
     future_fee_rate: int,
     enriched_state: tuple,
     scan_source: str,
-	offline_mode: bool = False
+	strategy: str,               
+    dust_threshold: int,   
+    offline_mode: bool = False
 ) -> tuple:
     """
     Freeze user intent on "Generate" click.
@@ -2993,7 +3098,21 @@ def on_generate(
         log.info("enriched_state is empty — nothing to generate")
         return None, [], gr.update(value=False), None
 
+    log.info(f"on_generate called — enriched_state type: {type(enriched_state)}, length: {len(enriched_state) if enriched_state else 'None'}")
+
+    if not enriched_state:
+        log.info("enriched_state empty — aborting generate")
+        return None, [], gr.update(value=False), None, "Nothing to generate — click ANALYZE first."
+
+    log.info("Extracting selected UTXOs from enriched_state...")
+    
     selected_utxos = _extract_selected_utxos(enriched_state)
+    log.info(f"Selected UTXOs after extraction: count = {len(selected_utxos)}")
+
+    if not selected_utxos:
+        log.warning("No selected UTXOs found — user may have no checkboxes checked")
+        return None, [], gr.update(value=False), None, "No UTXOs selected — check at least one box in the table."
+
     log.info(f"Selected UTXOs count: {len(selected_utxos)}")
 
     if not selected_utxos:
@@ -3008,8 +3127,10 @@ def on_generate(
             selected_utxos=selected_utxos,
             scan_source=scan_source,
             dest_override=cleaned_dest,
+            strategy=strategy,
             fee_rate=fee_rate,
             future_fee_rate=future_fee_rate,
+            dust_threshold=dust_threshold
         )
 
         log.debug("Snapshot created — persisting to file...")
@@ -3021,7 +3142,6 @@ def on_generate(
     except Exception as e:
         log.error(f"Snapshot creation failed: {e}", exc_info=True)
         return None, [], gr.update(value=False), None
-        
 # ====================
 # generate_psbt() helpers
 # ====================
@@ -3076,6 +3196,8 @@ class PsbtParams:
     dest_override: Optional[str]
     fee_rate: int
     future_fee_rate: int
+    strategy: str                      
+    dust_threshold: int                 
     fingerprint_short: str
     full_spend_no_change: bool = False
 
@@ -3086,11 +3208,12 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
         scan_source=snapshot["scan_source"],
         dest_override=snapshot.get("dest_addr_override"),
         fee_rate=snapshot["fee_rate"],
-        future_fee_rate=snapshot["future_fee_rate"],  # NEW
+        future_fee_rate=snapshot["future_fee_rate"],
+        strategy=snapshot.get("strategy", "Recommended — ~40% pruned (balanced savings & privacy)"),
+        dust_threshold=snapshot.get("dust_threshold", 546),
         fingerprint_short=snapshot["fingerprint_short"],
         full_spend_no_change=snapshot.get("full_spend_no_change", False),
     )
-
 
 def _resolve_destination(
     dest_override: Optional[str],
@@ -3098,29 +3221,40 @@ def _resolve_destination(
     enriched_state: Optional[tuple] = None,
     offline_mode: bool = False
 ) -> Union[bytes, str]:
-    """
-    Resolve final destination address to scriptPubKey (bytes) or return user-facing error HTML.
-
-    Logic:
-    - Offline mode priority: use first bc1q… or bc1p… from enriched UTXOs (manual paste)
-    - Else: override → scan_source
-    - No destination → return empty bytes (absorb to fee = full cleanup)
-    - Only allow modern outputs: P2WPKH (bc1q...) or Taproot (bc1p...)
-    - Legacy/Nested rejected with clear error
-
-    Returns:
-        bytes: valid scriptPubKey if modern
-        str: HTML error message if invalid/unsupported
-    """
     override_clean = (dest_override or "").strip()
     if "offline mode" in override_clean.lower() or len(override_clean) < 10:
         override_clean = ""  # ignore placeholder / empty
+
     source_clean = scan_source.strip()
 
     final_dest = ""
 
-    # Offline priority: scan enriched UTXOs for first VALID modern address
-    if offline_mode and enriched_state and len(enriched_state) == 2:
+    # Priority 1: User override (highest priority)
+    if override_clean:
+        try:
+            spk_test, meta_test = address_to_script_pubkey(override_clean)
+            if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
+                final_dest = override_clean
+                log.info("[DEST-RESOLVE] Using user override (priority 1): %s", final_dest)
+            else:
+                log.warning("[DEST-RESOLVE] Override address not modern: %s", override_clean)
+        except Exception:
+            log.debug("[DEST-RESOLVE] Invalid override address: %s", override_clean)
+
+    # Priority 2: Original scan_source (most logical default after override)
+    if not final_dest and source_clean:
+        try:
+            spk_test, meta_test = address_to_script_pubkey(source_clean)
+            if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
+                final_dest = source_clean
+                log.info("[DEST-RESOLVE] Using original scan_source (priority 2): %s", final_dest)
+            else:
+                log.debug("[DEST-RESOLVE] scan_source not modern: %s", source_clean)
+        except Exception:
+            log.debug("[DEST-RESOLVE] Invalid scan_source: %s", source_clean)
+
+    # Priority 3: First modern address from enriched UTXOs (restore/offline fallback)
+    if not final_dest and enriched_state and len(enriched_state) == 2:
         _, utxos = enriched_state
         for u in utxos:
             addr = u.get("address", "").strip()
@@ -3129,49 +3263,34 @@ def _resolve_destination(
                     spk_test, meta_test = address_to_script_pubkey(addr)
                     if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
                         final_dest = addr
-                        log.debug(f"Offline mode: using valid change addr from paste: {final_dest}")
+                        log.info("[DEST-RESOLVE] Fallback to first modern UTXO addr (priority 3): %s", final_dest)
                         break
                 except Exception:
-                    log.debug(f"Skipping invalid addr in paste: {addr}")
+                    log.debug("[DEST-RESOLVE] Skipping invalid UTXO addr: %s", addr)
         else:
-            log.debug("Offline mode: no valid modern address found in pasted UTXOs")
+            log.debug("[DEST-RESOLVE] No modern addr found in enriched UTXOs")
 
-    # Fallback to override or scan_source
+    # No destination → full cleanup
     if not final_dest:
-        final_dest = override_clean if override_clean else source_clean
-
-    # No destination → full cleanup (absorb change into fee)
-    if not final_dest:
+        log.info("[DEST-RESOLVE] No destination resolved → full fee absorb")
         return b''
 
-    log.debug(f"Final destination resolved to: '{final_dest}' (offline={offline_mode})")
+    log.debug("[DEST-RESOLVE] Final destination: '%s'", final_dest)
 
     try:
         spk, meta = address_to_script_pubkey(final_dest)
         typ = meta.get('type', 'unknown')
 
-        # Enforce modern change output only
+        log.info("[DEST-RESOLVE] Success — final_dest='%s' | type='%s' | dest_spk_len=%d | is_empty=%s",
+                 final_dest, typ, len(spk), spk == b'')
+
         if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
+            log.warning("[DEST-RESOLVE] Rejected legacy/nested: %s (%s)", final_dest, typ)
             return (
-                "<div style='"
-                "color:#ff3366 !important; "
-                "padding: clamp(20px, 5vw, 32px) !important; "
-                "background:#330000 !important; "
-                "border:3px solid #ff3366 !important; "
-                "border-radius:14px !important; "
-                "box-shadow:0 0 40px rgba(255,51,102,0.5) !important; "
-                "text-align:center !important; "
-                "max-width:95% !important; "
-                "margin:20px auto !important;"
-                "'>"
-                "<div style='font-size:clamp(1.3rem, 5vw, 1.7rem); font-weight:900;'>"
-                "Change address must be modern"
-                "</div><br>"
-                "Only <span style='font-weight:900;'>bc1q… (Native SegWit)</span> or "
-                "<span style='font-weight:900;'>bc1p… (Taproot)</span> allowed.<br><br>"
-                f"Detected: <span style='font-weight:900;'>{typ}</span><br>"
-                "Legacy (1…) or Nested (3…) outputs create very expensive change in 2025+ fee environment.<br><br>"
-                "In offline mode: include at least one valid bc1q… or bc1p… in your pasted UTXOs."
+                "<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                "Change address must be modern (bc1q… or bc1p… only)<br><br>"
+                f"Detected: {typ}<br>"
+                "Legacy/Nested not allowed for change."
                 "</div>"
             )
 
@@ -3179,17 +3298,14 @@ def _resolve_destination(
         return spk
 
     except Exception as e:
-        log.error("Failed to resolve destination '%s': %s", final_dest, str(e), exc_info=True)
+        log.error("[DEST-RESOLVE] Failed to resolve '%s': %s", final_dest, str(e), exc_info=True)
         return (
             "<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
-            "Invalid destination address<br><br>"
-            "Must be a valid modern Bitcoin address:<br>"
-            "• <span style='font-weight:900;'>bc1q…</span> — Native SegWit<br>"
-            "• <span style='font-weight:900;'>bc1p…</span> — Taproot<br><br>"
-            "Legacy (1…) and Nested (3…) are not allowed for change."
+            "Invalid change address<br><br>"
+            "Must be valid bc1q… (Native SegWit) or bc1p… (Taproot)"
             "</div>"
         )
-
+		
 def _build_unsigned_tx(
     inputs: list[dict],
     econ: TxEconomics,
@@ -3198,12 +3314,7 @@ def _build_unsigned_tx(
 ) -> tuple[Tx, list[dict], str, bool]:
     """
     Construct unsigned transaction and prepare UTXO info for PSBT.
-
-    Returns:
-        tx: Unsigned Tx object
-        utxos_for_psbt: Prepared UTXO dicts for PSBT input maps
-        no_change_warning: HTML warning (if no change address or absorbed)
-        has_change_output: True if a real change output was added
+    Guarantees at least one output (OP_RETURN if no change).
     """
     tx = Tx()
     utxos_for_psbt: list[dict[str, Any]] = []
@@ -3211,56 +3322,59 @@ def _build_unsigned_tx(
     for u in inputs:
         try:
             txid_str = u["txid"]
-            if not isinstance(txid_str, str) or len(txid_str) != 64 or not all(c in '0123456789abcdefABCDEF' for c in txid_str):
-                raise ValueError(f"Invalid txid format: {txid_str}")
             txid_bytes = bytes.fromhex(txid_str)
             vout = int(u["vout"])
-        except (ValueError, TypeError, KeyError) as e:
-            raise ValueError(f"Invalid txid/vout in input: {e} - UTXO: {u}")
+        except (ValueError, KeyError) as e:
+            raise ValueError(f"Invalid txid/vout in restored input: {e}")
 
         tx.tx_ins.append(TxIn(txid_bytes, vout))
 
-        # Prepare UTXO for PSBT witness data
-        _, meta = address_to_script_pubkey(u["address"])
-        spk = meta.get("scriptPubKey") or address_to_script_pubkey(u["address"])[0]
+        # Prepare witness UTXO for PSBT
+        spk = u.get("scriptPubKey")
+        if not spk or not isinstance(spk, bytes):
+            ident = f"txid={u['txid'][:12]}... vout={u['vout']}"
+            raise ValueError(f"Missing or invalid scriptPubKey for input {ident}")
 
+        witness_utxo = (
+            u["value"].to_bytes(8, "little") +
+            encode_varint(len(spk)) +
+            spk
+        )
         utxos_for_psbt.append({
             "value": u["value"],
             "scriptPubKey": spk,
             "script_type": u.get("script_type", "unknown"),
         })
 
-    # Change / remainder logic
     change_amt = econ.change_amt
-    if params.full_spend_no_change:
-        change_amt = econ.total_in - econ.fee  # Force full spend (absorb everything)
-
-    no_change_warning = ""
     has_change_output = False
+    no_change_warning = ""
 
     if change_amt > 0:
-        if dest_spk:
+        if dest_spk and len(dest_spk) > 0:
             # Normal change output
             tx.tx_outs.append(TxOut(change_amt, dest_spk))
             has_change_output = True
         else:
-            # No destination address — absorb remainder
+            # No valid destination → burn to OP_RETURN
+            op_return_script = b"\x6a\x14Prune: no change addr"  # OP_RETURN + 20-byte message
+            tx.tx_outs.append(TxOut(0, op_return_script))
             no_change_warning = (
-                "<div style='"
-                "color:#ff9900 !important;"
-                "background:rgba(51,34,0,0.6) !important;"
-                "border:2px solid #ff9900 !important;"
-                "border-radius:12px !important;"
-                "padding:16px !important;"
-                "margin:16px 0 !important;"
-                "text-align:center !important;"
-                "font-weight:600 !important;"
-                "'>"
-                "⚠️ No change address provided<br>"
-                "All remaining value absorbed into fees (full wallet cleanup).<br><br>"
-                "To receive change, include at least one bc1q… or bc1p… address in your pasted UTXOs."
+                "<div style='color:#ff9900;padding:16px;background:#331100;border:2px solid #ff9900;border-radius:12px;text-align:center;margin:16px 0;'>"
+                "⚠️ No valid change address provided → value absorbed into fee + tiny OP_RETURN burn<br>"
+                "<small>All remaining sats sent to miners (full consolidation mode)</small>"
                 "</div>"
             )
+    else:
+        # Full absorption / cleanup — add marker OP_RETURN for validity & clarity
+        op_return_script = b"\x6a\x0fFull prune cleanup"  # OP_RETURN + short message
+        tx.tx_outs.append(TxOut(0, op_return_script))
+        no_change_warning = (
+            "<div style='color:#88ffcc;padding:16px;background:#001100;border:2px solid #00ff88;border-radius:12px;text-align:center;margin:16px 0;'>"
+            "Full consolidation — all value sent to fee + OP_RETURN marker<br>"
+            "<small>No change output created (normal for deep cleanups)</small>"
+            "</div>"
+        )
 
     return tx, utxos_for_psbt, no_change_warning, has_change_output
 	
@@ -3270,56 +3384,54 @@ def _build_unsigned_tx(
 
 def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
     """
-    Generate QR code HTML for PSBT with graceful fallback for large payloads.
-    Returns (qr_html, qr_warning).
+    Generate QR code HTML for PSBT — safe fallback if too large.
+    Forces version 40 + low correction for borderline sizes.
     """
-    # QR version 40 max ~2953 chars — safe threshold
-    if len(psbt_b64) > 2900:
+    psbt_len = len(psbt_b64)
+    log.info("[QR] Attempting QR for PSBT of %d characters", psbt_len)
+
+    MAX_QR_CHARS = 2953  # version 40 theoretical max (alphanumeric, low correction)
+
+    if psbt_len > MAX_QR_CHARS:
         qr_html = ""
         qr_warning = (
-            "<div style='"
-            "margin: clamp(30px, 8vw, 60px) 0 !important;"
-            "padding: clamp(24px, 6vw, 40px) !important;"
-            "background:#221100 !important;"
-            "border:4px solid #ff9900 !important;"
-            "border-radius:18px !important;"
-            "text-align:center !important;"
-            "font-size: clamp(1.15rem, 4.5vw, 1.4rem) !important;"
-            "color:#ffeecc !important;"
-            "box-shadow:0 0 70px rgba(255,153,0,0.6) !important;"
-            "max-width:95% !important;"
-            "margin-left:auto !important;"
-            "margin-right:auto !important;"
-            "'>"
-            "<span style='color:#ffff66 !important; font-size: clamp(1.4rem, 6vw, 1.8rem) !important; font-weight:900 !important; text-shadow:0 0 35px #ffff00 !important;'>"
+            "<div style='margin:30px 0;padding:24px;background:#221100;border:4px solid #ff9900;border-radius:18px;text-align:center;color:#ffeecc;box-shadow:0 0 70px rgba(255,153,0,0.6);max-width:95%;'>"
+            "<span style='color:#ffff66;font-size:1.8rem;font-weight:900;text-shadow:0 0 35px #ffff00;'>"
             "PSBT Too Large for QR Code"
             "</span><br><br>"
-            f"<span style='color:#ffddaa !important; font-size: clamp(1rem, 3.8vw, 1.2rem) !important;'>"
-            f"Size: {len(psbt_b64):,} characters"
+            f"<span style='color:#ffddaa;font-size:1.2rem;'>"
+            f"Length: {psbt_len:,} characters ({psbt_len/1024:.1f} KB)<br>"
+            f"Max QR capacity: ~{MAX_QR_CHARS} characters (version 40)"
             "</span><br><br>"
-            "Use the <span style='color:#00ffff !important; font-size: clamp(1.2rem, 5vw, 1.5rem) !important; font-weight:900 !important; text-shadow:0 0 30px #00ffff !important;'>"
-            "COPY PSBT"
-            "</span> button below and paste directly into your wallet.<br><br>"
-            "<span style='color:#aaffff !important; font-size: clamp(0.95rem, 3.5vw, 1.1rem) !important;'>"
-            "Sparrow • Coldcard • Electrum • UniSat • Nunchuk • OKX"
-            "</span>"
+            "<strong>Use COPY PSBT below</strong> and paste directly into your wallet.<br>"
+            "<small style='color:#aaffff;'>Sparrow, Coldcard, Electrum, UniSat, Nunchuk, OKX all support raw PSBT paste.</small>"
             "</div>"
         )
+        log.warning("[QR] PSBT too large (%d chars > %d) — QR skipped", psbt_len, MAX_QR_CHARS)
         return qr_html, qr_warning
 
-    # Normal QR generation
-    error_correction = (
-        qrcode.constants.ERROR_CORRECT_L if len(psbt_b64) > 2600
-        else qrcode.constants.ERROR_CORRECT_M
-    )
+    # Force safe params for borderline/large data
     qr = qrcode.QRCode(
-        version=None,
-        error_correction=error_correction,
+        version=40,  # force max version — avoids auto-fit crash
+        error_correction=qrcode.constants.ERROR_CORRECT_L,  # lowest correction = max data capacity
         box_size=6,
         border=4,
     )
     qr.add_data(f"bitcoin:?psbt={psbt_b64}")
-    qr.make(fit=True)
+
+    try:
+        qr.make(fit=False)  # fit=False since we forced version
+    except Exception as e:
+        log.warning("[QR] QR make failed even with version 40: %s", e)
+        qr_html = ""
+        qr_warning = (
+            "<div style='margin:30px 0;padding:24px;background:#221100;border:4px solid #ff9900;border-radius:18px;text-align:center;color:#ffeecc;'>"
+            "<span style='color:#ffff66;font-size:1.8rem;font-weight:900;'>QR Generation Failed</span><br><br>"
+            "PSBT is large and couldn't fit in a single QR code.<br>"
+            "Use COPY PSBT below and paste directly into your wallet."
+            "</div>"
+        )
+        return qr_html, qr_warning
 
     img = qr.make_image(fill_color="#f7931a", back_color="#000000")
     buf = io.BytesIO()
@@ -3327,35 +3439,19 @@ def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
     qr_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
     qr_html = (
-        f'<img src="{qr_uri}" style="'
-        "width:100% !important;height:auto !important;display:block !important;"
-        "image-rendering:crisp-edges !important;border-radius:12px !important;\" "
-        "alt=\"PSBT QR Code\"/>"
+        f'<img src="{qr_uri}" style="width:100%;height:auto;display:block;image-rendering:crisp-edges;border-radius:12px;" alt="PSBT QR Code"/>'
     )
 
     qr_warning = ""
-    if len(psbt_b64) > 2600:
+    if psbt_len > 2600:
         qr_warning = (
-            "<div style='"
-            "margin-top: clamp(12px, 3vw, 20px) !important;"
-            "padding: clamp(10px, 3vw, 16px) !important;"
-            "background:#331a00 !important;"
-            "border:1px solid #ff9900 !important;"
-            "border-radius:12px !important;"
-            "color:#ffb347 !important;"
-            "font-size: clamp(0.9rem, 3.2vw, 1rem) !important;"
-            "line-height:1.5 !important;"
-            "text-align:center !important;"
-            "max-width:95% !important;"
-            "margin-left:auto !important;"
-            "margin-right:auto !important;"
-            "'>"
-            "Large PSBT — if QR scan fails, use <span style='color:#00ffff !important;font-weight:900 !important;'>COPY PSBT</span> and paste manually."
+            "<div style='margin-top:12px;padding:10px;background:#331a00;border:1px solid #ff9900;border-radius:12px;color:#ffb347;text-align:center;'>"
+            "Large PSBT — QR may be small/dense. If scan fails, use COPY PSBT."
             "</div>"
         )
 
+    log.info("[QR] QR generated successfully (%d chars)", psbt_len)
     return qr_html, qr_warning
-
 
 def _compose_psbt_html(
     fingerprint: str,
@@ -3766,7 +3862,14 @@ def generate_psbt(
     psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
     qr_html, qr_warning = _generate_qr(psbt_b64)
 
-    # Additional warnings
+    # Show PSBT size in UI for transparency (especially useful for large wallets)
+    psbt_size_info = (
+        f"<div style='color:#88ffcc;text-align:center;margin:12px 0;'>"
+        f"PSBT size: {len(psbt_b64):,} characters ({len(psbt_b64)/1024:.1f} KB)"
+        f"</div>"
+    )
+
+    # Additional warnings (start empty — append if needed)
     extra_note = ""
     if legacy_excluded:
         extra_note += (
@@ -3788,6 +3891,8 @@ def generate_psbt(
         dest_override=params.dest_override,
         fee_rate=params.fee_rate,
         future_fee_rate=params.future_fee_rate,
+        strategy=params.strategy,               # ← added
+        dust_threshold=params.dust_threshold    # ← added
     )
 
     # Fingerprint comparison banner
@@ -3823,7 +3928,6 @@ def generate_psbt(
         no_change_warning=no_change_warning,
         fp_banner=fp_banner
     )
-
 
 def analyze_and_show_summary(
     addr_input,
@@ -4011,38 +4115,44 @@ def update_status_and_ui(offline: bool | None, dark: bool | None) -> str:
     </div>
     """
 	
-# ── Offline toggle handler ─────────────────────────────────────
-def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
+# =============================
+# — Centralized UI toggle handler (all-in-one)
+# =============================
+def ui_toggle_handler(offline: bool, restore: bool, dark: bool) -> tuple:
     global _is_offline
-    _is_offline = bool(offline)  # sync global flag
-    
-    manual_box_vis = gr.update(visible=offline)
-    
-    addr_interactive = gr.update(interactive=not offline)
-    dest_interactive = gr.update(interactive=not offline)
-    
-    addr_placeholder = (
-        "Offline mode active — paste raw UTXOs below (txid:vout:value[:address])\n"
-        "Include at least one bc1q… or bc1p… address for change output."
-        if offline
-        else "Paste a single modern Bitcoin address (bc1q…, bc1p…, 1…, or 3…)\n"
-             "Only the first valid address is used."
-    )
-    
-    dest_placeholder = (
-        "Offline mode active — change address set via manual UTXO paste"
-        if offline
-        else "Paste Bitcoin address for change output (optional)"
-    )
-    
-    addr_value = "" if offline else gr.update()
-    dest_value_update = "" if offline else gr.update()
-    
-    # Disable fee preset buttons in offline mode
-    fee_btn_interactive = gr.update(interactive=not offline)
-    
-    status_html = update_status_and_ui(offline, dark)
+    _is_offline = bool(offline)
 
+    # Visibility & disable logic
+    manual_box_update = gr.update(visible=offline)           # raw UTXO paste — Offline only
+    restore_area_update = gr.update(visible=restore)         # JSON upload — Restore only
+
+    disabled = offline or restore
+
+    addr_update = gr.update(
+        interactive=not disabled,
+        placeholder=(
+            "Offline mode active — paste raw UTXOs below (txid:vout:value[:address])"
+            if offline else
+            "Restore active — addresses from JSON snapshot"
+            if restore else
+            "Paste a single modern Bitcoin address (bc1q…, bc1p…, 1…, or 3…)"
+        ),
+        value="" if disabled else None,  # clear when disabled, preserve when enabled
+    )
+
+    dest_update = gr.update(
+        interactive=not disabled,
+        placeholder=(
+            "Offline mode active — change via manual UTXO paste"
+            if offline else
+            "Restore active — change from JSON snapshot"
+            if restore else
+            "Paste Bitcoin address for change output (optional)"
+        ),
+        value="" if disabled else None,
+    )
+
+    # Fee info banner — only "Offline" when offline
     fee_info_update = gr.update(
         value="""
         <div style="
@@ -4080,24 +4190,20 @@ def offline_toggle_handler(offline: bool, dark: bool) -> tuple:
         </div>
         """
     )
-    
-    badge_update = update_prune_badge(offline)
+    prune_badge_update = update_prune_badge(offline)
+
+    status_update = update_status_and_ui(offline, dark)
 
     return (
-        manual_box_vis,         # 0
-        addr_value,             # 1
-        addr_interactive,       # 2
-        addr_placeholder,       # 3
-        dest_value_update,      # 4
-        dest_interactive,       # 5
-        dest_placeholder,       # 6
-        status_html,            # 7
-        fee_btn_interactive,    # 8: economy_btn interactive
-        fee_btn_interactive,    # 9: hour_btn interactive
-        fee_btn_interactive,    # 10: halfhour_btn interactive
-        fee_btn_interactive,    # 11: fastest_btn interactive
-        fee_info_update,        # 12: fee preset info text
-        badge_update,           # 13: prune_badge
+        manual_box_update,
+        restore_area_update,  # add if needed
+        addr_update,
+        dest_update,
+        fee_info_update,
+        prune_badge_update,
+        status_update,
+        gr.update(value=offline),   
+        gr.update(value=restore)
     )
 # --------------------------
 # Gradio UI
@@ -4846,7 +4952,8 @@ body:not(.dark-mode) .footer-donation button {
         Completely lock the UI after successful PSBT generation.
         Disables inputs/sliders/toggles/buttons, hides unnecessary elements,
         shows export area and locked badge.
-        Returns 22-tuple matching Gradio output order.
+        Resets restore toggle/area for clean state.
+        Returns tuple matching Gradio output order (now includes restore components).
         """
         return (
             gr.update(visible=False),                    # 0: gen_btn
@@ -4856,20 +4963,23 @@ body:not(.dark-mode) .footer-donation button {
             gr.update(visible=False, interactive=False), # 4: import_file
             "<div class='locked-badge'>LOCKED</div>",    # 5: locked_badge
             gr.update(interactive=False),                # 6: addr_input
-            gr.update(interactive=False),                # 7: dest (destination textbox)
-            gr.update(interactive=False),                # 8: strategy dropdown
-            gr.update(interactive=False),                # 9: dust slider
+            gr.update(interactive=False),                # 7: dest
+            gr.update(interactive=False),                # 8: strategy
+            gr.update(interactive=False),                # 9: dust
             gr.update(interactive=False),                # 10: fee_rate_slider
             gr.update(interactive=False),                # 11: future_fee_slider
-            gr.update(interactive=False),                # 13: offline_toggle
-            gr.update(interactive=False),                # 14: theme_checkbox
-            gr.update(interactive=False),                # 15: manual_utxo_input
-            gr.update(interactive=False),                # 16: economy_btn
-            gr.update(interactive=False),                # 17: hour_btn
-            gr.update(interactive=False),                # 18: halfhour_btn
-            gr.update(interactive=False),                # 19: fastest_btn
-            gr.update(visible=False),                    # 20: load_json_btn (hide when locked)
-            gr.update(visible=False),                    # 21: file uploader (optional extra hide)
+            gr.update(interactive=False),                # 12: offline_toggle
+            gr.update(interactive=False),                # 13: theme_checkbox
+            gr.update(interactive=False),                # 14: manual_utxo_input
+            gr.update(interactive=False),                # 15: economy_btn
+            gr.update(interactive=False),                # 16: hour_btn
+            gr.update(interactive=False),                # 17: halfhour_btn
+            gr.update(interactive=False),                # 18: fastest_btn
+            gr.update(visible=False),                    # 19: load_json_btn
+            gr.update(visible=False),                    # 20: file uploader (import_file)
+            gr.update(visible=False),                    # 21: restore_toggle — hide/lock
+            gr.update(visible=False),                    # 22: restore_area — hide
+            # Add more if you have extra restore outputs (e.g. restore status message)
         )
 
     # =============================
@@ -4963,6 +5073,28 @@ body:not(.dark-mode) .footer-donation button {
                     interactive=True
                 )
 
+        # ── Restore Previous Selection (toggle to show upload area) ──
+        restore_toggle = gr.Checkbox(
+            label="Restore Previous Pruning Session from JSON?",
+            value=False,
+            interactive=True,
+            info="Load saved selection to skip re-analyzing. Offline-safe (no API calls).",
+			elem_id="restore-toggle"
+        )
+
+        # Only wrap the upload + button in the toggle-able area
+        with gr.Row(visible=False) as restore_area:
+            import_file = gr.File(
+                label="Upload your saved Ωmega Pruner .json file",
+                file_types=[".json"],
+                type="filepath",
+            )
+            load_json_btn = gr.Button("Restore Session", variant="primary")
+
+        # Keep these at top level — always active
+        json_parsed_state = gr.State({})  # global state — never hide
+        warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
+
         # ── Main Input Fields ──
         with gr.Row():
             addr_input = gr.Textbox(
@@ -4974,6 +5106,8 @@ body:not(.dark-mode) .footer-donation button {
                 ),
                 lines=4,
                 scale=2,
+				interactive=True,
+				value=None,
             )
 
             dest = gr.Textbox(
@@ -4984,6 +5118,8 @@ body:not(.dark-mode) .footer-donation button {
                     "• Leave blank → returns to original scanned address<br>"
                 ),
                 scale=1,
+				interactive=True,
+				value=None,
             )
 
         # === AIR-GAPPED / OFFLINE MODE HEADER ===
@@ -5032,6 +5168,7 @@ body:not(.dark-mode) .footer-donation button {
                     value=False,
                     interactive=True,
                     info="No API calls • Paste raw UTXOs • True cold wallet prep",
+					elem_id="offline-toggle"
                 )
 
         with gr.Row(visible=False) as manual_box_row:
@@ -5221,19 +5358,6 @@ No API calls • Fully air-gapped safe""",
             outputs=dest_value
         )
 
-        # Import file last
-        import_file = gr.File(
-            label="Restore Previous Ωmega Selection: Upload your saved .json file",
-            file_types=[".json"],
-            type="filepath",
-            visible=False,
-        )
-
-        load_json_btn = gr.Button("Load Selection from JSON", variant="primary", visible=False)
-        json_parsed_state = gr.State({})  # ← dict instead of str
-
-        warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
-
         gr.HTML("""
             <div style="width: 100%; margin-top: 25px;"></div>
             <div class="check-to-prune-header">
@@ -5406,13 +5530,108 @@ No API calls • Fully air-gapped safe""",
             reset_btn = gr.Button("NUCLEAR RESET — START OVER — NO FUNDS AFFECTED", variant="secondary")
 			
     # =============================
-    # — Handlers —
+    # — Attach handlers to toggles
     # =============================
 
+     # 1. Simple visibility for Restore area (independent, keep separate)
+    restore_toggle.change(
+        fn=lambda toggle: gr.update(visible=toggle),
+        inputs=[restore_toggle],
+        outputs=[restore_area],
+    )
+
+    # 2. Full UI sync on Offline toggle
+    offline_toggle.change(
+        fn=ui_toggle_handler,
+        inputs=[offline_toggle, restore_toggle, theme_checkbox],
+        outputs=[
+            manual_box_row,
+            restore_area,
+            addr_input,
+            dest,
+            fee_preset_info,
+            prune_badge,
+            mode_status,
+            offline_toggle,
+            restore_toggle,
+        ]
+    )
+
+    # 3. Full UI sync on Restore toggle
+    restore_toggle.change(
+        fn=ui_toggle_handler,
+        inputs=[offline_toggle, restore_toggle, theme_checkbox],
+        outputs=[
+            manual_box_row,
+            restore_area,
+            addr_input,
+            dest,
+            fee_preset_info,
+            prune_badge,
+            mode_status,
+            offline_toggle,
+            restore_toggle,
+        ]
+    )
+	
+    # =============================
+    # — Symmetric last-click wins exclusivity (no stuck toggle)
+    # =============================
+
+    # Handler for when Offline is toggled
+    # If user just turned Offline ON → force Restore OFF
+    offline_toggle.change(
+        fn=lambda offline_val: gr.update(value=False) if offline_val else gr.update(),
+        inputs=[offline_toggle],
+        outputs=[restore_toggle],
+        js="""
+        (offline_val) => {
+            if (offline_val) {
+                // User just turned Offline ON → uncheck Restore instantly in browser
+                const restoreCheckbox = document.getElementById('restore-toggle');
+                if (restoreCheckbox && restoreCheckbox.checked) {
+                    restoreCheckbox.checked = false;
+                    restoreCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        }
+        """
+    )
+
+    # Handler for when Restore is toggled
+    # If user just turned Restore ON → force Offline OFF
+    restore_toggle.change(
+        fn=lambda restore_val: gr.update(value=False) if restore_val else gr.update(),
+        inputs=[restore_toggle],
+        outputs=[offline_toggle],
+        js="""
+        (restore_val) => {
+            if (restore_val) {
+                // User just turned Restore ON → uncheck Offline instantly in browser
+                const offlineCheckbox = document.getElementById('offline-toggle');
+                if (offlineCheckbox && offlineCheckbox.checked) {
+                    offlineCheckbox.checked = false;
+                    offlineCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        }
+        """
+    )
+	
+    #Theme toggle (only needs status update)
     theme_checkbox.change(
-        fn=update_status_and_ui,
-        inputs=[offline_toggle, theme_checkbox],
-        outputs=mode_status,
+        fn=ui_toggle_handler,
+        inputs=[offline_toggle, restore_toggle, theme_checkbox],
+        outputs=[
+            manual_box_row,
+            addr_input,
+            dest,
+            fee_preset_info,
+            prune_badge,
+            mode_status,
+            offline_toggle,
+            restore_toggle,
+        ],
         js="""
         () => {
             const toggle = document.getElementById('theme-checkbox');
@@ -5420,36 +5639,6 @@ No API calls • Fully air-gapped safe""",
             document.body.classList.toggle('dark-mode', isDark);
         }
         """
-    )
-
-    # 2. Pure Python handler: ONLY banner text update (runs reliably)
-    theme_checkbox.change(
-        fn=update_status_and_ui,
-        inputs=[offline_toggle, theme_checkbox],
-        outputs=[mode_status]
-    )
-	
-    # Also update banner when offline toggle changes (no JS needed here)
-    offline_toggle.change(
-        fn=offline_toggle_handler,
-        inputs=[offline_toggle, theme_checkbox],  # fixed: use theme_checkbox
-        outputs=[
-            manual_box_row,        # 0: manual visibility
-            addr_input,            # 1: addr value
-            addr_input,            # 2: addr interactive
-            addr_input,            # 3: addr placeholder
-            dest,                  # 4: NEW - dest value
-            dest,                  # 5: NEW - dest interactive
-            dest,                  # 6 placeholder
-            mode_status,           # 7 banner
-            economy_btn,           # 8 interactive
-            hour_btn,              # 9 interactive
-            halfhour_btn,          # 10 interactive
-            fastest_btn,           # 11 interactive
-            fee_preset_info,       # 12: info text + classes
-			prune_badge,           # 13: prune_badge
-			
-        ],
     )
 
     # =============================
@@ -5464,11 +5653,11 @@ No API calls • Fully air-gapped safe""",
         btn.click(
             fn=partial(apply_fee_preset_locked, preset=preset),
             inputs=[locked, offline_toggle],
-            outputs=fee_rate_slider, # current fee rate slider
+            outputs=fee_rate_slider,
         )
 
     # =============================
-    # — Import File (pure state mutation) — Now with Button for stability
+    # — Import File (pure state mutation — JSON is authoritative)
     # =============================
     load_json_btn.click(
         fn=process_uploaded_file,
@@ -5476,14 +5665,29 @@ No API calls • Fully air-gapped safe""",
         outputs=[json_parsed_state],
     ).then(
         fn=load_selection,
-        inputs=[json_parsed_state, enriched_state],
+        inputs=[json_parsed_state, enriched_state, offline_toggle],
         outputs=[
             enriched_state,
             warning_banner,
             loaded_fingerprint,
-            selection_changed_after_load  # NEW
+            selection_changed_after_load,
+            gr.State(),              # success
+            gr.State(),              # status
+            gr.State(),              # scan_src
+            gr.State(),              # dest_r
+            gr.State(),              # strat_r
+            gr.State()               # dust_r
         ],
-        js="() => { console.log('LOAD_JSON_BUTTON_CLICKED'); return true; }"
+    ).then(
+        fn=lambda s, src, d, st, du: [
+            gr.update(value=src or ""),
+            gr.update(value=d or ""),
+            gr.update(value=st or "Recommended — ~40% pruned (balanced savings & privacy)"),
+            gr.update(value=du or 546),
+            gr.update(visible=not s)   # hide analyze if success
+        ],
+        inputs=[gr.State(), gr.State(), gr.State(), gr.State(), gr.State()],
+        outputs=[addr_input, dest, strategy, dust, analyze_btn],
     ).then(
         fn=rebuild_df_rows,
         inputs=[enriched_state],
@@ -5501,12 +5705,7 @@ No API calls • Fully air-gapped safe""",
             offline_toggle,
         ],
         outputs=[status_output, generate_row]
-    ).then(
-        fn=lambda x: print(">>> RESTORE_CHAIN_COMPLETED - enriched len:", len(x) if x else 0),
-        inputs=[enriched_state],
-        outputs=[gr.State()]
     )
-
     # =============================
     # — ANALYZE BUTTON (pure data loading + affordances) —
     # =============================
@@ -5547,7 +5746,9 @@ No API calls • Fully air-gapped safe""",
             future_fee_slider,
             enriched_state,
             scan_source,
-            offline_toggle,          # NEW: pass offline mode state
+			strategy,
+			dust,
+            offline_toggle,       
         ],
         outputs=[psbt_snapshot, selected_utxos_for_psbt, locked, export_file],
     ).then(
@@ -5556,8 +5757,8 @@ No API calls • Fully air-gapped safe""",
             psbt_snapshot,
             selected_utxos_for_psbt,
             df,
-            offline_toggle,          # NEW: pass to generate_psbt
-            enriched_state,           # NEW: pass enriched_state for offline change preference
+            offline_toggle,      
+            enriched_state,           
             loaded_fingerprint,
             selection_changed_after_load
         ],
@@ -5584,8 +5785,10 @@ No API calls • Fully air-gapped safe""",
             hour_btn,
             halfhour_btn,
             fastest_btn,
-            load_json_btn,          # ← NEW
-            import_file,            # ← Optional: hide uploader too (if you want double-hide)
+            load_json_btn,        
+            import_file,           
+            restore_toggle,         
+            restore_area,          
         ],
     ).then(
         lambda: gr.update(interactive=False),
@@ -5594,14 +5797,14 @@ No API calls • Fully air-gapped safe""",
         lambda: True,
         outputs=locked,
     )
-     # =============================
+    # =============================
     # — NUCLEAR RESET BUTTON —
     # =============================
     def nuclear_reset():
         """NUCLEAR RESET — silent wipe of state and affordances."""
         return (
-            fresh_empty_dataframe(),
-            tuple(),                                                 # enriched_state — empty
+            fresh_empty_dataframe(),                                 # df
+            tuple(),                                                 # enriched_state
             gr.update(value=""),                                     # warning_banner
             gr.update(visible=True),                                 # analyze_btn — show
             gr.update(visible=False),                                # generate_row — hide
@@ -5609,15 +5812,15 @@ No API calls • Fully air-gapped safe""",
             False,                                                   # locked — unlock
             "",                                                      # locked_badge — clear
             gr.update(value="", interactive=True),                   # addr_input
-            gr.update(value="", interactive=True),                   # dest_value — ENABLE + clear
+            gr.update(value="", interactive=True),                   # dest
             gr.update(interactive=True),                             # strategy
             gr.update(interactive=True),                             # dust
             gr.update(interactive=True),                             # fee_rate_slider
             gr.update(interactive=True),                             # future_fee_slider
             gr.update(value=False, interactive=True),                # offline_toggle
-            gr.update(value="", interactive=True),                    # manual_utxo_input
-            gr.update(visible=False),                                # manual_box_row 
-            gr.update(value= True, interactive=True),                 # theme_checkbox
+            gr.update(value="", interactive=True),                   # manual_utxo_input
+            gr.update(visible=False),                                # manual_box_row
+            gr.update(value=True, interactive=True),                 # theme_checkbox — reset to dark
             gr.update(interactive=True),                             # fastest_btn
             gr.update(interactive=True),                             # halfhour_btn
             gr.update(interactive=True),                             # hour_btn
@@ -5625,9 +5828,12 @@ No API calls • Fully air-gapped safe""",
             gr.update(visible=False),                                # export_title_row
             gr.update(visible=False),                                # export_file_row
             None,                                                    # export_file
-            gr.update(value=None, visible=False, interactive=True),  # import_file
-            "",                                                      # psbt_output — clear PSBT
-			gr.update(visible=False),								 # ← load_json_btn hidden on reset
+            gr.update(value=None, visible=True, interactive=True),  # import_file
+            "",                                                      # psbt_output
+            gr.update(visible=True, interactive=True),               # load_json_btn — SHOW + interactive
+            gr.update(value=False, visible=True, interactive=True),  # restore_toggle — off + visible + clickable
+            gr.update(visible=False),                                # restore_area — hide
+            "",                                                      # clear any restore message if you have one
         )
 
     reset_btn.click(
@@ -5651,7 +5857,7 @@ No API calls • Fully air-gapped safe""",
             offline_toggle,
             manual_utxo_input,
             manual_box_row,
-            theme_checkbox,               # ← added: reset theme to default (dark on)
+            theme_checkbox,
             fastest_btn,
             halfhour_btn,
             hour_btn,
@@ -5662,20 +5868,23 @@ No API calls • Fully air-gapped safe""",
             import_file,
             psbt_output,
             load_json_btn,
+            restore_toggle,           
+            restore_area,        
+            gr.State()              
         ],
     ).then(
         fn=lambda: (
-            "",                          # status_output cleared
-            gr.update(visible=False),    # generate_row hidden
-            gr.update(visible=True)      # analyze_btn re-shown
+            "",                        
+            gr.update(visible=False),  
+            gr.update(visible=True)    
         ),
         outputs=[status_output, generate_row, analyze_btn]
     ).then(
         fn=update_status_and_ui,
-        inputs=[offline_toggle, theme_checkbox],   # ← changed to theme_checkbox
+        inputs=[offline_toggle, theme_checkbox],
         outputs=[mode_status]
     )
-      # =============================
+    # =============================
     # — LIVE INTERPRETATION (single source of truth) —
     # =============================
     df.change(
@@ -5683,7 +5892,7 @@ No API calls • Fully air-gapped safe""",
         inputs=[df, enriched_state, locked],
         outputs=enriched_state,
     ).then(
-        fn=lambda: True,  # user changed selection
+        fn=lambda: True, 
         outputs=selection_changed_after_load
     ).then(
         fn=generate_summary_safe,
