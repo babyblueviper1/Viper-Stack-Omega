@@ -1,9 +1,9 @@
 # Ωmega Pruner — Fee-Aware UTXO Consolidation  
 ## Design Overview
 
-Ωmega Pruner is an experimental tool for **fee-aware and time-aware UTXO consolidation**, with explicit, user-visible exposure to **Common Input Ownership Heuristic (CIOH)** tradeoffs.
+Ωmega Pruner is an experimental tool for **fee-aware and time-aware UTXO consolidation**, with deliberate, user-visible exposure to **Common Input Ownership Heuristic (CIOH)** tradeoffs.
 
-Rather than treating consolidation as a one-time wallet cleanup, the project frames it as an **economic decision made under changing network conditions**, where timing, fee environment, and linkage risk matter as much as transaction construction.
+Rather than treating consolidation as a one-time wallet cleanup, the project frames it as an **economic decision made under observable network conditions**, where timing, fee environment, and linkage risk are as consequential as transaction construction itself.
 
 > **Visual reference:**  
 > System flow and threat-model diagrams are included in the full README:  
@@ -17,23 +17,23 @@ Rather than treating consolidation as a one-time wallet cleanup, the project fra
 
 ## Core Question
 
-Can UTXO consolidation decisions be modeled as **economic and time-dependent choices**—rather than a static cleanup operation—**without increasing address linkage or CIOH exposure**?
+Can UTXO consolidation be modeled as a **fee- and time-dependent economic choice**—rather than a static cleanup operation—**without increasing address linkage or CIOH exposure**?
 
 ---
 
 ## Design Goals
 
-- Treat consolidation as **fee- and time-dependent**, not opportunistic
-- Surface **privacy and CIOH tradeoffs before** transaction construction
+- Treat consolidation as **time- and fee-contextual**, not opportunistic
+- Surface **privacy and CIOH tradeoffs before** any transaction is constructed
 - Preserve **determinism and signability** across software and hardware wallets
-- Avoid hidden aggregation, inference, or wallet-level heuristics
-- Ensure all risk signals are **visible, explicit, and user-controlled**
+- Avoid hidden aggregation, inference, or wallet-level assumptions
+- Ensure all risk signals are **user-visible and decision-relevant**
 
 ---
 
 ## Scope & Threat Model
 
-Ωmega Pruner operates under a deliberately **constrained and explicit scope**:
+Ωmega Pruner operates under a deliberately **constrained scope**:
 
 - **Single address per run**
 - No cross-wallet or multi-account aggregation
@@ -41,16 +41,16 @@ Can UTXO consolidation decisions be modeled as **economic and time-dependent cho
 - Deterministic input selection → predictable signing behavior
 - Outputs are reproducible given identical inputs and fee context
 
-This constraint is intentional.  
-Reducing scope is treated as a **security property**, not a limitation.
+This constraint is intentional.
 
-By refusing to infer wallet structure or user intent, the tool minimizes CIOH amplification and avoids false certainty derived from assumed relationships between UTXOs.
+Reducing scope is treated as a **security property**, not a limitation.  
+By refusing to infer wallet structure or user intent, the tool minimizes CIOH amplification and avoids false certainty derived from assumed UTXO relationships.
 
 ---
 
 ## Fee Context & Timing Model
 
-Ωmega Pruner evaluates consolidation decisions against **observed network conditions**, not static fee presets.
+Ωmega Pruner evaluates consolidation decisions against **observed network conditions**, not fixed fee presets.
 
 The current **economy fee** is compared against mined historical medians:
 
@@ -60,9 +60,10 @@ The current **economy fee** is compared against mined historical medians:
 
 (Fee data sourced from **mempool.space** mining statistics.)
 
-This comparison enables users to reason explicitly about **“consolidate now vs later” regret**, expressed directly in sats, *before* any PSBT is constructed.
+This comparison allows users to reason explicitly about **“consolidate now vs later” regret**, expressed directly in sats, *before* any PSBT is constructed.
 
-The fee context layer is informational and advisory; it does not auto-select or override user intent.
+The fee context layer is **advisory only**.  
+It informs decision-making but does not auto-select inputs or override user intent.
 
 ---
 
@@ -97,14 +98,80 @@ This condition is surfaced clearly in the UI and does **not** block transaction 
 
 ## Safety Properties
 
-Ωmega Pruner is designed to be interruptible, inspectable, and non-authoritative:
+Ωmega Pruner is designed to be **inspectable, interruptible, and non-authoritative**:
 
 - No custody of keys or funds
 - No transaction signing or broadcasting
 - No background state mutation
-- Offline / air-gapped operation supported via raw UTXO input
+- Offline / air-gapped operation via raw UTXO input
 - Deterministic export (JSON + cryptographic fingerprint)
 - All computation is local, reviewable, and user-initiated
+
+---
+## Assumptions & Failure Modes
+
+Ωmega Pruner is intentionally narrow. Its guarantees hold **only** if the following assumptions are understood and respected.
+
+### Core Assumptions
+
+- **User intent is deliberate**  
+  The user understands that UTXO consolidation is irreversible once spent and reviews all warnings before proceeding.
+
+- **Input data is accurate**  
+  UTXOs provided by the user correctly represent the address being analyzed.  
+  The tool does not verify ownership, provenance, or wallet context.
+
+- **Observed fees are representative, not predictive**  
+  Fee medians reflect recent mined conditions, not future certainty.  
+  The tool assumes past conditions are a useful *context*, not a guarantee.
+
+- **Single-address scope is sufficient**  
+  The user does not expect cross-address, cross-wallet, or account-level inference.
+
+---
+
+### Known Failure Modes
+
+- **Fee regime shifts**  
+  Sudden mempool shocks (spam waves, market events, miner behavior changes) may invalidate short-term fee comparisons after analysis.
+
+- **Hardware wallet signing refusal**  
+  Taproot PSBTs without explicit derivation paths may fail to sign on some hardware devices, despite being structurally valid.
+
+- **False sense of optimality**  
+  A favorable fee comparison does **not** imply a consolidation is privacy-optimal, future-proof, or globally optimal — only that it is economically favorable *relative to recent history*.
+
+- **Unmodeled linkage outside scope**  
+  CIOH exposure is evaluated **within the provided input set only**.  
+  Linkage arising from prior transactions, external surveillance, or wallet behavior is out of scope.
+
+- **User misinterpretation**  
+  The tool surfaces tradeoffs; it does not make decisions.  
+  Acting without understanding the warnings negates the tool’s safety model.
+
+---
+
+### Non-Failures (By Design)
+
+The following are **not** considered failures, even if they surprise users:
+
+- The tool refusing to consolidate Legacy or Nested SegWit inputs
+- The absence of automatic selection or optimization
+- The inability to infer wallet structure or ownership
+- The requirement for manual review before PSBT export
+
+These behaviors are deliberate and preserve the tool’s security and privacy guarantees.
+
+---
+
+### Design Position
+
+Ωmega Pruner does not attempt to eliminate risk.
+
+It attempts to **make risk legible before it becomes irreversible**.
+
+Any consolidation decision made with incomplete information is the user’s responsibility —  
+the tool’s responsibility is to ensure that **no risk is hidden by design**.
 
 ---
 
@@ -124,7 +191,7 @@ These exclusions prevent silent linkage, hidden assumptions, and irreversible pr
 
 ## Current Limitations
 
-- Single-address only
+- Single-address scope only
 - Legacy and Nested SegWit inputs cannot be consolidated
 - No automatic Taproot derivation path recovery
 - No batch, multi-wallet, or coordinator functionality
@@ -135,6 +202,6 @@ These exclusions prevent silent linkage, hidden assumptions, and irreversible pr
 
 **Active experiment.**
 
-The project prioritizes correctness, determinism, and explicit tradeoffs over convenience.
+The project prioritizes correctness, determinism, and visible tradeoffs over convenience.
 
 Critical review and adversarial feedback are encouraged.
