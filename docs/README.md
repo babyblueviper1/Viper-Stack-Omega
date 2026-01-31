@@ -59,7 +59,7 @@ Spend or migrate them separately before consolidation.
 
 Ωmega Pruner enforces a strict **single-scope safety model**:
 
-- One address **or** one xpub per run
+- One address per run
 - **No** cross-wallet or multi-wallet mixing
 - **No** hidden aggregation — ever
 - Deterministic selection → predictable signing → reduced CIOH risk
