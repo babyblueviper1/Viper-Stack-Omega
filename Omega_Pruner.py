@@ -5352,18 +5352,54 @@ No API calls • Fully air-gapped safe""",
         # Fee sliders
         with gr.Row():
             fee_rate_slider = gr.Slider(
-                1, 300, 15, step=1, label="Fee Rate now (sat/vB)", scale=3,
+                minimum=1,
+                maximum=300,
+                value=15,
+                step=1,
+                label="Fee rate for consolidation now (sat/vB)",
+                scale=3,
             )
             future_fee_slider = gr.Slider(
-                5, 500, value=60, step=1, label="Future fee rate in 3–6 months (sat/vB)", scale=3,
+                minimum=5,
+                maximum=500,
+                value=60,
+                step=1,
+                label="Expected future fee environment (3–6 months)",
+                scale=3,
             )
 
         with gr.Row():
-            economy_btn = gr.Button("Economy", size="sm", elem_classes="fee-btn", interactive=True)
-            hour_btn = gr.Button("1 hour", size="sm", elem_classes="fee-btn", interactive=True)
-            halfhour_btn = gr.Button("30 min", size="sm", elem_classes="fee-btn", interactive=True)
-            fastest_btn = gr.Button("Fastest", size="sm", elem_classes="fee-btn", interactive=True)
+            economy_btn   = gr.Button("Economy",   size="sm", elem_classes="fee-btn", interactive=True)
+            hour_btn      = gr.Button("1 hour",    size="sm", elem_classes="fee-btn", interactive=True)
+            halfhour_btn  = gr.Button("30 min",    size="sm", elem_classes="fee-btn", interactive=True)
+            fastest_btn   = gr.Button("Fastest",   size="sm", elem_classes="fee-btn", interactive=True)
 
+        pre_analysis_info = gr.HTML("""
+<div style="
+    margin: 12px auto 8px auto;
+    padding: 12px 16px;
+    max-width: 720px;
+    text-align: center;
+    color: #88ffcc;
+    font-size: clamp(0.9rem, 3.2vw, 1.05rem);
+    background: rgba(0, 40, 20, 0.6);
+    border: 1px solid #00ff88;
+    border-radius: 10px;
+    box-shadow: 0 0 18px rgba(0,255,136,0.15);
+    line-height: 1.5;
+">
+    <span style="color:#aaffff !important; font-weight:700 !important;">What this does:</span><br>
+    These values estimate whether consolidating now reduces future costs.<br>
+    Lower current fees vs higher future fees favor consolidation.
+    <br><br>
+    <span style="color:#aaffff !important; font-weight:700 !important;">Timing hint:</span><br>
+    Consolidation is most effective when today’s economy rate is below recent mined medians.
+    <br><br>
+    <span style="color:#aaffff !important; font-weight:700 !important;">Next step:</span><br>
+    Click <span style="color:#00ffff !important; font-weight:700 !important; background:rgba(0,255,255,0.08) !important; padding:2px 4px; border-radius:4px;">Analyze & Load UTXOs</span> to evaluate network conditions and privacy trade-offs<br>
+    before any PSBT is created.
+</div>
+""")
         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
 
         # States (invisible)
@@ -5555,7 +5591,7 @@ No API calls • Fully air-gapped safe""",
 
         # Reset button (final control)
         with gr.Column():
-            reset_btn = gr.Button("NUCLEAR RESET — START OVER — NO FUNDS AFFECTED", variant="secondary")
+            reset_btn = gr.Button("RESET SESSION — START OVER — NO FUNDS AFFECTED", variant="secondary")
 			
     # =============================
     # — Attach handlers to toggles
