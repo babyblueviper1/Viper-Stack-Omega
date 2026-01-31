@@ -5,6 +5,8 @@
 designed to help users make **economically informed and privacy-conscious wallet cleanup decisions**
 under changing network conditions.
 
+**No inputs are processed until the user explicitly chooses to analyze.**
+
 > **Terminology note:**  
 > “Pruning” here refers to *wallet-side UTXO consolidation*,  
 > **not** Bitcoin Core’s node-level UTXO set pruning.
@@ -16,43 +18,56 @@ under changing network conditions.
 > A longer, text-heavy README with architecture diagrams and the explicit
 > threat model lives in  
 > **[`docs/README.md`](docs/README.md)**.
----
-### New in v11.1
 
-- **Pruning Conditions Badge** — fee-context snapshot
+---
+
+## New in v11.1
+
+- **Network Conditions Badge** — fee-context snapshot  
 - Current economy fee vs 1-day / 1-week / 1-month medians (mempool.space mining data)  
 - Clear vertical layout: **current fee → VS → medians** (1-day → 1-week → 1-month)  
 - Live BTC price + block height + hashrate  
 - Next difficulty adjustment + halving countdown  
-- **Instant insight**: know if now is prime pruning time — before pasting anything
+- **Instant insight**: assess whether consolidation conditions are favorable — before pasting anything
 
-### Optimized for Modern Bitcoin
+---
+
+## Optimized for Modern Bitcoin
 
 **Fully supported input types:**
 - Native SegWit (`bc1q…`)
 - Taproot (`bc1p…`)
 
-**Legacy (`1…`) and Nested SegWit (`3…`) inputs** are displayed for transparency only and **cannot be pruned** (faded, disabled checkboxes).  
+**Legacy (`1…`) and Nested SegWit (`3…`) inputs** are displayed for transparency only and **cannot be pruned**  
+(faded rows, disabled checkboxes).  
 Spend or convert them separately before consolidation.
 
-### Scope & Safety Model (Important)
+---
+
+## Scope & Safety Model (Important)
 
 - Single-address analysis only  
 - **No** cross-wallet or multi-wallet mixing  
 - **No** hidden aggregation — ever  
-- Deterministic results → safer signing → minimized CIOH risk
+- Deterministic results → safer signing → minimized CIOH risk  
 
-### Hardware Wallet & Taproot Notes
+---
+
+## Hardware Wallet & Taproot Notes
 
 - Taproot inputs may require a derivation path for some hardware wallets  
-- If no derivation path is provided, PSBTs are still valid but signing may fail on certain devices  
+- If no derivation path is provided, PSBTs remain valid but signing may fail on certain devices  
 - A **non-blocking warning** appears when this condition is detected  
-- **No re-generation with corrected path** is currently supported — use a wallet that already knows the account (e.g., Sparrow) or recreate the tx there
+- **No automatic re-generation with corrected paths** is currently supported  
+  — use a wallet that already knows the account (e.g., Sparrow) or recreate the transaction there
 
-### Core Features
+---
+
+## Core Features
 
 - Table-first interface — data loads instantly, act before reading  
-- Unambiguous labeling — no confusion between pre- and post-prune states  
+- Analysis-first flow — intent is evaluated before any commitment  
+- Unambiguous labeling — no confusion between pre- and post-consolidation states  
 - CIOH recovery guidance — warnings translated into concrete next steps  
 - **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls  
 - Pure dark nuclear mode — full contrast, no haze  
@@ -60,19 +75,24 @@ Spend or convert them separately before consolidation.
 - Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
 - **Privacy Score (0–100)** — linkage, merge exposure, CIOH risk  
 - Tiered CIOH warnings — color-coded and impossible to miss  
-- “Consolidate now vs later” fee delta — see future regret in sats
+- “Consolidate now vs later” fee delta — see future regret in sats  
 - Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
 - Live wallet footprint comparison — before / after cleanup  
 - **NUCLEAR WALLET CLEANUP** confirmation step  
 - 100% preview → PSBT fidelity  
 - Zero custody • Full coin control • RBF • Taproot • Dust-resistant  
 
-**Custom builds** → babyblueviperbusiness@gmail.com
+---
 
-**Limitations**
+## Limitations
+
 - Only Native SegWit & Taproot inputs can be pruned  
-- Legacy/Nested inputs cannot be included in PSBTs  
+- Legacy and Nested SegWit inputs cannot be included in PSBTs  
 - No automatic derivation path inference for Taproot hardware signing  
-- Single-address scope only — no batch/multi-wallet support
+- Single-address scope only — no batch or multi-wallet support  
 
-**Prune smarter. Win forever. • Ω**
+---
+
+**Consolidate smarter. Win forever. • Ω**
+
+**Custom builds** → babyblueviperbusiness@gmail.com
