@@ -1,10 +1,11 @@
 # Ωmega Pruner v11.1 — Forged Anew  
 **Reclaim Sovereignty**
 
-Ωmega Pruner is a **fee-aware UTXO consolidation tool** designed to surface **privacy tradeoffs** before any transaction is constructed.
+Ωmega Pruner is a **fee-aware UTXO consolidation tool** built to surface **privacy tradeoffs**
+before any transaction is constructed.
 
-It is non-custodial and condition-aware.  
-**No inputs are processed until the user chooses to analyze.**
+It is non-custodial and responsive to real network conditions.  
+**No inputs are processed until the user explicitly chooses to analyze.**
 
 > **Terminology note:**  
 > “Pruning” here refers to *wallet-side UTXO consolidation*,  
@@ -21,12 +22,15 @@ It is non-custodial and condition-aware.
 
 ## New in v11.1
 
-- **Network Conditions Badge** — fee-context snapshot  
-- Current economy fee vs 1-day / 1-week / 1-month medians (mempool.space mining data)  
-- Clear vertical layout: **current fee → VS → medians** (1-day → 1-week → 1-month)  
-- Live BTC price + block height + hashrate  
-- Next difficulty adjustment + halving countdown  
-- **Instant insight**: assess whether consolidation conditions are favorable — before pasting anything
+- **Network Conditions Badge** — immediate fee-context snapshot  
+- Current economy fee vs 1-day / 1-week / 1-month mined medians  
+  (mempool.space mining data)  
+- Clear vertical layout: **current fee → VS → medians**  
+  (1-day → 1-week → 1-month)  
+- Live BTC price, block height, and network hashrate  
+- Next difficulty adjustment and halving countdown  
+- **Instant insight:** assess whether consolidation conditions are favorable  
+  *before pasting anything*
 
 ---
 
@@ -36,8 +40,9 @@ It is non-custodial and condition-aware.
 - Native SegWit (`bc1q…`)
 - Taproot (`bc1p…`)
 
-**Legacy (`1…`) and Nested SegWit (`3…`) inputs** are displayed for transparency only and **cannot be pruned**  
-(faded rows, disabled checkboxes).  
+**Legacy (`1…`) and Nested SegWit (`3…`) inputs** are displayed for transparency only and  
+**cannot be consolidated** (faded rows, disabled checkboxes).
+
 Spend or convert them separately before consolidation.
 
 ---
@@ -47,7 +52,7 @@ Spend or convert them separately before consolidation.
 - Single-address analysis only  
 - **No** cross-wallet or multi-wallet mixing  
 - **No** hidden aggregation — ever  
-- Deterministic results → safer signing → minimized CIOH risk  
+- Deterministic results → safer signing → reduced CIOH risk  
 
 ---
 
@@ -63,12 +68,12 @@ Spend or convert them separately before consolidation.
 
 ## Core Features
 
-- Table-first interface — data loads instantly, act before reading  
+- Table-first interface — data loads instantly; decide before reading  
 - Analysis-first flow — intent is evaluated before any commitment  
 - Unambiguous labeling — no confusion between pre- and post-consolidation states  
 - CIOH recovery guidance — warnings translated into concrete next steps  
 - **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls  
-- Pure dark nuclear mode — full contrast, no haze  
+- Pure dark mode — full contrast, no haze  
 - Deterministic selection export — JSON + cryptographic fingerprint  
 - Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
 - **Privacy Score (0–100)** — linkage, merge exposure, CIOH risk  
@@ -84,7 +89,7 @@ Spend or convert them separately before consolidation.
 
 ## Limitations
 
-- Only Native SegWit & Taproot inputs can be pruned  
+- Only Native SegWit and Taproot inputs can be consolidated  
 - Legacy and Nested SegWit inputs cannot be included in PSBTs  
 - No automatic derivation path inference for Taproot hardware signing  
 - Single-address scope only — no batch or multi-wallet support  
