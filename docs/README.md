@@ -15,7 +15,7 @@ under real, observable network conditions.
 
 > **Design note:**  
 > A technical overview of the fee model, scope constraints, and CIOH tradeoffs  
-> is available in **[design.md`](design.md)**.
+> is available in **[`design.md`](design.md)**.
 
 **LIVE:** https://omega-pruner.onrender.com  
 **Launched:** 26 December 2025  
@@ -48,7 +48,7 @@ Optimized for modern Bitcoin script types:
 
 These provide superior fee efficiency, cleaner accounting, and forward compatibility.
 
-**Legacy (`1…`) and Nested SegWit (`3…`)** inputs are shown for transparency only and  
+**Legacy (`1…`) and Nested SegWit (`3…`)** inputs are displayed for transparency only and  
 **cannot be consolidated** (faded, disabled).
 
 Spend or migrate them separately before consolidation.
@@ -63,7 +63,7 @@ Spend or migrate them separately before consolidation.
 - **No** cross-wallet or multi-wallet mixing
 - **No** hidden aggregation — ever
 - Deterministic selection → predictable signing → reduced CIOH risk
-- Wallet-side analysis only — no node state, no broadcast role
+- Wallet-side analysis only — no node state, no signing, no broadcast role
 
 These constraints are deliberate and foundational to the tool’s guarantees.
 
@@ -91,7 +91,7 @@ Import the PSBT into a wallet that already knows the account
 ## Core Features
 
 - Table-first interface — data loads instantly; decide before reading
-- Explicit labels — no ambiguity between pre- and post-consolidation state
+- Clear labels — no ambiguity between pre- and post-consolidation state
 - CIOH recovery guidance — warnings translated into concrete next steps
 - **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls
 - Pure dark high-contrast mode — clarity over comfort
@@ -110,11 +110,11 @@ Import the PSBT into a wallet that already knows the account
 
 ## Under the Hood — Canonical State Model
 
-| Principle              | Implementation           | Why It Matters             |
-|------------------------|--------------------------|----------------------------|
-| Single source of truth | Immutable enriched state | No stale or desynced UI    |
-| Derived economics      | Live computation         | Internal coherence         |
-| Intent fingerprint    | Deterministic hash       | Provable user intent       |
+| Principle              | Implementation           | Why It Matters          |
+|------------------------|--------------------------|-------------------------|
+| Single source of truth | Immutable enriched state | No stale or desynced UI |
+| Derived economics      | Live computation         | Internal coherence      |
+| Intent fingerprint    | Deterministic hash       | Provable user intent    |
 
 **Audit-friendly. Deterministic. Explicit.**
 
@@ -125,7 +125,7 @@ Import the PSBT into a wallet that already knows the account
 ```text
 ┌──────────────────────────┐
 │        User Input        │
-│     (Single Address) 
+│     (Single Address)     │
 └────────────┬─────────────┘
              │
              ▼
@@ -163,15 +163,15 @@ Import the PSBT into a wallet that already knows the account
              │
              ▼
 ┌──────────────────────────┐
-│   PSBT Construction     │
-│  (unsigned, reproducible)│
+│   PSBT Construction      │
+│ (unsigned, reproducible) │
 └────────────┬─────────────┘
              │
              ▼
 ┌──────────────────────────┐
 │   Deterministic Export   │
-│      & Review            │
-│ (JSON + fingerprint)    │
+│        & Review          │
+│  (JSON + fingerprint)   │
 └──────────────────────────┘
 ````
 
@@ -180,7 +180,7 @@ Import the PSBT into a wallet that already knows the account
 * **Single-entry point:** one address per run
 * **No hidden inference:** no clustering or attribution
 * **Immutable state:** all downstream logic derives from a fixed snapshot
-* **Fee-aware decision layer:** time-context is explicit
+* **Fee-aware decision layer:** time context is explicit
 * **Deterministic output:** identical inputs → identical PSBTs
 * **Human-in-the-loop:** no signing or broadcasting
 
@@ -203,7 +203,7 @@ These are excluded to prevent **false certainty**, **hidden linkage**, and **irr
 ### Security Posture
 
 * **Local-first:** no custody, no signing, no broadcast
-* **Deterministic:** same inputs produce the same outputs
+* **Deterministic:** identical inputs yield identical outputs
 * **Explainable:** every warning and decision is visible
 * **Interruptible:** abort at any stage with no side effects
 
