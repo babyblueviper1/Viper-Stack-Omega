@@ -15,7 +15,7 @@ under real, observable network conditions.
 
 > **Design note:**  
 > A technical overview of the fee model, scope constraints, and CIOH tradeoffs  
-> is available in **[`docs/design.md`](docs/design.md)**.
+> is available in **[design.md`](design.md)**.
 
 **LIVE:** https://omega-pruner.onrender.com  
 **Launched:** 26 December 2025  
