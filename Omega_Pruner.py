@@ -4334,7 +4334,7 @@ with gr.Blocks(
                 ΩMEGA PRUNER
             </div>
 
-            <!-- NUCLEAR COIN CONTROL -->
+            <!-- STRUCTURAL COIN CONTROL -->
             <div style="
                 color: #0f0;
                 font-size: clamp(1.8rem, 7vw, 3.2rem);
@@ -4343,7 +4343,7 @@ with gr.Blocks(
                 text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
                 margin: clamp(20px, 5vw, 35px) 0;
             ">
-                NUCLEAR COIN CONTROL
+                STRUCTURAL COIN CONTROL
             </div>
 
             <!-- Version -->
@@ -4354,7 +4354,7 @@ with gr.Blocks(
                 text-shadow: 0 0 12px #00ffaa;
                 margin: clamp(15px, 4vw, 25px) 0;
             ">
-                FORGED ANEW — v11
+                FORGED ANEW — v11.1
             </div>
 
         <!-- Body text -->
