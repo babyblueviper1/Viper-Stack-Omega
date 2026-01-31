@@ -81,7 +81,7 @@ Spend or convert them separately before consolidation.
 - “Consolidate now vs later” fee delta — see future regret in sats  
 - Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
 - Live wallet footprint comparison — before / after cleanup  
-- **NUCLEAR WALLET CLEANUP** confirmation step  
+- **One-Time Structural Consolidation Warning**  
 - 100% preview → PSBT fidelity  
 - Zero custody • Full coin control • RBF • Taproot • Dust-resistant  
 
