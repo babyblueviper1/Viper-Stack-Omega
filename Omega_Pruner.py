@@ -6110,42 +6110,32 @@ No API calls • Fully air-gapped safe""",
             <br><br>
 
             <!-- CUSTOM BUILDS SECTION -->
-            <div style="margin: clamp(20px, 5vw, 30px) auto; max-width: 720px;">
+            <div style="margin: clamp(20px, 5vw, 30px) auto; max-width: 720px; text-align:center;">
+              <div style="
+                  display: inline-block;
+                  padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 24px);
+                  font-size: clamp(0.9rem, 3.5vw, 1.05rem);
+                  font-weight: 700;
+                  border-radius: 14px;
+                  color: #00ff9d;
+                  background: rgba(0, 40, 20, 0.35);
+                  box-shadow: 0 0 16px rgba(0, 255, 157, 0.35);
+              ">
+                This is a demo. Treat it as such.
+              </div>
+
+              <div style="
+                  margin-top: 10px;
+                  font-size: clamp(0.8rem, 3vw, 0.95rem);
+                  color: #88ffcc;
+                  opacity: 0.85;
+              ">
                 <a href="https://www.babyblueviper.com/p/omega-pruner-custom-builds"
                    target="_blank"
-                   style="color: inherit; text-decoration: none;">
-                    <div style="
-                        display: inline-block;
-                        padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 24px) !important;
-                        margin: clamp(8px, 2vw, 12px) 0 !important;
-                        font-size: clamp(0.9rem, 3.5vw, 1.05rem) !important;
-                        font-weight: 700;
-                        letter-spacing: 0.3px;
-                        border-radius: 14px;
-                        transition: all 0.4s ease;
-                        color: #00ff9d;
-                        background: rgba(0, 40, 20, 0.4);
-                        box-shadow: 0 0 20px rgba(0, 255, 157, 0.4);
-                    ">
-                        This is a demo. Treat it as such.
-                    </div>
-                    <br>
-                    <div style="
-                        display: inline-block;
-                        padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 24px) !important;
-                        margin: clamp(8px, 2vw, 12px) 0 !important;
-                        font-size: clamp(0.9rem, 3.5vw, 1.05rem) !important;
-                        font-weight: 700;
-                        letter-spacing: 0.3px;
-                        border-radius: 14px;
-                        transition: all 0.4s ease;
-                        color: #00ff88;
-                        background: rgba(0, 35, 15, 0.4);
-                        box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
-                    ">
-                        For extended capabilities or tailored integrations, custom versions can be commissioned.
-                    </div>
+                   style="color:#88ffcc; text-decoration:underline;">
+                  Custom builds are available by request.
                 </a>
+              </div>
             </div>
 
 <!-- Donation section – centered QRs + copy buttons -->
