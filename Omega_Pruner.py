@@ -6090,7 +6090,7 @@ No API calls • Fully air-gapped safe""",
                 color: #f7931a;
                 text-shadow: 0 0 15px rgba(247,147,26,0.7);
             ">
-                Ωmega Pruner v11 — Forged Anew
+                Ωmega Pruner v11.1 — Forged Anew
             </div>
 
             <!-- GITHUB LINK -->
