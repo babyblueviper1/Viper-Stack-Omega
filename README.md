@@ -1,11 +1,10 @@
 # Ωmega Pruner v11.1 — Forged Anew  
 **Reclaim Sovereignty**
 
-Ωmega Pruner is a fee-aware **UTXO consolidation analysis and PSBT construction tool**
-designed to help users make **economically informed and privacy-conscious wallet cleanup decisions**
-under changing network conditions.
+Ωmega Pruner is a **fee-aware UTXO consolidation tool** designed to surface **privacy tradeoffs** before any transaction is constructed.
 
-**No inputs are processed until the user explicitly chooses to analyze.**
+It is non-custodial and condition-aware.  
+**No inputs are processed until the user chooses to analyze.**
 
 > **Terminology note:**  
 > “Pruning” here refers to *wallet-side UTXO consolidation*,  
@@ -15,8 +14,7 @@ under changing network conditions.
 > For a formal overview of the fee model, scope, and CIOH tradeoffs, see  
 > **[`docs/design.md`](docs/design.md)**.  
 >  
-> A longer, text-heavy README with architecture diagrams and the explicit
-> threat model lives in  
+> A longer, text-heavy README with architecture diagrams and the threat model lives in  
 > **[`docs/README.md`](docs/README.md)**.
 
 ---
