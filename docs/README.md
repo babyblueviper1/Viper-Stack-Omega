@@ -102,7 +102,7 @@ Import the PSBT into a wallet that already knows the account
 - “Consolidate now vs later” fee delta — quantify future regret in sats
 - Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked
 - Live wallet footprint comparison — before / after consolidation
--**One-Time Structural Consolidation Warning**
+- **One-Time Structural Consolidation Warning**
 - Full preview → PSBT fidelity guarantee
 - Zero custody • Full coin control • RBF • Taproot • Dust-resistant
 
