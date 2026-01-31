@@ -5396,7 +5396,7 @@ No API calls • Fully air-gapped safe""",
     Consolidation is most effective when today’s economy rate is below recent mined medians.
     <br><br>
     <span style="color:#aaffff !important; font-weight:700 !important;">Next step:</span><br>
-    Click <span style="color:#00ffff !important; font-weight:700 !important; background:rgba(0,255,255,0.08) !important; padding:2px 4px; border-radius:4px;">Analyze & Load UTXOs</span> to evaluate network conditions and privacy trade-offs<br>
+    Click the <span style="color:#00ffff !important; font-weight:700 !important;">Analyze & Load UTXOs</span> button below to evaluate network conditions and privacy trade-offs<br>
     before any PSBT is created.
 </div>
 """)
