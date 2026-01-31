@@ -5862,10 +5862,10 @@ No API calls • Fully air-gapped safe""",
         outputs=locked,
     )
     # =============================
-    # — NUCLEAR RESET BUTTON —
+    # — RESET BUTTON —
     # =============================
-    def nuclear_reset():
-        """NUCLEAR RESET — silent wipe of state and affordances."""
+    def reset():
+        """RESET — silent wipe of state and affordances."""
         return (
             fresh_empty_dataframe(),                                 # df
             tuple(),                                                 # enriched_state
@@ -5901,7 +5901,7 @@ No API calls • Fully air-gapped safe""",
         )
 
     reset_btn.click(
-        fn=nuclear_reset,
+        fn=reset,
         inputs=None,
         outputs=[
             df,
