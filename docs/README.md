@@ -125,7 +125,7 @@ Import the PSBT into a wallet that already knows the account
 ```text
 ┌──────────────────────────┐
 │        User Input        │
-│  (Single Address / xpub) │
+│     (Single Address) 
 └────────────┬─────────────┘
              │
              ▼
@@ -177,7 +177,7 @@ Import the PSBT into a wallet that already knows the account
 
 ### Diagram Notes
 
-* **Single-entry point:** one address or xpub per run
+* **Single-entry point:** one address per run
 * **No hidden inference:** no clustering or attribution
 * **Immutable state:** all downstream logic derives from a fixed snapshot
 * **Fee-aware decision layer:** time-context is explicit
