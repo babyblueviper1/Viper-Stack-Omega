@@ -2855,7 +2855,7 @@ def generate_summary_safe(
             line-height:1.6 !important;
             margin-bottom:16px !important;
         ">
-            One-time structural cleanup — the numbers below show why this matters now.
+            This is a one-time structural consolidation.
         </div>
         <div style="
             color:#fff !important;
@@ -2895,7 +2895,7 @@ def generate_summary_safe(
                 text-shadow:0 0 30px #0f0 !important;
                 line-height:1.6 !important;
             ">
-              {savings_label.upper()} WALLET CLEANUP!
+              {savings_label.upper()} WALLET CLEANUP
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;">
               <b style="color:#fff !important;">Current fee (paid now):</b> 
