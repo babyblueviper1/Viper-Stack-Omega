@@ -1,4 +1,5 @@
-# Ωmega Pruner — Fee-Aware UTXO Consolidation  
+# Ωmega Pruner — Fee-Aware UTXO Consolidation
+
 ## Design Overview
 
 Ωmega Pruner is an experimental tool for **fee-aware and time-aware UTXO consolidation**, with deliberate, user-visible exposure to **Common Input Ownership Heuristic (CIOH)** tradeoffs.
@@ -7,7 +8,7 @@ Rather than treating consolidation as a one-time wallet cleanup, the project fra
 
 > **Visual reference:**  
 > System flow and threat-model diagrams are included in the full README:  
-> https://github.com/babyblueviper1/Viper-Stack-Omega/blob/main/docs/README.md
+> [https://github.com/babyblueviper1/Viper-Stack-Omega/blob/main/docs/README.md](https://github.com/babyblueviper1/Viper-Stack-Omega/blob/main/docs/README.md)
 
 > **Terminology note:**  
 > Ωmega Pruner uses *“pruning”* internally to describe **intentional UTXO reduction via consolidation**.  
@@ -48,6 +49,22 @@ By refusing to infer wallet structure or user intent, the tool minimizes CIOH am
 
 ---
 
+## On Offline vs Online Operation
+
+True offline workflows are harder than they appear — and partial implementations often introduce more ambiguity than safety.
+
+Ωmega Pruner does not attempt to simulate or approximate an “offline mode” inside a browser environment. No half-measures are taken.
+
+While PSBTs produced by the tool can be signed in fully offline or air-gapped environments, the analysis phase itself assumes an online context with observable network data.
+
+If a genuinely sound, inspectable, and user-verifiable offline architecture can be achieved in the future, it may be incorporated. Until then, the project remains explicit about what it does and does not guarantee.
+
+More broadly, offline is not automatically safer, just as online is not inherently surveillance. Both can fail. Both can be done well.
+
+Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust — not ideology.
+
+---
+
 ## Fee Context & Timing Model
 
 Ωmega Pruner evaluates consolidation decisions against **observed network conditions**, not fixed fee presets.
@@ -56,7 +73,7 @@ The current **economy fee** is compared against mined historical medians:
 
 - **1-day median**
 - **1-week median** *(primary benchmark)*
-- **1-month median*
+- **1-month median**
 
 (Fee data sourced from **mempool.space** mining statistics.)
 
@@ -102,12 +119,15 @@ This condition is surfaced clearly in the UI and does **not** block transaction 
 
 - No custody of keys or funds
 - No transaction signing or broadcasting
-- No background state mutation
-- Offline / air-gapped operation via raw UTXO input
+- No hidden background state or side effects
 - Deterministic export (JSON + cryptographic fingerprint)
-- All computation is local, reviewable, and user-initiated
+- All computation is explicit, reviewable, and user-initiated
+- PSBTs may be signed in online or fully offline / air-gapped environments
+
+Safety is derived from **scope reduction, determinism, and visibility** — not from attempting to approximate offline guarantees in unsuitable environments.
 
 ---
+
 ## Assumptions & Failure Modes
 
 Ωmega Pruner is intentionally narrow. Its guarantees hold **only** if the following assumptions are understood and respected.
@@ -128,8 +148,6 @@ This condition is surfaced clearly in the UI and does **not** block transaction 
 - **Single-address scope is sufficient**  
   The user does not expect cross-address, cross-wallet, or account-level inference.
 
----
-
 ### Known Failure Modes
 
 - **Fee regime shifts**  
@@ -149,8 +167,6 @@ This condition is surfaced clearly in the UI and does **not** block transaction 
   The tool surfaces tradeoffs; it does not make decisions.  
   Acting without understanding the warnings negates the tool’s safety model.
 
----
-
 ### Non-Failures (By Design)
 
 The following are **not** considered failures, even if they surprise users:
@@ -164,14 +180,14 @@ These behaviors are deliberate and preserve the tool’s security and privacy gu
 
 ---
 
-### Design Position
+## Design Position
 
 Ωmega Pruner does not attempt to eliminate risk.
 
 It attempts to **make risk legible before it becomes irreversible**.
 
 Any consolidation decision made with incomplete information is the user’s responsibility —  
-the tool’s responsibility is to ensure that **no risk is hidden by design**.
+the tool’s responsibility is to ensure that **no risk is obscured by design**.
 
 ---
 
