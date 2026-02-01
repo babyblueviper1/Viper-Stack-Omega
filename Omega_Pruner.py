@@ -6366,19 +6366,12 @@ No API calls • Fully air-gapped safe""",
 )
 	
 if __name__ == "__main__":
-    # Gradio 5.x: Use correct queue params — tiny/local-only to stabilize offline UI
-    demo.queue(
-        default_concurrency_limit=1,   # global default (replaces old concurrency_count)
-        max_size=1,                    # tiny queue — no backlog
-        api_open=False                 # no external API exposure
-    )
-    
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
         debug=False,
         allowed_paths=["/"],
-        prevent_thread_lock=True,
+        prevent_thread_lock=True,   # keeps process alive
         show_error=True
     )
