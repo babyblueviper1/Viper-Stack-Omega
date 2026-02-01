@@ -5015,8 +5015,8 @@ body:not(.dark-mode) .footer-donation button {
      
     with gr.Column():
         # Modern Bitcoin Optimization Note
-        gr.HTML(
-            value="""
+     gr.HTML(
+        value="""
             <div style="
                 margin: clamp(20px, 5vw, 60px) auto !important;
                 padding: clamp(16px, 4vw, 28px) !important;
@@ -5044,47 +5044,72 @@ body:not(.dark-mode) .footer-donation button {
                     Optimized for Modern Bitcoin
                 </div>
 
-                Ωmega Pruner is built <strong style="color:#00ffff !important;font-weight:900 !important;">specifically for modern single-signature wallets</strong>,
-                prioritizing <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>,
-                <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
-                and <strong style="color:#00ffff !important;font-weight:900 !important;">hardware-wallet compatibility</strong>.
-                <br><br>
+                <p>
+                    Ωmega Pruner is built <strong style="color:#00ffff !important;font-weight:900 !important;">specifically for modern single-signature wallets</strong>,
+                    prioritizing <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>,
+                    <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
+                    and <strong style="color:#00ffff !important;font-weight:900 !important;">hardware-wallet compatibility</strong>.
+                </p>
 
-                This tool is intentionally <strong style="color:#00ffff !important; font-weight:900 !important;">non-interactive with counterparties</strong> —  
-                it optimizes wallet structure and future spend efficiency,  
-                not counterparty-dependent transaction negotiation.
-                <br><br>
+                <p>
+                    The tool is intentionally <strong style="color:#00ffff !important;font-weight:900 !important;">non-interactive with counterparties</strong> —  
+                    it optimizes wallet structure and future spend efficiency, not counterparty-dependent transaction negotiation.
+                </p>
 
-                ✅ Fully supported for PSBT creation and hardware signing:<br>
-                <strong style="color:#00ffff !important;font-weight:900 !important;">Native SegWit (bc1q…)</strong>  •  
-                <strong style="color:#00ffff !important;font-weight:900 !important;">Taproot / BIP86 (bc1p…)</strong>
-                <br><br>
+                <p>
+                    ✅ Fully supported for PSBT creation and hardware signing:<br>
+                    <strong style="color:#00ffff !important;font-weight:900 !important;">Native SegWit (bc1q…)</strong> •  
+                    <strong style="color:#00ffff !important;font-weight:900 !important;">Taproot / BIP86 (bc1p…)</strong>
+                </p>
 
-                PSBTs generated here include all required metadata
-                (<span style="font-weight:900 !important; color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
-                UTXO data, derivation paths, fingerprints
-                </span>)
-                and can be signed either online or fully offline / air-gapped
-                using <strong style="color:#00ffcc !important;">Sparrow</strong>,
-                <strong style="color:#00ffcc !important;">Coldcard</strong>,
-                <strong style="color:#00ffcc !important;">Ledger</strong>, 
-                <strong style="color:#00ffcc !important;">Trezor</strong>, 
-                <strong style="color:#00ffcc !important;">Jade</strong>, 
-                and similar wallets.
-                <br><br>
+                <p>
+                    PSBTs generated here include all required metadata
+                    (<span style="font-weight:900 !important; color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
+                    UTXO data, derivation paths, fingerprints
+                    </span>)
+                    and can be signed either online or fully offline / air-gapped
+                    using <strong style="color:#00ffcc !important;">Sparrow</strong>,
+                    <strong style="color:#00ffcc !important;">Coldcard</strong>,
+                    <strong style="color:#00ffcc !important;">Ledger</strong>, 
+                    <strong style="color:#00ffcc !important;">Trezor</strong>, 
+                    <strong style="color:#00ffcc !important;">Jade</strong>, 
+                    and similar wallets.
+                </p>
 
-                ⚠️ Legacy inputs
-                (<strong style="color:#ffaa00 !important;font-weight:900 !important;">1…</strong>)
-                and Nested SegWit inputs
-                (<strong style="color:#ffaa00 !important;font-weight:900 !important;">3…</strong>)
-                are shown for transparency only and
-                <strong style="color:#ff6666 !important;font-weight:900 !important;">
-                cannot be included in PSBTs generated here
-                </strong>.
-                <br>
-                To spend or consolidate these inputs, use a compatible wallet or migrate them separately.
+                <p>
+                    ⚠️ Legacy inputs (<strong style="color:#ffaa00 !important;font-weight:900 !important;">1…</strong>)
+                    and Nested SegWit inputs (<strong style="color:#ffaa00 !important;font-weight:900 !important;">3…</strong>)
+                    are shown for transparency only and
+                    <strong style="color:#ff6666 !important;font-weight:900 !important;">
+                    cannot be included in PSBTs generated here
+                    </strong>.
+                    <br>
+                    To spend or consolidate these inputs, use a compatible wallet or migrate them separately.
+                </p>
+
+                <p style="
+                    color:#ffcc99 !important;
+                    font-size: clamp(0.9rem, 3.2vw, 1rem) !important;
+                    line-height: 1.7 !important;
+                    margin-top: clamp(24px, 5vw, 32px) !important;
+                    padding: clamp(12px, 3vw, 20px) !important;
+                    background: rgba(50, 20, 0, 0.4) !important;
+                    border: 1px solid #ff9900 !important;
+                    border-radius: 12px !important;
+                ">
+                    <strong>On offline vs online operation:</strong><br>
+                    True offline workflows are harder than they appear — and partial implementations often introduce more ambiguity than safety.
+                    <br><br>
+                    For now, Ωmega Pruner does not attempt to simulate or approximate “offline mode” inside a browser environment. We prefer no half-measures.
+                    <br><br>
+                    If a genuinely sound, inspectable, and user-verifiable offline architecture can be achieved in the future, it may be incorporated. Until then, the project remains explicit about what it does and does not guarantee.
+                    <br><br>
+                    More broadly, the tradeoffs between offline and online operation — when done correctly — are often misunderstood. Offline is not automatically safer, just as online is not inherently surveillance. Both can fail. Both can be done well.
+                    <br><br>
+                    Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust — not ideology.
+                </p>
             </div>
-            """
+        """
         )
         mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
         
