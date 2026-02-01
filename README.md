@@ -89,21 +89,15 @@ Spend or convert them separately before consolidation.
 
 ## Offline vs Online Operation
 
-Ωmega Pruner does not attempt to approximate or simulate an “offline mode” inside a browser
-environment.
+Ωmega Pruner does not currently provide a dedicated offline mode within the browser.
 
-True offline workflows are harder than they appear, and partial implementations often introduce
-more ambiguity than safety. No half-measures are taken here.
+Implementing partial or simulated offline workflows often creates more confusion than real safety benefits, so the project avoids half-measures. If a genuinely sound, inspectable offline architecture becomes feasible in the future, it may be added explicitly.
 
-If a genuinely sound, inspectable, and user-verifiable offline architecture becomes viable in the
-future, it may be incorporated deliberately and explicitly.
+More broadly, offline and online operation involve tradeoffs that are often misunderstood.  
+Offline is not automatically safer, and online is not inherently surveillance.  
+Both approaches can succeed or fail depending on how they are designed.
 
-More broadly, the tradeoffs between offline and online operation — *when done correctly* — are
-often misunderstood. Offline is not automatically safer, just as online is not inherently
-surveillance. Both can fail. Both can be done well.
-
-Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust —
-not ideology.
+Ωmega Pruner prioritizes clarity, explicit behavior, and minimized trust over ideology.
 
 ---
 
