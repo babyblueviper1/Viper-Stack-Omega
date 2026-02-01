@@ -5648,23 +5648,23 @@ No API calls • Fully air-gapped safe""",
 
     # Handler for when Offline is toggled
     # If user just turned Offline ON → force Restore OFF
-    offline_toggle.change(
-        fn=lambda offline_val: gr.update(value=False) if offline_val else gr.update(),
-        inputs=[offline_toggle],
-        outputs=[restore_toggle],
-        js="""
-        (offline_val) => {
-            if (offline_val) {
-                // User just turned Offline ON → uncheck Restore instantly in browser
-                const restoreCheckbox = document.getElementById('restore-toggle');
-                if (restoreCheckbox && restoreCheckbox.checked) {
-                    restoreCheckbox.checked = false;
-                    restoreCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
-        }
-        """
-    )
+    #offline_toggle.change(
+        #fn=lambda offline_val: gr.update(value=False) if offline_val else gr.update(),
+        #inputs=[offline_toggle],
+       ## outputs=[restore_toggle],
+        #js="""
+        #(offline_val) => {
+            #if (offline_val) {
+                #// User just turned Offline ON → uncheck Restore instantly in browser
+               #const restoreCheckbox = document.getElementById('restore-toggle');
+                #if (restoreCheckbox && restoreCheckbox.checked) {
+                    #restoreCheckbox.checked = false;
+                   # restoreCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+               # }
+           # }
+        #}
+       # """
+   # )
 
     # Handler for when Restore is toggled
     # If user just turned Restore ON → force Offline OFF
