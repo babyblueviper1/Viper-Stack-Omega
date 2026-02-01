@@ -69,6 +69,27 @@ These constraints are deliberate and foundational to the tool’s guarantees.
 
 ---
 
+## On Offline vs Online Operation
+
+True offline workflows are harder than they appear — and partial implementations often introduce  
+more ambiguity than safety.
+
+For now, Ωmega Pruner does not attempt to simulate or approximate “offline mode” inside a browser  
+environment. We prefer no half-measures.
+
+If a genuinely sound, inspectable, and user-verifiable offline architecture can be achieved in the  
+future, it may be incorporated. Until then, the project remains explicit about what it does and does  
+not guarantee.
+
+More broadly, the tradeoffs between offline and online operation — when done correctly — are often  
+misunderstood. Offline is not automatically safer, just as online is not inherently surveillance.  
+Both can fail. Both can be done well.
+
+Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust — not  
+ideology.
+
+---
+
 ## Hardware Wallet & Taproot Notes
 
 Ωmega Pruner always produces valid PSBTs — even without derivation metadata.
