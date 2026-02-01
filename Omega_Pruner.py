@@ -6366,17 +6366,14 @@ No API calls • Fully air-gapped safe""",
 )
 	
 if __name__ == "__main__":
-    # For Gradio 5.x: do NOT call .queue() at all if you want to disable queuing
-    # This prevents all /queue/join and heartbeat requests → perfect for offline
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
-        debug=False,
+        debug=False,                    # set to True temporarily if you need more logs on Render
         allowed_paths=["/"],
-        # No queue= arg here — it's invalid in 5.x
-        # Optional extras for better offline behavior:
-        prevent_thread_lock=True,    # keeps script running
-        show_error=True,             # shows errors in UI
-        inline=False
+        # ── No queue arg here — invalid in Gradio 5.x ──
+        # ── No separate .queue() call either — we want queue OFF for offline reliability ──
+        prevent_thread_lock=True,       # helps in some container environments
+        show_error=True                 # shows startup errors in browser instead of just logs
     )
