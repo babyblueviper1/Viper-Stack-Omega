@@ -44,7 +44,7 @@ RULES:
 Violations will be treated as bugs.
 """
 
-import gradio as gr
+import gradio_offline as gr
 import requests
 import time
 import base64
@@ -6368,8 +6368,6 @@ No API calls • Fully air-gapped safe""",
 if __name__ == "__main__":
     import time
     
-    print("Render startup - launching Gradio...")
-    
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
@@ -6380,8 +6378,8 @@ if __name__ == "__main__":
         show_error=True
     )
     
-    # MUST HAVE for Render: keep process alive
-    print("Gradio running - entering keep-alive loop")
+    # Keep-alive for Render
+    print("Gradio running - keep-alive loop")
     while True:
         time.sleep(300)
         print("Alive...")
