@@ -7,4 +7,4 @@ fastapi
 uvicorn[standard]
 coincurve
 pytz
-gradio-offline==3.31.0.4
+gradio>=5.9.0
