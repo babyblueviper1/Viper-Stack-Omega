@@ -44,7 +44,7 @@ RULES:
 Violations will be treated as bugs.
 """
 
-import gradio_offline as gr
+import gradio-offline as gr
 import requests
 import time
 import base64
