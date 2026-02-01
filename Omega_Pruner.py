@@ -6366,5 +6366,15 @@ No API calls • Fully air-gapped safe""",
 )
 	
 if __name__ == "__main__":
-    demo.queue(default_concurrency_limit=None, max_size=40)
-    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)), share=False, debug=False, allowed_paths=["/"],)
+    # IMPORTANT: Disable queue for true offline/air-gapped safety
+    # No /queue/join or heartbeat spam → UI stays stable when disconnected
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=int(os.environ.get("PORT", 7860)),
+        share=False,
+        debug=False,
+        allowed_paths=["/"],
+        queue=False,                    # ← This line is the key fix
+        prevent_thread_lock=True,       # Optional: keeps server running in script
+        show_error=True                 # Optional: shows errors in UI instead of console spam
+    )
