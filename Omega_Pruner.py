@@ -5109,11 +5109,11 @@ body:not(.dark-mode) .footer-donation button {
                     Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust — not ideology.
                 </p>
             </div>
-        """
+            """
         )
         mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
         
-         # ── Theme Toggle ──
+        # ── Theme Toggle ──
         with gr.Row():
             with gr.Column(scale=1, min_width=220):
                 theme_checkbox = gr.Checkbox(
@@ -5123,7 +5123,6 @@ body:not(.dark-mode) .footer-donation button {
                     elem_id="theme-checkbox",             # optional: for targeted styling
                     interactive=True
                 )
-
         # ── Restore Previous Selection (toggle to show upload area) ──
         restore_toggle = gr.Checkbox(
             label="Restore previous session",
