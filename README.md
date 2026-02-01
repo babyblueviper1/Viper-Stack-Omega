@@ -2,7 +2,7 @@
 **Reclaim Sovereignty**
 
 Ωmega Pruner is a **fee-aware UTXO consolidation tool** built to surface **privacy tradeoffs**
-before any transaction is constructed.
+*before* any transaction is constructed.
 
 It is non-custodial and responsive to real network conditions.  
 **No inputs are processed until the user explicitly chooses to analyze.**
@@ -72,7 +72,7 @@ Spend or convert them separately before consolidation.
 - Analysis-first flow — intent is evaluated before any commitment  
 - Unambiguous labeling — no confusion between pre- and post-consolidation states  
 - CIOH recovery guidance — warnings translated into concrete next steps  
-- **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls  
+- Explicit online execution model — no simulated or partial “offline mode”  
 - Pure dark mode — full contrast, no haze  
 - Deterministic selection export — JSON + cryptographic fingerprint  
 - Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
@@ -87,6 +87,26 @@ Spend or convert them separately before consolidation.
 
 ---
 
+## Offline vs Online Operation
+
+Ωmega Pruner does not attempt to approximate or simulate an “offline mode” inside a browser
+environment.
+
+True offline workflows are harder than they appear, and partial implementations often introduce
+more ambiguity than safety. No half-measures are taken here.
+
+If a genuinely sound, inspectable, and user-verifiable offline architecture becomes viable in the
+future, it may be incorporated deliberately and explicitly.
+
+More broadly, the tradeoffs between offline and online operation — *when done correctly* — are
+often misunderstood. Offline is not automatically safer, just as online is not inherently
+surveillance. Both can fail. Both can be done well.
+
+Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust —
+not ideology.
+
+---
+
 ## Limitations
 
 - Only Native SegWit and Taproot inputs can be consolidated  
@@ -98,4 +118,4 @@ Spend or convert them separately before consolidation.
 
 **Consolidate smarter. Win forever. • Ω**
 
-**Custom builds** → babyblueviperbusiness@gmail.com
+**Custom builds** → babyblueviperbusiness@gmai
