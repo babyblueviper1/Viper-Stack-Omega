@@ -5012,103 +5012,103 @@ body:not(.dark-mode) .footer-donation button {
     # 🖥️ MAIN INPUT & UI LAYOUT
     # Address input, destination, toggles, notes, and core controls
     # =============================
-     
+    
     with gr.Column():
         # Modern Bitcoin Optimization Note
-     gr.HTML(
-        value="""
-            <div style="
-                margin: clamp(20px, 5vw, 60px) auto !important;
-                padding: clamp(16px, 4vw, 28px) !important;
-                max-width: 95% !important;
-                width: 100% !important;
-                background: rgba(0, 20, 10, 0.6) !important;
-                border: 3px solid #00ff9d !important;
-                border-radius: 18px !important;
-                text-align: center !important;
-                font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
-                line-height: 1.7 !important;
-                color: #ccffe6 !important;
-                box-shadow: 0 0 clamp(30px, 8vw, 60px) rgba(0, 255, 157, 0.4) !important;
-                overflow-wrap: break-word !important;
-                word-break: break-word !important;
-            ">
+        gr.HTML(
+            value="""
                 <div style="
-                    color: #00ffdd !important;
-                    font-size: clamp(1.3rem, 5vw, 1.8rem) !important;
-                    font-weight: 900 !important;
-                    letter-spacing: clamp(1px, 0.5vw, 2px) !important;
-                    margin-bottom: clamp(12px, 3vw, 16px) !important;
-                    text-shadow: 0 0 25px #00ffdd !important;
-                ">
-                    Optimized for Modern Bitcoin
-                </div>
-
-                <p>
-                    Ωmega Pruner is built <strong style="color:#00ffff !important;font-weight:900 !important;">specifically for modern single-signature wallets</strong>,
-                    prioritizing <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>,
-                    <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
-                    and <strong style="color:#00ffff !important;font-weight:900 !important;">hardware-wallet compatibility</strong>.
-                </p>
-
-                <p>
-                    The tool is intentionally <strong style="color:#00ffff !important;font-weight:900 !important;">non-interactive with counterparties</strong> —  
-                    it optimizes wallet structure and future spend efficiency, not counterparty-dependent transaction negotiation.
-                </p>
-
-                <p>
-                    ✅ Fully supported for PSBT creation and hardware signing:<br>
-                    <strong style="color:#00ffff !important;font-weight:900 !important;">Native SegWit (bc1q…)</strong> •  
-                    <strong style="color:#00ffff !important;font-weight:900 !important;">Taproot / BIP86 (bc1p…)</strong>
-                </p>
-
-                <p>
-                    PSBTs generated here include all required metadata
-                    (<span style="font-weight:900 !important; color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
-                    UTXO data, derivation paths, fingerprints
-                    </span>)
-                    and can be signed either online or fully offline / air-gapped
-                    using <strong style="color:#00ffcc !important;">Sparrow</strong>,
-                    <strong style="color:#00ffcc !important;">Coldcard</strong>,
-                    <strong style="color:#00ffcc !important;">Ledger</strong>, 
-                    <strong style="color:#00ffcc !important;">Trezor</strong>, 
-                    <strong style="color:#00ffcc !important;">Jade</strong>, 
-                    and similar wallets.
-                </p>
-
-                <p>
-                    ⚠️ Legacy inputs (<strong style="color:#ffaa00 !important;font-weight:900 !important;">1…</strong>)
-                    and Nested SegWit inputs (<strong style="color:#ffaa00 !important;font-weight:900 !important;">3…</strong>)
-                    are shown for transparency only and
-                    <strong style="color:#ff6666 !important;font-weight:900 !important;">
-                    cannot be included in PSBTs generated here
-                    </strong>.
-                    <br>
-                    To spend or consolidate these inputs, use a compatible wallet or migrate them separately.
-                </p>
-
-                <p style="
-                    color:#ffcc99 !important;
-                    font-size: clamp(0.9rem, 3.2vw, 1rem) !important;
+                    margin: clamp(20px, 5vw, 60px) auto !important;
+                    padding: clamp(16px, 4vw, 28px) !important;
+                    max-width: 95% !important;
+                    width: 100% !important;
+                    background: rgba(0, 20, 10, 0.6) !important;
+                    border: 3px solid #00ff9d !important;
+                    border-radius: 18px !important;
+                    text-align: center !important;
+                    font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
                     line-height: 1.7 !important;
-                    margin-top: clamp(24px, 5vw, 32px) !important;
-                    padding: clamp(12px, 3vw, 20px) !important;
-                    background: rgba(50, 20, 0, 0.4) !important;
-                    border: 1px solid #ff9900 !important;
-                    border-radius: 12px !important;
+                    color: #ccffe6 !important;
+                    box-shadow: 0 0 clamp(30px, 8vw, 60px) rgba(0, 255, 157, 0.4) !important;
+                    overflow-wrap: break-word !important;
+                    word-break: break-word !important;
                 ">
-                    <strong>On offline vs online operation:</strong><br>
-                    True offline workflows are harder than they appear — and partial implementations often introduce more ambiguity than safety.
-                    <br><br>
-                    For now, Ωmega Pruner does not attempt to simulate or approximate “offline mode” inside a browser environment. We prefer no half-measures.
-                    <br><br>
-                    If a genuinely sound, inspectable, and user-verifiable offline architecture can be achieved in the future, it may be incorporated. Until then, the project remains explicit about what it does and does not guarantee.
-                    <br><br>
-                    More broadly, the tradeoffs between offline and online operation — when done correctly — are often misunderstood. Offline is not automatically safer, just as online is not inherently surveillance. Both can fail. Both can be done well.
-                    <br><br>
-                    Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust — not ideology.
-                </p>
-            </div>
+                    <div style="
+                        color: #00ffdd !important;
+                        font-size: clamp(1.3rem, 5vw, 1.8rem) !important;
+                        font-weight: 900 !important;
+                        letter-spacing: clamp(1px, 0.5vw, 2px) !important;
+                        margin-bottom: clamp(12px, 3vw, 16px) !important;
+                        text-shadow: 0 0 25px #00ffdd !important;
+                    ">
+                        Optimized for Modern Bitcoin
+                    </div>
+
+                    <p>
+                        Ωmega Pruner is built <strong style="color:#00ffff !important;font-weight:900 !important;">specifically for modern single-signature wallets</strong>,
+                        prioritizing <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>,
+                        <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
+                        and <strong style="color:#00ffff !important;font-weight:900 !important;">hardware-wallet compatibility</strong>.
+                    </p>
+
+                    <p>
+                        The tool is intentionally <strong style="color:#00ffff !important;font-weight:900 !important;">non-interactive with counterparties</strong> —  
+                        it optimizes wallet structure and future spend efficiency, not counterparty-dependent transaction negotiation.
+                    </p>
+
+                    <p>
+                        ✅ Fully supported for PSBT creation and hardware signing:<br>
+                        <strong style="color:#00ffff !important;font-weight:900 !important;">Native SegWit (bc1q…)</strong> •  
+                        <strong style="color:#00ffff !important;font-weight:900 !important;">Taproot / BIP86 (bc1p…)</strong>
+                    </p>
+
+                    <p>
+                        PSBTs generated here include all required metadata
+                        (<span style="font-weight:900 !important; color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
+                        UTXO data, derivation paths, fingerprints
+                        </span>)
+                        and can be signed either online or fully offline / air-gapped
+                        using <strong style="color:#00ffcc !important;">Sparrow</strong>,
+                        <strong style="color:#00ffcc !important;">Coldcard</strong>,
+                        <strong style="color:#00ffcc !important;">Ledger</strong>, 
+                        <strong style="color:#00ffcc !important;">Trezor</strong>, 
+                        <strong style="color:#00ffcc !important;">Jade</strong>, 
+                        and similar wallets.
+                    </p>
+
+                    <p>
+                        ⚠️ Legacy inputs (<strong style="color:#ffaa00 !important;font-weight:900 !important;">1…</strong>)
+                        and Nested SegWit inputs (<strong style="color:#ffaa00 !important;font-weight:900 !important;">3…</strong>)
+                        are shown for transparency only and
+                        <strong style="color:#ff6666 !important;font-weight:900 !important;">
+                        cannot be included in PSBTs generated here
+                        </strong>.
+                        <br>
+                        To spend or consolidate these inputs, use a compatible wallet or migrate them separately.
+                    </p>
+
+                    <p style="
+                        color:#ffcc99 !important;
+                        font-size: clamp(0.9rem, 3.2vw, 1rem) !important;
+                        line-height: 1.7 !important;
+                        margin-top: clamp(24px, 5vw, 32px) !important;
+                        padding: clamp(12px, 3vw, 20px) !important;
+                        background: rgba(50, 20, 0, 0.4) !important;
+                        border: 1px solid #ff9900 !important;
+                        border-radius: 12px !important;
+                    ">
+                        <strong>On offline vs online operation:</strong><br>
+                        True offline workflows are harder than they appear — and partial implementations often introduce more ambiguity than safety.
+                        <br><br>
+                        For now, Ωmega Pruner does not attempt to simulate or approximate “offline mode” inside a browser environment. We prefer no half-measures.
+                        <br><br>
+                        If a genuinely sound, inspectable, and user-verifiable offline architecture can be achieved in the future, it may be incorporated. Until then, the project remains explicit about what it does and does not guarantee.
+                        <br><br>
+                        More broadly, the tradeoffs between offline and online operation — when done correctly — are often misunderstood. Offline is not automatically safer, just as online is not inherently surveillance. Both can fail. Both can be done well.
+                        <br><br>
+                        Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust — not ideology.
+                    </p>
+                </div>
             """
         )
         mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
@@ -5123,15 +5123,15 @@ body:not(.dark-mode) .footer-donation button {
                     elem_id="theme-checkbox",             # optional: for targeted styling
                     interactive=True
                 )
+        
         # ── Restore Previous Selection (toggle to show upload area) ──
         restore_toggle = gr.Checkbox(
             label="Restore previous session",
             value=False,
             interactive=True,
             info="Resume a saved UTXO selection without re-analysis. Offline-safe (no API calls).",
-			elem_id="restore-toggle"
+            elem_id="restore-toggle"
         )
-
         # Only wrap the upload + button in the toggle-able area
         with gr.Row(visible=False) as restore_area:
             import_file = gr.File(
@@ -5173,53 +5173,53 @@ body:not(.dark-mode) .footer-donation button {
             )
 
         # === AIR-GAPPED / OFFLINE MODE HEADER ===
-        gr.HTML("""
-            <div style="
-                text-align:center !important;
-                padding: clamp(20px, 6vw, 32px) !important;
-                margin: clamp(30px, 8vw, 50px) 0 !important;
-                background:#001100 !important;
-                border:3px solid #00ff88 !important;
-                border-radius:18px !important;
-                box-shadow:
-                    0 12px 40px rgba(0,0,0,0.6) !important,
-                    0 8px 32px rgba(0,255,136,0.4) !important,
-                    inset 0 0 30px rgba(0,255,136,0.2) !important;
-                max-width:95% !important;
-                margin-left:auto !important;
-                margin-right:auto !important;
-            "> 
-              <div style="
-                  color:#00ff88 !important;
-                  font-size: clamp(1.3rem, 5.5vw, 1.7rem) !important;
-                  font-weight:900 !important;
-                  text-shadow:0 0 30px #00ff88 !important;
-                  margin-bottom: clamp(10px, 3vw, 16px) !important;
-              ">
-                🔒 Air-Gapped / Offline Mode
-              </div>
-
-              <div style="
-                  color:#aaffcc !important;
-                  font-size: clamp(1rem, 3.8vw, 1.2rem) !important;
-                  line-height:1.7 !important;
-              ">
-                Fully offline operation — no API calls, perfect for cold wallets.
-              </div>
-            </div>
-            """
-        )
+        # gr.HTML("""
+        #     <div style="
+        #         text-align:center !important;
+        #         padding: clamp(20px, 6vw, 32px) !important;
+        #         margin: clamp(30px, 8vw, 50px) 0 !important;
+        #         background:#001100 !important;
+        #         border:3px solid #00ff88 !important;
+        #         border-radius:18px !important;
+        #         box-shadow:
+        #             0 12px 40px rgba(0,0,0,0.6) !important,
+        #             0 8px 32px rgba(0,255,136,0.4) !important,
+        #             inset 0 0 30px rgba(0,255,136,0.2) !important;
+        #         max-width:95% !important;
+        #         margin-left:auto !important;
+        #         margin-right:auto !important;
+        #     "> 
+        #       <div style="
+        #           color:#00ff88 !important;
+        #           font-size: clamp(1.3rem, 5.5vw, 1.7rem) !important;
+        #           font-weight:900 !important;
+        #           text-shadow:0 0 30px #00ff88 !important;
+        #           margin-bottom: clamp(10px, 3vw, 16px) !important;
+        #       ">
+        #         🔒 Air-Gapped / Offline Mode
+        #       </div>
+        #
+        #       <div style="
+        #           color:#aaffcc !important;
+        #           font-size: clamp(1rem, 3.8vw, 1.2rem) !important;
+        #           line-height:1.7 !important;
+        #       ">
+        #         Fully offline operation — no API calls, perfect for cold wallets.
+        #       </div>
+        #     </div>
+        #     """
+        # )
 
         # === OFFLINE MODE ===
-        with gr.Row():
-            with gr.Column(scale=1, min_width=220):
-                offline_toggle = gr.Checkbox(
-                    label="🔒 Offline / Air-Gapped Mode",
-                    value=False,
-                    interactive=True,
-                    info="No API calls • Paste raw UTXOs • True cold wallet prep",
-					elem_id="offline-toggle"
-                )
+        #with gr.Row():
+            #with gr.Column(scale=1, min_width=220):
+                #offline_toggle = gr.Checkbox(
+                    #label="🔒 Offline / Air-Gapped Mode",
+                    #value=False,
+                    #interactive=True,
+                    #info="No API calls • Paste raw UTXOs • True cold wallet prep",
+					#elem_id="offline-toggle"
+                #)
 
         with gr.Row(visible=False) as manual_box_row:
             with gr.Column():
@@ -5672,26 +5672,25 @@ No API calls • Fully air-gapped safe""",
 
     # Handler for when Offline is toggled
     # If user just turned Offline ON → force Restore OFF
-    #offline_toggle.change(
-        #fn=lambda offline_val: gr.update(value=False) if offline_val else gr.update(),
-        #inputs=[offline_toggle],
-       ## outputs=[restore_toggle],
-        #js="""
-        #(offline_val) => {
-            #if (offline_val) {
-                #// User just turned Offline ON → uncheck Restore instantly in browser
-               #const restoreCheckbox = document.getElementById('restore-toggle');
-                #if (restoreCheckbox && restoreCheckbox.checked) {
-                    #restoreCheckbox.checked = false;
-                   # restoreCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-               # }
-           # }
-        #}
-       # """
-   # )
+    offline_toggle.change(
+        fn=lambda offline_val: gr.update(value=False) if offline_val else gr.update(),
+        inputs=[offline_toggle],
+        outputs=[restore_toggle],
+        js="""
+        (offline_val) => {
+            if (offline_val) {
+                // User just turned Offline ON → uncheck Restore instantly in browser
+                const restoreCheckbox = document.getElementById('restore-toggle');
+                if (restoreCheckbox && restoreCheckbox.checked) {
+                    restoreCheckbox.checked = false;
+                    restoreCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        }
+        """
+    )
 
-    # Handler for when Restore is toggled
-    # If user just turned Restore ON → force Offline OFF
+    # Mirror handler for symmetry: If user just turned Restore ON → force Offline OFF
     restore_toggle.change(
         fn=lambda restore_val: gr.update(value=False) if restore_val else gr.update(),
         inputs=[restore_toggle],
