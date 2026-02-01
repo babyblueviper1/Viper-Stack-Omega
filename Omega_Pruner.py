@@ -6366,13 +6366,22 @@ No API calls • Fully air-gapped safe""",
 )
 	
 if __name__ == "__main__":
+    import time
+    
+    print("Starting Gradio server...")  # debug marker
+    
     demo.launch(
         server_name="0.0.0.0",
-        server_port=int(os.environ.get("PORT", 7860)),  # Render sets PORT env var automatically
+        server_port=int(os.environ.get("PORT", 7860)),
         share=False,
-        debug=False,                    # keep False in prod (less verbose logs)
+        debug=False,                    # keep False in prod
         allowed_paths=["/"],
-        # ── Critical for Render/containers: prevent early exit ──
-        prevent_thread_lock=True,       # ← This keeps the script alive (no thread lock hang)
-        show_error=True                 # helpful for debugging in browser
+        prevent_thread_lock=True,       # helps, but not always sufficient alone
+        show_error=True
     )
+    
+    # Critical: Keep-alive loop to prevent early exit on Render/containers
+    print("Gradio launched — entering keep-alive loop")
+    while True:
+        time.sleep(300)  # sleep 5 min — low CPU, keeps process alive
+        print("Keep-alive heartbeat...")  # optional log marker
