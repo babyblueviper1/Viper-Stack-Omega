@@ -6366,15 +6366,14 @@ No API calls • Fully air-gapped safe""",
 )
 	
 if __name__ == "__main__":
-    # For Gradio 5.x+: do NOT call .queue() and do NOT pass queue= to launch()
-    # This disables the problematic queue system → no /queue/join spam, stable offline
+    # Gradio 5.x: Do NOT call .queue() and do NOT pass queue= to launch()
+    # This disables the queue system → no /queue/join or heartbeat spam → stable offline
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
-        debug=False,                    # Change to True temporarily if you need more startup logs on Render
+        debug=False,                    # ← Set to True temporarily for more logs if needed
         allowed_paths=["/"],
-        # These are safe & helpful for Render/offline:
-        prevent_thread_lock=True,       # Prevents script hang in container
+        prevent_thread_lock=True,       # Helps in containers like Render
         show_error=True                 # Shows errors in browser UI
     )
