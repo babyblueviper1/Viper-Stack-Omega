@@ -6366,12 +6366,22 @@ No API calls • Fully air-gapped safe""",
 )
 	
 if __name__ == "__main__":
+    import time
+    
+    print("Starting Gradio server on Render...")  # debug marker
+    
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
-        debug=False,
+        debug=False,                    # False in prod
         allowed_paths=["/"],
-        prevent_thread_lock=True,   # keeps process alive
+        prevent_thread_lock=True,       # Helps non-blocking start
         show_error=True
     )
+    
+    # Critical keep-alive loop: prevents exit in container
+    print("Gradio launched — entering keep-alive loop (Render requires this)")
+    while True:
+        time.sleep(300)  # 5 minutes — low CPU
+        print("Keep-alive heartbeat...")  # optional log)
