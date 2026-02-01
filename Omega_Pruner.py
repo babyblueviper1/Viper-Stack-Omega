@@ -8,8 +8,6 @@ User Inputs (mutable via UI):
 - dest_addr
 - fee_rate_slider
 - future_fee_slider
-- offline_mode
-- manual_utxo_input
 
 
 Derived State (write-once per analyze()):
@@ -82,7 +80,6 @@ HEALTH_PRIORITY = {
     "HEAVY":   1,
     "CAREFUL": 2,
     "MEDIUM":  3,
-    "MANUAL":  3,     # Neutral — no strong consolidation/keep bias
     "OPTIMAL": 4,
 }
 
@@ -123,8 +120,8 @@ no_utxos_msg = (
     "font-size: clamp(1rem, 3.5vw, 1.2rem) !important;"
     "line-height:1.7 !important;"
     "'>"
-    "Paste one or more addresses/xpubs below,<br>"
-    "lower the dust threshold, or use Offline Mode to paste raw UTXOs."
+    "Paste one or more addresses below,<br>"
+    "or lower the dust threshold."
     "</div>"
     "</div>"
 )
@@ -186,20 +183,14 @@ _last_medians = {"24h": None, "1w": None, "1m": None}
 _last_fetch_time = 0
 _CACHE_TTL = 300  # 5 minutes
 
-# Global flag — updated when offline toggle changes
-_is_offline = False  # default: assume online at startup
-
 # ===========================
 # Selection resolver
 # ===========================
-def _resolve_selected(df_rows: List[list], enriched_state: tuple, offline_mode: bool = False) -> List[dict]:
+def _resolve_selected(df_rows: List[list], enriched_state: tuple) -> List[dict]:
     """
     Resolve selected UTXOs from Gradio DataFrame checkbox state.
     Uses row-order matching — safe for Gradio's mutable UI representation.
     """
-    if offline_mode:
-        log.debug("_resolve_selected skipped — offline mode (pure computation allowed)")
-        # Could early-return [] if desired, but no need — keep normal flow
 
     if not df_rows:
         return []
@@ -295,14 +286,9 @@ def _selection_fingerprint(selected_utxos: List[dict]) -> str:
 # Utility Functions
 # =========================
 
-def safe_get(url: str, timeout: int = 8, offline_mode: bool = False) -> Optional[requests.Response]:
+def safe_get(url: str, timeout: int = 8) -> Optional[requests.Response]:
     """
-    Robust GET with 3 retries, exponential backoff, and strict timeout.
-    Completely blocked in offline mode — returns None immediately.
-    """
-    if offline_mode:
-        log.debug(f"safe_get blocked — offline mode active for {url}")
-        return None  # Immediate return — no network attempt
+    Robust GET with 3 retries, exponential backoff, and strict timeout.    """
 
     for attempt in range(3):
         try:
@@ -328,21 +314,10 @@ def safe_get(url: str, timeout: int = 8, offline_mode: bool = False) -> Optional
     log.warning(f"safe_get failed after 3 attempts: {url}")
     return None
 
-def get_live_fees(offline_mode: bool = False) -> Dict[str, int]:
+def get_live_fees() -> Dict[str, int]:
     """
     Fetch recommended fees from mempool.space with 30-second caching.
-    Completely skipped in offline mode — returns conservative fallback instantly.
     """
-    if offline_mode:
-        log.debug("get_live_fees skipped — offline mode active")
-        return {
-            "fastest":   10,
-            "half_hour": 6,
-            "hour":      3,
-            "economy":   1,
-            "minimum":   1,
-        }
-
     # Cache check — only for online
     if hasattr(get_live_fees, "cache") and hasattr(get_live_fees, "cache_time"):
         if time.time() - get_live_fees.cache_time < 30:
@@ -382,15 +357,11 @@ def get_live_fees(offline_mode: bool = False) -> Dict[str, int]:
     log.debug("Returning fallback fees due to fetch/cache failure")
     return fallback
 
-def get_consolidation_score(offline_mode: bool = False) -> str:
+def get_consolidation_score() -> str:
     """
     Generate the network conditions badge HTML.
-    Completely skipped in offline mode — returns empty string instantly.
-    All network calls guarded with offline_mode.
+
     """
-    if offline_mode:
-        log.debug("get_consolidation_score skipped — offline mode active")
-        return ""  # Silent return — caller handles fallback
 
     # All network calls protected
     urls = {
@@ -402,7 +373,7 @@ def get_consolidation_score(offline_mode: bool = False) -> str:
 
     try:
         for period, url in urls.items():
-            r = safe_get(url, timeout=12, offline_mode=offline_mode)
+            r = safe_get(url, timeout=12)
             if r and r.status_code == 200:
                 data = r.json()
                 if len(data) > 5:
@@ -420,7 +391,7 @@ def get_consolidation_score(offline_mode: bool = False) -> str:
         avgs = {'24h': None, '1w': None, '1m': None}
 
     # Current economy fee — guarded
-    current_fees = get_live_fees(offline_mode=offline_mode) or {'economy': 1}
+    current_fees = get_live_fees() or {'economy': 1}
     current = current_fees['economy']
 
     # Primary avg: 1w preferred
@@ -664,13 +635,11 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
     return (meta, tuple(updated_utxos))
 
 
-def load_selection(parsed_snapshot: dict, current_enriched: Any, offline_mode: bool = False) -> Tuple[Any, str, Optional[str], bool, bool, str, str, str, str, int]:
+def load_selection(parsed_snapshot: dict, current_enriched: Any,) -> Tuple[Any, str, Optional[str], bool, bool, str, str, str, str, int]:
     """
     Load saved selection from JSON snapshot — JSON is authoritative.
     Builds fresh enriched_state directly from snapshot inputs when possible.
     """
-    log.info("[RESTORE] load_selection called | offline_mode=%s", offline_mode)
-
     if not parsed_snapshot or not isinstance(parsed_snapshot, dict):
         log.warning("[RESTORE] Invalid snapshot: empty or not dict")
         return current_enriched, "No valid parsed JSON loaded", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
@@ -1586,16 +1555,12 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
 # UTXO Fetching Functions
 # =========================
 
-def get_utxos_with_timeout(addr: str, dust: int, offline_mode: bool = False, timeout_sec: int = 60) -> List[dict]:
+def get_utxos_with_timeout(addr: str, dust: int, timeout_sec: int = 60) -> List[dict]:
     """
-    Fetch UTXOs with a hard per-address timeout — completely skipped in offline mode.
+    Fetch UTXOs with a hard per-address timeout.
     """
-    if offline_mode:
-        log.info(f"UTXO fetch skipped — offline mode active for address: {addr}")
-        return []  # No network calls ever in offline mode
-
     def inner_fetch():
-        return get_utxos(addr, dust, offline_mode=False)  # Explicitly pass offline=False
+        return get_utxos(addr, dust)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(inner_fetch)
@@ -1609,15 +1574,11 @@ def get_utxos_with_timeout(addr: str, dust: int, offline_mode: bool = False, tim
             return []
 
 
-def get_utxos(addr: str, dust: int = 546, offline_mode: bool = False) -> List[dict]:
+def get_utxos(addr: str, dust: int = 546) -> List[dict]:
     """
-    Fetch confirmed UTXOs from public APIs — completely disabled in offline mode.
-    Filters out dust. Returns early on first successful source (online only).
+    Fetch confirmed UTXOs from public APIs.
+    Filters out dust. Returns early on first successful source.
     """
-    if offline_mode:
-        log.info(f"get_utxos skipped — offline mode active for address: {addr}")
-        return []  # Zero network activity
-
     addr = addr.strip()
     if not addr:
         log.debug("Empty address — returning empty list")
@@ -1632,7 +1593,7 @@ def get_utxos(addr: str, dust: int = 546, offline_mode: bool = False) -> List[di
     for attempt in range(3):
         for url in apis:
             try:
-                r = safe_get(url, timeout=8, offline_mode=offline_mode)  # Pass guard to safe_get too
+                r = safe_get(url, timeout=8)
                 if not r:
                     continue
 
@@ -1676,6 +1637,8 @@ def get_utxos(addr: str, dust: int = 546, offline_mode: bool = False) -> List[di
 
     log.warning(f"No UTXOs found after retries for address: {addr}")
     return []
+
+
 # =================
 # Analyze functions
 # ================
@@ -1686,9 +1649,7 @@ class AnalyzeParams:
     future_fee_rate: int
     dust_threshold: int
     strategy: str
-    offline_mode: bool
     addr_input: str
-    manual_utxo_input: str
     scan_source: str
 
 
@@ -1698,8 +1659,6 @@ def _sanitize_analyze_inputs(
     dust_threshold: Any,
     fee_rate_slider: Any,
     future_fee_slider: Any,
-    offline_mode: Any,
-    manual_utxo_input: str,
 ) -> AnalyzeParams:
     """
     Normalize and clamp all analyze() inputs into a deterministic frozen params object.
@@ -1717,78 +1676,9 @@ def _sanitize_analyze_inputs(
         future_fee_rate=future_fee_rate,
         dust_threshold=dust_threshold,
         strategy=strategy,
-        offline_mode=bool(offline_mode),
         addr_input=scan_source,
-        manual_utxo_input=(manual_utxo_input or "").strip(),
         scan_source=scan_source,
     )
-
-
-def _collect_manual_utxos(params: AnalyzeParams) -> Tuple[List[Dict], int]:
-    """
-    Parse offline/manual UTXO input lines into normalized dicts.
-    Returns (utxos, skipped_count) for feedback.
-    """
-    if not params.manual_utxo_input:
-        return [], 0
-
-    utxos = []
-    skipped = 0
-
-    for line_num, line in enumerate(params.manual_utxo_input.splitlines(), 1):
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-
-        parts = line.split(":")
-        if len(parts) < 3:
-            skipped += 1
-            continue
-
-        try:
-            txid_raw = parts[0].strip()
-            # Validate txid is exactly 64 hex chars
-            if len(txid_raw) != 64 or not all(c in '0123456789abcdefABCDEF' for c in txid_raw):
-                log.warning(f"Invalid txid format on line {line_num}: {txid_raw}")
-                skipped += 1
-                continue
-
-            txid = txid_raw.lower()  # normalize to lowercase hex
-            vout = int(parts[1].strip())
-            value = int(parts[2].strip())
-
-            addr = parts[3].strip() if len(parts) >= 4 else "unknown (manual)"
-
-            if value <= params.dust_threshold:
-                skipped += 1
-                continue
-
-            _, meta = address_to_script_pubkey(addr)
-            input_weight = meta.get("input_vb", 68) * 4
-
-            utxos.append({
-                "txid": txid,
-                "vout": vout,
-                "value": value,
-                "address": addr,
-                "input_weight": input_weight,
-                "health": "MANUAL",
-                "recommend": "REVIEW",
-                "script_type": meta.get("type", "Manual"),
-                "script_type_inferred": True,
-                "source": "Manual Offline",
-                "selected": False,
-            })
-
-        except (ValueError, Exception) as e:
-            log.debug(f"Skipped invalid manual UTXO line {line_num}: {e}")
-            skipped += 1
-
-    if skipped:
-        log.info(f"Manual UTXO parse: skipped {skipped} invalid/malformed lines")
-
-    return utxos, skipped
-
 
 def _collect_online_utxos(params: AnalyzeParams) -> Tuple[List[Dict], str, List[Any]]:
     """
@@ -2124,9 +2014,7 @@ def analyze(
     dust_threshold: Any,
     fee_rate_slider: Any,
     future_fee_slider: Any,
-    offline_mode: Any,
-    manual_utxo_input: str,
-):
+) -> tuple:
     """
     Main entrypoint: sanitize inputs → collect UTXOs → enrich → consolidate → build UI outputs.
     Enforces the canonical state model (immutable enriched_state tuple).
@@ -2140,24 +2028,14 @@ def analyze(
         dust_threshold=dust_threshold,
         fee_rate_slider=fee_rate_slider,
         future_fee_slider=future_fee_slider,
-        offline_mode=offline_mode,
-        manual_utxo_input=manual_utxo_input,
     )
 
-    skipped = 0  # default for online mode
-
-    # 2. Collect raw UTXOs (online or offline)
-    if params.offline_mode:
-        log.debug("Offline mode active — skipping all network fetches")
-        raw_utxos, skipped = _collect_manual_utxos(params)
-        scan_debug = "Offline mode — manual UTXOs only"
-        log.debug(f"Offline mode: collected {len(raw_utxos)} manual UTXOs")
-    else:
-        log.debug("Online mode — proceeding with UTXO fetch")
-        raw_utxos, scan_debug, _ = _collect_online_utxos(params)
-        log.debug(f"Online mode: collected {len(raw_utxos)} raw UTXOs")
-        if raw_utxos:
-            log.debug(f"First UTXO address: {raw_utxos[0].get('address', 'unknown')}")
+    # 2. Collect raw UTXOs (online only)
+    log.debug("Proceeding with UTXO fetch")
+    raw_utxos, scan_debug, _ = _collect_online_utxos(params)
+    log.debug(f"Collected {len(raw_utxos)} raw UTXOs")
+    if raw_utxos:
+        log.debug(f"First UTXO address: {raw_utxos[0].get('address', 'unknown')}")
 
     # Early exit if nothing found
     if not raw_utxos:
@@ -2174,89 +2052,45 @@ def analyze(
             )
 
         else:
-            # Non-legacy case: timeout, rate-limit, or empty modern address
-            if params.offline_mode:
-                # Offline: no API was even attempted → different message
-                timeout_msg = """
+            # Online timeout/rate-limit or empty modern address
+            timeout_msg = """
+            <div style='
+                color:#aaffcc !important;
+                padding: clamp(24px, 5vw, 40px) !important;
+                background:#001122 !important;
+                border:3px solid #00ccff !important;
+                border-radius:16px !important;
+                text-align:center !important;
+                max-width:95% !important;
+                margin: clamp(20px, 5vw, 40px) auto !important;
+                box-shadow:0 0 40px rgba(0,204,255,0.4) !important;
+            '>
                 <div style='
-                    color:#aaffcc !important;
-                    padding: clamp(24px, 5vw, 40px) !important;
-                    background:#001122 !important;
-                    border:3px solid #00ccff !important;
-                    border-radius:16px !important;
-                    text-align:center !important;
-                    max-width:95% !important;
-                    margin: clamp(20px, 5vw, 40px) auto !important;
-                    box-shadow:0 0 40px rgba(0,204,255,0.4) !important;
+                    color:#00ccff !important;
+                    font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+                    font-weight:900 !important;
+                    margin-bottom: clamp(12px, 3vw, 20px) !important;
                 '>
-                    <div style='
-                        color:#00ccff !important;
-                        font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
-                        font-weight:900 !important;
-                        margin-bottom: clamp(12px, 3vw, 20px) !important;
-                    '>
-                        ⚠️ Offline Mode — No UTXOs Found
-                    </div>
-                    
-                    <div style='
-                        color:#88ffdd !important;
-                        font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
-                        line-height:1.6 !important;
-                    '>
-                        No UTXOs were pasted or they were invalid/dust.<br><br>
-                        
-                        <span style='font-weight:900 !important; color:#ffffff !important;'>Next steps:</span><br>
-                        • Paste valid raw UTXOs in the offline box (txid:vout:value[:address])<br>
-                        • Make sure at least one line has a value > dust threshold<br>
-                        • Include a bc1q… or bc1p… address if you want change output<br><br>
-                        
-                        <small style='color:#66ccff !important;'>
-                            Tip: Use a block explorer offline to export UTXOs first.
-                        </small>
-                    </div>
+                    ⚠️ Fetch timed out or rate-limited
                 </div>
-                """
-            else:
-                # Online: original timeout/rate-limit message
-                timeout_msg = """
+                
                 <div style='
-                    color:#aaffcc !important;
-                    padding: clamp(24px, 5vw, 40px) !important;
-                    background:#001122 !important;
-                    border:3px solid #00ccff !important;
-                    border-radius:16px !important;
-                    text-align:center !important;
-                    max-width:95% !important;
-                    margin: clamp(20px, 5vw, 40px) auto !important;
-                    box-shadow:0 0 40px rgba(0,204,255,0.4) !important;
+                    color:#88ffdd !important;
+                    font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
+                    line-height:1.6 !important;
                 '>
-                    <div style='
-                        color:#00ccff !important;
-                        font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
-                        font-weight:900 !important;
-                        margin-bottom: clamp(12px, 3vw, 20px) !important;
-                    '>
-                        ⚠️ Fetch timed out or rate-limited
-                    </div>
+                    The address may be very large, or public APIs are currently rate-limiting / slow.<br><br>
                     
-                    <div style='
-                        color:#88ffdd !important;
-                        font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
-                        line-height:1.6 !important;
-                    '>
-                        The address may be very large, or public APIs are currently rate-limiting / slow.<br><br>
-                        
-                        <span style='font-weight:900 !important; color:#ffffff !important;'>Options:</span><br>
-                        • Try again in a few minutes (APIs often recover)<br>
-                        • Use offline mode and paste raw UTXOs manually<br>
-                        • Check the address on a block explorer first<br><br>
-                        
-                        <small style='color:#66ccff !important;'>
-                            Tip: For very large wallets, offline mode is usually faster and more reliable.
-                        </small>
-                    </div>
+                    <span style='font-weight:900 !important; color:#ffffff !important;'>Options:</span><br>
+                    • Try again in a few minutes (APIs often recover)<br>
+                    • Check the address on a block explorer first<br><br>
+                    
+                    <small style='color:#66ccff !important;'>
+                        Tip: For very large wallets, use a block explorer export first.
+                    </small>
                 </div>
-                """
+            </div>
+            """
 
             return (
                 gr.update(value=[]),                   # 0: Empty DataFrame
@@ -2271,7 +2105,6 @@ def analyze(
             )
 
     # 3. Enrich UTXOs with metadata, health, script info
-    # (no network calls here — already safe)
     enriched = _enrich_utxos(raw_utxos, params)
     log.debug(f"Enriched {len(enriched)} UTXOs")
 
@@ -2393,9 +2226,6 @@ def _analyze_empty_legacy_warning(scan_source: str = "") -> tuple:
             • Migrate to a modern address first (bc1q… Native SegWit or bc1p… Taproot)<br>
             • Then re-analyze here<br><br>
             
-            <small style='color:#ffaa66 !important;'>
-                Tip: Use offline mode and paste even one example UTXO line to see the legacy warning and table styling.
-            </small>
         </div>
     </div>
     """
@@ -2463,18 +2293,25 @@ def _validate_utxos_and_selection(
     df_rows: List[list],
     utxos: List[dict],
     *,
-    offline_mode: bool = False,
 ) -> Tuple[Optional[List[dict]], int, Optional[str]]:
     """
-    Resolve selected UTXOs from Gradio DataFrame checkboxes.
-    Prioritizes fresh UI state over frozen flags; strict in offline mode.
+    Resolve selected UTXOs from Gradio DataFrame checkbox state.
+
+    Prioritizes fresh UI checkbox state over frozen 'selected' flags.
+    Returns selected UTXOs, count, or error code if invalid/no selection.
+
+    Returns:
+        Tuple[Optional[List[dict]], int, Optional[str]]:
+            - List of selected UTXOs (or None if invalid)
+            - Count of selected inputs
+            - Error string ("NO_UTXOs" or "NO_SELECTION") or None on success
     """
     if not utxos:
-        return None, 0, "NO_UTXOS"
+        return None, 0, "NO_UTXOs"
 
     utxos = [u for u in utxos if isinstance(u, dict)]
     if not utxos:
-        return None, 0, "NO_UTXOS"
+        return None, 0, "NO_UTXOs"
 
     selected_indices = []
     if isinstance(df_rows, list) and df_rows:
@@ -2493,15 +2330,11 @@ def _validate_utxos_and_selection(
     else:
         selected_utxos = [u for u in utxos if u.get("selected", False)]
 
-    if offline_mode and not selected_indices:
-        selected_utxos = []
-
     consolidate_count = len(selected_utxos)
     if consolidate_count == 0:
         return None, 0, "NO_SELECTION"
 
     return selected_utxos, consolidate_count, None
-
 
 def _compute_privacy_metrics(selected_utxos: List[dict], total_utxos: int) -> Tuple[int, str]:
     """Compute privacy score and UI color."""
@@ -2665,7 +2498,6 @@ def generate_summary_safe(
     locked,
     strategy,
     dest_value,
-    offline_mode,
 ) -> tuple:
     """
     Generate main status/summary HTML — the central UI feedback loop.
@@ -2685,7 +2517,7 @@ def generate_summary_safe(
         return no_utxos_msg, gr.update(visible=False)
 
     selected_utxos, consolidate_count, error = _validate_utxos_and_selection(
-        df, utxos, offline_mode=offline_mode
+        df, utxos,
     )
 
     # Hard errors
@@ -2694,15 +2526,11 @@ def generate_summary_safe(
     if error == "NO_SELECTION":
         return select_msg, gr.update(visible=False)
 
-    # Filter to supported inputs (offline-safe)
+    # Filter to supported inputs
     supported_selected = [
         u for u in selected_utxos
         if u.get("script_type") in ("P2WPKH", "Taproot", "P2TR")
     ]
-
-    offline_inferred_count = sum(
-        1 for u in supported_selected if u.get("script_type_inferred", False)
-    )
 
     consolidate_count = len(supported_selected)
     if consolidate_count == 0:
@@ -2758,55 +2586,13 @@ def generate_summary_safe(
             "change sent to standard address"
         )
     else:
-        if offline_mode and not any(u.get("address") for u in utxos):
-            change_line = (
-                f"💧 <span style='color:#ff9900 !important;font-weight:800 !important;'>No change output</span> "
-                "(all remaining value absorbed into fees — full cleanup)"
-            )
-        else:
-            change_line = (
-                f"💧 <span style='color:#ff9900 !important;font-weight:800 !important;'>No change output</span> "
-                "(remaining value below dust threshold — absorbed into fee)"
-            )
-
-    # Offline address warning (fallback if no bc1q/bc1p address found)
-    offline_address_warning = ""
-    if offline_mode:
-        has_modern_addr = any(
-            u.get("address")
-            and isinstance(u["address"], str)
-            and u["address"].strip().startswith(('bc1q', 'bc1p'))
-            for u in utxos
-        )
-        if not has_modern_addr:
-            offline_address_warning = (
-                "<div style='"
-                "color:#ffdd88 !important; background:#332200 !important; "
-                "padding:16px; margin:20px 0; border:3px solid #ff9900 !important; "
-                "border-radius:14px; text-align:center; font-weight:700;"
-                "'>"
-                "⚠️ Offline mode: No modern change address detected<br><br>"
-                "Include at least one bc1q… or bc1p… address in your pasted UTXOs to receive change.<br>"
-                "Without it, all remaining value will be absorbed into fees (full cleanup)."
-                "</div>"
-            )
-
-    # Offline inferred script badge (if any)
-    offline_badge = ""
-    if offline_mode and offline_inferred_count > 0:
-        offline_badge = (
-            "<div style='"
-            "color:#bb86fc !important; background:rgba(187,134,252,0.15) !important; "
-            "padding:12px; margin:12px 0; border:2px solid #bb86fc !important; "
-            "border-radius:12px; text-align:center; font-weight:700;"
-            "'>"
-            f"⚠️ {offline_inferred_count} script type(s) inferred from offline input<br>"
-            "Review addresses carefully — accuracy depends on your paste."
-            "</div>"
+        change_line = (
+            f"💧 <span style='color:#ff9900 !important;font-weight:800 !important;'>No change output</span> "
+            "(remaining value below dust threshold — absorbed into fee)"
         )
 
     # Main status box HTML
-    status_box_html = offline_address_warning + f"""
+    status_box_html = f"""
     <div style="
         text-align:center !important;
         margin:clamp(30px, 8vw, 60px) auto 20px auto !important;
@@ -2832,7 +2618,6 @@ def generate_summary_safe(
         ">
             SELECTION READY
         </div>
-        {offline_badge}
         <div style="
             color:#f7931a !important;
             font-size:clamp(1.5rem, 5vw, 1.9rem) !important;
@@ -2985,12 +2770,12 @@ def _create_psbt_snapshot(
     dest_override: Optional[str],
     fee_rate: int,
     future_fee_rate: int,
-    strategy: str,             # NEW
-    dust_threshold: int,       # NEW
+    strategy: str,
+    dust_threshold: int,
 ) -> dict:
     """
     Create deterministic, audit-friendly JSON snapshot of user selection.
-    Now includes strategy and dust_threshold for full restore.
+    Includes strategy and dust_threshold for full restore.
     """
     if not selected_utxos:
         raise ValueError("No UTXOs selected for snapshot")
@@ -3011,8 +2796,6 @@ def _create_psbt_snapshot(
     ]
 
     dest_override_clean = dest_override.strip() if dest_override else None
-    if dest_override_clean and any(phrase in dest_override_clean.lower() for phrase in ["offline mode", "change address set", "locked", "manual utxo"]):
-        dest_override_clean = None
 
     snapshot = {
         "version": 1,
@@ -3021,8 +2804,8 @@ def _create_psbt_snapshot(
         "dest_addr_override": dest_override_clean,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
-        "strategy": strategy,                 # NEW — full strategy string
-        "dust_threshold": dust_threshold,     # NEW — dust slider value
+        "strategy": strategy,
+        "dust_threshold": dust_threshold,
         "consolidate_count": len(clean_inputs),
         "inputs": clean_inputs,
     }
@@ -3039,6 +2822,7 @@ def _create_psbt_snapshot(
     snapshot["fingerprint_short"] = fingerprint[:16].upper()
 
     return snapshot
+	
 	
 def _persist_snapshot(snapshot: dict) -> str:
     """
@@ -3102,48 +2886,26 @@ def on_generate(
     future_fee_rate: int,
     enriched_state: tuple,
     scan_source: str,
-	strategy: str,               
-    dust_threshold: int,   
-    offline_mode: bool = False
+    strategy: str,
+    dust_threshold: int,
 ) -> tuple:
     """
     Freeze user intent on "Generate" click.
     Returns snapshot (for JSON export), selected UTXOs, locked flag, and file path.
     """
-    # Clean dest_value — ignore placeholder nonsense
+    # Clean destination — ignore placeholders
     cleaned_dest = dest_value.strip()
-    if "offline mode" in cleaned_dest.lower() or len(cleaned_dest) < 10 or "change address set" in cleaned_dest.lower():
+    if len(cleaned_dest) < 10 or any(phrase in cleaned_dest.lower() for phrase in ["change address set", "locked"]):
         cleaned_dest = ""  # treat as no override
 
     if not enriched_state:
-        log.info("enriched_state is empty — nothing to generate")
         return None, [], gr.update(value=False), None
 
-    log.info(f"on_generate called — enriched_state type: {type(enriched_state)}, length: {len(enriched_state) if enriched_state else 'None'}")
-
-    if not enriched_state:
-        log.info("enriched_state empty — aborting generate")
-        return None, [], gr.update(value=False), None, "Nothing to generate — click ANALYZE first."
-
-    log.info("Extracting selected UTXOs from enriched_state...")
-    
     selected_utxos = _extract_selected_utxos(enriched_state)
-    log.info(f"Selected UTXOs after extraction: count = {len(selected_utxos)}")
-
     if not selected_utxos:
-        log.warning("No selected UTXOs found — user may have no checkboxes checked")
-        return None, [], gr.update(value=False), None, "No UTXOs selected — check at least one box in the table."
-
-    log.info(f"Selected UTXOs count: {len(selected_utxos)}")
-
-    if not selected_utxos:
-        log.info("Generate attempted with no UTXOs selected")
         return None, [], gr.update(value=False), None
-
-    log.debug(f"Destination override: {dest_value!r}")
 
     try:
-        log.debug("Creating snapshot...")
         snapshot = _create_psbt_snapshot(
             selected_utxos=selected_utxos,
             scan_source=scan_source,
@@ -3154,15 +2916,14 @@ def on_generate(
             dust_threshold=dust_threshold
         )
 
-        log.debug("Snapshot created — persisting to file...")
         file_path = _persist_snapshot(snapshot)
 
-        log.info("Snapshot persisted — locking UI")
         return snapshot, selected_utxos, gr.update(value=True), file_path
 
     except Exception as e:
         log.error(f"Snapshot creation failed: {e}", exc_info=True)
         return None, [], gr.update(value=False), None
+		
 # ====================
 # generate_psbt() helpers
 # ====================
@@ -3240,41 +3001,36 @@ def _resolve_destination(
     dest_override: Optional[str],
     scan_source: str,
     enriched_state: Optional[tuple] = None,
-    offline_mode: bool = False
 ) -> Union[bytes, str]:
     override_clean = (dest_override or "").strip()
-    if "offline mode" in override_clean.lower() or len(override_clean) < 10:
-        override_clean = ""  # ignore placeholder / empty
+    if len(override_clean) < 10:
+        override_clean = ""  # ignore empty/short input
 
     source_clean = scan_source.strip()
 
     final_dest = ""
 
-    # Priority 1: User override (highest priority)
+    # Priority 1: User override
     if override_clean:
         try:
             spk_test, meta_test = address_to_script_pubkey(override_clean)
             if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
                 final_dest = override_clean
-                log.info("[DEST-RESOLVE] Using user override (priority 1): %s", final_dest)
             else:
-                log.warning("[DEST-RESOLVE] Override address not modern: %s", override_clean)
+                log.warning("Override address not modern: %s", override_clean)
         except Exception:
-            log.debug("[DEST-RESOLVE] Invalid override address: %s", override_clean)
+            pass  # silent fallback
 
-    # Priority 2: Original scan_source (most logical default after override)
+    # Priority 2: Original scan_source
     if not final_dest and source_clean:
         try:
             spk_test, meta_test = address_to_script_pubkey(source_clean)
             if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
                 final_dest = source_clean
-                log.info("[DEST-RESOLVE] Using original scan_source (priority 2): %s", final_dest)
-            else:
-                log.debug("[DEST-RESOLVE] scan_source not modern: %s", source_clean)
         except Exception:
-            log.debug("[DEST-RESOLVE] Invalid scan_source: %s", source_clean)
+            pass  # silent fallback
 
-    # Priority 3: First modern address from enriched UTXOs (restore/offline fallback)
+    # Priority 3: First modern address from UTXOs (restore fallback)
     if not final_dest and enriched_state and len(enriched_state) == 2:
         _, utxos = enriched_state
         for u in utxos:
@@ -3284,29 +3040,19 @@ def _resolve_destination(
                     spk_test, meta_test = address_to_script_pubkey(addr)
                     if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
                         final_dest = addr
-                        log.info("[DEST-RESOLVE] Fallback to first modern UTXO addr (priority 3): %s", final_dest)
                         break
                 except Exception:
-                    log.debug("[DEST-RESOLVE] Skipping invalid UTXO addr: %s", addr)
-        else:
-            log.debug("[DEST-RESOLVE] No modern addr found in enriched UTXOs")
+                    continue
 
-    # No destination → full cleanup
+    # No destination → full cleanup (absorb remainder into fee)
     if not final_dest:
-        log.info("[DEST-RESOLVE] No destination resolved → full fee absorb")
         return b''
-
-    log.debug("[DEST-RESOLVE] Final destination: '%s'", final_dest)
 
     try:
         spk, meta = address_to_script_pubkey(final_dest)
         typ = meta.get('type', 'unknown')
 
-        log.info("[DEST-RESOLVE] Success — final_dest='%s' | type='%s' | dest_spk_len=%d | is_empty=%s",
-                 final_dest, typ, len(spk), spk == b'')
-
         if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
-            log.warning("[DEST-RESOLVE] Rejected legacy/nested: %s (%s)", final_dest, typ)
             return (
                 "<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
                 "Change address must be modern (bc1q… or bc1p… only)<br><br>"
@@ -3315,11 +3061,9 @@ def _resolve_destination(
                 "</div>"
             )
 
-        log.info("Resolved change address %s → %s (spk len=%d)", final_dest, typ, len(spk))
         return spk
 
     except Exception as e:
-        log.error("[DEST-RESOLVE] Failed to resolve '%s': %s", final_dest, str(e), exc_info=True)
         return (
             "<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
             "Invalid change address<br><br>"
@@ -3335,7 +3079,7 @@ def _build_unsigned_tx(
 ) -> tuple[Tx, list[dict], str, bool]:
     """
     Construct unsigned transaction and prepare UTXO info for PSBT.
-    Guarantees at least one output (OP_RETURN if no change).
+    Guarantees at least one output (OP_RETURN marker if no change).
     """
     tx = Tx()
     utxos_for_psbt: list[dict[str, Any]] = []
@@ -3346,7 +3090,7 @@ def _build_unsigned_tx(
             txid_bytes = bytes.fromhex(txid_str)
             vout = int(u["vout"])
         except (ValueError, KeyError) as e:
-            raise ValueError(f"Invalid txid/vout in restored input: {e}")
+            raise ValueError(f"Invalid txid/vout in input: {e}")
 
         tx.tx_ins.append(TxIn(txid_bytes, vout))
 
@@ -3713,7 +3457,6 @@ def generate_psbt(
     psbt_snapshot: dict,
     full_selected_utxos: list[dict],
     df_rows,
-    offline_mode: bool = False,
     enriched_state: tuple = None,
     loaded_fingerprint: Optional[str] = None,
     selection_changed_after_load: bool = False
@@ -3851,7 +3594,6 @@ def generate_psbt(
         dest_override=params.dest_override,
         scan_source=params.scan_source if hasattr(params, 'scan_source') else "unknown",
         enriched_state=enriched_state,
-        offline_mode=offline_mode
     )
     
     if isinstance(dest_result, str):
@@ -3917,8 +3659,8 @@ def generate_psbt(
         dest_override=params.dest_override,
         fee_rate=params.fee_rate,
         future_fee_rate=params.future_fee_rate,
-        strategy=params.strategy,               # ← added
-        dust_threshold=params.dust_threshold    # ← added
+        strategy=params.strategy,
+        dust_threshold=params.dust_threshold
     )
 
     # Fingerprint comparison banner
@@ -3961,8 +3703,6 @@ def analyze_and_show_summary(
     dust_threshold,
     fee_rate_slider,
     future_fee_slider,
-    offline_mode,
-    manual_utxo_input,
     locked,
     dest_value,
 ):
@@ -3976,8 +3716,6 @@ def analyze_and_show_summary(
         dust_threshold,
         fee_rate_slider,
         future_fee_slider,
-        offline_mode,
-        manual_utxo_input,
     )
 
     # Extract fresh rows
@@ -4002,7 +3740,6 @@ def analyze_and_show_summary(
         locked,
         strategy,
         dest_value,
-        offline_mode,
     )
 
     # Return the original 9 outputs (Gradio expects exactly 9)
@@ -4091,27 +3828,13 @@ def process_uploaded_file(file):
         return {}
 
 
-# ── UI status banner (theme + offline mode) ─────────────────────────────────────
-def update_status_and_ui(offline: bool | None, dark: bool | None) -> str:
-    """Generate responsive status banner showing theme & connection mode."""
+# ── UI status banner (theme only) ─────────────────────────────────────
+def update_status_and_ui(dark: bool | None) -> str:
+    """Generate responsive status banner showing theme."""
     is_dark = dark if dark is not None else True
-    is_offline = offline if offline is not None else False
-
-    log.debug(
-        "[Banner] Called | offline=%s | dark=%s | rendering %s",
-        is_offline,
-        is_dark,
-        'DARK' if is_dark else 'LIGHT'
-    )
 
     theme_icon = "🌙" if is_dark else "☀️"
     theme_text = "Dark" if is_dark else "Light"
-
-    connection = (
-        '<span style="color:#ff4444; font-weight:900;">Offline 🔒 Air-gapped</span>'
-        if is_offline
-        else '<span style="color:#00ff88; font-weight:900;">Online</span> • API calls enabled'
-    )
 
     glow = "0 0 20px #00ff88" if is_dark else "none"
     bg = "rgba(0, 30, 0, 0.6)" if is_dark else "rgba(220, 255, 220, 0.4)"
@@ -4137,28 +3860,23 @@ def update_status_and_ui(offline: bool | None, dark: bool | None) -> str:
         margin-right: auto !important;
     ">
         <span style="font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important; margin-right: 12px !important;">{theme_icon}</span>
-        {theme_text} • {connection}
+        {theme_text}
     </div>
     """
-	
-# =============================
-# — Centralized UI toggle handler (all-in-one)
-# =============================
-def ui_toggle_handler(offline: bool, restore: bool, dark: bool) -> tuple:
-    global _is_offline
-    _is_offline = bool(offline)
 
-    # Visibility & disable logic
-    manual_box_update = gr.update(visible=offline)           # raw UTXO paste — Offline only
-    restore_area_update = gr.update(visible=restore)         # JSON upload — Restore only
 
-    disabled = offline or restore
+# =============================
+# — Centralized UI toggle handler (restore + theme only)
+# =============================
+def ui_toggle_handler(restore: bool, dark: bool) -> tuple:
+    # Visibility & disable logic (restore only)
+    restore_area_update = gr.update(visible=restore)  # JSON upload — Restore only
+
+    disabled = restore
 
     addr_update = gr.update(
         interactive=not disabled,
         placeholder=(
-            "Offline mode active — paste raw UTXOs below (txid:vout:value[:address])"
-            if offline else
             "Restore active — addresses from JSON snapshot"
             if restore else
             "Paste a single modern Bitcoin address (bc1q…, bc1p…, 1…, or 3…)"
@@ -4169,8 +3887,6 @@ def ui_toggle_handler(offline: bool, restore: bool, dark: bool) -> tuple:
     dest_update = gr.update(
         interactive=not disabled,
         placeholder=(
-            "Offline mode active — change via manual UTXO paste"
-            if offline else
             "Restore active — change from JSON snapshot"
             if restore else
             "Paste Bitcoin address for change output (optional)"
@@ -4178,26 +3894,9 @@ def ui_toggle_handler(offline: bool, restore: bool, dark: bool) -> tuple:
         value="" if disabled else None,
     )
 
-    # Fee info banner — only "Offline" when offline
+    # Fee info banner — always online
     fee_info_update = gr.update(
         value="""
-        <div style="
-            color: #ffcc88;
-            font-size: clamp(0.95rem, 3.2vw, 1.1rem);
-            line-height: 1.5;
-            font-weight: 600;
-            margin: clamp(8px, 2vw, 16px) 0 clamp(12px, 3vw, 20px) 0;
-            padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px);
-            background: rgba(50, 20, 0, 0.4);
-            border: 1px solid #ff9900;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 0 20px rgba(255, 153, 0, 0.3);
-            transition: all 0.3s ease;
-        ">
-            Offline mode — use sliders to set fees (preset buttons disabled)
-        </div>
-        """ if offline else """
         <div style="
             color: #88ffcc;
             font-size: clamp(0.95rem, 3.2vw, 1.1rem);
@@ -4216,19 +3915,18 @@ def ui_toggle_handler(offline: bool, restore: bool, dark: bool) -> tuple:
         </div>
         """
     )
-    network_badge_update = update_network_badge(offline)
 
-    status_update = update_status_and_ui(offline, dark)
+    network_badge_update = update_network_badge()
+
+    status_update = update_status_and_ui(dark)
 
     return (
-        manual_box_update,
-        restore_area_update,  # add if needed
+        restore_area_update,
         addr_update,
         dest_update,
         fee_info_update,
         network_badge_update,
         status_update,
-        gr.update(value=offline),   
         gr.update(value=restore)
     )
 # --------------------------
@@ -4546,7 +4244,6 @@ with gr.Blocks(
             .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.12); }
             .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
             .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.12); }
-            .health-manual   { color: #bb86fc; background: rgba(187, 134, 252, 0.12); }
 
             .health small {
                 display: block;
@@ -4857,19 +4554,15 @@ body:not(.dark-mode) .footer-donation button {
     # Dynamic network conditions badge (populated by load or timer)
     network_badge = gr.HTML("")
 
-    # =============================
+     # =============================
     # — BACKGROUND FEE CACHE REFRESH —
     # =============================
     def refresh_fees_periodically():
-        """Background daemon thread to keep fee cache warm every 30 seconds — offline-safe."""
-        global _is_offline
+        """Background daemon thread to keep fee cache warm every 30 seconds."""
         while True:
             time.sleep(30)
-            if _is_offline:
-                # log.debug("Fee refresh skipped — offline mode active")  # uncomment if you want logs
-                continue
             try:
-                get_live_fees()  # only called if online
+                get_live_fees()  # always refresh
             except Exception as e:
                 log.warning(f"Background fee refresh error: {e}")
 
@@ -4888,14 +4581,14 @@ body:not(.dark-mode) .footer-donation button {
     # =============================
     # 🔒 LOCK-SAFE FEE PRESET HANDLER
     # =============================
-    def apply_fee_preset_locked(locked: bool, offline_mode: bool, preset: str):
-        """Apply a fee preset to the slider — completely safe in offline mode."""
-        if offline_mode or locked:
-            return gr.update()  # no-op — don't touch the slider, safe in both modes
+    def apply_fee_preset_locked(locked: bool, preset: str):
+        """Apply a fee preset to the slider — safe when locked."""
+        if locked:
+            return gr.update()  # no-op — don't touch the slider when locked
 
-        # Only reach here if online and not locked
+        # Only reach here if not locked
         try:
-            fees = get_live_fees()  # safe: we've already guarded get_live_fees itself
+            fees = get_live_fees()  # live fees
         except Exception as e:
             log.warning(f"Live fee fetch failed in preset handler: {e}")
             fees = None
@@ -4919,55 +4612,41 @@ body:not(.dark-mode) .footer-donation button {
         new_rate = rate_map.get(preset, 3)
         return gr.update(value=new_rate)
 
-
     # =============================
     # 🔘 FEE PRESET BUTTONS STATE HELPER
-    # Disables buttons on load/offline/locked — improves UX
+    # Disables buttons on load/locked — improves UX
     # =============================
-    def update_fee_buttons_state(offline_mode: bool, locked: bool):
-        interactive = not (offline_mode or locked)
+    def update_fee_buttons_state(locked: bool):
+        interactive = not locked
         return [gr.update(interactive=interactive)] * 4  # shorthand for all 4 buttons
-		
 
     # =============================
-    # 🛡️ OFFLINE-AWARE NETWORK CONDITIONS BADGE
-    # Shows live fee/consolidate context online, safe fallback in air-gapped mode
+    # 🛡️ NETWORK CONDITIONS BADGE
+    # Shows live fee/consolidation context from mempool.space
     # =============================
-    def update_network_badge(offline_mode: bool):
-        if offline_mode:
+    def update_network_badge() -> gr.update:
+        """
+        Generate and return the network conditions badge HTML.
+
+        Fetches current fee data and recent medians from mempool.space.
+        Returns formatted HTML for display in the UI.
+        """
+        try:
+            return gr.update(value=get_consolidation_score(), visible=True)
+        except Exception as e:
             return gr.update(
-                value="""
+                value=f"""
                 <div style="
-                    text-align:center; padding:20px; background:#001122; 
-                    border:2px solid #00ccff; border-radius:12px; color:#88ddff;
-                    max-width:600px; margin:20px auto; font-weight:600;
+                    text-align:center; padding:16px; background:#220000; 
+                    border:2px solid #ff4444; border-radius:12px; color:#ffaaaa;
+                    max-width:600px; margin:20px auto;
                 ">
-                    <strong>Offline Mode Active</strong><br>
-                    Live network conditions & fee data unavailable<br>
-                    <small>(zero network calls in air-gapped mode)</small>
+                    <strong>Failed to load live fees</strong><br>
+                    {str(e)}
                 </div>
                 """,
                 visible=True
             )
-        else:
-            try:
-                # Pass the flag — now safe even if someone calls this function directly
-                return gr.update(value=get_consolidation_score(offline_mode=offline_mode), visible=True)
-            except Exception as e:
-                return gr.update(
-                    value=f"""
-                    <div style="
-                        text-align:center; padding:16px; background:#220000; 
-                        border:2px solid #ff4444; border-radius:12px; color:#ffaaaa;
-                        max-width:600px; margin:20px auto;
-                    ">
-                        <strong>Failed to load live fees</strong><br>
-                        {str(e)}
-                    </div>
-                    """,
-                    visible=True
-                )
-
 
     # =============================
     # 🔐 FINALIZE & LOCK UI AFTER PSBT GENERATION
@@ -4994,9 +4673,7 @@ body:not(.dark-mode) .footer-donation button {
             gr.update(interactive=False),                # 9: dust
             gr.update(interactive=False),                # 10: fee_rate_slider
             gr.update(interactive=False),                # 11: future_fee_slider
-            gr.update(interactive=False),                # 12: offline_toggle
             gr.update(interactive=False),                # 13: theme_checkbox
-            gr.update(interactive=False),                # 14: manual_utxo_input
             gr.update(interactive=False),                # 15: economy_btn
             gr.update(interactive=False),                # 16: hour_btn
             gr.update(interactive=False),                # 17: halfhour_btn
@@ -5067,7 +4744,8 @@ body:not(.dark-mode) .footer-donation button {
                         (<span style="font-weight:900 !important; color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
                         UTXO data, derivation paths, fingerprints
                         </span>)
-                        and can be signed either online or fully offline / air-gapped
+                        and can be signed in standard online workflows
+						or exported for fully air-gapped signing
                         using <strong style="color:#00ffcc !important;">Sparrow</strong>,
                         <strong style="color:#00ffcc !important;">Coldcard</strong>,
                         <strong style="color:#00ffcc !important;">Ledger</strong>, 
@@ -5129,7 +4807,7 @@ body:not(.dark-mode) .footer-donation button {
             label="Restore previous session",
             value=False,
             interactive=True,
-            info="Resume a saved UTXO selection without re-analysis. Offline-safe (no API calls).",
+            info="Resume a saved UTXO selection without re-analysis.",
             elem_id="restore-toggle"
         )
         # Only wrap the upload + button in the toggle-able area
@@ -5171,130 +4849,7 @@ body:not(.dark-mode) .footer-donation button {
 				interactive=True,
 				value=None,
             )
-
-        # === AIR-GAPPED / OFFLINE MODE HEADER ===
-        # gr.HTML("""
-        #     <div style="
-        #         text-align:center !important;
-        #         padding: clamp(20px, 6vw, 32px) !important;
-        #         margin: clamp(30px, 8vw, 50px) 0 !important;
-        #         background:#001100 !important;
-        #         border:3px solid #00ff88 !important;
-        #         border-radius:18px !important;
-        #         box-shadow:
-        #             0 12px 40px rgba(0,0,0,0.6) !important,
-        #             0 8px 32px rgba(0,255,136,0.4) !important,
-        #             inset 0 0 30px rgba(0,255,136,0.2) !important;
-        #         max-width:95% !important;
-        #         margin-left:auto !important;
-        #         margin-right:auto !important;
-        #     "> 
-        #       <div style="
-        #           color:#00ff88 !important;
-        #           font-size: clamp(1.3rem, 5.5vw, 1.7rem) !important;
-        #           font-weight:900 !important;
-        #           text-shadow:0 0 30px #00ff88 !important;
-        #           margin-bottom: clamp(10px, 3vw, 16px) !important;
-        #       ">
-        #         🔒 Air-Gapped / Offline Mode
-        #       </div>
-        #
-        #       <div style="
-        #           color:#aaffcc !important;
-        #           font-size: clamp(1rem, 3.8vw, 1.2rem) !important;
-        #           line-height:1.7 !important;
-        #       ">
-        #         Fully offline operation — no API calls, perfect for cold wallets.
-        #       </div>
-        #     </div>
-        #     """
-        # )
-
-        # === OFFLINE MODE ===
-        #with gr.Row():
-            #with gr.Column(scale=1, min_width=220):
-                #offline_toggle = gr.Checkbox(
-                    #label="🔒 Offline / Air-Gapped Mode",
-                    #value=False,
-                    #interactive=True,
-                    #info="No API calls • Paste raw UTXOs • True cold wallet prep",
-					#elem_id="offline-toggle"
-                #)
-
-        with gr.Row(visible=False) as manual_box_row:
-            with gr.Column():
-                gr.HTML("""
-                <div style="
-                    color: #ffdd88 !important;
-                    background: rgba(51, 34, 0, 0.75) !important;
-                    border: 3px solid #ff9900 !important;
-                    border-radius: 14px !important;
-                    padding: clamp(16px, 4vw, 20px) !important;
-                    margin: 16px 0 20px 0 !important;
-                    font-weight: 700 !important;
-                    text-align: center !important;
-                    font-size: clamp(1rem, 3.8vw, 1.1rem) !important;
-                    line-height: 1.5 !important;
-                    box-shadow: 0 0 25px rgba(255,153,0,0.5) !important, inset 0 0 12px rgba(0,0,0,0.6) !important;
-                    max-width: 100% !important;
-                    overflow-x: hidden !important;
-                ">
-                  ⚠️ Important: Offline Mode Address Requirement<br>
-                  <span style="
-                      font-size: clamp(1.05rem, 4vw, 1.15rem) !important;
-                      color: #ffffff !important;
-                      text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
-                      font-weight: 900 !important;
-                  ">
-                    To receive change back to your wallet, include 
-                    <strong style="color: #ffffff !important;">at least one valid address</strong> 
-                    (bc1q... or bc1p...) in your pasted UTXOs.<br><br>
-
-                    Format example:<br>
-                    <div style="overflow-x: auto; max-width: 100%; margin: 12px 0;">
-                      <code style="
-                          display: block !important;
-                          background: #000000 !important;
-                          color: #ffffff !important;
-                          padding: 12px !important;
-                          border-radius: 8px !important;
-                          font-family: monospace !important;
-                          font-size: clamp(0.85rem, 3.2vw, 0.95rem) !important;
-                          text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;
-                          box-shadow: inset 0 0 6px rgba(0,0,0,0.8) !important;
-                          white-space: pre-wrap !important;
-                          word-break: break-all !important;
-                          overflow-wrap: anywhere !important;
-                          line-height: 1.4 !important;
-                          width: fit-content !important;
-                          min-width: 100% !important;
-                      ">txid:vout:value_in_sats:bc1qyouraddresshere</code>
-                    </div><br>
-
-                    If no address is provided, 
-                    <strong style="color:#ffffff !important; text-shadow: 0 0 6px #000000, 0 0 12px #000000 !important;">
-                    no change output
-                    </strong> 
-                    will be created — all remaining value absorbed into fees (full wallet cleanup only).<br>
-                    Add an address and re-analyze if you want change.
-                  </span>
-                </div>
-                """)
-                manual_utxo_input = gr.Textbox(
-                    label="🔒 OFFLINE MODE • ACTIVE INPUT • Paste raw UTXOs (one per line)",
-                    placeholder="""Paste raw UTXOs — one per line
-
-Format: txid:vout:value_in_sats[:address]
-
-Examples:
-abc123...000:0:125000:bc1qexample...          ← include address
-def456...789:1:5000000:bc1p...               ← REQUIRED for change output
-txidhere:2:999999                            ← OK if another line has address
-
-No API calls • Fully air-gapped safe""",
-                    lines=10,
-                )
-
+    
         # === Consolidation Strategy & Economic Controls Header ===
         gr.HTML(
             value="""
@@ -5350,7 +4905,7 @@ No API calls • Fully air-gapped safe""",
             )
         dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)", info="Inputs below this value are treated as inefficient to spend individually.")
 
-        # Fee preset info (above sliders — dynamic via offline toggle)
+
         fee_preset_info = gr.HTML(
             """
             <div style="
@@ -5367,7 +4922,7 @@ No API calls • Fully air-gapped safe""",
                 box-shadow: 0 0 20px rgba(0, 204, 136, 0.3);
                 transition: all 0.3s ease;
             ">
-                Use sliders or fee preset buttons to choose fees (API calls enabled)
+                Use sliders or fee preset buttons to choose fees
             </div>
             """,
             visible=True
@@ -5632,95 +5187,32 @@ No API calls • Fully air-gapped safe""",
         outputs=[restore_area],
     )
 
-    # 2. Full UI sync on Offline toggle
-    offline_toggle.change(
-        fn=ui_toggle_handler,
-        inputs=[offline_toggle, restore_toggle, theme_checkbox],
-        outputs=[
-            manual_box_row,
-            restore_area,
-            addr_input,
-            dest,
-            fee_preset_info,
-            network_badge,
-            mode_status,
-            offline_toggle,
-            restore_toggle,
-        ]
-    )
-
     # 3. Full UI sync on Restore toggle
     restore_toggle.change(
         fn=ui_toggle_handler,
-        inputs=[offline_toggle, restore_toggle, theme_checkbox],
+        inputs=[restore_toggle, theme_checkbox],
         outputs=[
-            manual_box_row,
             restore_area,
             addr_input,
             dest,
             fee_preset_info,
             network_badge,
             mode_status,
-            offline_toggle,
             restore_toggle,
         ]
     )
-	
-    # =============================
-    # — Symmetric last-click wins exclusivity (no stuck toggle)
-    # =============================
+	)
 
-    # Handler for when Offline is toggled
-    # If user just turned Offline ON → force Restore OFF
-    offline_toggle.change(
-        fn=lambda offline_val: gr.update(value=False) if offline_val else gr.update(),
-        inputs=[offline_toggle],
-        outputs=[restore_toggle],
-        js="""
-        (offline_val) => {
-            if (offline_val) {
-                // User just turned Offline ON → uncheck Restore instantly in browser
-                const restoreCheckbox = document.getElementById('restore-toggle');
-                if (restoreCheckbox && restoreCheckbox.checked) {
-                    restoreCheckbox.checked = false;
-                    restoreCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
-        }
-        """
-    )
-
-    # Mirror handler for symmetry: If user just turned Restore ON → force Offline OFF
-    restore_toggle.change(
-        fn=lambda restore_val: gr.update(value=False) if restore_val else gr.update(),
-        inputs=[restore_toggle],
-        outputs=[offline_toggle],
-        js="""
-        (restore_val) => {
-            if (restore_val) {
-                // User just turned Restore ON → uncheck Offline instantly in browser
-                const offlineCheckbox = document.getElementById('offline-toggle');
-                if (offlineCheckbox && offlineCheckbox.checked) {
-                    offlineCheckbox.checked = false;
-                    offlineCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }
-        }
-        """
-    )
-	
     #Theme toggle (only needs status update)
     theme_checkbox.change(
         fn=ui_toggle_handler,
-        inputs=[offline_toggle, restore_toggle, theme_checkbox],
+        inputs=[restore_toggle, theme_checkbox],
         outputs=[
-            manual_box_row,
             addr_input,
             dest,
             fee_preset_info,
             network_badge,
             mode_status,
-            offline_toggle,
             restore_toggle,
         ],
         js="""
@@ -5743,7 +5235,7 @@ No API calls • Fully air-gapped safe""",
     ]:
         btn.click(
             fn=partial(apply_fee_preset_locked, preset=preset),
-            inputs=[locked, offline_toggle],
+            inputs=[locked],
             outputs=fee_rate_slider,
         )
 
@@ -5756,7 +5248,7 @@ No API calls • Fully air-gapped safe""",
         outputs=[json_parsed_state],
     ).then(
         fn=load_selection,
-        inputs=[json_parsed_state, enriched_state, offline_toggle],
+        inputs=[json_parsed_state, enriched_state],
         outputs=[
             enriched_state,
             warning_banner,
@@ -5793,7 +5285,6 @@ No API calls • Fully air-gapped safe""",
             locked,
             strategy,
             dest_value,
-            offline_toggle,
         ],
         outputs=[status_output, generate_row]
     )
@@ -5808,8 +5299,6 @@ No API calls • Fully air-gapped safe""",
             dust,
             fee_rate_slider,
             future_fee_slider,
-            offline_toggle,
-            manual_utxo_input,
 			locked,
 			dest_value
         ],
@@ -5838,8 +5327,7 @@ No API calls • Fully air-gapped safe""",
             enriched_state,
             scan_source,
 			strategy,
-			dust,
-            offline_toggle,       
+			dust
         ],
         outputs=[psbt_snapshot, selected_utxos_for_psbt, locked, export_file],
     ).then(
@@ -5847,8 +5335,7 @@ No API calls • Fully air-gapped safe""",
         inputs=[
             psbt_snapshot,
             selected_utxos_for_psbt,
-            df,
-            offline_toggle,      
+            df,    
             enriched_state,           
             loaded_fingerprint,
             selection_changed_after_load
@@ -5869,9 +5356,7 @@ No API calls • Fully air-gapped safe""",
             dust,
             fee_rate_slider,
             future_fee_slider,
-            offline_toggle,
             theme_checkbox,
-            manual_utxo_input,
             economy_btn,
             hour_btn,
             halfhour_btn,
@@ -5908,9 +5393,6 @@ No API calls • Fully air-gapped safe""",
             gr.update(interactive=True),                             # dust
             gr.update(interactive=True),                             # fee_rate_slider
             gr.update(interactive=True),                             # future_fee_slider
-            gr.update(value=False, interactive=True),                # offline_toggle
-            gr.update(value="", interactive=True),                   # manual_utxo_input
-            gr.update(visible=False),                                # manual_box_row
             gr.update(value=True, interactive=True),                 # theme_checkbox — reset to dark
             gr.update(interactive=True),                             # fastest_btn
             gr.update(interactive=True),                             # halfhour_btn
@@ -5945,9 +5427,6 @@ No API calls • Fully air-gapped safe""",
             dust,
             fee_rate_slider,
             future_fee_slider,
-            offline_toggle,
-            manual_utxo_input,
-            manual_box_row,
             theme_checkbox,
             fastest_btn,
             halfhour_btn,
@@ -5972,7 +5451,7 @@ No API calls • Fully air-gapped safe""",
         outputs=[status_output, generate_row, analyze_btn]
     ).then(
         fn=update_status_and_ui,
-        inputs=[offline_toggle, theme_checkbox],
+        inputs=[theme_checkbox],
         outputs=[mode_status]
     )
     # =============================
@@ -5995,7 +5474,6 @@ No API calls • Fully air-gapped safe""",
             locked,
             strategy,
             dest_value,
-            offline_toggle,
         ],
         outputs=[status_output, generate_row]
     )
@@ -6013,7 +5491,6 @@ No API calls • Fully air-gapped safe""",
             locked,
             strategy,
             dest_value,
-            offline_toggle,
         ],
         outputs=[status_output, generate_row]
     )
@@ -6031,7 +5508,6 @@ No API calls • Fully air-gapped safe""",
             locked,
             strategy,
             dest_value,
-            offline_toggle,
         ],
         outputs=[status_output, generate_row]
     )
@@ -6051,46 +5527,39 @@ No API calls • Fully air-gapped safe""",
             locked,
             strategy,
             dest_value,
-            offline_toggle,
         ],
         outputs=[status_output, generate_row]
     )
 
-    # =============================
+     # =============================
     # — Initial UI state & dark mode (always run on page load / restart)
     # =============================
 
-    # 2. Force initial banner (online + dark by default) — pure UI, safe
-    demo.load(
-        fn=lambda: update_status_and_ui(False, True),
-        outputs=[mode_status]
-    )
-
-    # 3. Force initial dark mode (client-side, instant) — JS only, no network
+    # Force initial dark mode (client-side, instant) — JS only, no network
     demo.load(
         fn=update_status_and_ui,
-        inputs=[offline_toggle, theme_checkbox],
+        inputs=[theme_checkbox],
         outputs=[mode_status],
         js="""
-        (offline, isDark) => {
+        (isDark) => {
             console.log("[Ω Initial Load] isDark from checkbox:", isDark);
             document.body.classList.toggle('dark-mode', isDark);
         }
         """
     )
 
-    # 4. Fee preset buttons initial state — disable if offline/locked, pure UI
+    # Force initial banner (dark by default via checkbox) — pure UI
     demo.load(
-        fn=update_fee_buttons_state,
-        inputs=[offline_toggle, locked],
-        outputs=[economy_btn, hour_btn, halfhour_btn, fastest_btn]
+        fn=update_status_and_ui,
+        inputs=[theme_checkbox],
+        outputs=[mode_status]
     )
 
-    # 5. Consolidation conditions badge — already offline-safe, but reinforce guard
+    # 4. Fee preset buttons initial state — disable if locked, pure UI
     demo.load(
-        fn=lambda offline: update_network_badge(offline),
-        inputs=[offline_toggle],
-        outputs=[network_badge]
+        fn=update_fee_buttons_state,
+        inputs=[locked],
+        outputs=[economy_btn, hour_btn, halfhour_btn, fastest_btn]
     )
 
     # 5. FOOTER
