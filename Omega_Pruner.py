@@ -6366,22 +6366,19 @@ No API calls • Fully air-gapped safe""",
 )
 	
 if __name__ == "__main__":
-    import time
-    
-    print("Starting Gradio server...")  # debug marker
+    # Force tiny/local-only queue to stabilize offline UI (reduces heartbeat/queue spam)
+    demo.queue(
+        concurrency_count=1,       # single user only
+        max_size=1,                # tiny queue — no backlog
+        api_open=False             # no external API exposure
+    )
     
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
-        debug=False,                    # keep False in prod
+        debug=False,
         allowed_paths=["/"],
-        prevent_thread_lock=True,       # helps, but not always sufficient alone
+        prevent_thread_lock=True,
         show_error=True
     )
-    
-    # Critical: Keep-alive loop to prevent early exit on Render/containers
-    print("Gradio launched — entering keep-alive loop")
-    while True:
-        time.sleep(300)  # sleep 5 min — low CPU, keeps process alive
-        print("Keep-alive heartbeat...")  # optional log marker
