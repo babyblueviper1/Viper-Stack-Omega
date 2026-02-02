@@ -4680,7 +4680,7 @@ body:not(.dark-mode) .footer-donation button {
 
     with gr.Column():
         # Modern Bitcoin Optimization Note
-         gr.HTML(
+        gr.HTML(
             value="""
             <div style="
                 margin: 32px auto;
