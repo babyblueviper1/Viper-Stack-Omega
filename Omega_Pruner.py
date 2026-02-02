@@ -3658,37 +3658,37 @@ def generate_psbt(
             enriched_state=enriched_state,
         )
 
-        # DEBUG (keep until fixed, then remove)
+        # DEBUG (keep for confirmation, remove after test)
         log.info(f"[DEST_DEBUG] type={type(dest_result).__name__}, repr={repr(dest_result)[:400]}")
         if isinstance(dest_result, dict):
             log.info(f"[DEST_DEBUG_KEYS] keys={list(dest_result.keys())}")
 
-        # ── FIXED UNWRAP LOGIC ──
+        # FIXED unwrap: handle Gradio's exact wrapped update format
         error_html = None
 
-        # Priority 1: It's a dict with 'value' (Gradio's wrapped update)
         if isinstance(dest_result, dict):
-            if 'value' in dest_result:
-                error_html = dest_result['value']
-            elif '__type__' in dest_result and dest_result.get('__type__') == 'update':
+            # Gradio's queued update wrapper: {'value': html_str, '__type__': 'update'}
+            if '__type__' in dest_result and dest_result.get('__type__') == 'update':
                 error_html = dest_result.get('value')
+            # Direct value key (fallback)
+            elif 'value' in dest_result:
+                error_html = dest_result['value']
 
-        # Priority 2: It's a real gr.update object
+        # If it's a real gr.update() object (less common in queued mode)
         elif isinstance(dest_result, type(gr.update())):
             error_html = dest_result.value
 
-        # Priority 3: Raw string fallback (unlikely but safe)
+        # Raw string (your original fallback style)
         elif isinstance(dest_result, str):
             error_html = dest_result
 
-        # If we got error HTML → return it (clean red box)
         if error_html:
-            # Extra safety: if still dict somehow, extract value
-            if isinstance(error_html, dict) and 'value' in error_html:
+            # Final safety: if still wrapped somehow, extract
+            while isinstance(error_html, dict) and 'value' in error_html:
                 error_html = error_html['value']
-            return error_html
+            return error_html  # This will render the clean red box
 
-        # Success: must be bytes (or b'')
+        # Success: dest_result is bytes or b''
         dest_spk = dest_result
 		
         try:
