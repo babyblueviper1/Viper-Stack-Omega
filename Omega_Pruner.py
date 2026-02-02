@@ -3028,36 +3028,60 @@ def _resolve_destination(
     dest_override: Optional[str],
     scan_source: str,
     enriched_state: Optional[tuple] = None,
-) -> Union[bytes, str]:
+) -> Union[bytes, gr.update]:
+    """
+    Resolve change destination → scriptPubKey bytes or UI error message.
+    
+    Returns:
+        bytes: valid scriptPubKey (or b'' for no change / full absorb)
+        gr.update: error message HTML to display in UI
+    """
     override_clean = (dest_override or "").strip()
     if len(override_clean) < 10:
-        override_clean = ""  # ignore empty/short input
+        override_clean = ""  # ignore short/empty input
 
     source_clean = scan_source.strip()
 
     final_dest = ""
 
-    # Priority 1: User override
+    # Priority 1: User override — validate immediately
     if override_clean:
         try:
             spk_test, meta_test = address_to_script_pubkey(override_clean)
-            if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
+            typ = meta_test.get('type', 'unknown')
+            if typ in ('P2WPKH', 'Taproot', 'P2TR'):
                 final_dest = override_clean
             else:
-                log.warning("Override address not modern: %s", override_clean)
+                # Early error: bad override type → stop here
+                return gr.update(value=f"""
+                <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
+                    <strong>Invalid change address type</strong><br><br>
+                    You entered: {override_clean[:12]}... ({typ})<br>
+                    Only Native SegWit (bc1q…) and Taproot (bc1p…) allowed for change.<br><br>
+                    <small>Try again with a valid modern address.</small>
+                </div>
+                """)
         except Exception:
-            pass  # silent fallback
+            # Early error: invalid format → stop here
+            return gr.update(value=f"""
+            <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
+                Invalid change address format<br><br>
+                You entered: {override_clean[:12]}...<br>
+                Must be a valid bc1q… or bc1p… address.<br><br>
+                <small>Try again with a valid modern address.</small>
+            </div>
+            """)
 
-    # Priority 2: Original scan_source
+    # Priority 2: Original scan_source (silent fallback if invalid)
     if not final_dest and source_clean:
         try:
             spk_test, meta_test = address_to_script_pubkey(source_clean)
             if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
                 final_dest = source_clean
         except Exception:
-            pass  # silent fallback
+            pass  # silent — go to next priority
 
-    # Priority 3: First modern address from UTXOs (restore fallback)
+    # Priority 3: First modern address from UTXOs (silent fallback)
     if not final_dest and enriched_state and len(enriched_state) == 2:
         _, utxos = enriched_state
         for u in utxos:
@@ -3071,32 +3095,35 @@ def _resolve_destination(
                 except Exception:
                     continue
 
-    # No destination → full cleanup (absorb remainder into fee)
+    # No valid destination found → full absorb (no change output)
     if not final_dest:
         return b''
 
+    # Final validation (should rarely fail here, but keep as safety net)
     try:
         spk, meta = address_to_script_pubkey(final_dest)
         typ = meta.get('type', 'unknown')
 
         if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
-            return (
-                "<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
-                "Change address must be modern (bc1q… or bc1p… only)<br><br>"
-                f"Detected: {typ}<br>"
-                "Legacy/Nested not allowed for change."
-                "</div>"
-            )
+            return gr.update(value=f"""
+            <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
+                <strong>Change address must be modern</strong><br><br>
+                Detected: {final_dest[:12]}... ({typ})<br>
+                Only Native SegWit (bc1q…) and Taproot (bc1p…) allowed for change outputs.<br><br>
+                <small>Try again with a valid modern address.</small>
+            </div>
+            """)
 
         return spk
 
     except Exception as e:
-        return (
-            "<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
-            "Invalid change address<br><br>"
-            "Must be valid bc1q… (Native SegWit) or bc1p… (Taproot)"
-            "</div>"
-        )
+        return gr.update(value=f"""
+        <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
+            Invalid change address<br><br>
+            Must be valid bc1q… (Native SegWit) or bc1p… (Taproot)<br><br>
+            <small>Error: {str(e)[:80]}…</small>
+        </div>
+        """)
 		
 def _build_unsigned_tx(
     inputs: list[dict],
@@ -3591,7 +3618,8 @@ def generate_psbt(
 
         if val <= 0:
             return (
-                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
+                f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
                 f"Invalid UTXO value ≤ 0 sats detected<br>"
                 f"<strong>{ident}</strong><br><br>"
                 "This is likely a paste error or corrupted data. Please re-analyze or correct the UTXO value."
@@ -3600,7 +3628,8 @@ def generate_psbt(
 
         if val > MAX_SATS:
             return (
-                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
+                f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
                 f"Impossible UTXO value > {MAX_BTC:,} BTC detected<br>"
                 f"<strong>{val:,} sats — {ident}</strong><br><br>"
                 "This exceeds the total Bitcoin supply. Likely bad input data. Please verify and re-analyze."
@@ -3609,24 +3638,28 @@ def generate_psbt(
 
         if "scriptPubKey" not in u or not u.get("scriptPubKey"):
             return (
-                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
+                f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
                 f"Missing or empty scriptPubKey for input<br>"
                 f"<strong>{ident}</strong><br><br>"
-                "Cannot build safe PSBT without scriptPubKey. Please re-analyze or correct the UTXO entry."
+                "Cannot build safe PSBT without scriptPubKey. "
+                "Please re-analyze or correct the UTXO entry."
                 "</div>"
             )
 
-    # Proceed — inputs look sane
+    # All inputs passed sanity checks → proceed
     dest_result = _resolve_destination(
         dest_override=params.dest_override,
-        scan_source=params.scan_source if hasattr(params, 'scan_source') else "unknown",
+        scan_source=params.scan_source,
         enriched_state=enriched_state,
     )
-    
-    if isinstance(dest_result, str):
-        return dest_result
-    
-    dest_spk = dest_result
+
+    # Handle both possible return types from _resolve_destination()
+    if isinstance(dest_result, gr.update):
+        # Error case: show the red warning box in the PSBT output area
+        return dest_result.value
+
+    dest_spk = dest_result  # Now guaranteed to be bytes (or b'')
 
     try:
         econ = estimate_tx_economics(supported_inputs, params.fee_rate)
