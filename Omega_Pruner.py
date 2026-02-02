@@ -2141,16 +2141,7 @@ def analyze(
             "</div>"
         )
 
-    # Add skipped warning (top banner only)
-    if skipped > 0:
-        warning_banner += f"""
-        <div style='color:#ff9900 !important; padding:12px; background:#331100 !important; border:2px solid #ff9900 !important; border-radius:10px !important; text-align:center; margin:16px 0;'>
-            Warning: {skipped} line(s) skipped during paste (invalid format, dust, or checksum error).<br>
-            Review table for missing UTXOs and start over if needed.
-        </div>
-        """
-
-    # 6. Freeze the enriched state (immutable tuple)
+        # 6. Freeze the enriched state (immutable tuple)
     frozen_state = _freeze_enriched(
         enriched_consolidated,
         strategy=params.strategy,
@@ -2164,7 +2155,6 @@ def analyze(
         scan_source=params.scan_source,
         warning_banner=warning_banner,
     )
-
 
 
 def _analyze_success(
