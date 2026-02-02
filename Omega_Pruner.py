@@ -3521,247 +3521,269 @@ def generate_psbt(
     Orchestrate PSBT generation using snapshot (params) and full enriched UTXOs.
     Returns full PSBT HTML output (QR, raw text, warnings, fingerprint).
     """
-    if not psbt_snapshot:
-        return _render_no_snapshot()
+    try:
+        if not psbt_snapshot:
+            return _render_no_snapshot()
 
-    if not full_selected_utxos:
-        return _render_no_inputs()
+        if not full_selected_utxos:
+            return _render_no_inputs()
 
-    # Safety check: nothing actually selected
-    if not any(row and row[CHECKBOX_COL] for row in df_rows if row):
-        return (
-            "<div style='"
-            "color:#ff9900 !important;"
-            "background:rgba(51,34,0,0.6) !important;"
-            "border:3px solid #ff9900 !important;"
-            "border-radius:14px !important;"
-            "padding: clamp(24px,6vw,40px) !important;"
-            "margin:20px 0 !important;"
-            "text-align:center !important;"
-            "font-size: clamp(1.1rem,4vw,1.3rem) !important;"
-            "font-weight:700 !important;"
-            "box-shadow:0 0 25px rgba(255,153,0,0.5) !important;"
-            "'>"
-            "⚠️ Nothing selected yet<br><br>"
-            "Start over and check at least one UTXO in the table to generate the PSBT.<br>"
-            "Your coins are waiting — just pick which ones to consolidate."
-            "</div>"
+        # Safety check: nothing actually selected
+        if not any(row and row[CHECKBOX_COL] for row in df_rows if row):
+            return (
+                "<div style='"
+                "color:#ff9900 !important;"
+                "background:rgba(51,34,0,0.6) !important;"
+                "border:3px solid #ff9900 !important;"
+                "border-radius:14px !important;"
+                "padding: clamp(24px,6vw,40px) !important;"
+                "margin:20px 0 !important;"
+                "text-align:center !important;"
+                "font-size: clamp(1.1rem,4vw,1.3rem) !important;"
+                "font-weight:700 !important;"
+                "box-shadow:0 0 25px rgba(255,153,0,0.5) !important;"
+                "'>"
+                "⚠️ Nothing selected yet<br><br>"
+                "Start over and check at least one UTXO in the table to generate the PSBT.<br>"
+                "Your coins are waiting — just pick which ones to consolidate."
+                "</div>"
+            )
+
+        # Safe param extraction
+        try:
+            params = _extract_psbt_params(psbt_snapshot)
+        except Exception as e:
+            log.error(f"Failed to extract PSBT params: {e}", exc_info=True)
+            return (
+                "<div style='"
+                "color:#ff6666 !important;"
+                "text-align:center !important;"
+                "padding: clamp(30px, 8vw, 60px) !important;"
+                "background:#440000 !important;"
+                "border-radius:18px !important;"
+                "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
+                "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+                "line-height:1.7 !important;"
+                "max-width:90% !important;"
+                "margin:0 auto !important;"
+                "'>"
+                "<span style='color:#ff3366 !important;font-size: clamp(1.4rem, 5vw, 1.8rem) !important;font-weight:900 !important;'>"
+                "Invalid or corrupted snapshot"
+                "</span><br><br>"
+                "Please click <strong style='color:#ffaa66 !important;'>GENERATE</strong> again."
+                "</div>"
+            )
+
+        # Use full enriched UTXOs
+        all_inputs = full_selected_utxos
+
+        # Filter to supported types only
+        supported_inputs = [
+            u for u in all_inputs
+            if u.get("script_type") in ("P2WPKH", "Taproot")
+        ]
+
+        if not supported_inputs:
+            return (
+                "<div style='"
+                "color:#ffdd88 !important;"
+                "text-align:center !important;"
+                "padding: clamp(30px, 8vw, 60px) !important;"
+                "background:#332200 !important;"
+                "border:3px solid #ff9900 !important;"
+                "border-radius:18px !important;"
+                "box-shadow:0 0 60px rgba(255,153,0,0.5) !important;"
+                "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
+                "line-height:1.8 !important;"
+                "max-width:90% !important;"
+                "margin:0 auto !important;"
+                "'>"
+                "<strong style='color:#ffff66 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;'>"
+                "No supported inputs selected"
+                "</strong><br><br>"
+                "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q…)</strong> and "
+                "<strong style='color:#00ffff !important;'>Taproot (bc1p…)</strong> inputs can be consolidated.<br><br>"
+                "Legacy and Nested inputs were automatically skipped."
+                "</div>"
+            )
+
+        legacy_excluded = len(supported_inputs) < len(all_inputs)
+
+        # Strict input value sanity checks
+        MAX_BTC = 21_000_000
+        MAX_SATS = MAX_BTC * 100_000_000
+
+        for u in supported_inputs:
+            val = u.get("value", 0)
+            txid_short = (u.get("txid", "unknown")[:12] + "...") if u.get("txid") else "?"
+            vout = u.get("vout", "?")
+            ident = f"txid={txid_short} vout={vout}"
+
+            if val <= 0:
+                return (
+                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
+                    f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                    f"Invalid UTXO value ≤ 0 sats detected<br>"
+                    f"<strong>{ident}</strong><br><br>"
+                    "This is likely a paste error or corrupted data. Please re-analyze or correct the UTXO value."
+                    "</div>"
+                )
+
+            if val > MAX_SATS:
+                return (
+                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
+                    f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                    f"Impossible UTXO value > {MAX_BTC:,} BTC detected<br>"
+                    f"<strong>{val:,} sats — {ident}</strong><br><br>"
+                    "This exceeds the total Bitcoin supply. Likely bad input data. Please verify and re-analyze."
+                    "</div>"
+                )
+
+            if "scriptPubKey" not in u or not u.get("scriptPubKey"):
+                return (
+                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
+                    f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                    f"Missing or empty scriptPubKey for input<br>"
+                    f"<strong>{ident}</strong><br><br>"
+                    "Cannot build safe PSBT without scriptPubKey. "
+                    "Please re-analyze or correct the UTXO entry."
+                    "</div>"
+                )
+
+        # All inputs passed sanity checks → proceed
+        dest_result = _resolve_destination(
+            dest_override=params.dest_override,
+            scan_source=params.scan_source,
+            enriched_state=enriched_state,
         )
 
-    # Safe param extraction
-    try:
-        params = _extract_psbt_params(psbt_snapshot)
+        # Robust handling for every possible Gradio return shape
+        error_html = None
+
+        if isinstance(dest_result, type(gr.update())):
+            error_html = dest_result.value
+        elif isinstance(dest_result, dict) and 'value' in dest_result:
+            error_html = dest_result['value']
+        elif isinstance(dest_result, str):
+            error_html = dest_result
+        # else → assume bytes (success path)
+
+        if error_html:
+            return error_html  # red validation error box
+
+        # Success: dest_result is bytes (or b'')
+        dest_spk = dest_result
+
+        try:
+            econ = estimate_tx_economics(supported_inputs, params.fee_rate)
+        except ValueError as e:
+            log.warning(f"Economics failed in generate_psbt: {e}")
+            return (
+                "<div style='color:#ff6666 !important; text-align:center; padding:30px; background:#440000; border-radius:18px; box-shadow:0 0 50px rgba(255,51,102,0.5) !important;'>"
+                "Invalid transaction economics — please re-analyze."
+                "</div>"
+            )
+
+        # Build unsigned tx
+        tx, utxos_for_psbt, no_change_warning, has_change_output = _build_unsigned_tx(
+            supported_inputs,
+            econ,
+            dest_spk,
+            params,
+        )
+
+        if len(utxos_for_psbt) != len(tx.tx_ins):
+            return (
+                "<div style='color:#ff6666 !important; text-align:center; padding:30px; font-size:1.2rem; font-weight:700;'>"
+                "Internal error: Input/UTXO count mismatch — please report this bug."
+                "</div>"
+            )
+
+        # Generate PSBT & QR
+        psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
+        qr_html, qr_warning = _generate_qr(psbt_b64)
+
+        # Show PSBT size in UI for transparency
+        psbt_size_info = (
+            f"<div style='color:#88ffcc;text-align:center;margin:12px 0;'>"
+            f"PSBT size: {len(psbt_b64):,} characters ({len(psbt_b64)/1024:.1f} KB)"
+            f"</div>"
+        )
+
+        # Additional warnings
+        extra_note = ""
+        if legacy_excluded:
+            extra_note += (
+                "<div style='color:#ffdd88 !important; background:#332200 !important; "
+                "padding:16px; margin:30px 0; border:3px solid #ff9900 !important; "
+                "border-radius:16px; text-align:center;'>"
+                "⚠️ Some inputs were excluded from this PSBT<br><br>"
+                "<small style='color:#ffcc88 !important;'>"
+                "Only Native SegWit and Taproot inputs are supported.<br>"
+                "Legacy/Nested inputs were automatically skipped."
+                "</small>"
+                "</div>"
+            )
+
+        # Create temp snapshot for fingerprint comparison
+        temp_snapshot = _create_psbt_snapshot(
+            selected_utxos=full_selected_utxos,
+            scan_source=params.scan_source if hasattr(params, 'scan_source') else "unknown",
+            dest_override=params.dest_override,
+            fee_rate=params.fee_rate,
+            future_fee_rate=params.future_fee_rate,
+            strategy=params.strategy,
+            dust_threshold=params.dust_threshold
+        )
+
+        # Fingerprint comparison banner
+        fp_banner = ""
+        if loaded_fingerprint:
+            if temp_snapshot["fingerprint"] == loaded_fingerprint:
+                fp_banner = """
+                <div style='color:#00ff88 !important; padding:16px; background:#001100 !important; border:2px solid #00ff88 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important; font-weight:700 !important;'>
+                    ✓ Fingerprint matches loaded snapshot — selection identical.
+                </div>
+                """
+            elif not selection_changed_after_load:
+                fp_banner = """
+                <div style='color:#ff9900 !important; padding:16px; background:#331100 !important; border:2px solid #ff9900 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important;'>
+                    ⚠️ Fingerprint mismatch without selection change — verify UTXOs manually (possible restore glitch).
+                </div>
+                """
+            else:
+                fp_banner = """
+                <div style='color:#88ffcc !important; padding:16px; background:#001122 !important; border:2px solid #88ffcc !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important;'>
+                    Note: Selection modified after load — new fingerprint expected.
+                </div>
+                """
+
+        # Final HTML composition
+        return _compose_psbt_html(
+            fingerprint=temp_snapshot["fingerprint_short"],
+            qr_html=qr_html,
+            qr_warning=qr_warning,
+            psbt_b64=psbt_b64,
+            extra_note=extra_note,
+            has_change_output=has_change_output,
+            no_change_warning=no_change_warning,
+            fp_banner=fp_banner
+        )
+
     except Exception as e:
-        log.error(f"Failed to extract PSBT params: {e}", exc_info=True)
-        return (
-            "<div style='"
-            "color:#ff6666 !important;"
-            "text-align:center !important;"
-            "padding: clamp(30px, 8vw, 60px) !important;"
-            "background:#440000 !important;"
-            "border-radius:18px !important;"
-            "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
-            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
-            "line-height:1.7 !important;"
-            "max-width:90% !important;"
-            "margin:0 auto !important;"
-            "'>"
-            "<span style='color:#ff3366 !important;font-size: clamp(1.4rem, 5vw, 1.8rem) !important;font-weight:900 !important;'>"
-            "Invalid or corrupted snapshot"
-            "</span><br><br>"
-            "Please click <strong style='color:#ffaa66 !important;'>GENERATE</strong> again."
-            "</div>"
-        )
-
-    # Use full enriched UTXOs
-    all_inputs = full_selected_utxos
-
-    # Filter to supported types only
-    supported_inputs = [
-        u for u in all_inputs
-        if u.get("script_type") in ("P2WPKH", "Taproot")
-    ]
-
-    if not supported_inputs:
-        return (
-            "<div style='"
-            "color:#ffdd88 !important;"
-            "text-align:center !important;"
-            "padding: clamp(30px, 8vw, 60px) !important;"
-            "background:#332200 !important;"
-            "border:3px solid #ff9900 !important;"
-            "border-radius:18px !important;"
-            "box-shadow:0 0 60px rgba(255,153,0,0.5) !important;"
-            "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
-            "line-height:1.8 !important;"
-            "max-width:90% !important;"
-            "margin:0 auto !important;"
-            "'>"
-            "<strong style='color:#ffff66 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;'>"
-            "No supported inputs selected"
-            "</strong><br><br>"
-            "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q…)</strong> and "
-            "<strong style='color:#00ffff !important;'>Taproot (bc1p…)</strong> inputs can be consolidated.<br><br>"
-            "Legacy and Nested inputs were automatically skipped."
-            "</div>"
-        )
-
-    legacy_excluded = len(supported_inputs) < len(all_inputs)
-
-    # Strict input value sanity checks
-    MAX_BTC = 21_000_000
-    MAX_SATS = MAX_BTC * 100_000_000
-
-    for u in supported_inputs:
-        val = u.get("value", 0)
-        txid_short = (u.get("txid", "unknown")[:12] + "...") if u.get("txid") else "?"
-        vout = u.get("vout", "?")
-        ident = f"txid={txid_short} vout={vout}"
-
-        if val <= 0:
-            return (
-                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
-                f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
-                f"Invalid UTXO value ≤ 0 sats detected<br>"
-                f"<strong>{ident}</strong><br><br>"
-                "This is likely a paste error or corrupted data. Please re-analyze or correct the UTXO value."
-                "</div>"
-            )
-
-        if val > MAX_SATS:
-            return (
-                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
-                f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
-                f"Impossible UTXO value > {MAX_BTC:,} BTC detected<br>"
-                f"<strong>{val:,} sats — {ident}</strong><br><br>"
-                "This exceeds the total Bitcoin supply. Likely bad input data. Please verify and re-analyze."
-                "</div>"
-            )
-
-        if "scriptPubKey" not in u or not u.get("scriptPubKey"):
-            return (
-                f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
-                f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
-                f"Missing or empty scriptPubKey for input<br>"
-                f"<strong>{ident}</strong><br><br>"
-                "Cannot build safe PSBT without scriptPubKey. "
-                "Please re-analyze or correct the UTXO entry."
-                "</div>"
-            )
-
-    # All inputs passed sanity checks → proceed
-    dest_result = _resolve_destination(
-        dest_override=params.dest_override,
-        scan_source=params.scan_source,
-        enriched_state=enriched_state,
-    )
-
-    # Handle both possible return types from _resolve_destination()
-    if isinstance(dest_result, type(gr.update())):
-        return dest_result.value
-
-    # NEW: Gradio sometimes wraps string returns in dict {'value': ...}
-    if isinstance(dest_result, dict) and 'value' in dest_result:
-        return dest_result['value']
-
-    dest_spk = dest_result  # bytes (or b'')
-
-    try:
-        econ = estimate_tx_economics(supported_inputs, params.fee_rate)
-    except ValueError as e:
-        log.warning(f"Economics failed in generate_psbt: {e}")
-        return (
-            "<div style='color:#ff6666 !important; text-align:center; padding:30px; background:#440000; border-radius:18px; box-shadow:0 0 50px rgba(255,51,102,0.5) !important;'>"
-            "Invalid transaction economics — please re-analyze."
-            "</div>"
-        )
-
-    # Build unsigned tx
-    tx, utxos_for_psbt, no_change_warning, has_change_output = _build_unsigned_tx(
-        supported_inputs,
-        econ,
-        dest_spk,
-        params,
-    )
-
-    if len(utxos_for_psbt) != len(tx.tx_ins):
-        return (
-            "<div style='color:#ff6666 !important; text-align:center; padding:30px; font-size:1.2rem; font-weight:700;'>"
-            "Internal error: Input/UTXO count mismatch — please report this bug."
-            "</div>"
-        )
-
-    # Generate PSBT & QR
-    psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
-    qr_html, qr_warning = _generate_qr(psbt_b64)
-
-    # Show PSBT size in UI for transparency (especially useful for large wallets)
-    psbt_size_info = (
-        f"<div style='color:#88ffcc;text-align:center;margin:12px 0;'>"
-        f"PSBT size: {len(psbt_b64):,} characters ({len(psbt_b64)/1024:.1f} KB)"
-        f"</div>"
-    )
-
-    # Additional warnings (start empty — append if needed)
-    extra_note = ""
-    if legacy_excluded:
-        extra_note += (
-            "<div style='color:#ffdd88 !important; background:#332200 !important; "
-            "padding:16px; margin:30px 0; border:3px solid #ff9900 !important; "
-            "border-radius:16px; text-align:center;'>"
-            "⚠️ Some inputs were excluded from this PSBT<br><br>"
-            "<small style='color:#ffcc88 !important;'>"
-            "Only Native SegWit and Taproot inputs are supported.<br>"
-            "Legacy/Nested inputs were automatically skipped."
-            "</small>"
-            "</div>"
-        )
-
-    # Create temp snapshot for fingerprint comparison (always before banners)
-    temp_snapshot = _create_psbt_snapshot(
-        selected_utxos=full_selected_utxos,
-        scan_source=params.scan_source if hasattr(params, 'scan_source') else "unknown",
-        dest_override=params.dest_override,
-        fee_rate=params.fee_rate,
-        future_fee_rate=params.future_fee_rate,
-        strategy=params.strategy,
-        dust_threshold=params.dust_threshold
-    )
-
-    # Fingerprint comparison banner
-    fp_banner = ""
-    if loaded_fingerprint:
-        if temp_snapshot["fingerprint"] == loaded_fingerprint:
-            fp_banner = """
-            <div style='color:#00ff88 !important; padding:16px; background:#001100 !important; border:2px solid #00ff88 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important; font-weight:700 !important;'>
-                ✓ Fingerprint matches loaded snapshot — selection identical.
-            </div>
-            """
-        elif not selection_changed_after_load:
-            fp_banner = """
-            <div style='color:#ff9900 !important; padding:16px; background:#331100 !important; border:2px solid #ff9900 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important;'>
-                ⚠️ Fingerprint mismatch without selection change — verify UTXOs manually (possible restore glitch).
-            </div>
-            """
-        else:
-            fp_banner = """
-            <div style='color:#88ffcc !important; padding:16px; background:#001122 !important; border:2px solid #88ffcc !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important;'>
-                Note: Selection modified after load — new fingerprint expected.
-            </div>
-            """
-
-    # Final HTML composition
-    return _compose_psbt_html(
-        fingerprint=temp_snapshot["fingerprint_short"],
-        qr_html=qr_html,
-        qr_warning=qr_warning,
-        psbt_b64=psbt_b64,
-        extra_note=extra_note,
-        has_change_output=has_change_output,
-        no_change_warning=no_change_warning,
-        fp_banner=fp_banner
-    )
-
+        import traceback
+        tb = traceback.format_exc()
+        log.error(f"generate_psbt crashed: {e}\n{tb}")
+        return f"""
+        <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
+            <strong>PSBT Generation Failed</strong><br><br>
+            {str(e)}<br><br>
+            <small style='color:#ffaaaa !important;'>
+                Please check logs or try re-analyzing.<br>
+                Details: {tb[:400]}...
+            </small>
+        </div>
+        """
 def analyze_and_show_summary(
     addr_input,
     strategy,
