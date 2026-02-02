@@ -4691,10 +4691,11 @@ body:not(.dark-mode) .footer-donation button {
                 border: 2px solid #00e88a;
                 border-radius: 16px;
                 color: #ffffff;
-                font-size: 1.08rem;
-                line-height: 1.68;
+                font-size: 1.07rem;
+                line-height: 1.72;
                 text-align: center;
                 box-shadow: 0 4px 35px rgba(0, 230, 140, 0.22);
+                font-weight: 600;           /* ← main change: semi-bold default */
             ">
                 <div style="
                     margin: 0 2.5rem;
@@ -4710,12 +4711,12 @@ body:not(.dark-mode) .footer-donation button {
 
                 <div style="margin: 0 2.5rem;">
                     <p style="margin: 0 0 1.3em;">
-                        Built for <strong style="color: #00ffff; font-weight: 700;">modern single-sig wallets</strong>,
+                        Built for <strong style="color: #00ffff;">modern single-sig wallets</strong>,
                         with strong emphasis on
-                        <strong style="color: #00ffff; font-weight: 700;">privacy</strong>,
-                        <strong style="color: #00ffff; font-weight: 700;">fee efficiency</strong>,
+                        <strong style="color: #00ffff;">privacy</strong>,
+                        <strong style="color: #00ffff;">fee efficiency</strong>,
                         and
-                        <strong style="color: #00ffff; font-weight: 700;">hardware wallet compatibility</strong>.
+                        <strong style="color: #00ffff;">hardware wallet compatibility</strong>.
                     </p>
 
                     <p style="margin: 0 0 1.3em;">
@@ -4732,20 +4733,20 @@ body:not(.dark-mode) .footer-donation button {
                         (Sparrow Wallet, Coldcard, Ledger, Trezor, Blockstream Jade, etc.)
                     </p>
 
-                    <p style="margin: 0 0 1.3em; color: #ffdd88;">
+                    <p style="margin: 0 0 1.3em; color: #ffdd88; font-weight: 600;">
                         ⚠️ <strong style="color: #ffaa44;">Legacy (1…)</strong> and
                         <strong style="color: #ffaa44;">Nested SegWit (3…)</strong> inputs are displayed<br>
                         for transparency only and
-                        <strong style="color: #ff6666; font-weight: 700;">cannot</strong> be included in generated PSBTs.
+                        <strong style="color: #ff6666;">cannot</strong> be included in generated PSBTs.
                     </p>
 
                     <p style="
                         margin-top: 2.2em;
                         color: #ffddaa;
                         font-size: 1rem;
-                        line-height: 1.6;
+                        line-height: 1.65;
                         font-style: italic;
-                        font-weight: 500;
+                        font-weight: 600;
                     ">
                         Note: Ωmega Pruner does not fake “browser offline mode”.<br>
                         Security relies on clear, explicit behavior and verifiable outputs — not illusions.
