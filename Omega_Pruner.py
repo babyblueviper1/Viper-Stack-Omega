@@ -4865,7 +4865,7 @@ body:not(.dark-mode) .footer-donation button {
                 ],
                 value="Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)",
                 label="Consolidation Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
-				info="Use the Network Conditions panel above to judge how aggressive consolidation should be today."
+				info="Use the Network Conditions panel above to judge how aggressive consolidation should be today.",
 				allow_custom_value=True
             )
         dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)", info="Inputs below this value are treated as inefficient to spend individually.")
