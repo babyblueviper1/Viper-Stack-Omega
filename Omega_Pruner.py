@@ -4745,7 +4745,7 @@ body:not(.dark-mode) .footer-donation button {
                     font-style: italic !important;
                     font-weight: 700 !important;
                 ">
-                    <span style="font-style: italic !important; font-weight: 700 !important;">Note:</span> Ωmega Pruner does not fake “browser offline mode”.<br>
+                    <strong style="font-style: italic !important; font-weight: 900 !important; color: #ffd080 !important;"> Ωmega Pruner does not fake “browser offline mode”.<br>
                     Security relies on clear, explicit behavior and verifiable outputs — not illusions.
                 </div>
             </div>
