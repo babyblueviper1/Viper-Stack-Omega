@@ -4684,7 +4684,7 @@ body:not(.dark-mode) .footer-donation button {
             # Add more if you have extra restore outputs (e.g. restore status message)
         )
 
-        # =============================
+    # =============================
     # 🖥️ MAIN INPUT & UI LAYOUT
     # Address input, destination, toggles, notes, and core controls
     # =============================
@@ -4752,6 +4752,7 @@ body:not(.dark-mode) .footer-donation button {
                         color:#ffcc99 !important;
                         font-size: 0.95rem !important;
                         margin-top: 18px !important;
+                        line-height: 1.7 !important;
                     ">
                         Note: Ωmega Pruner does not simulate browser-based “offline mode”.
                         Security comes from explicit behavior and verifiable outputs —
