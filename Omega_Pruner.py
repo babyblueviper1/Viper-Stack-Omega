@@ -4687,69 +4687,68 @@ body:not(.dark-mode) .footer-donation button {
                 padding: 28px;
                 max-width: 920px;
                 width: 92%;
-                background: #00140c;
-                border: 2px solid #00e88a;
+                background: #000f0a;
+                border: 2px solid #00ff9d;
                 border-radius: 16px;
                 color: #ffffff;
                 font-size: 1.07rem;
-                line-height: 1.72;
+                line-height: 1.78;
                 text-align: center;
-                box-shadow: 0 4px 35px rgba(0, 230, 140, 0.22);
-                font-weight: 600;           /* ← main change: semi-bold default */
+                box-shadow: 0 4px 40px rgba(0, 255, 157, 0.18);
             ">
                 <div style="
                     margin: 0 2.5rem;
-                    color: #00ffcc;
-                    font-size: 2.1rem;
-                    font-weight: 800;
-                    letter-spacing: 1.2px;
-                    margin-bottom: 24px;
-                    text-shadow: 0 0 16px rgba(0, 255, 204, 0.5);
+                    color: #00ffdd;
+                    font-size: 2.2rem;
+                    font-weight: 900;
+                    letter-spacing: 1.4px;
+                    margin-bottom: 28px;
+                    text-shadow: 0 0 20px rgba(0, 255, 221, 0.6);
                 ">
                     Optimized for Modern Bitcoin
                 </div>
 
                 <div style="margin: 0 2.5rem;">
-                    <p style="margin: 0 0 1.3em;">
-                        Built for <strong style="color: #00ffff;">modern single-sig wallets</strong>,
-                        with strong emphasis on
-                        <strong style="color: #00ffff;">privacy</strong>,
-                        <strong style="color: #00ffff;">fee efficiency</strong>,
-                        and
-                        <strong style="color: #00ffff;">hardware wallet compatibility</strong>.
+                    <p style="margin: 0 0 1.4em; font-weight: 700 !important;">
+                        <strong>Built for</strong> <strong style="color: #00ffff;">modern single-sig wallets</strong><strong>,</strong>
+                        <strong>with strong emphasis on</strong>
+                        <strong style="color: #00ffff;">privacy</strong><strong>,</strong>
+                        <strong style="color: #00ffff;">fee efficiency</strong><strong>,</strong>
+                        <strong>and</strong>
+                        <strong style="color: #00ffff;">hardware wallet compatibility</strong><strong>.</strong>
                     </p>
 
-                    <p style="margin: 0 0 1.3em;">
-                        ✅ PSBT creation & signing support:<br>
-                        <strong style="color: #00ffff;">Native SegWit (bc1q…)</strong> •
+                    <p style="margin: 0 0 1.4em; font-weight: 700 !important;">
+                        <strong>✅ PSBT creation & signing support:</strong><br>
+                        <strong style="color: #00ffff;">Native SegWit (bc1q…)</strong> <strong>•</strong>
                         <strong style="color: #00ffff;">Taproot / BIP86 (bc1p…)</strong>
                     </p>
 
-                    <p style="margin: 0 0 1.3em;">
-                        PSBTs include all necessary metadata<br>
-                        (<strong style="color: #00ffcc;">UTXOs, derivation paths, master fingerprints</strong>)<br>
-                        and can be signed online or exported for
+                    <p style="margin: 0 0 1.4em; font-weight: 700 !important;">
+                        <strong>PSBTs include all necessary metadata</strong><br>
+                        <strong>(</strong><strong style="color: #00ffcc;">UTXOs, derivation paths, master fingerprints</strong><strong>)</strong><br>
+                        <strong>and can be signed online or exported for</strong>
                         <strong style="color: #00ffcc;">air-gapped / offline signing</strong><br>
-                        (Sparrow Wallet, Coldcard, Ledger, Trezor, Blockstream Jade, etc.)
+                        <strong>(Sparrow Wallet, Coldcard, Ledger, Trezor, Blockstream Jade, etc.)</strong>
                     </p>
 
-                    <p style="margin: 0 0 1.3em; color: #ffdd88; font-weight: 600;">
-                        ⚠️ <strong style="color: #ffaa44;">Legacy (1…)</strong> and
-                        <strong style="color: #ffaa44;">Nested SegWit (3…)</strong> inputs are displayed<br>
-                        for transparency only and
-                        <strong style="color: #ff6666;">cannot</strong> be included in generated PSBTs.
+                    <p style="margin: 0 0 1.4em; color: #ffea99; font-weight: 700 !important;">
+                        <strong>⚠️</strong> <strong style="color: #ffcc66;">Legacy (1…)</strong> <strong>and</strong>
+                        <strong style="color: #ffcc66;">Nested SegWit (3…)</strong> <strong>inputs are displayed</strong><br>
+                        <strong>for transparency only and</strong>
+                        <strong style="color: #ff5555;">cannot</strong> <strong>be included in generated PSBTs.</strong>
                     </p>
 
                     <p style="
-                        margin-top: 2.2em;
-                        color: #ffddaa;
-                        font-size: 1rem;
-                        line-height: 1.65;
+                        margin-top: 2.4em;
+                        color: #ffe0b0;
+                        font-size: 1.02rem;
+                        line-height: 1.7;
                         font-style: italic;
-                        font-weight: 600;
+                        font-weight: 700 !important;
                     ">
-                        Note: Ωmega Pruner does not fake “browser offline mode”.<br>
-                        Security relies on clear, explicit behavior and verifiable outputs — not illusions.
+                        <strong>Note:</strong> <strong>Ωmega Pruner does not fake “browser offline mode”.</strong><br>
+                        <strong>Security relies on clear, explicit behavior and verifiable outputs — not illusions.</strong>
                     </p>
                 </div>
             </div>
