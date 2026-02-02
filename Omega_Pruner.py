@@ -3657,21 +3657,39 @@ def generate_psbt(
             enriched_state=enriched_state,
         )
 
-        # Robust handling for every possible Gradio return shape
+        # ── DEBUG: Log exactly what we got from _resolve_destination() ──
+        log.info(f"[DEST_DEBUG] type={type(dest_result).__name__}, repr={repr(dest_result)[:400]}")
+        if isinstance(dest_result, dict):
+            log.info(f"[DEST_DEBUG_KEYS] keys={list(dest_result.keys())}")
+
+        # Robust unwrapping — handle every possible Gradio shape
         error_html = None
 
+        # 1. Classic gr.update object
         if isinstance(dest_result, type(gr.update())):
             error_html = dest_result.value
+
+        # 2. Dict with 'value' key (most common Gradio wrapper)
         elif isinstance(dest_result, dict) and 'value' in dest_result:
             error_html = dest_result['value']
+
+        # 3. Dict with internal Gradio markers (__type__ == 'update')
+        elif isinstance(dest_result, dict) and '__type__' in dest_result and dest_result.get('__type__') == 'update':
+            error_html = dest_result.get('value') or dest_result.get('data')
+
+        # 4. Raw string (your original return style)
         elif isinstance(dest_result, str):
             error_html = dest_result
-        # else → assume bytes (success path)
 
+        # 5. Single-value dict fallback
+        elif isinstance(dest_result, dict) and len(dest_result) == 1:
+            error_html = next(iter(dest_result.values()))
+
+        # If we found error HTML, return it (red box)
         if error_html:
-            return error_html  # red validation error box
+            return error_html
 
-        # Success: dest_result is bytes (or b'')
+        # If none of the above → assume success (bytes or b'')
         dest_spk = dest_result
 
         try:
@@ -3773,15 +3791,17 @@ def generate_psbt(
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
-        log.error(f"generate_psbt crashed: {e}\n{tb}")
+        log.error(f"generate_psbt crashed: {e}\n{tb[:800]}")  # truncate long tracebacks
         return f"""
-        <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
-            <strong>PSBT Generation Failed</strong><br><br>
+        <div style='color:#ff3366 !important; padding:30px; background:#330000; border:4px solid #ff3366; border-radius:16px; text-align:center; max-width:90%; margin:20px auto;'>
+            <strong style='font-size:1.4rem;'>PSBT Generation Failed</strong><br><br>
             {str(e)}<br><br>
-            <small style='color:#ffaaaa !important;'>
-                Please check logs or try re-analyzing.<br>
-                Details: {tb[:400]}...
-            </small>
+            <small style='color:#ffaaaa; font-family:monospace;'>
+                {tb.splitlines()[-3] or ''}<br>
+                {tb.splitlines()[-2] or ''}<br>
+                {tb.splitlines()[-1] or ''}
+            </small><br>
+            <small>Please check server logs or try re-analyzing.</small>
         </div>
         """
 def analyze_and_show_summary(
