@@ -3658,43 +3658,39 @@ def generate_psbt(
             enriched_state=enriched_state,
         )
 
-        # ── DEBUG (keep for now, remove later) ──
+        # DEBUG (keep until fixed, then remove)
         log.info(f"[DEST_DEBUG] type={type(dest_result).__name__}, repr={repr(dest_result)[:400]}")
         if isinstance(dest_result, dict):
             log.info(f"[DEST_DEBUG_KEYS] keys={list(dest_result.keys())}")
 
-        # Robust unwrapping — handle Gradio's wrapped update dict
+        # ── FIXED UNWRAP LOGIC ──
         error_html = None
 
-        if isinstance(dest_result, type(gr.update())):
+        # Priority 1: It's a dict with 'value' (Gradio's wrapped update)
+        if isinstance(dest_result, dict):
+            if 'value' in dest_result:
+                error_html = dest_result['value']
+            elif '__type__' in dest_result and dest_result.get('__type__') == 'update':
+                error_html = dest_result.get('value')
+
+        # Priority 2: It's a real gr.update object
+        elif isinstance(dest_result, type(gr.update())):
             error_html = dest_result.value
 
-        elif isinstance(dest_result, dict):
-            # Gradio-wrapped update: {'value': html, '__type__': 'update'}
-            if '__type__' in dest_result and dest_result.get('__type__') == 'update':
-                error_html = dest_result.get('value')
-            # Direct 'value' key
-            elif 'value' in dest_result:
-                error_html = dest_result['value']
-            # Other common keys
-            elif 'data' in dest_result:
-                error_html = dest_result['data']
-            # Single-value dict fallback
-            elif len(dest_result) == 1:
-                error_html = next(iter(dest_result.values()))
-
+        # Priority 3: Raw string fallback (unlikely but safe)
         elif isinstance(dest_result, str):
             error_html = dest_result
 
+        # If we got error HTML → return it (clean red box)
         if error_html:
-            # Ensure it's a string (in case nested)
+            # Extra safety: if still dict somehow, extract value
             if isinstance(error_html, dict) and 'value' in error_html:
                 error_html = error_html['value']
-            return error_html  # red box
+            return error_html
 
-        # Success path: assume bytes
+        # Success: must be bytes (or b'')
         dest_spk = dest_result
-
+		
         try:
             econ = estimate_tx_economics(supported_inputs, params.fee_rate)
         except ValueError as e:
