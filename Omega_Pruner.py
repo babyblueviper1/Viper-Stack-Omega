@@ -3027,6 +3027,9 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
 from typing import Union, Optional
 import gradio as gr
 
+from typing import Union, Optional
+import gradio as gr
+
 def _resolve_destination(
     dest_override: Optional[str],
     scan_source: str,
@@ -3036,12 +3039,12 @@ def _resolve_destination(
     Resolve change destination → scriptPubKey bytes or UI error message.
     
     Returns:
-        bytes: valid scriptPubKey (or b'' for no change / full absorb)
-        gr.update: error message to display in UI
+        bytes: valid scriptPubKey (or b'' for no change)
+        gr.update: error message HTML to display in UI
     """
     override_clean = (dest_override or "").strip()
     if len(override_clean) < 10:
-        override_clean = ""  # ignore short/empty input
+        override_clean = ""
 
     source_clean = scan_source.strip()
 
@@ -3055,36 +3058,34 @@ def _resolve_destination(
             if typ in ('P2WPKH', 'Taproot', 'P2TR'):
                 final_dest = override_clean
             else:
-                # Early error: bad override type
                 return gr.update(value=f"""
                 <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
                     <strong>Invalid change address type</strong><br><br>
-                    You entered: {override_clean[:12]}... ({typ})<br>
-                    Only Native SegWit (bc1q…) and Taproot (bc1p…) allowed for change.<br><br>
+                    Entered: {override_clean[:12]}... ({typ})<br>
+                    Only bc1q… (Native SegWit) and bc1p… (Taproot) allowed.<br><br>
                     <small>Try again with a valid modern address.</small>
                 </div>
                 """)
         except Exception as e:
-            # Early error: invalid format
             return gr.update(value=f"""
             <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
                 Invalid change address format<br><br>
-                You entered: {override_clean[:12]}...<br>
-                Must be a valid bc1q… or bc1p… address.<br><br>
+                Entered: {override_clean[:12]}...<br>
+                Must be valid bc1q… or bc1p… address.<br><br>
                 <small>Error: {str(e)[:80]}…</small>
             </div>
             """)
 
-    # Priority 2: Original scan_source (silent fallback if invalid)
+    # Priority 2: scan_source (silent fallback)
     if not final_dest and source_clean:
         try:
             spk_test, meta_test = address_to_script_pubkey(source_clean)
             if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
                 final_dest = source_clean
         except Exception:
-            pass  # silent
+            pass
 
-    # Priority 3: First modern address from UTXOs (silent fallback)
+    # Priority 3: first modern from UTXOs (silent fallback)
     if not final_dest and enriched_state and len(enriched_state) == 2:
         _, utxos = enriched_state
         for u in utxos:
@@ -3098,25 +3099,23 @@ def _resolve_destination(
                 except Exception:
                     continue
 
-    # No valid destination → full absorb (no change output)
+    # No valid destination → full absorb
     if not final_dest:
         return b''
 
-    # Final validation
+    # Final safety check
     try:
         spk, meta = address_to_script_pubkey(final_dest)
         typ = meta.get('type', 'unknown')
-
         if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
             return gr.update(value=f"""
             <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
                 <strong>Change address must be modern</strong><br><br>
                 Detected: {final_dest[:12]}... ({typ})<br>
-                Only Native SegWit (bc1q…) and Taproot (bc1p…) allowed for change outputs.<br><br>
+                Only bc1q… and bc1p… allowed for change.<br><br>
                 <small>Try again with a valid modern address.</small>
             </div>
             """)
-
         return spk
 
     except Exception as e:
