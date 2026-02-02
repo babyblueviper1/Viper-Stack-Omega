@@ -4735,7 +4735,7 @@ body:not(.dark-mode) .footer-donation button {
                 <strong style="color:#ffcc66 !important;">Nested SegWit (3…)</strong> inputs are displayed<br>
                 for transparency only and
                 <strong style="color:#ff5555 !important;font-weight:900 !important;">cannot</strong> be included in generated PSBTs.
-                <br><br>
+                <br>
 
                 <div style="
                     margin-top: clamp(20px, 4vw, 32px) !important;
@@ -4745,7 +4745,7 @@ body:not(.dark-mode) .footer-donation button {
                     font-style: italic !important;
                     font-weight: 700 !important;
                 ">
-                    <strong>Note:</strong> Ωmega Pruner does not fake “browser offline mode”.<br>
+                    <span style="font-style: italic !important; font-weight: 700 !important;">Note:</span> Ωmega Pruner does not fake “browser offline mode”.<br>
                     Security relies on clear, explicit behavior and verifiable outputs — not illusions.
                 </div>
             </div>
