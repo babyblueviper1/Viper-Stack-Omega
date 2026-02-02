@@ -3024,6 +3024,9 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
         full_spend_no_change=snapshot.get("full_spend_no_change", False),
     )
 
+from typing import Union, Optional
+import gradio as gr
+
 def _resolve_destination(
     dest_override: Optional[str],
     scan_source: str,
@@ -3034,7 +3037,7 @@ def _resolve_destination(
     
     Returns:
         bytes: valid scriptPubKey (or b'' for no change / full absorb)
-        gr.update: error message HTML to display in UI
+        gr.update: error message to display in UI
     """
     override_clean = (dest_override or "").strip()
     if len(override_clean) < 10:
@@ -3052,7 +3055,7 @@ def _resolve_destination(
             if typ in ('P2WPKH', 'Taproot', 'P2TR'):
                 final_dest = override_clean
             else:
-                # Early error: bad override type → stop here
+                # Early error: bad override type
                 return gr.update(value=f"""
                 <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
                     <strong>Invalid change address type</strong><br><br>
@@ -3061,14 +3064,14 @@ def _resolve_destination(
                     <small>Try again with a valid modern address.</small>
                 </div>
                 """)
-        except Exception:
-            # Early error: invalid format → stop here
+        except Exception as e:
+            # Early error: invalid format
             return gr.update(value=f"""
             <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
                 Invalid change address format<br><br>
                 You entered: {override_clean[:12]}...<br>
                 Must be a valid bc1q… or bc1p… address.<br><br>
-                <small>Try again with a valid modern address.</small>
+                <small>Error: {str(e)[:80]}…</small>
             </div>
             """)
 
@@ -3079,7 +3082,7 @@ def _resolve_destination(
             if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
                 final_dest = source_clean
         except Exception:
-            pass  # silent — go to next priority
+            pass  # silent
 
     # Priority 3: First modern address from UTXOs (silent fallback)
     if not final_dest and enriched_state and len(enriched_state) == 2:
@@ -3095,11 +3098,11 @@ def _resolve_destination(
                 except Exception:
                     continue
 
-    # No valid destination found → full absorb (no change output)
+    # No valid destination → full absorb (no change output)
     if not final_dest:
         return b''
 
-    # Final validation (should rarely fail here, but keep as safety net)
+    # Final validation
     try:
         spk, meta = address_to_script_pubkey(final_dest)
         typ = meta.get('type', 'unknown')
