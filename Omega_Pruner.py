@@ -2864,7 +2864,7 @@ def _persist_snapshot(snapshot: dict) -> str:
     raw_size_bytes = len(json_str.encode('utf-8'))
     
     # Filename components
-    date_str = datetime.utcnow().strftime("%Y%m%d")
+    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
     version = snapshot.get("version", 1)
     fingerprint_short = snapshot.get("fingerprint_short", "UNKNOWN")[:16].upper()
     base_name = f"Ωmega_Session_v{version}_{date_str}_{fingerprint_short}"
@@ -3657,11 +3657,14 @@ def generate_psbt(
     )
 
     # Handle both possible return types from _resolve_destination()
-    if isinstance(dest_result, type(gr.update())):  # ← this is the key fix
-        # Error case: show the red warning box in the PSBT output area
+    if isinstance(dest_result, type(gr.update())):
         return dest_result.value
 
-    dest_spk = dest_result  # Now guaranteed to be bytes (or b'')
+    # NEW: Gradio sometimes wraps string returns in dict {'value': ...}
+    if isinstance(dest_result, dict) and 'value' in dest_result:
+        return dest_result['value']
+
+    dest_spk = dest_result  # bytes (or b'')
 
     try:
         econ = estimate_tx_economics(supported_inputs, params.fee_rate)
