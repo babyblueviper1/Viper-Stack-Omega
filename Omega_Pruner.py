@@ -4680,21 +4680,22 @@ body:not(.dark-mode) .footer-donation button {
 
     with gr.Column():
         # Modern Bitcoin Optimization Note
-        gr.HTML(
+       gr.HTML(
             value="""
             <div style="
                 margin: 32px auto;
                 padding: 28px;
                 max-width: 920px;
                 width: 92%;
-                background: rgba(0, 25, 18, 0.78);
+                background: rgba(0, 20, 12, 0.92);
                 border: 2px solid #00e88a;
                 border-radius: 16px;
-                color: #f5fff5;
+                color: #fafffa;
                 font-size: 1.08rem;
                 line-height: 1.68;
                 text-align: center;
                 box-shadow: 0 4px 35px rgba(0, 230, 140, 0.22);
+                font-weight: 450;
             ">
                 <div style="
                     margin: 0 2.5rem;
