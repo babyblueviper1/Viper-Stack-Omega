@@ -5437,7 +5437,7 @@ body:not(.dark-mode) .footer-donation button {
     # =============================
     # — GENERATE BUTTON (pure execution + PSBT render) —
     # =============================
-      gen_btn.click(
+    gen_btn.click(
         fn=on_generate,
         inputs=[
             dest_value,
@@ -5454,8 +5454,8 @@ body:not(.dark-mode) .footer-donation button {
         inputs=[
             psbt_snapshot,
             selected_utxos_for_psbt,
-            df,    
-            enriched_state,           
+            df,
+            enriched_state,
             loaded_fingerprint,
             selection_changed_after_load
         ],
@@ -5481,10 +5481,10 @@ body:not(.dark-mode) .footer-donation button {
             hour_btn,
             halfhour_btn,
             fastest_btn,
-            load_json_btn,        
-            import_file,           
-            restore_toggle,         
-            restore_area,          
+            load_json_btn,
+            import_file,
+            restore_toggle,
+            restore_area,
         ],
     ).then(
         lambda: gr.update(interactive=False),
@@ -5493,6 +5493,7 @@ body:not(.dark-mode) .footer-donation button {
         lambda: True,
         outputs=locked,
     )
+
     # =============================
     # — RESET BUTTON —
     # =============================
