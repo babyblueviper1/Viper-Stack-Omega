@@ -635,7 +635,7 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
     return (meta, tuple(updated_utxos))
 
 
-def load_selection(parsed_snapshot: dict, current_enriched: Any,) -> Tuple[Any, str, Optional[str], bool, bool, str, str, str, str, int]:
+def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, str, Optional[str], bool, bool, str, str, str, str, int]:
     """
     Load saved selection from JSON snapshot — JSON is authoritative.
     Builds fresh enriched_state directly from snapshot inputs when possible.
@@ -752,59 +752,59 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any,) -> Tuple[Any, 
 
         return_tuple = (meta, tuple(restored_utxos))
 
+        # ── Build success message ──────────────────────────────────────────────────
         message = (
-            "<div style=\""
-            "margin: 20px auto; "
-            "padding: 24px; "
-            "max-width: 95%; "
-            "background: rgba(0, 20, 10, 0.65); "
-            "border: 2px solid #00ff9d; "
-            "border-radius: 16px; "
-            "text-align: center; "
-            "color: #ccffe6; "
-            "font-size: clamp(1rem, 3.2vw, 1.1rem); "
-            "line-height: 1.6; "
-            "box-shadow: 0 0 30px rgba(0, 255, 157, 0.25); "
-            "\">"
-            "<div style=\""
-            "color: #00ffdd; "
-            "font-size: clamp(1.4rem, 4.5vw, 1.7rem); "
-            "font-weight: 900; "
-            "letter-spacing: 1px; "
-            "text-shadow: 0 0 18px #00ffdd; "
-            "margin-bottom: 12px; "
-            "\">"
-            f"Table restored from snapshot — {len(restored_utxos)} UTXOs loaded!"
-            "</div>"
-            "<div style=\"opacity: 0.9;\">"
-            "Selection, strategy, dust threshold and metadata fully recovered.<br>"
-            "Ready to generate PSBT — no ANALYZE needed."
-            "</div>"
-            "</div>"
+            "<div style='"
+            "    margin: 20px auto !important; "
+            "    padding: 30px !important; "
+            "    max-width: 95% !important; "
+            "    background: rgba(0, 18, 35, 0.7) !important; "  # semi-transparent dark teal-cyan base (less pure black)
+            "    border: 3px solid #00ffcc !important; "         # brighter cyan border
+            "    border-radius: 16px !important; "
+            "    text-align: center !important; "
+            "    box-shadow: 0 0 35px rgba(0, 255, 204, 0.45) !important; "  # glow halo
+            "    color: #ccffeb !important;"                     # light mint-cyan text fallback
+            "'>"
+            
+            "    <span style='"
+            "        color: #00ffdd !important; "                    # vivid cyan
+            "        font-size: 1.6rem !important; "
+            "        font-weight: 900 !important; "
+            "        text-shadow: 0 0 18px #00ffdd80 !important; "   # strong glow (survives overrides well)
+            "        letter-spacing: 1px !important;"
+            "    '>"
+            f"        Table restored from snapshot — {len(restored_utxos)} UTXOs loaded!"
+            "    </span><br>"
+            
+            "    <small style='"
+            "        color: #aaffff !important; "                    # lighter cyan
+            "        font-size: 1rem !important; "
+            "        text-shadow: 0 0 8px rgba(170, 255, 255, 0.5) !important;"
+            "    '>"
+            "        Selection, strategy, dust threshold and metadata fully recovered.<br>"
+            "        Ready to generate PSBT — no ANALYZE needed."
+            "    </small>"
+            
+            "    </div>"
         )
 
         if missing_address_count:
             message += (
-                "<br><br>"
-                "<div style=\""
-                "margin: 0 auto; "
-                "padding: 16px; "
-                "max-width: 90%; "
-                "background: rgba(255, 140, 0, 0.12); "
-                "border: 2px solid #ffaa00; "
-                "border-radius: 12px; "
-                "color: #ffea99; "
-                "font-size: clamp(1rem, 3.2vw, 1.1rem); "
-                "font-weight: 700; "
-                "line-height: 1.55; "
-                "text-align: center; "
-                "box-shadow: 0 0 20px rgba(255, 170, 0, 0.3); "
-                "\">"
-                f"<strong style=\"color: #ffcc66; text-shadow: 0 0 10px rgba(255,204,102,0.6);\">⚠️ Warning:</strong><br>"
-                f"{missing_address_count} UTXO(s) missing address → no scriptPubKey.<br>"
-                "PSBT generation may fail or exclude those inputs.<br>"
-                "<strong>Re-analyze with original addresses to fix.</strong>"
-                "</div>"
+                "    <br><br><div style='"
+                "        color: #ffea99 !important; "                # warm yellow warning text
+                "        font-weight: 900 !important; "
+                "        background: rgba(255, 180, 0, 0.18) !important; "  # faint orange glow bg
+                "        padding: 16px !important; "
+                "        border: 2px solid #ffcc66 !important; "
+                "        border-radius: 10px !important; "
+                "        text-shadow: 0 0 10px rgba(255, 204, 102, 0.6) !important;"
+                "        box-shadow: 0 0 20px rgba(255, 153, 0, 0.3) !important;"
+                "    '>"
+                f"        <strong style='color: #ff5555 !important; font-size: 1.1rem;'>Warning:</strong> "
+                f"        {missing_address_count} UTXO(s) missing address → no scriptPubKey.<br>"
+                "        PSBT generation may fail or exclude those inputs. "
+                "        <br><strong>Re-analyze with original addresses to fix.</strong>"
+                "    </div>"
             )
 
         if fingerprint:
