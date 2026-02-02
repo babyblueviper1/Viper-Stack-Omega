@@ -3651,46 +3651,48 @@ def generate_psbt(
                     "</div>"
                 )
 
-        # All inputs passed sanity checks → proceed
+           # All inputs passed sanity checks → proceed
         dest_result = _resolve_destination(
             dest_override=params.dest_override,
             scan_source=params.scan_source,
             enriched_state=enriched_state,
         )
 
-        # ── DEBUG: Log exactly what we got from _resolve_destination() ──
+        # ── DEBUG (keep for now, remove later) ──
         log.info(f"[DEST_DEBUG] type={type(dest_result).__name__}, repr={repr(dest_result)[:400]}")
         if isinstance(dest_result, dict):
             log.info(f"[DEST_DEBUG_KEYS] keys={list(dest_result.keys())}")
 
-        # Robust unwrapping — handle every possible Gradio shape
+        # Robust unwrapping — handle Gradio's wrapped update dict
         error_html = None
 
-        # 1. Classic gr.update object
         if isinstance(dest_result, type(gr.update())):
             error_html = dest_result.value
 
-        # 2. Dict with 'value' key (most common Gradio wrapper)
-        elif isinstance(dest_result, dict) and 'value' in dest_result:
-            error_html = dest_result['value']
+        elif isinstance(dest_result, dict):
+            # Gradio-wrapped update: {'value': html, '__type__': 'update'}
+            if '__type__' in dest_result and dest_result.get('__type__') == 'update':
+                error_html = dest_result.get('value')
+            # Direct 'value' key
+            elif 'value' in dest_result:
+                error_html = dest_result['value']
+            # Other common keys
+            elif 'data' in dest_result:
+                error_html = dest_result['data']
+            # Single-value dict fallback
+            elif len(dest_result) == 1:
+                error_html = next(iter(dest_result.values()))
 
-        # 3. Dict with internal Gradio markers (__type__ == 'update')
-        elif isinstance(dest_result, dict) and '__type__' in dest_result and dest_result.get('__type__') == 'update':
-            error_html = dest_result.get('value') or dest_result.get('data')
-
-        # 4. Raw string (your original return style)
         elif isinstance(dest_result, str):
             error_html = dest_result
 
-        # 5. Single-value dict fallback
-        elif isinstance(dest_result, dict) and len(dest_result) == 1:
-            error_html = next(iter(dest_result.values()))
-
-        # If we found error HTML, return it (red box)
         if error_html:
-            return error_html
+            # Ensure it's a string (in case nested)
+            if isinstance(error_html, dict) and 'value' in error_html:
+                error_html = error_html['value']
+            return error_html  # red box
 
-        # If none of the above → assume success (bytes or b'')
+        # Success path: assume bytes
         dest_spk = dest_result
 
         try:
