@@ -4684,11 +4684,11 @@ body:not(.dark-mode) .footer-donation button {
             # Add more if you have extra restore outputs (e.g. restore status message)
         )
 
-    # =============================
+        # =============================
     # 🖥️ MAIN INPUT & UI LAYOUT
     # Address input, destination, toggles, notes, and core controls
     # =============================
-    
+
     with gr.Column():
         # Modern Bitcoin Optimization Note
         gr.HTML(
@@ -4703,91 +4703,65 @@ body:not(.dark-mode) .footer-donation button {
                     border-radius: 18px !important;
                     text-align: center !important;
                     font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
-                    line-height: 1.7 !important;
+                    line-height: 1.6 !important;
                     color: #ccffe6 !important;
                     box-shadow: 0 0 clamp(30px, 8vw, 60px) rgba(0, 255, 157, 0.4) !important;
-                    overflow-wrap: break-word !important;
-                    word-break: break-word !important;
                 ">
                     <div style="
                         color: #00ffdd !important;
                         font-size: clamp(1.3rem, 5vw, 1.8rem) !important;
                         font-weight: 900 !important;
                         letter-spacing: clamp(1px, 0.5vw, 2px) !important;
-                        margin-bottom: clamp(12px, 3vw, 16px) !important;
+                        margin-bottom: clamp(10px, 3vw, 14px) !important;
                         text-shadow: 0 0 25px #00ffdd !important;
                     ">
                         Optimized for Modern Bitcoin
                     </div>
 
                     <p>
-                        Ωmega Pruner is built <strong style="color:#00ffff !important;font-weight:900 !important;">specifically for modern single-signature wallets</strong>,
-                        prioritizing <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>,
-                        <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
-                        and <strong style="color:#00ffff !important;font-weight:900 !important;">hardware-wallet compatibility</strong>.
+                        Built for <strong style="color:#00ffff !important;">modern single-sig wallets</strong>,
+                        with an explicit focus on
+                        <strong style="color:#00ffff !important;">privacy</strong>,
+                        <strong style="color:#00ffff !important;">fee efficiency</strong>,
+                        and
+                        <strong style="color:#00ffff !important;">hardware-wallet compatibility</strong>.
                     </p>
 
                     <p>
-                        The tool is intentionally <strong style="color:#00ffff !important;font-weight:900 !important;">non-interactive with counterparties</strong> —  
-                        it optimizes wallet structure and future spend efficiency, not counterparty-dependent transaction negotiation.
+                        ✅ PSBT creation and signing support:<br>
+                        <strong style="color:#00ffff !important;">Native SegWit (bc1q…)</strong> •
+                        <strong style="color:#00ffff !important;">Taproot / BIP86 (bc1p…)</strong>
                     </p>
 
                     <p>
-                        ✅ Fully supported for PSBT creation and hardware signing:<br>
-                        <strong style="color:#00ffff !important;font-weight:900 !important;">Native SegWit (bc1q…)</strong> •  
-                        <strong style="color:#00ffff !important;font-weight:900 !important;">Taproot / BIP86 (bc1p…)</strong>
+                        PSBTs include required metadata
+                        (<strong style="color:#00ffcc !important;">UTXOs, derivation paths, fingerprints</strong>)
+                        and can be signed online or exported for
+                        <strong style="color:#00ffcc !important;">air-gapped signing</strong>
+                        using Sparrow, Coldcard, Ledger, Trezor, Jade, and similar wallets.
                     </p>
 
                     <p>
-                        PSBTs generated here include all required metadata
-                        (<span style="font-weight:900 !important; color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
-                        UTXO data, derivation paths, fingerprints
-                        </span>)
-                        and can be signed in standard online workflows
-						or exported for fully air-gapped signing
-                        using <strong style="color:#00ffcc !important;">Sparrow</strong>,
-                        <strong style="color:#00ffcc !important;">Coldcard</strong>,
-                        <strong style="color:#00ffcc !important;">Ledger</strong>, 
-                        <strong style="color:#00ffcc !important;">Trezor</strong>, 
-                        <strong style="color:#00ffcc !important;">Jade</strong>, 
-                        and similar wallets.
-                    </p>
-
-                    <p>
-                        ⚠️ Legacy inputs (<strong style="color:#ffaa00 !important;font-weight:900 !important;">1…</strong>)
-                        and Nested SegWit inputs (<strong style="color:#ffaa00 !important;font-weight:900 !important;">3…</strong>)
-                        are shown for transparency only and
-                        <strong style="color:#ff6666 !important;font-weight:900 !important;">
-                        cannot be included in PSBTs generated here
-                        </strong>.
-                        <br>
-                        To spend or consolidate these inputs, use a compatible wallet or migrate them separately.
+                        ⚠️ Legacy (<strong style="color:#ffaa00 !important;">1…</strong>) and
+                        Nested SegWit (<strong style="color:#ffaa00 !important;">3…</strong>)
+                        inputs are shown for transparency only and
+                        <strong style="color:#ff6666 !important;">cannot be included in PSBTs</strong>.
                     </p>
 
                     <p style="
                         color:#ffcc99 !important;
-                        font-size: clamp(0.9rem, 3.2vw, 1rem) !important;
-                        line-height: 1.7 !important;
-                        margin-top: clamp(24px, 5vw, 32px) !important;
-                        padding: clamp(12px, 3vw, 20px) !important;
-                        background: rgba(50, 20, 0, 0.4) !important;
-                        border: 1px solid #ff9900 !important;
-                        border-radius: 12px !important;
+                        font-size: 0.95rem !important;
+                        margin-top: 18px !important;
                     ">
-                        <strong>On offline vs online operation:</strong><br>
-                        True offline workflows are harder than they appear — and partial implementations often introduce more ambiguity than safety.
-                        <br><br>
-                        For now, Ωmega Pruner does not attempt to simulate or approximate “offline mode” inside a browser environment. We prefer no half-measures.
-                        <br><br>
-                        If a genuinely sound, inspectable, and user-verifiable offline architecture can be achieved in the future, it may be incorporated. Until then, the project remains explicit about what it does and does not guarantee.
-                        <br><br>
-                        More broadly, the tradeoffs between offline and online operation — when done correctly — are often misunderstood. Offline is not automatically safer, just as online is not inherently surveillance. Both can fail. Both can be done well.
-                        <br><br>
-                        Ωmega Pruner is designed around clarity of intent, observable behavior, and minimized trust — not ideology.
+                        Note: Ωmega Pruner does not simulate browser-based “offline mode”.
+                        Security comes from explicit behavior and verifiable outputs —
+                        not from half-measures.
                     </p>
+
                 </div>
             """
         )
+
         mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
         
         # ── Theme Toggle ──
