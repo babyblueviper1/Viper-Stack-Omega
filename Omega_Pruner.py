@@ -2292,7 +2292,6 @@ def _render_locked_state() -> Tuple[str, gr.update]:
 def _validate_utxos_and_selection(
     df_rows: List[list],
     utxos: List[dict],
-    *,
 ) -> Tuple[Optional[List[dict]], int, Optional[str]]:
     """
     Resolve selected UTXOs from Gradio DataFrame checkbox state.
