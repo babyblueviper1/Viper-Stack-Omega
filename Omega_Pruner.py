@@ -4681,77 +4681,78 @@ body:not(.dark-mode) .footer-donation button {
 
     with gr.Column():
         # Modern Bitcoin Optimization Note
-          gr.HTML(
-                value="""
+        gr.HTML(
+            value="""
+                <div style="
+                    margin: clamp(20px, 5vw, 60px) auto !important;
+                    padding: clamp(16px, 4vw, 28px) !important;
+                    max-width: 95% !important;
+                    width: 100% !important;
+                    background: rgba(0, 20, 10, 0.6) !important;
+                    border: 3px solid #00ff9d !important;
+                    border-radius: 18px !important;
+                    text-align: center !important;
+                    font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
+                    line-height: 1.6 !important;
+                    color: #ccffe6 !important;
+                    box-shadow: 0 0 clamp(30px, 8vw, 60px) rgba(0, 255, 157, 0.4) !important;
+                ">
                     <div style="
-                        margin: clamp(20px, 5vw, 60px) auto !important;
-                        padding: clamp(16px, 4vw, 28px) !important;
-                        max-width: 95% !important;
-                        width: 100% !important;
-                        background: rgba(0, 20, 10, 0.6) !important;
-                        border: 3px solid #00ff9d !important;
-                        border-radius: 18px !important;
-                        text-align: center !important;
-                        font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
-                        line-height: 1.6 !important;
-                        color: #ccffe6 !important;
-                        box-shadow: 0 0 clamp(30px, 8vw, 60px) rgba(0, 255, 157, 0.4) !important;
+                        color: #00ffdd !important;
+                        font-size: clamp(1.3rem, 5vw, 1.8rem) !important;
+                        font-weight: 900 !important;
+                        letter-spacing: clamp(1px, 0.5vw, 2px) !important;
+                        margin-bottom: clamp(10px, 3vw, 14px) !important;
+                        text-shadow: 0 0 25px #00ffdd !important;
                     ">
-                        <div style="
-                            color: #00ffdd !important;
-                            font-size: clamp(1.3rem, 5vw, 1.8rem) !important;
-                            font-weight: 900 !important;
-                            letter-spacing: clamp(1px, 0.5vw, 2px) !important;
-                            margin-bottom: clamp(10px, 3vw, 14px) !important;
-                            text-shadow: 0 0 25px #00ffdd !important;
-                        ">
-                            Optimized for Modern Bitcoin
-                        </div>
-
-                        <p>
-                            Built for <strong style="color:#00ffff !important;">modern single-sig wallets</strong>,
-                            with an explicit focus on
-                            <strong style="color:#00ffff !important;">privacy</strong>,
-                            <strong style="color:#00ffff !important;">fee efficiency</strong>,
-                            and
-                            <strong style="color:#00ffff !important;">hardware-wallet compatibility</strong>.
-                        </p>
-
-                        <p>
-                            ✅ PSBT creation and signing support:<br>
-                            <strong style="color:#00ffff !important;">Native SegWit (bc1q…)</strong> •
-                            <strong style="color:#00ffff !important;">Taproot / BIP86 (bc1p…)</strong>
-                        </p>
-
-                        <p>
-                            PSBTs include required metadata
-                            (<strong style="color:#00ffcc !important;">UTXOs, derivation paths, fingerprints</strong>)
-                            and can be signed online or exported for
-                            <strong style="color:#00ffcc !important;">air-gapped signing</strong>
-                            using Sparrow, Coldcard, Ledger, Trezor, Jade, and similar wallets.
-                        </p>
-
-                        <p>
-                            ⚠️ Legacy (<strong style="color:#ffaa00 !important;">1…</strong>) and
-                            Nested SegWit (<strong style="color:#ffaa00 !important;">3…</strong>)
-                            inputs are shown for transparency only and
-                            <strong style="color:#ff6666 !important;">cannot be included in PSBTs</strong>.
-                        </p>
-
-                        <p style="
-                            color:#ffcc99 !important;
-                            font-size: 0.95rem !important;
-                            margin-top: 18px !important;
-                            line-height: 1.7 !important;
-                        ">
-                            Note: Ωmega Pruner does not simulate browser-based “offline mode”.
-                            Security comes from explicit behavior and verifiable outputs —
-                            not from half-measures.
-                        </p>
-
+                        Optimized for Modern Bitcoin
                     </div>
-                """
-            )
+
+                    <p>
+                        Built for <strong style="color:#00ffff !important;">modern single-sig wallets</strong>,
+                        with an explicit focus on
+                        <strong style="color:#00ffff !important;">privacy</strong>,
+                        <strong style="color:#00ffff !important;">fee efficiency</strong>,
+                        and
+                        <strong style="color:#00ffff !important;">hardware-wallet compatibility</strong>.
+                    </p>
+
+                    <p>
+                        ✅ PSBT creation and signing support:<br>
+                        <strong style="color:#00ffff !important;">Native SegWit (bc1q…)</strong> •
+                        <strong style="color:#00ffff !important;">Taproot / BIP86 (bc1p…)</strong>
+                    </p>
+
+                    <p>
+                        PSBTs include required metadata
+                        (<strong style="color:#00ffcc !important;">UTXOs, derivation paths, fingerprints</strong>)
+                        and can be signed online or exported for
+                        <strong style="color:#00ffcc !important;">air-gapped signing</strong>
+                        using Sparrow, Coldcard, Ledger, Trezor, Jade, and similar wallets.
+                    </p>
+
+                    <p>
+                        ⚠️ Legacy (<strong style="color:#ffaa00 !important;">1…</strong>) and
+                        Nested SegWit (<strong style="color:#ffaa00 !important;">3…</strong>)
+                        inputs are shown for transparency only and
+                        <strong style="color:#ff6666 !important;">cannot be included in PSBTs</strong>.
+                    </p>
+
+                    <p style="
+                        color:#ffcc99 !important;
+                        font-size: 0.95rem !important;
+                        margin-top: 18px !important;
+                        line-height: 1.7 !important;
+                    ">
+                        Note: Ωmega Pruner does not simulate browser-based “offline mode”.
+                        Security comes from explicit behavior and verifiable outputs —
+                        not from half-measures.
+                    </p>
+
+                </div>
+            """
+        )
+
         mode_status = gr.HTML("")  # ← Empty placeholder — will be filled dynamically
         
         # ── Theme Toggle ──
@@ -4865,6 +4866,7 @@ body:not(.dark-mode) .footer-donation button {
                 value="Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)",
                 label="Consolidation Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
 				info="Use the Network Conditions panel above to judge how aggressive consolidation should be today."
+				allow_custom_value=True
             )
         dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)", info="Inputs below this value are treated as inefficient to spend individually.")
 
