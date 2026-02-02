@@ -3658,38 +3658,37 @@ def generate_psbt(
             enriched_state=enriched_state,
         )
 
-        # DEBUG (keep for confirmation, remove after test)
+        # DEBUG (keep for one more test, then remove or comment out)
         log.info(f"[DEST_DEBUG] type={type(dest_result).__name__}, repr={repr(dest_result)[:400]}")
         if isinstance(dest_result, dict):
             log.info(f"[DEST_DEBUG_KEYS] keys={list(dest_result.keys())}")
 
-        # FIXED unwrap: handle Gradio's exact wrapped update format
+        # ── FIXED: Handle Gradio's exact wrapped format ──
         error_html = None
 
         if isinstance(dest_result, dict):
-            # Gradio's queued update wrapper: {'value': html_str, '__type__': 'update'}
-            if '__type__' in dest_result and dest_result.get('__type__') == 'update':
-                error_html = dest_result.get('value')
-            # Direct value key (fallback)
-            elif 'value' in dest_result:
+            # This matches your log EXACTLY: {'value': html_str, '__type__': 'update'}
+            if 'value' in dest_result:
                 error_html = dest_result['value']
+            # Extra check for __type__ if needed
+            elif '__type__' in dest_result and dest_result.get('__type__') == 'update':
+                error_html = dest_result.get('value')
 
-        # If it's a real gr.update() object (less common in queued mode)
         elif isinstance(dest_result, type(gr.update())):
             error_html = dest_result.value
 
-        # Raw string (your original fallback style)
         elif isinstance(dest_result, str):
             error_html = dest_result
 
+        # Return clean error if we extracted HTML
         if error_html:
-            # Final safety: if still wrapped somehow, extract
-            while isinstance(error_html, dict) and 'value' in error_html:
+            # Double-check nesting (rare Gradio quirk)
+            if isinstance(error_html, dict) and 'value' in error_html:
                 error_html = error_html['value']
-            return error_html  # This will render the clean red box
+            return error_html  # ← This renders the clean red box!
 
-        # Success: dest_result is bytes or b''
-        dest_spk = dest_result
+        # If no error → success path
+        dest_spk = dest_result  # bytes or b''
 		
         try:
             econ = estimate_tx_economics(supported_inputs, params.fee_rate)
