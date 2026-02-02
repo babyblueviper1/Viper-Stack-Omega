@@ -4679,77 +4679,74 @@ body:not(.dark-mode) .footer-donation button {
     # =============================
 
     with gr.Column():
-        # Modern Bitcoin Optimization Note
         gr.HTML(
             value="""
             <div style="
-                margin: 32px auto;
-                padding: 28px;
-                max-width: 920px;
-                width: 92%;
-                background: #000f0a;
-                border: 2px solid #00ff9d;
-                border-radius: 16px;
-                color: #ffffff;
-                font-size: 1.07rem;
-                line-height: 1.78;
-                text-align: center;
-                box-shadow: 0 4px 40px rgba(0, 255, 157, 0.18);
+                margin: clamp(20px, 5vw, 60px) auto !important;
+                padding: clamp(16px, 4vw, 28px) !important;
+                max-width: 95% !important;
+                width: 100% !important;
+                background: rgba(0, 20, 10, 0.6) !important;
+                border: 3px solid #00ff9d !important;
+                border-radius: 18px !important;
+                text-align: center !important;
+                font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
+                line-height: 1.7 !important;
+                color: #ccffe6 !important;
+                box-shadow: 0 0 clamp(30px, 8vw, 60px) rgba(0, 255, 157, 0.4) !important;
+                overflow-wrap: break-word !important;
+                word-break: break-word !important;
             ">
                 <div style="
-                    margin: 0 2.5rem;
-                    color: #00ffdd;
-                    font-size: 2.2rem;
-                    font-weight: 900;
-                    letter-spacing: 1.4px;
-                    margin-bottom: 28px;
-                    text-shadow: 0 0 20px rgba(0, 255, 221, 0.6);
+                    color: #00ffdd !important;
+                    font-size: clamp(1.3rem, 5vw, 1.8rem) !important;
+                    font-weight: 900 !important;
+                    letter-spacing: clamp(1px, 0.5vw, 2px) !important;
+                    margin-bottom: clamp(12px, 3vw, 16px) !important;
+                    text-shadow: 0 0 25px #00ffdd !important;
                 ">
                     Optimized for Modern Bitcoin
                 </div>
 
-                <div style="margin: 0 2.5rem;">
-                    <p style="margin: 0 0 1.4em; font-weight: 700 !important;">
-                        <strong>Built for</strong> <strong style="color: #00ffff;">modern single-sig wallets</strong><strong>,</strong>
-                        <strong>with strong emphasis on</strong>
-                        <strong style="color: #00ffff;">privacy</strong><strong>,</strong>
-                        <strong style="color: #00ffff;">fee efficiency</strong><strong>,</strong>
-                        <strong>and</strong>
-                        <strong style="color: #00ffff;">hardware wallet compatibility</strong><strong>.</strong>
-                    </p>
+                Built for <strong style="color:#00ffff !important;font-weight:900 !important;">modern single-sig wallets</strong>,
+                with strong emphasis on
+                <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>,
+                <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
+                and
+                <strong style="color:#00ffff !important;font-weight:900 !important;">hardware wallet compatibility</strong>.
+                <br><br>
 
-                    <p style="margin: 0 0 1.4em; font-weight: 700 !important;">
-                        <strong>✅ PSBT creation & signing support:</strong><br>
-                        <strong style="color: #00ffff;">Native SegWit (bc1q…)</strong> <strong>•</strong>
-                        <strong style="color: #00ffff;">Taproot / BIP86 (bc1p…)</strong>
-                    </p>
+                <strong style="color:#00ffdd !important;">✅ PSBT creation & signing support:</strong><br>
+                <strong style="color:#00ffff !important;">Native SegWit (bc1q…)</strong> • 
+                <strong style="color:#00ffff !important;">Taproot / BIP86 (bc1p…)</strong>
+                <br><br>
 
-                    <p style="margin: 0 0 1.4em; font-weight: 700 !important;">
-                        <strong>PSBTs include all necessary metadata</strong><br>
-                        <strong>(</strong><strong style="color: #00ffcc;">UTXOs, derivation paths, master fingerprints</strong><strong>)</strong><br>
-                        <strong>and can be signed online or exported for</strong>
-                        <strong style="color: #00ffcc;">air-gapped / offline signing</strong><br>
-                        <strong>(Sparrow Wallet, Coldcard, Ledger, Trezor, Blockstream Jade, etc.)</strong>
-                    </p>
+                PSBTs include all necessary metadata
+                (<strong style="color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
+                UTXOs, derivation paths, master fingerprints
+                </strong>)<br>
+                and can be signed online or exported for
+                <strong style="color:#00ffcc !important;">air-gapped / offline signing</strong><br>
+                (Sparrow Wallet, Coldcard, Ledger, Trezor, Blockstream Jade, etc.)
+                <br><br>
 
-                    <p style="margin: 0 0 1.4em; color: #ffea99; font-weight: 700 !important;">
-                        <strong>⚠️</strong> <strong style="color: #ffcc66;">Legacy (1…)</strong> <strong>and</strong>
-                        <strong style="color: #ffcc66;">Nested SegWit (3…)</strong> <strong>inputs are displayed</strong><br>
-                        <strong>for transparency only and</strong>
-                        <strong style="color: #ff5555;">cannot</strong> <strong>be included in generated PSBTs.</strong>
-                    </p>
+                <strong style="color:#ffea99 !important;">⚠️</strong>
+                <strong style="color:#ffcc66 !important;">Legacy (1…)</strong> and
+                <strong style="color:#ffcc66 !important;">Nested SegWit (3…)</strong> inputs are displayed<br>
+                for transparency only and
+                <strong style="color:#ff5555 !important;font-weight:900 !important;">cannot</strong> be included in generated PSBTs.
+                <br><br>
 
-                    <p style="
-                        margin-top: 2.4em;
-                        color: #ffe0b0;
-                        font-size: 1.02rem;
-                        line-height: 1.7;
-                        font-style: italic;
-                        font-weight: 700 !important;
-                    ">
-                        <strong>Note:</strong> <strong>Ωmega Pruner does not fake “browser offline mode”.</strong><br>
-                        <strong>Security relies on clear, explicit behavior and verifiable outputs — not illusions.</strong>
-                    </p>
+                <div style="
+                    margin-top: clamp(20px, 4vw, 32px) !important;
+                    color: #ffe0b0 !important;
+                    font-size: clamp(0.98rem, 3vw, 1.02rem) !important;
+                    line-height: 1.7 !important;
+                    font-style: italic !important;
+                    font-weight: 700 !important;
+                ">
+                    <strong>Note:</strong> Ωmega Pruner does not fake “browser offline mode”.<br>
+                    Security relies on clear, explicit behavior and verifiable outputs — not illusions.
                 </div>
             </div>
             """
