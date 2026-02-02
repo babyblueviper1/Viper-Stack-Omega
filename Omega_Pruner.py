@@ -4673,7 +4673,6 @@ body:not(.dark-mode) .footer-donation button {
             gr.update(visible=False),                    # 22: restore_area — hide
             # Add more if you have extra restore outputs (e.g. restore status message)
         )
-
     # =============================
     # 🖥️ MAIN INPUT & UI LAYOUT
     # Address input, destination, toggles, notes, and core controls
@@ -4693,22 +4692,24 @@ body:not(.dark-mode) .footer-donation button {
                     border-radius: 18px !important;
                     text-align: center !important;
                     font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
-                    line-height: 1.6 !important;
-                    color: #ccffe6 !important;
+                    line-height: 1.7 !important;
+                    color: #e0ffe0 !important;  /* brighter base fallback */
                     box-shadow: 0 0 clamp(30px, 8vw, 60px) rgba(0, 255, 157, 0.4) !important;
+                    overflow-wrap: break-word !important;
+                    word-break: break-word !important;
                 ">
                     <div style="
                         color: #00ffdd !important;
                         font-size: clamp(1.3rem, 5vw, 1.8rem) !important;
                         font-weight: 900 !important;
                         letter-spacing: clamp(1px, 0.5vw, 2px) !important;
-                        margin-bottom: clamp(10px, 3vw, 14px) !important;
+                        margin-bottom: clamp(12px, 3vw, 16px) !important;
                         text-shadow: 0 0 25px #00ffdd !important;
                     ">
                         Optimized for Modern Bitcoin
                     </div>
 
-                    <p>
+                    <p style="font-weight: 700 !important; color: #ffffff !important;">
                         Built for <strong style="color:#00ffff !important;">modern single-sig wallets</strong>,
                         with an explicit focus on
                         <strong style="color:#00ffff !important;">privacy</strong>,
@@ -4717,13 +4718,13 @@ body:not(.dark-mode) .footer-donation button {
                         <strong style="color:#00ffff !important;">hardware-wallet compatibility</strong>.
                     </p>
 
-                    <p>
+                    <p style="font-weight: 700 !important; color: #ffffff !important;">
                         ✅ PSBT creation and signing support:<br>
                         <strong style="color:#00ffff !important;">Native SegWit (bc1q…)</strong> •
                         <strong style="color:#00ffff !important;">Taproot / BIP86 (bc1p…)</strong>
                     </p>
 
-                    <p>
+                    <p style="font-weight: 700 !important; color: #ffffff !important;">
                         PSBTs include required metadata
                         (<strong style="color:#00ffcc !important;">UTXOs, derivation paths, fingerprints</strong>)
                         and can be signed online or exported for
@@ -4731,7 +4732,7 @@ body:not(.dark-mode) .footer-donation button {
                         using Sparrow, Coldcard, Ledger, Trezor, Jade, and similar wallets.
                     </p>
 
-                    <p>
+                    <p style="font-weight: 700 !important; color: #ffffff !important;">
                         ⚠️ Legacy (<strong style="color:#ffaa00 !important;">1…</strong>) and
                         Nested SegWit (<strong style="color:#ffaa00 !important;">3…</strong>)
                         inputs are shown for transparency only and
@@ -4743,6 +4744,7 @@ body:not(.dark-mode) .footer-donation button {
                         font-size: 0.95rem !important;
                         margin-top: 18px !important;
                         line-height: 1.7 !important;
+                        font-weight: 700 !important;
                     ">
                         Note: Ωmega Pruner does not simulate browser-based “offline mode”.
                         Security comes from explicit behavior and verifiable outputs —
