@@ -3060,23 +3060,23 @@ def _resolve_destination(
                 final_dest = override_clean
             else:
                 return gr.update(value=f"""
-                <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
-                    <strong>Invalid change address type</strong><br><br>
+                <div style='color:#ffdddd !important; padding:20px; background:#550000; border:3px solid #ff6666; border-radius:12px; text-align:center; font-weight:600; text-shadow:0 0 6px #ff6666;'>
+                    <strong style='font-size:1.2em; color:#ffffff; text-shadow:0 0 8px #ff4444;'>Invalid change address type</strong><br><br>
                     Entered: {override_clean[:12]}... ({typ})<br>
                     Only bc1q… (Native SegWit) and bc1p… (Taproot) allowed.<br><br>
-                    <small>Try again with a valid modern address.</small>
+                    <small style='color:#ffbbbb;'>Try again with a valid modern address.</small>
                 </div>
                 """)
         except Exception as e:
             return gr.update(value=f"""
-            <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
-                Invalid change address format<br><br>
+            <div style='color:#ffdddd !important; padding:20px; background:#550000; border:3px solid #ff6666; border-radius:12px; text-align:center; font-weight:600; text-shadow:0 0 6px #ff6666;'>
+                <strong style='font-size:1.2em; color:#ffffff; text-shadow:0 0 8px #ff4444;'>Invalid change address format</strong><br><br>
                 Entered: {override_clean[:12]}...<br>
                 Must be valid bc1q… or bc1p… address.<br><br>
-                <small>Error: {str(e)[:80]}…</small>
+                <small style='color:#ffbbbb;'>Error: {str(e)[:80]}…</small>
             </div>
             """)
-
+            
     # Priority 2: scan_source (silent fallback)
     if not final_dest and source_clean:
         try:
@@ -4756,39 +4756,79 @@ body:not(.dark-mode) .footer-donation button {
     # =============================
     # 🔐 FINALIZE & LOCK UI AFTER PSBT GENERATION
     # Freezes all inputs, shows export area, displays LOCKED badge — irreversible until reset
+    # ONLY if generation succeeded (no validation error)
     # =============================
-    def finalize_generate_ui():
+    def finalize_generate_ui(psbt_html: str):
         """
-        Completely lock the UI after successful PSBT generation.
-        Disables inputs/sliders/toggles/buttons, hides unnecessary elements,
-        shows export area and locked badge.
-        Resets restore toggle/area for clean state.
-        Returns tuple matching Gradio output order (now includes restore components).
+        Lock UI only on successful PSBT generation.
+        On error: show Analyze button again, keep inputs editable, hide export/lock.
         """
-        return (
-            gr.update(visible=False),                    # 0: gen_btn
-            gr.update(visible=False),                    # 1: generate_row
-            gr.update(visible=True),                     # 2: export_title_row
-            gr.update(visible=True),                     # 3: export_file_row
-            gr.update(visible=False, interactive=False), # 4: import_file
-            "<div class='locked-badge'>LOCKED</div>",    # 5: locked_badge
-            gr.update(interactive=False),                # 6: addr_input
-            gr.update(interactive=False),                # 7: dest
-            gr.update(interactive=False),                # 8: strategy
-            gr.update(interactive=False),                # 9: dust
-            gr.update(interactive=False),                # 10: fee_rate_slider
-            gr.update(interactive=False),                # 11: future_fee_slider
-            gr.update(interactive=False),                # 13: theme_checkbox
-            gr.update(interactive=False),                # 15: economy_btn
-            gr.update(interactive=False),                # 16: hour_btn
-            gr.update(interactive=False),                # 17: halfhour_btn
-            gr.update(interactive=False),                # 18: fastest_btn
-            gr.update(visible=False),                    # 19: load_json_btn
-            gr.update(visible=False),                    # 20: file uploader (import_file)
-            gr.update(visible=False),                    # 21: restore_toggle — hide/lock
-            gr.update(visible=False),                    # 22: restore_area — hide
-            # Add more if you have extra restore outputs (e.g. restore status message)
-        )
+        # Detect error by keywords in the HTML output
+        is_error = any(keyword in psbt_html for keyword in [
+            "Invalid change address",
+            "Invalid change address type",
+            "Invalid change address format",
+            "PSBT Generation Failed",
+            "No supported inputs",
+            "Invalid transaction economics",
+            "Internal error:",
+            "Invalid or corrupted snapshot",
+            "Nothing selected yet",
+            "Missing or empty scriptPubKey",
+            "Impossible UTXO value",
+            "Invalid UTXO value"
+        ])
+
+        if is_error:
+            # Error: show Analyze button, keep everything editable, hide lock/export
+            return (
+                gr.update(visible=False),                    # 0: gen_btn — hide (user needs to Analyze first)
+                gr.update(visible=False),                    # 1: generate_row — hide
+                gr.update(visible=False),                    # 2: export_title_row — hide
+                gr.update(visible=False),                    # 3: export_file_row — hide
+                gr.update(visible=True, interactive=True),   # 4: import_file — keep usable
+                "",                                          # 5: locked_badge — empty
+                gr.update(interactive=True),                 # 6: addr_input
+                gr.update(interactive=True),                 # 7: dest
+                gr.update(interactive=True),                 # 8: strategy
+                gr.update(interactive=True),                 # 9: dust
+                gr.update(interactive=True),                 # 10: fee_rate_slider
+                gr.update(interactive=True),                 # 11: future_fee_slider
+                gr.update(interactive=True),                 # 13: theme_checkbox
+                gr.update(interactive=True),                 # 15: economy_btn
+                gr.update(interactive=True),                 # 16: hour_btn
+                gr.update(interactive=True),                 # 17: halfhour_btn
+                gr.update(interactive=True),                 # 18: fastest_btn
+                gr.update(visible=True),                     # 19: load_json_btn — keep
+                gr.update(visible=True),                     # 20: import_file — keep
+                gr.update(visible=True),                     # 21: restore_toggle — keep
+                gr.update(visible=False),                    # 22: restore_area — hide
+            )
+        else:
+            # Success: lock UI, hide gen/analyze, show export, disable inputs, show badge
+            return (
+                gr.update(visible=False),                    # 0: gen_btn
+                gr.update(visible=False),                    # 1: generate_row
+                gr.update(visible=True),                     # 2: export_title_row
+                gr.update(visible=True),                     # 3: export_file_row
+                gr.update(visible=False, interactive=False), # 4: import_file
+                "<div class='locked-badge'>LOCKED</div>",    # 5: locked_badge
+                gr.update(interactive=False),                # 6: addr_input
+                gr.update(interactive=False),                # 7: dest
+                gr.update(interactive=False),                # 8: strategy
+                gr.update(interactive=False),                # 9: dust
+                gr.update(interactive=False),                # 10: fee_rate_slider
+                gr.update(interactive=False),                # 11: future_fee_slider
+                gr.update(interactive=False),                # 13: theme_checkbox
+                gr.update(interactive=False),                # 15: economy_btn
+                gr.update(interactive=False),                # 16: hour_btn
+                gr.update(interactive=False),                # 17: halfhour_btn
+                gr.update(interactive=False),                # 18: fastest_btn
+                gr.update(visible=False),                    # 19: load_json_btn
+                gr.update(visible=False),                    # 20: import_file
+                gr.update(visible=False),                    # 21: restore_toggle — hide/lock
+                gr.update(visible=False),                    # 22: restore_area — hide
+            )
     # =============================
     # 🖥️ MAIN INPUT & UI LAYOUT
     # Address input, destination, toggles, notes, and core controls
@@ -5397,7 +5437,7 @@ body:not(.dark-mode) .footer-donation button {
     # =============================
     # — GENERATE BUTTON (pure execution + PSBT render) —
     # =============================
-    gen_btn.click(
+      gen_btn.click(
         fn=on_generate,
         inputs=[
             dest_value,
@@ -5405,8 +5445,8 @@ body:not(.dark-mode) .footer-donation button {
             future_fee_slider,
             enriched_state,
             scan_source,
-			strategy,
-			dust
+            strategy,
+            dust
         ],
         outputs=[psbt_snapshot, selected_utxos_for_psbt, locked, export_file],
     ).then(
@@ -5422,6 +5462,7 @@ body:not(.dark-mode) .footer-donation button {
         outputs=[psbt_output],
     ).then(
         fn=finalize_generate_ui,
+        inputs=[psbt_output],  # ← This line: pass the HTML output so we can check for errors
         outputs=[
             gen_btn,
             generate_row,
