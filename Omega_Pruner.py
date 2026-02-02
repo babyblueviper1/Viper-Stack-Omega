@@ -5528,8 +5528,8 @@ body:not(.dark-mode) .footer-donation button {
         ],
         outputs=[status_output, generate_row]
     )
-
-     # =============================
+	
+    # =============================
     # — Initial UI state & dark mode (always run on page load / restart)
     # =============================
 
@@ -5551,6 +5551,12 @@ body:not(.dark-mode) .footer-donation button {
         fn=update_status_and_ui,
         inputs=[theme_checkbox],
         outputs=[mode_status]
+    )
+
+    # Force initial network conditions badge (always visible on load)
+    demo.load(
+        fn=update_network_badge,
+        outputs=[network_badge]  # your network_badge component
     )
 
     # 4. Fee preset buttons initial state — disable if locked, pure UI
