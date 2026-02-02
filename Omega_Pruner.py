@@ -5200,7 +5200,6 @@ body:not(.dark-mode) .footer-donation button {
             restore_toggle,
         ]
     )
-	)
 
     #Theme toggle (only needs status update)
     theme_checkbox.change(
