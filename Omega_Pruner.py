@@ -63,7 +63,6 @@ import copy
 import pandas as pd
 import statistics
 import concurrent.futures
-from gradio.components import Update
 
 # ── Logging ─────────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -3656,9 +3655,7 @@ def generate_psbt(
     )
 
     # Handle both possible return types from _resolve_destination()
-    from gradio.components import Update   # ← add this import at top of file if missing
-
-    if isinstance(dest_result, Update):
+    if isinstance(dest_result, type(gr.update())):  # ← this is the key fix
         # Error case: show the red warning box in the PSBT output area
         return dest_result.value
 
