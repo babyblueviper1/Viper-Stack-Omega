@@ -4760,75 +4760,34 @@ body:not(.dark-mode) .footer-donation button {
     # =============================
     def finalize_generate_ui(psbt_html: str):
         """
-        Lock UI only on successful PSBT generation.
-        On error: show Analyze button again, keep inputs editable, hide export/lock.
+        Always lock UI after Generate is clicked (success or error).
+        - On error: show red box, lock everything, only Reset available
+        - On success: show PSBT/export, lock everything
         """
-        # Detect error by keywords in the HTML output
-        is_error = any(keyword in psbt_html for keyword in [
-            "Invalid change address",
-            "Invalid change address type",
-            "Invalid change address format",
-            "PSBT Generation Failed",
-            "No supported inputs",
-            "Invalid transaction economics",
-            "Internal error:",
-            "Invalid or corrupted snapshot",
-            "Nothing selected yet",
-            "Missing or empty scriptPubKey",
-            "Impossible UTXO value",
-            "Invalid UTXO value"
-        ])
-
-        if is_error:
-            # Error: show Analyze button, keep everything editable, hide lock/export
-            return (
-                gr.update(visible=False),                    # 0: gen_btn — hide (user needs to Analyze first)
-                gr.update(visible=False),                    # 1: generate_row — hide
-                gr.update(visible=False),                    # 2: export_title_row — hide
-                gr.update(visible=False),                    # 3: export_file_row — hide
-                gr.update(visible=True, interactive=True),   # 4: import_file — keep usable
-                "",                                          # 5: locked_badge — empty
-                gr.update(interactive=True),                 # 6: addr_input
-                gr.update(interactive=True),                 # 7: dest
-                gr.update(interactive=True),                 # 8: strategy
-                gr.update(interactive=True),                 # 9: dust
-                gr.update(interactive=True),                 # 10: fee_rate_slider
-                gr.update(interactive=True),                 # 11: future_fee_slider
-                gr.update(interactive=True),                 # 13: theme_checkbox
-                gr.update(interactive=True),                 # 15: economy_btn
-                gr.update(interactive=True),                 # 16: hour_btn
-                gr.update(interactive=True),                 # 17: halfhour_btn
-                gr.update(interactive=True),                 # 18: fastest_btn
-                gr.update(visible=True),                     # 19: load_json_btn — keep
-                gr.update(visible=True),                     # 20: import_file — keep
-                gr.update(visible=True),                     # 21: restore_toggle — keep
-                gr.update(visible=False),                    # 22: restore_area — hide
-            )
-        else:
-            # Success: lock UI, hide gen/analyze, show export, disable inputs, show badge
-            return (
-                gr.update(visible=False),                    # 0: gen_btn
-                gr.update(visible=False),                    # 1: generate_row
-                gr.update(visible=True),                     # 2: export_title_row
-                gr.update(visible=True),                     # 3: export_file_row
-                gr.update(visible=False, interactive=False), # 4: import_file
-                "<div class='locked-badge'>LOCKED</div>",    # 5: locked_badge
-                gr.update(interactive=False),                # 6: addr_input
-                gr.update(interactive=False),                # 7: dest
-                gr.update(interactive=False),                # 8: strategy
-                gr.update(interactive=False),                # 9: dust
-                gr.update(interactive=False),                # 10: fee_rate_slider
-                gr.update(interactive=False),                # 11: future_fee_slider
-                gr.update(interactive=False),                # 13: theme_checkbox
-                gr.update(interactive=False),                # 15: economy_btn
-                gr.update(interactive=False),                # 16: hour_btn
-                gr.update(interactive=False),                # 17: halfhour_btn
-                gr.update(interactive=False),                # 18: fastest_btn
-                gr.update(visible=False),                    # 19: load_json_btn
-                gr.update(visible=False),                    # 20: import_file
-                gr.update(visible=False),                    # 21: restore_toggle — hide/lock
-                gr.update(visible=False),                    # 22: restore_area — hide
-            )
+        # Always lock — no conditional needed anymore
+        return (
+            gr.update(visible=False),                    # 0: gen_btn — hide
+            gr.update(visible=False),                    # 1: generate_row — hide
+            gr.update(visible=True if "PSBT size:" in psbt_html else False),  # 2: export_title_row — show only on success
+            gr.update(visible=True if "PSBT size:" in psbt_html else False),  # 3: export_file_row — show only on success
+            gr.update(visible=False, interactive=False), # 4: import_file — hide/disable
+            "<div class='locked-badge'>LOCKED</div>",    # 5: locked_badge — always show
+            gr.update(interactive=False),                # 6: addr_input
+            gr.update(interactive=False),                # 7: dest
+            gr.update(interactive=False),                # 8: strategy
+            gr.update(interactive=False),                # 9: dust
+            gr.update(interactive=False),                # 10: fee_rate_slider
+            gr.update(interactive=False),                # 11: future_fee_slider
+            gr.update(interactive=False),                # 13: theme_checkbox
+            gr.update(interactive=False),                # 15: economy_btn
+            gr.update(interactive=False),                # 16: hour_btn
+            gr.update(interactive=False),                # 17: halfhour_btn
+            gr.update(interactive=False),                # 18: fastest_btn
+            gr.update(visible=False),                    # 19: load_json_btn
+            gr.update(visible=False),                    # 20: import_file
+            gr.update(visible=False),                    # 21: restore_toggle
+            gr.update(visible=False),                    # 22: restore_area
+        )
     # =============================
     # 🖥️ MAIN INPUT & UI LAYOUT
     # Address input, destination, toggles, notes, and core controls
