@@ -104,8 +104,7 @@ However:
 - No automatic re-generation with corrected paths is currently supported
 
 **Workaround:**  
-Import the PSBT into a wallet that already knows the account  
-(e.g., Sparrow), or recreate the transaction there.
+Import the PSBT into a wallet that already knows the account or recreate the transaction there.
 
 ---
 
