@@ -64,6 +64,7 @@ import pandas as pd
 import statistics
 import concurrent.futures
 from datetime import datetime, timezone
+import random
 
 # ── Logging ─────────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -287,7 +288,7 @@ def _selection_fingerprint(selected_utxos: List[dict]) -> str:
 # Utility Functions
 # =========================
 
-def safe_get(url: str, timeout: int = 8) -> Optional[requests.Response]:
+def safe_get(url: str, timeout: int = 12) -> Optional[requests.Response]:
     """
     Robust GET with 3 retries, exponential backoff, and strict timeout.    """
 
@@ -1732,10 +1733,15 @@ def _collect_online_utxos(params: AnalyzeParams) -> Tuple[List[Dict], str, List[
 
     entries = [e.strip() for e in params.addr_input.splitlines() if e.strip()]
 
-    for entry in entries:
+    for i, entry in enumerate(entries):
         if not entry.startswith(("bc1q", "bc1p", "1", "3")):
             debug_lines.append(f"Skipped invalid entry: {entry[:20]}...")
             continue
+
+        # Polite delay: ~1 request per second with small random jitter
+        # (prevents rate-limiting from mempool.space / blockstream / etc.)
+        if i > 0:
+            time.sleep(0.9 + random.uniform(-0.1, 0.3))  # 0.8–1.2 seconds range
 
         entry_utxos = get_utxos_with_timeout(entry, params.dust_threshold, timeout_sec=60)
         count = len(entry_utxos)
@@ -2794,60 +2800,78 @@ def _extract_selected_utxos(enriched_state: tuple) -> List[dict]:
 
 def _create_psbt_snapshot(
     selected_utxos: List[dict],
-    scan_source: str,
-    dest_override: Optional[str],
-    fee_rate: int,
-    future_fee_rate: int,
-    strategy: str,
-    dust_threshold: int,
+    scan_source: str = "",
+    dest_override: Optional[str] = None,
+    strategy: str = "Recommended — ~40% consolidated (balanced savings & privacy)",
+    fee_rate: int = 15,
+    future_fee_rate: int = 60,
+    dust_threshold: int = 546,
 ) -> dict:
-    """
-    Create deterministic, audit-friendly JSON snapshot of user selection.
-    Includes strategy and dust_threshold for full restore.
-    """
     if not selected_utxos:
-        raise ValueError("No UTXOs selected for snapshot")
+        return {
+            "fingerprint": "none",
+            "count": 0,
+            "total_value": 0,
+            "utxos": [],
+            "scan_source": scan_source.strip(),
+            "dest_addr_override": None,
+            "strategy": strategy,
+            "fee_rate": fee_rate,
+            "future_fee_rate": future_fee_rate,
+            "dust_threshold": dust_threshold,
+        }
 
-    sorted_utxos = sorted(selected_utxos, key=lambda u: (u["txid"], u["vout"]))
+    # Normalize minimal fields for snapshot (not for hash)
+    normalized_utxos = [
+        {
+            "txid": str(u["txid"]).strip().lower(),
+            "vout": str(u["vout"]).strip(),
+            "value": str(u["value"]).replace(",", "").strip(),
+            "address": str(u.get("address") or "").strip().lower(),
+            "script_type": str(u.get("script_type") or "").strip(),
+            "health": str(u.get("health") or "").strip(),
+            "source": str(u.get("source") or "").strip(),
+        }
+        for u in selected_utxos
+    ]
 
+    # Sort for stable order
+    sorted_utxos = sorted(normalized_utxos, key=lambda u: (u["txid"], u["vout"]))
+
+    # Fingerprint ONLY on sorted txid:vout (stable, survives value changes)
+    keys = [(u["txid"], u["vout"]) for u in sorted_utxos]
+    data = ":".join(f"{txid}:{vout}" for txid, vout in keys).encode()
+    fingerprint = hashlib.sha256(data).hexdigest()
+    fingerprint_short = fingerprint[:16].upper()
+
+    # Build snapshot with normalized data
     clean_inputs = [
         {
             "txid": u["txid"],
             "vout": u["vout"],
             "value": u["value"],
-            "address": u.get("address"),
-            "script_type": u.get("script_type"),
-            "health": u.get("health"),
-            "source": u.get("source"),
+            "address": u["address"],
+            "script_type": u["script_type"],
+            "health": u["health"],
+            "source": u["source"],
         }
         for u in sorted_utxos
     ]
-
-    dest_override_clean = dest_override.strip() if dest_override else None
 
     snapshot = {
         "version": 1,
         "timestamp": int(time.time()),
         "scan_source": scan_source.strip(),
-        "dest_addr_override": dest_override_clean,
+        "dest_addr_override": dest_override.strip() if dest_override else None,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
         "strategy": strategy,
         "dust_threshold": dust_threshold,
         "consolidate_count": len(clean_inputs),
         "inputs": clean_inputs,
+        "fingerprint": fingerprint,
+        "fingerprint_short": fingerprint_short,
     }
-
-    # Fingerprint: exclude variable/user-specific fields
-    canonical_data = {
-        k: v for k, v in snapshot.items()
-        if k not in ["timestamp", "scan_source", "dest_addr_override"]
-    }
-    canonical_json = json.dumps(canonical_data, sort_keys=True, separators=(",", ":"))
-    fingerprint = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
-
-    snapshot["fingerprint"] = fingerprint
-    snapshot["fingerprint_short"] = fingerprint[:16].upper()
 
     return snapshot
 	
@@ -3031,6 +3055,36 @@ import gradio as gr
 from typing import Union, Optional
 import gradio as gr
 
+def is_mainnet_address(addr: str) -> bool:
+    """
+    Quick + reliable check: is this a Bitcoin **mainnet** address?
+    Rejects testnet, signet, regtest, malformed strings.
+    """
+    addr = (addr or "").strip().lower()
+    if not addr:
+        return False
+
+    # Bech32 / Bech32m → must start with 'bc1'
+    if addr.startswith('bc1'):
+        return True  # bc1... is always mainnet (BIP-173 / BIP-350)
+
+    # Legacy Base58 (1... or 3...)
+    if addr.startswith(('1', '3')):
+        try:
+            decoded = base58_decode(addr)
+            if len(decoded) != 25:
+                return False
+            version = decoded[0]
+            # Mainnet: 0x00 = P2PKH (1...), 0x05 = P2SH (3...)
+            # Testnet: 0x6F = P2PKH (m/n...), 0xC4 = P2SH
+            return version in (0x00, 0x05)
+        except (ValueError, IndexError):
+            return False
+
+    # Anything else is definitely not a mainnet Bitcoin address
+    return False
+
+
 def _resolve_destination(
     dest_override: Optional[str],
     scan_source: str,
@@ -3039,9 +3093,10 @@ def _resolve_destination(
     """
     Resolve change destination → scriptPubKey bytes or UI error message.
     
-    Returns:
-        bytes: valid scriptPubKey (or b'' for no change)
-        gr.update: error message HTML to display in UI
+    Safety layers:
+    1. Must be valid mainnet address (rejects testnet/signet/regtest)
+    2. Must be modern (P2WPKH or Taproot — bc1q… or bc1p…)
+    3. Graceful fallbacks + clear error messages
     """
     override_clean = (dest_override or "").strip()
     if len(override_clean) < 10:
@@ -3053,45 +3108,97 @@ def _resolve_destination(
 
     # Priority 1: User override — validate immediately
     if override_clean:
+        # First quick filter: must look like mainnet
+        if not is_mainnet_address(override_clean):
+            return gr.update(value=f"""
+            <div style='
+                color:#ffdddd !important;
+                padding:20px !important;
+                background:#550000 !important;
+                border:3px solid #ff6666 !important;
+                border-radius:12px !important;
+                text-align:center !important;
+                font-weight:600 !important;
+                text-shadow:0 0 6px #ff6666 !important;
+            '>
+                <strong style='font-size:1.3em; color:#ffffff; text-shadow:0 0 8px #ff4444;'>
+                    Only Bitcoin mainnet addresses allowed
+                </strong><br><br>
+                Entered: {override_clean[:16]}...<br><br>
+                This looks like:<br>
+                • Testnet (tb1q…, m…, n…)<br>
+                • Signet<br>
+                • Invalid format<br><br>
+                <small style='color:#ffbbbb;'>
+                    Change address must be a real mainnet bc1q… or bc1p… address.
+                </small>
+            </div>
+            """)
+
+        # Then full validation
         try:
             spk_test, meta_test = address_to_script_pubkey(override_clean)
             typ = meta_test.get('type', 'unknown')
-            if typ in ('P2WPKH', 'Taproot', 'P2TR'):
-                final_dest = override_clean
-            else:
+            if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
                 return gr.update(value=f"""
-                <div style='color:#ffdddd !important; padding:20px; background:#550000; border:3px solid #ff6666; border-radius:12px; text-align:center; font-weight:600; text-shadow:0 0 6px #ff6666;'>
-                    <strong style='font-size:1.2em; color:#ffffff; text-shadow:0 0 8px #ff4444;'>Invalid change address type</strong><br><br>
-                    Entered: {override_clean[:12]}... ({typ})<br>
-                    Only bc1q… (Native SegWit) and bc1p… (Taproot) allowed.<br><br>
-                    <small style='color:#ffbbbb;'>Try again with a valid modern address.</small>
+                <div style='
+                    color:#ffdddd !important;
+                    padding:20px !important;
+                    background:#550000 !important;
+                    border:3px solid #ff6666 !important;
+                    border-radius:12px !important;
+                    text-align:center !important;
+                    font-weight:600 !important;
+                '>
+                    <strong style='font-size:1.2em; color:#ffffff; text-shadow:0 0 8px #ff4444;'>
+                        Invalid change address type
+                    </strong><br><br>
+                    Entered: {override_clean[:12]}... ({typ})<br><br>
+                    Only <strong>bc1q… (Native SegWit)</strong> and <strong>bc1p… (Taproot)</strong> allowed.<br><br>
+                    <small style='color:#ffbbbb;'>
+                        Legacy (1…) and Nested (3…) addresses are not supported for change.
+                    </small>
                 </div>
                 """)
+            final_dest = override_clean
         except Exception as e:
             return gr.update(value=f"""
-            <div style='color:#ffdddd !important; padding:20px; background:#550000; border:3px solid #ff6666; border-radius:12px; text-align:center; font-weight:600; text-shadow:0 0 6px #ff6666;'>
-                <strong style='font-size:1.2em; color:#ffffff; text-shadow:0 0 8px #ff4444;'>Invalid change address format</strong><br><br>
-                Entered: {override_clean[:12]}...<br>
-                Must be valid bc1q… or bc1p… address.<br><br>
-                <small style='color:#ffbbbb;'>Error: {str(e)[:80]}…</small>
+            <div style='
+                color:#ffdddd !important;
+                padding:20px !important;
+                background:#550000 !important;
+                border:3px solid #ff6666 !important;
+                border-radius:12px !important;
+                text-align:center !important;
+                font-weight:600 !important;
+            '>
+                <strong style='font-size:1.2em; color:#ffffff; text-shadow:0 0 8px #ff4444;'>
+                    Invalid change address format
+                </strong><br><br>
+                Entered: {override_clean[:16]}...<br>
+                Must be a valid mainnet bc1q… or bc1p… address.<br><br>
+                <small style='color:#ffbbbb;'>
+                    Error: {str(e)[:100]}…
+                </small>
             </div>
             """)
-            
+
     # Priority 2: scan_source (silent fallback)
     if not final_dest and source_clean:
-        try:
-            spk_test, meta_test = address_to_script_pubkey(source_clean)
-            if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
-                final_dest = source_clean
-        except Exception:
-            pass
+        if is_mainnet_address(source_clean):
+            try:
+                spk_test, meta_test = address_to_script_pubkey(source_clean)
+                if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
+                    final_dest = source_clean
+            except Exception:
+                pass
 
     # Priority 3: first modern from UTXOs (silent fallback)
     if not final_dest and enriched_state and len(enriched_state) == 2:
         _, utxos = enriched_state
         for u in utxos:
             addr = u.get("address", "").strip()
-            if addr.startswith(("bc1q", "bc1p")):
+            if addr.startswith(("bc1q", "bc1p")) and is_mainnet_address(addr):
                 try:
                     spk_test, meta_test = address_to_script_pubkey(addr)
                     if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
@@ -3100,31 +3207,46 @@ def _resolve_destination(
                 except Exception:
                     continue
 
-    # No valid destination → full absorb
+    # No valid modern mainnet destination found → full absorb (no change output)
     if not final_dest:
         return b''
 
-    # Final safety check
+    # Final validation (should never fail at this point, but belt-and-suspenders)
     try:
         spk, meta = address_to_script_pubkey(final_dest)
         typ = meta.get('type', 'unknown')
         if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
             return gr.update(value=f"""
-            <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
-                <strong>Change address must be modern</strong><br><br>
+            <div style='
+                color:#ff3366 !important;
+                padding:20px !important;
+                background:#330000 !important;
+                border:3px solid #ff3366 !important;
+                border-radius:12px !important;
+                text-align:center !important;
+            '>
+                <strong>Change address must be modern (Native SegWit or Taproot)</strong><br><br>
                 Detected: {final_dest[:12]}... ({typ})<br>
-                Only bc1q… and bc1p… allowed for change.<br><br>
-                <small>Try again with a valid modern address.</small>
+                Only bc1q… and bc1p… allowed for change output.<br><br>
+                <small>Try again with a valid modern mainnet address.</small>
             </div>
             """)
         return spk
 
     except Exception as e:
         return gr.update(value=f"""
-        <div style='color:#ff3366 !important; padding:20px; background:#330000; border:3px solid #ff3366; border-radius:12px; text-align:center;'>
-            Invalid change address<br><br>
-            Must be valid bc1q… (Native SegWit) or bc1p… (Taproot)<br><br>
-            <small>Error: {str(e)[:80]}…</small>
+        <div style='
+            color:#ff3366 !important;
+            padding:20px !important;
+            background:#330000 !important;
+            border:3px solid #ff3366 !important;
+            border-radius:12px !important;
+            text-align:center !important;
+        '>
+            <strong>Final validation failed</strong><br><br>
+            Address: {final_dest[:16]}...<br>
+            <small>Error: {str(e)[:100]}…</small><br><br>
+            Please use a valid mainnet bc1q… or bc1p… address.
         </div>
         """)
 		
@@ -3610,7 +3732,50 @@ def generate_psbt(
 
         legacy_excluded = len(supported_inputs) < len(all_inputs)
 
-        # Strict input value sanity checks
+        # Soft warning for very large consolidations
+        LARGE_THRESHOLD_SATS = 1000 * 100_000_000  # 1000 BTC
+        total_sats = sum(u.get("value", 0) for u in supported_inputs)
+        warn_html = ""
+		
+        if total_sats >= LARGE_THRESHOLD_SATS:
+            btc_amount = total_sats / 100_000_000
+            warn_html = f"""
+            <div style='
+                color:#ffffff !important;
+                padding: clamp(24px, 6vw, 36px) clamp(24px, 6vw, 36px) 8px clamp(24px, 6vw, 36px) !important;
+                background:#4a2a00 !important;          /* slightly warmer/darker amber base */
+                border:3px solid #ffcc66 !important;
+                border-radius:14px !important;
+                margin: 0 auto !important;
+                text-align:center !important;
+                max-width:90% !important;
+                box-shadow:0 0 45px rgba(255,204,102,0.6) !important;
+                font-weight:500 !important;
+            '>
+                <strong style='
+                    font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
+                    display:block !important;
+                    margin-bottom:16px !important;
+                    color:#fffacd !important;           /* very light yellow for title */
+                    text-shadow:0 0 10px rgba(255,255,205,0.8) !important;
+                '>
+                    ⚠️ Very Large Consolidation Detected
+                </strong>
+                Total selected value: ≈ {btc_amount:,.1f} BTC<br><br>
+                <span style='
+                    font-size: clamp(1.1rem, 4vw, 1.35rem) !important;
+                    line-height:1.7 !important;
+                    color:#ffffff !important;
+                    text-shadow:0 1px 4px rgba(0,0,0,0.8) !important;  /* shadow for readability */
+                    font-weight:500 !important;
+                '>
+                    Make sure this is intentional — you're about to consolidate a significant amount.<br>
+                    Double-check the selected UTXOs and destination address before signing.
+                </span>
+            </div>
+            """
+
+        # Strict per-UTXO sanity checks
         MAX_BTC = 21_000_000
         MAX_SATS = MAX_BTC * 100_000_000
 
@@ -3622,74 +3787,62 @@ def generate_psbt(
 
             if val <= 0:
                 return (
-                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
-                    f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000 !important; "
+                    f"border:3px solid #ff3366 !important; border-radius:12px; text-align:center;'>"
                     f"Invalid UTXO value ≤ 0 sats detected<br>"
-                    f"<strong>{ident}</strong><br><br>"
+                    f"<div style='font-weight:900;'>{ident}</div><br><br>"
                     "This is likely a paste error or corrupted data. Please re-analyze or correct the UTXO value."
                     "</div>"
                 )
 
             if val > MAX_SATS:
                 return (
-                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
-                    f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000 !important; "
+                    f"border:3px solid #ff3366 !important; border-radius:12px; text-align:center;'>"
                     f"Impossible UTXO value > {MAX_BTC:,} BTC detected<br>"
-                    f"<strong>{val:,} sats — {ident}</strong><br><br>"
+                    f"<div style='font-weight:900;'>{val:,} sats — {ident}</div><br><br>"
                     "This exceeds the total Bitcoin supply. Likely bad input data. Please verify and re-analyze."
                     "</div>"
                 )
 
             if "scriptPubKey" not in u or not u.get("scriptPubKey"):
                 return (
-                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000; "
-                    f"border:3px solid #ff3366; border-radius:12px; text-align:center;'>"
+                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000 !important; "
+                    f"border:3px solid #ff3366 !important; border-radius:12px; text-align:center;'>"
                     f"Missing or empty scriptPubKey for input<br>"
-                    f"<strong>{ident}</strong><br><br>"
+                    f"<div style='font-weight:900;'>{ident}</div><br><br>"
                     "Cannot build safe PSBT without scriptPubKey. "
                     "Please re-analyze or correct the UTXO entry."
                     "</div>"
                 )
 
-           # All inputs passed sanity checks → proceed
+        # All inputs passed sanity checks → proceed
         dest_result = _resolve_destination(
             dest_override=params.dest_override,
             scan_source=params.scan_source,
             enriched_state=enriched_state,
         )
 
-        # DEBUG (keep for one more test, then remove or comment out)
-        log.info(f"[DEST_DEBUG] type={type(dest_result).__name__}, repr={repr(dest_result)[:400]}")
-        if isinstance(dest_result, dict):
-            log.info(f"[DEST_DEBUG_KEYS] keys={list(dest_result.keys())}")
-
-        # ── FIXED: Handle Gradio's exact wrapped format ──
+        # ── Handle Gradio's wrapped update format ──
         error_html = None
-
         if isinstance(dest_result, dict):
-            # This matches your log EXACTLY: {'value': html_str, '__type__': 'update'}
             if 'value' in dest_result:
                 error_html = dest_result['value']
-            # Extra check for __type__ if needed
             elif '__type__' in dest_result and dest_result.get('__type__') == 'update':
                 error_html = dest_result.get('value')
-
         elif isinstance(dest_result, type(gr.update())):
             error_html = dest_result.value
-
         elif isinstance(dest_result, str):
             error_html = dest_result
 
-        # Return clean error if we extracted HTML
         if error_html:
-            # Double-check nesting (rare Gradio quirk)
             if isinstance(error_html, dict) and 'value' in error_html:
                 error_html = error_html['value']
-            return error_html  # ← This renders the clean red box!
+            return error_html
 
-        # If no error → success path
+        # Success path: valid destination (or no change)
         dest_spk = dest_result  # bytes or b''
-		
+
         try:
             econ = estimate_tx_economics(supported_inputs, params.fee_rate)
         except ValueError as e:
@@ -3719,7 +3872,7 @@ def generate_psbt(
         psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
         qr_html, qr_warning = _generate_qr(psbt_b64)
 
-        # Show PSBT size in UI for transparency
+        # PSBT size info
         psbt_size_info = (
             f"<div style='color:#88ffcc;text-align:center;margin:12px 0;'>"
             f"PSBT size: {len(psbt_b64):,} characters ({len(psbt_b64)/1024:.1f} KB)"
@@ -3741,9 +3894,27 @@ def generate_psbt(
                 "</div>"
             )
 
-        # Create temp snapshot for fingerprint comparison
+        # ── Fingerprint handling ──────────────────────────────────────────────────
+        fp_banner = ""
+        temp_snapshot = None
+
+        # Normalize to strings (matches JSON serialization during save)
+        normalized_selected = [
+            {
+                "txid": str(u["txid"]).strip().lower(),
+                "vout": str(u["vout"]).strip(),
+                "value": str(u["value"]).replace(",", "").strip(),  # remove commas if any
+                "address": str(u.get("address") or "").strip().lower(),
+            }
+            for u in full_selected_utxos
+            if u.get("selected", False)
+        ]
+
+        # Sort for stable fingerprint
+        sorted_norm = sorted(normalized_selected, key=lambda x: (x["txid"], x["vout"]))
+
         temp_snapshot = _create_psbt_snapshot(
-            selected_utxos=full_selected_utxos,
+            selected_utxos=normalized_selected,
             scan_source=params.scan_source if hasattr(params, 'scan_source') else "unknown",
             dest_override=params.dest_override,
             fee_rate=params.fee_rate,
@@ -3752,30 +3923,48 @@ def generate_psbt(
             dust_threshold=params.dust_threshold
         )
 
-        # Fingerprint comparison banner
-        fp_banner = ""
+        current_fp = temp_snapshot["fingerprint"]
+
         if loaded_fingerprint:
-            if temp_snapshot["fingerprint"] == loaded_fingerprint:
+            if current_fp == loaded_fingerprint:
                 fp_banner = """
                 <div style='color:#00ff88 !important; padding:16px; background:#001100 !important; border:2px solid #00ff88 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important; font-weight:700 !important;'>
                     ✓ Fingerprint matches loaded snapshot — selection identical.
                 </div>
                 """
-            elif not selection_changed_after_load:
-                fp_banner = """
-                <div style='color:#ff9900 !important; padding:16px; background:#331100 !important; border:2px solid #ff9900 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important;'>
-                    ⚠️ Fingerprint mismatch without selection change — verify UTXOs manually (possible restore glitch).
-                </div>
-                """
             else:
-                fp_banner = """
-                <div style='color:#88ffcc !important; padding:16px; background:#001122 !important; border:2px solid #88ffcc !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important;'>
-                    Note: Selection modified after load — new fingerprint expected.
+                fp_banner = f"""
+                <div style='
+                    color:#ffffff !important;
+                    padding: clamp(18px, 4vw, 24px) !important;
+                    background:#442200 !important;          /* lighter amber base for better contrast */
+                    border:2px solid #ff9900 !important;
+                    border-radius:12px !important;
+                    text-align:center !important;
+                    margin: clamp(20px, 5vw, 32px) 0 !important;
+                    box-shadow:0 0 30px rgba(255,153,0,0.5) !important;
+                '>
+                    ⚠️ Fingerprint mismatch<br>
+                    Loaded: {loaded_fingerprint}<br>
+                    Current: {current_fp}<br><br>
+                    <small style='
+                        font-size: clamp(1rem, 3.8vw, 1.15rem) !important;
+                        line-height: 1.7 !important;
+                        color:#ffffff !important;
+                        text-shadow: 0 1px 4px rgba(0,0,0,0.9) !important;  /* strong shadow for legibility */
+                        font-weight: 500 !important;
+                        display: block !important;
+                    '>
+                        This usually means the selection changed after loading<br>
+                        (e.g. a checkbox was toggled).<br>
+                        Verify UTXOs manually or re-analyze if unexpected.
+                    </small>
                 </div>
                 """
+        # else: no banner if not a restored session
 
         # Final HTML composition
-        return _compose_psbt_html(
+        main_content = _compose_psbt_html(
             fingerprint=temp_snapshot["fingerprint_short"],
             qr_html=qr_html,
             qr_warning=qr_warning,
@@ -3786,20 +3975,31 @@ def generate_psbt(
             fp_banner=fp_banner
         )
 
+        return warn_html + main_content
+
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
-        log.error(f"generate_psbt crashed: {e}\n{tb[:800]}")  # truncate long tracebacks
+        log.error(f"generate_psbt crashed: {e}\n{tb}")
+
+        # Shortened user message — no need for 3 traceback lines in UI
+        error_msg = str(e) if str(e) else "Unknown error during PSBT generation"
         return f"""
-        <div style='color:#ff3366 !important; padding:30px; background:#330000; border:4px solid #ff3366; border-radius:16px; text-align:center; max-width:90%; margin:20px auto;'>
+        <div style='
+            color:#ff3366 !important;
+            padding:30px !important;
+            background:#330000 !important;
+            border:4px solid #ff3366 !important;
+            border-radius:16px !important;
+            text-align:center !important;
+            max-width:90% !important;
+            margin:20px auto !important;
+        '>
             <strong style='font-size:1.4rem;'>PSBT Generation Failed</strong><br><br>
-            {str(e)}<br><br>
-            <small style='color:#ffaaaa; font-family:monospace;'>
-                {tb.splitlines()[-3] or ''}<br>
-                {tb.splitlines()[-2] or ''}<br>
-                {tb.splitlines()[-1] or ''}
-            </small><br>
-            <small>Please check server logs or try re-analyzing.</small>
+            {error_msg}<br><br>
+            <small style='color:#ffaaaa;'>
+                Please check server logs for details or try re-analyzing.
+            </small>
         </div>
         """
 def analyze_and_show_summary(
@@ -4759,35 +4959,32 @@ body:not(.dark-mode) .footer-donation button {
     # ONLY if generation succeeded (no validation error)
     # =============================
     def finalize_generate_ui(psbt_html: str):
-        """
-        Always lock UI after Generate is clicked (success or error).
-        - On error: show red box, lock everything, only Reset available
-        - On success: show PSBT/export, lock everything
-        """
-        # Always lock — no conditional needed anymore
+        is_success = "PSBT size:" in psbt_html or "bitcoin:" in psbt_html or len(psbt_html) > 200  # rough success check
+        
         return (
-            gr.update(visible=False),                    # 0: gen_btn — hide
-            gr.update(visible=False),                    # 1: generate_row — hide
-            gr.update(visible=True if "PSBT size:" in psbt_html else False),  # 2: export_title_row — show only on success
-            gr.update(visible=True if "PSBT size:" in psbt_html else False),  # 3: export_file_row — show only on success
-            gr.update(visible=False, interactive=False), # 4: import_file — hide/disable
-            "<div class='locked-badge'>LOCKED</div>",    # 5: locked_badge — always show
-            gr.update(interactive=False),                # 6: addr_input
-            gr.update(interactive=False),                # 7: dest
-            gr.update(interactive=False),                # 8: strategy
-            gr.update(interactive=False),                # 9: dust
-            gr.update(interactive=False),                # 10: fee_rate_slider
-            gr.update(interactive=False),                # 11: future_fee_slider
-            gr.update(interactive=False),                # 13: theme_checkbox
-            gr.update(interactive=False),                # 15: economy_btn
-            gr.update(interactive=False),                # 16: hour_btn
-            gr.update(interactive=False),                # 17: halfhour_btn
-            gr.update(interactive=False),                # 18: fastest_btn
-            gr.update(visible=False),                    # 19: load_json_btn
-            gr.update(visible=False),                    # 20: import_file
-            gr.update(visible=False),                    # 21: restore_toggle
-            gr.update(visible=False),                    # 22: restore_area
+            gr.update(visible=False),                    # gen_btn
+            gr.update(visible=False),                    # generate_row
+            gr.update(visible=is_success),               # export_title_row
+            gr.update(visible=is_success),               # export_file_row ← now shows even if QR skipped
+            gr.update(visible=False, interactive=False), # import_file
+            "<div class='locked-badge'>LOCKED</div>",    # locked_badge
+            gr.update(interactive=False),                # addr_input
+            gr.update(interactive=False),                # dest
+            gr.update(interactive=False),                # strategy
+            gr.update(interactive=False),                # dust
+            gr.update(interactive=False),                # fee_rate_slider
+            gr.update(interactive=False),                # future_fee_slider
+            gr.update(interactive=False),                # theme_checkbox
+            gr.update(interactive=False),                # economy_btn
+            gr.update(interactive=False),                # hour_btn
+            gr.update(interactive=False),                # halfhour_btn
+            gr.update(interactive=False),                # fastest_btn
+            gr.update(visible=False),                    # load_json_btn
+            gr.update(visible=False),                    # import_file (duplicate, already hidden)
+            gr.update(visible=False),                    # restore_toggle
+            gr.update(visible=False),                    # restore_area
         )
+
     # =============================
     # 🖥️ MAIN INPUT & UI LAYOUT
     # Address input, destination, toggles, notes, and core controls
@@ -4982,8 +5179,18 @@ body:not(.dark-mode) .footer-donation button {
 				info="Use the Network Conditions panel above to judge how aggressive consolidation should be today.",
 				allow_custom_value=True
             )
-        dust = gr.Slider(0, 5000, 546, step=1, label="Dust Threshold (sats)", info="Inputs below this value are treated as inefficient to spend individually.")
 
+        dust = gr.Slider(
+            minimum=546,
+            maximum=5000,
+            value=1000,
+            step=1,
+            label="Dust Threshold (sats)",
+            info=(
+                "Inputs below this value are treated as dust (unspendable economically).\n"
+                "Bitcoin's canonical dust limit for modern outputs is 546 sats — lower values are ignored."
+            )
+        )
 
         fee_preset_info = gr.HTML(
             """
@@ -5071,6 +5278,12 @@ body:not(.dark-mode) .footer-donation button {
         locked = gr.State(False)
         psbt_snapshot = gr.State(None)
         locked_badge = gr.HTML("")  # Starts hidden
+        success_flag_state = gr.State(False)     
+        status_msg_state   = gr.State("")      
+        scan_source_restored_state  = gr.State("") 
+        dest_restored_state = gr.State("")    
+        strategy_restored_state = gr.State("")  
+        dust_restored_state = gr.State(546)      
         
         selected_utxos_for_psbt = gr.State([])
         loaded_fingerprint = gr.State(None)  # Holds fingerprint from loaded snapshot (or None)
@@ -5328,26 +5541,38 @@ body:not(.dark-mode) .footer-donation button {
         fn=load_selection,
         inputs=[json_parsed_state, enriched_state],
         outputs=[
+            enriched_state,                   # 0
+            warning_banner,                   # 1
+            loaded_fingerprint,               # 2
+            selection_changed_after_load,     # 3
+            success_flag_state,               # 4 ← success bool (True on good restore)
+            status_msg_state,                 # 5
+            scan_source_restored_state,       # 6
+            dest_restored_state,              # 7
+            strategy_restored_state,          # 8
+            dust_restored_state,             # 9
+        ],
+    ).then(
+        # Now name ALL relevant outputs so we can use success_flag
+        fn=lambda enriched, warn, fp, changed, success_flag, status, src, dest_r, strat_r, dust_r: [
+            gr.update(value=src or ""),                    # addr_input
+            gr.update(value=dest_r or ""),                 # dest
+            gr.update(value=strat_r or "Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)"),
+            gr.update(value=dust_r or 546),
+            gr.update(visible=not success_flag),           # ← Fixed: hide analyze_btn on success
+        ],
+        inputs=[
             enriched_state,
             warning_banner,
             loaded_fingerprint,
             selection_changed_after_load,
-            gr.State(),              # success
-            gr.State(),              # status
-            gr.State(),              # scan_src
-            gr.State(),              # dest_r
-            gr.State(),              # strat_r
-            gr.State()               # dust_r
+            success_flag_state,              # ← 5th: the real success bool
+            status_msg_state,
+            scan_source_restored_state,
+            dest_restored_state,
+            strategy_restored_state,
+            dust_restored_state,
         ],
-    ).then(
-        fn=lambda s, src, d, st, du: [
-            gr.update(value=src or ""),
-            gr.update(value=d or ""),
-            gr.update(value=st or "Recommended — ~40% consolidated (balanced savings & privacy)"),
-            gr.update(value=du or 546),
-            gr.update(visible=not s)   # hide analyze if success
-        ],
-        inputs=[gr.State(), gr.State(), gr.State(), gr.State(), gr.State()],
         outputs=[addr_input, dest, strategy, dust, analyze_btn],
     ).then(
         fn=rebuild_df_rows,
