@@ -62,7 +62,7 @@ Spend or convert them separately before consolidation.
 - If no derivation path is provided, PSBTs remain valid but signing may fail on certain devices  
 - A **non-blocking warning** appears when this condition is detected  
 - **No automatic re-generation with corrected paths** is currently supported  
-  — use a wallet that already knows the account (e.g., Sparrow) or recreate the transaction there
+  — use a wallet that already knows the account or recreate the transaction there
 
 ---
 
