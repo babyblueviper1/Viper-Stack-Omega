@@ -1506,9 +1506,6 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
         psbt += encode_varint(len(value))
         psbt += value
 
-    def write_bip32_derivation(psbt: bytearray, pubkey: bytes, fingerprint: bytes, path_bytes: bytes):
-        write_kv(psbt, 0x06, pubkey, fingerprint + path_bytes)
-
     # ── Validation ──────────────────────────────────────────────────────────────
     if not tx.tx_ins:
         raise ValueError("Transaction has no inputs")
@@ -1542,8 +1539,6 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
             raise ValueError(f"Impossible UTXO value > 21M BTC ({val:,} sats) ({ident})")
         if "scriptPubKey" not in u:
             raise ValueError(f"Missing scriptPubKey ({ident})")
-        if not isinstance(u["scriptPubKey"], (bytes, str)):
-            raise ValueError(f"Invalid scriptPubKey type (must be bytes or hex str) ({ident})")
 
         # Witness UTXO (required for segwit/taproot)
         spk = u["scriptPubKey"]
@@ -1557,26 +1552,35 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
         )
         write_kv(psbt, 0x01, b"", witness_utxo)
 
-        # ALWAYS write SIGHASH_ALL — required by most hardware wallets
+        # ALWAYS write SIGHASH_ALL
         write_kv(psbt, 0x03, b"", bytes([0x01, 0x00, 0x00, 0x00]))
 
-        # Optional BIP-32 derivation (only if full data present)
-        if all(k in u for k in ["pubkey", "fingerprint", "full_derivation_path"]):
+        # ── Optional: BIP-32 derivation + master fingerprint ────────────────────
+        if all(k in u for k in ["pubkey", "master_fingerprint", "derivation_path"]):
             try:
-                pubkey = bytes.fromhex(u["pubkey"])
-                fingerprint = bytes.fromhex(u["fingerprint"])
-                path_str = u["full_derivation_path"].replace("m/", "")
+                pubkey_bytes = bytes.fromhex(u["pubkey"])
+                fp_bytes = bytes.fromhex(u["master_fingerprint"])
+
+                # Parse derivation path (e.g. "m/84'/0'/0'/0/5" → bytes)
+                path_str = u["derivation_path"].replace("m/", "").strip()
                 path_bytes = b""
                 for part in path_str.split("/"):
-                    hardened = part.endswith("'")
-                    n = int(part.rstrip("'"))
+                    if not part:
+                        continue
+                    hardened = part.endswith(("'", "h"))
+                    n = int(part.rstrip("'h"))
                     if hardened:
                         n |= 0x80000000
                     path_bytes += n.to_bytes(4, "little")
 
-                write_bip32_derivation(psbt, pubkey, fingerprint, path_bytes)
+                # Write PSBT_IN_BIP32_DERIVATION (type 0x06)
+                write_kv(psbt, 0x06, pubkey_bytes, fp_bytes + path_bytes)
+
+                log.debug(f"Added BIP-32 derivation for input {ident}: path={u['derivation_path']}")
             except Exception as e:
-                log.warning(f"Failed to add BIP32 derivation ({ident}): {e}")
+                log.warning(f"Failed to add BIP-32 derivation for {ident}: {e}")
+        else:
+            log.debug(f"No BIP-32 data available for input {ident} — skipping")
 
         psbt += b"\x00"  # end input map
 
@@ -3351,9 +3355,6 @@ def _generate_qr(psbt_b64: str) -> Tuple[str, str]:
 			"Use COPY PSBT below"
 			"</span>"
 			" and paste directly into your wallet.<br>"
-			"<small style='color:#aaffff;'>"
-            "Sparrow, Coldcard, Electrum, UniSat, Nunchuk, OKX all support raw PSBT paste."
-            "</small>"
 			"</div>"
         )
         log.warning("[QR] PSBT too large (%d chars > %d) — QR skipped", psbt_len, MAX_QR_CHARS)
@@ -3620,9 +3621,6 @@ def _compose_psbt_html(
             <div style='color:#fff !important;font-weight:800 !important;font-size: clamp(1rem, 3.5vw, 1.2rem) !important;'>
                 Important: Wallet must support <span style='color:#0f0 !important;'>PSBT</span>
             </div>
-            <div style='color:#0f8 !important;margin-top: clamp(8px, 2vw, 12px) !important;font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;'>
-                Sparrow • BlueWallet • Electrum • UniSat • Nunchuk • OKX
-            </div>
         </div>
     </div>
     </div>
@@ -3870,6 +3868,43 @@ def generate_psbt(
 
         # Generate PSBT & QR
         psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
+
+        # Check if any input has BIP-32 derivation info
+        has_derivation_info = any(
+            all(k in u for k in ["pubkey", "master_fingerprint", "derivation_path"])
+            for u in utxos_for_psbt
+        )
+
+         # Hardware wallet compatibility warning — always appears in current version
+        derivation_warning = ""
+        if not has_derivation_info:
+            derivation_warning = """
+<div style="
+    margin: clamp(20px, 5vw, 40px) 0 !important;
+    padding: clamp(16px, 4vw, 24px) !important;
+    background: rgba(40, 20, 0, 0.7) !important;
+    border: 2px solid #ffaa00 !important;
+    border-radius: 12px !important;
+    color: #ffddaa !important;
+    text-align: center !important;
+    font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;
+    line-height: 1.6 !important;
+    box-shadow: 0 0 30px rgba(255,170,0,0.4) !important;
+">
+    <div style="color:#ffcc00; font-size: clamp(1.1rem, 3.8vw, 1.3rem) !important; font-weight: bold !important;">
+        Hardware Wallet Compatibility Note
+    </div><br>
+    This PSBT does not contain BIP-32 derivation paths or master fingerprints.<br>
+    <span style="font-weight: bold !important;">This is the intended design of this single-sig tool.</span><br><br>
+    Most hardware wallets will therefore display a 
+    <span style="font-weight: bold !important;">"blind sign?"</span> warning or 
+    prompt to <span style="font-weight: bold !important;">"verify unknown inputs"</span>.<br><br>
+    <small style="color:#ffcc88;">
+        Signing should still work — but may require extra confirmation steps on the device.<br>
+    </small>
+</div>
+"""
+
         qr_html, qr_warning = _generate_qr(psbt_b64)
 
         # PSBT size info
@@ -3879,7 +3914,7 @@ def generate_psbt(
             f"</div>"
         )
 
-        # Additional warnings
+        # Additional warnings (legacy exclusion + new derivation warning)
         extra_note = ""
         if legacy_excluded:
             extra_note += (
@@ -3893,6 +3928,9 @@ def generate_psbt(
                 "</small>"
                 "</div>"
             )
+
+        # Append the derivation warning (appears only when needed)
+        extra_note += derivation_warning
 
         # ── Fingerprint handling ──────────────────────────────────────────────────
         fp_banner = ""
@@ -5020,12 +5058,11 @@ body:not(.dark-mode) .footer-donation button {
                     Optimized for Modern Bitcoin
                 </div>
 
-                Built for <strong style="color:#00ffff !important;font-weight:900 !important;">modern single-sig wallets</strong>,
+                This is a <strong style="color:#00ffff !important;font-weight:900 !important;">single-sig tool</strong>
                 with strong emphasis on
-                <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>,
-                <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>,
+                <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>
                 and
-                <strong style="color:#00ffff !important;font-weight:900 !important;">hardware wallet compatibility</strong>.
+                <strong style="color:#00ffff !important;font-weight:900 !important;">privacy</strong>.
                 <br><br>
 
                 <strong style="color:#00ffdd !important;">✅ PSBT creation & signing support:</strong><br>
@@ -5033,13 +5070,9 @@ body:not(.dark-mode) .footer-donation button {
                 <strong style="color:#00ffff !important;">Taproot / BIP86 (bc1p…)</strong>
                 <br><br>
 
-                PSBTs include all necessary metadata
-                (<strong style="color:#00ffcc !important; text-shadow:0 0 10px rgba(0,255,204,0.5) !important;">
-                UTXOs, derivation paths, master fingerprints
-                </strong>)<br>
-                and can be signed online or exported for
-                <strong style="color:#00ffcc !important;">air-gapped / offline signing</strong><br>
-                (Sparrow Wallet, Coldcard, Ledger, Trezor, Blockstream Jade, etc.)
+                <strong style="color:#ffea99 !important;">Hardware note:</strong> Due to this tool's address-only design, 
+                PSBTs lack BIP-32 paths/fingerprints — expect "blind sign?" prompts on most devices 
+                (signing should still work with extra confirms).
                 <br><br>
 
                 <strong style="color:#ffea99 !important;">⚠️</strong>
@@ -5056,8 +5089,8 @@ body:not(.dark-mode) .footer-donation button {
                     line-height: 1.7 !important;
                     font-style: italic !important;
                     font-weight: 700 !important;
-                ">
-                    <strong style="color: #ffea99 !important; font-style: italic !important; font-weight: 900 !important; text-shadow: 0 0 12px rgba(255,234,153,0.6) !important;">Note:</strong>  Ωmega Pruner does not fake “browser offline mode”.<br>
+                ">  
+                    Ωmega Pruner does not fake “browser offline mode”.<br>
                     Security relies on clear, explicit behavior and verifiable outputs — not illusions.
                 </div>
             </div>
