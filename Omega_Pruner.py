@@ -3476,7 +3476,7 @@ def _compose_psbt_html(
 
     <div style="
         text-align:center !important;
-        margin: clamp(40px, 10vw, 80px) auto 0 !important;
+        margin: clamp(8px, 2vw, 16px) auto 0 !important;
         max-width:960px !important;
         position: relative;
         z-index: 1;
@@ -3742,7 +3742,7 @@ def generate_psbt(
             warn_html = f"""
             <div style='
                 color:#ffffff !important;
-                padding: clamp(24px, 6vw, 36px) clamp(24px, 6vw, 36px) 8px clamp(24px, 6vw, 36px) !important;
+                padding: clamp(24px, 6vw, 36px) !important;
                 background:#4a2a00 !important;          /* slightly warmer/darker amber base */
                 border:3px solid #ffcc66 !important;
                 border-radius:14px !important;
@@ -5684,21 +5684,21 @@ body:not(.dark-mode) .footer-donation button {
     def reset():
         """RESET — silent wipe of state and affordances."""
         return (
-            fresh_empty_dataframe(),                                 # df
-            tuple(),                                                 # enriched_state
-            gr.update(value=""),                                     # warning_banner
-            gr.update(visible=True),                                 # analyze_btn — show
-            gr.update(visible=False),                                # generate_row — hide
-            None,                                                    # psbt_snapshot — wipe
-            False,                                                   # locked — unlock
-            "",                                                      # locked_badge — clear
+            fresh_empty_dataframe(),                                 # df → empty table
+            tuple(),                                                 # enriched_state → clear all UTXOs/selection
+            gr.update(value=""),                                     # warning_banner → clear
+            gr.update(visible=True),                                 # analyze_btn → show
+            gr.update(visible=False),                                # generate_row → hide
+            None,                                                    # psbt_snapshot → wipe
+            False,                                                   # locked → unlock
+            "",                                                      # locked_badge → clear
             gr.update(value="", interactive=True),                   # addr_input
             gr.update(value="", interactive=True),                   # dest
             gr.update(interactive=True),                             # strategy
             gr.update(interactive=True),                             # dust
             gr.update(interactive=True),                             # fee_rate_slider
             gr.update(interactive=True),                             # future_fee_slider
-            gr.update(value=True, interactive=True),                 # theme_checkbox — reset to dark
+            gr.update(value=True, interactive=True),                 # theme_checkbox → reset to dark
             gr.update(interactive=True),                             # fastest_btn
             gr.update(interactive=True),                             # halfhour_btn
             gr.update(interactive=True),                             # hour_btn
@@ -5706,12 +5706,13 @@ body:not(.dark-mode) .footer-donation button {
             gr.update(visible=False),                                # export_title_row
             gr.update(visible=False),                                # export_file_row
             None,                                                    # export_file
-            gr.update(value=None, visible=True, interactive=True),  # import_file
-            "",                                                      # psbt_output
-            gr.update(visible=True, interactive=True),               # load_json_btn — SHOW + interactive
-            gr.update(value=False, visible=True, interactive=True),  # restore_toggle — off + visible + clickable
-            gr.update(visible=False),                                # restore_area — hide
-            "",                                                      # clear any restore message if you have one
+            gr.update(value=None, visible=True, interactive=True),   # import_file
+            "",                                                      # psbt_output → clear PSBT HTML
+            gr.update(visible=True, interactive=True),               # load_json_btn
+            gr.update(value=False, visible=True, interactive=True),  # restore_toggle
+            gr.update(visible=False),                                # restore_area
+            "",                                                      # clear restore message if any
+            gr.update(value="")                                      # status_output → clear summary/warning
         )
 
     reset_btn.click(
@@ -5743,22 +5744,32 @@ body:not(.dark-mode) .footer-donation button {
             import_file,
             psbt_output,
             load_json_btn,
-            restore_toggle,           
-            restore_area,        
-            gr.State()              
+            restore_toggle,
+            restore_area,
+            gr.State(),       # restore message
+            status_output,    # clear warning/summary
         ],
     ).then(
-        fn=lambda: (
-            "",                        
-            gr.update(visible=False),  
-            gr.update(visible=True)    
-        ),
-        outputs=[status_output, generate_row, analyze_btn]
+        fn=generate_summary_safe,  # force re-run summary with empty state → clears warning
+        inputs=[
+            df,
+            enriched_state,
+            fee_rate_slider,
+            future_fee_slider,
+            locked,
+            strategy,
+            dest_value,
+        ],
+        outputs=[status_output, generate_row],
+    ).then(
+        fn=lambda: "",  # optional: extra clear of status_output if needed
+        outputs=status_output,
     ).then(
         fn=update_status_and_ui,
         inputs=[theme_checkbox],
-        outputs=[mode_status]
+        outputs=[mode_status],  # ← re-added: refreshes theme banner
     )
+	
     # =============================
     # — LIVE INTERPRETATION (single source of truth) —
     # =============================
