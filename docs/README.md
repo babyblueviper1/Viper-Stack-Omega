@@ -110,20 +110,24 @@ Import the PSBT into a wallet that already knows the account or recreate the tra
 
 ## Core Features
 
-- Table-first interface — data loads instantly; decide before reading
-- Clear labels — no ambiguity between pre- and post-consolidation state
-- CIOH recovery guidance — warnings translated into concrete next steps
-- **True air-gapped / offline mode** 🔒 — paste raw UTXOs, zero API calls
-- Pure dark high-contrast mode — clarity over comfort
-- Deterministic selection export — JSON + cryptographic fingerprint
-- Live mempool fee oracle — Economy / 1h / 30m / Fastest presets
-- **Privacy Score (0–100)** — linkage, merge exposure, CIOH visibility
-- Tiered CIOH warnings — color-coded and unavoidable
-- “Consolidate now vs later” fee delta — quantify future regret in sats
-- Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked
-- Live wallet footprint comparison — before / after consolidation
-- **One-Time Structural Consolidation Warning**
-- Full preview → PSBT fidelity guarantee
+- Table-first interface — data loads instantly; decide before reading  
+- Analysis-first flow — intent is evaluated before any commitment  
+- Unambiguous labeling — no confusion between pre- and post-consolidation states  
+- CIOH recovery guidance — warnings translated into concrete next steps  
+- Explicit online execution model — no simulated or partial “offline mode”  
+- Pure dark mode — full contrast, no haze  
+- Deterministic selection export — JSON + cryptographic fingerprint  
+- Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
+- **Privacy Score (0–100)** — linkage, merge exposure, CIOH risk  
+- Tiered CIOH warnings — color-coded and impossible to miss  
+- “Consolidate now vs later” fee delta — see future regret in sats  
+- Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
+- **Per-input age display** — shows confirmation age ("<1 day", "12 days", "~3 months", "~4 years") with color-coding:  
+  red = very recent (high linkage risk), orange = months-old, green = years-old (ideal for cleanup)  
+  helps prioritize dust/heavy UTXOs that are safe to consolidate without fresh linkage concerns  
+- Live wallet footprint comparison — before / after cleanup  
+- **One-Time Structural Consolidation Warning**  
+- 100% preview → PSBT fidelity  
 - Zero custody • Full coin control • RBF • Taproot • Dust-resistant
 
 ---
