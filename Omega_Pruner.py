@@ -5252,7 +5252,7 @@ with gr.Blocks(
                     Optimized for Modern Bitcoin
                 </div>
 
-                This is a <strong style="color:#00ffff !important;font-weight:900 !important;">single-sig tool demo</strong>
+                This is a <strong style="color:#00ffff !important;font-weight:900 !important;">single-sig demo tool</strong>
                 with strong emphasis on
                 <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>
                 and
