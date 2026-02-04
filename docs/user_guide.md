@@ -35,9 +35,9 @@ The Ωmega Pruner interface is designed to be intuitive and minimalistic. Here�
 Upon entering your address, the tool will enumerate all the UTXOs associated with it. For each UTXO, you’ll see:
 
 - **Value**: The amount in satoshis.
-- **Age**: How long it has been since the UTXO was created.
-- **Script Type**: Identifying the script type (e.g., SegWit, Taproot).
 - **Weight**: The UTXO’s size in weight units (important for fee optimization).
+- **Script Type**: Identifying the script type (e.g., SegWit, Taproot).
+- **Age**: How long it has been since the UTXO was created.
 
 ### Fee Context Layer
 This section provides live, real-time fee data:
