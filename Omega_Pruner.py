@@ -359,6 +359,34 @@ def get_live_fees() -> Dict[str, int]:
     log.debug("Returning fallback fees due to fetch/cache failure")
     return fallback
 
+
+def get_utxo_age_display(confirmed_at: Optional[int]) -> str:
+    if not confirmed_at or confirmed_at <= 0:
+        return '<span class="age-unknown">unknown</span>'
+    
+    try:
+        confirmed_dt = datetime.fromtimestamp(confirmed_at, tz=timezone.utc)
+        now = datetime.now(timezone.utc)
+        delta_days = (now - confirmed_dt).days
+
+        if delta_days < 0:
+            return '<span class="age-unknown">unknown</span>'
+
+        if delta_days == 0:
+            return '<span class="age-recent"><1 day</span>'
+        if delta_days == 1:
+            return '<span class="age-recent">1 day</span>'
+        if delta_days < 30:
+            return f'<span class="age-recent">{delta_days} days</span>'
+        if delta_days < 365:
+            months = delta_days // 30
+            return f'<span class="age-medium">~{months} month{"s" if months > 1 else ""}</span>'
+        years = delta_days // 365
+        return f'<span class="age-old">~{years} year{"s" if years > 1 else ""}</span>'
+    except Exception:
+        return '<span class="age-unknown">unknown</span>'
+
+
 def get_consolidation_score() -> str:
     """
     Generate the network conditions badge HTML.
@@ -637,19 +665,44 @@ def update_enriched_from_df(df_rows: List[list], enriched_state: tuple, locked: 
     return (meta, tuple(updated_utxos))
 
 
-def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, str, Optional[str], bool, bool, str, str, str, str, int]:
+def load_selection(
+    parsed_snapshot: dict,
+    current_enriched: Any
+) -> Tuple[Any, str, Optional[str], bool, bool, str, str, str, str, int]:
     """
     Load saved selection from JSON snapshot — JSON is authoritative.
     Builds fresh enriched_state directly from snapshot inputs when possible.
     """
     if not parsed_snapshot or not isinstance(parsed_snapshot, dict):
         log.warning("[RESTORE] Invalid snapshot: empty or not dict")
-        return current_enriched, "No valid parsed JSON loaded", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
+        return (
+            current_enriched,
+            "No valid parsed JSON loaded",
+            None,
+            False,
+            False,
+            "failed",
+            "",
+            "",
+            "Recommended — ~40% consolidated (balanced savings & privacy)",
+            546
+        )
 
     try:
         if "inputs" not in parsed_snapshot or not parsed_snapshot["inputs"]:
             log.warning("[RESTORE] Snapshot missing or empty 'inputs'")
-            return current_enriched, "Invalid snapshot — no UTXOs found in file", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
+            return (
+                current_enriched,
+                "Invalid snapshot — no UTXOs found in file",
+                None,
+                False,
+                False,
+                "failed",
+                "",
+                "",
+                "Recommended — ~40% consolidated (balanced savings & privacy)",
+                546
+            )
 
         # ── Build fresh UTXOs directly from JSON ───────────────────────────────
         log.info("[RESTORE] Building table directly from snapshot JSON (authoritative)")
@@ -668,7 +721,10 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
 
                 # Safe value parsing
                 value_raw = inp.get("value", 0)
-                log.debug("[RESTORE] Raw 'value' from JSON for %s:%d → %s (type=%s)", txid[:12], vout, value_raw, type(value_raw))
+                log.debug(
+                    "[RESTORE] Raw 'value' from JSON for %s:%d → %s (type=%s)",
+                    txid[:12], vout, value_raw, type(value_raw)
+                )
 
                 if isinstance(value_raw, str):
                     value_raw = value_raw.replace(",", "").strip()
@@ -689,7 +745,10 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
 
                 # Sanity cap — prevent insane numbers from breaking everything
                 if value > MAX_SATS * 10:
-                    log.error("[RESTORE] Impossible UTXO value: %d sats (txid=%s vout=%d) — skipping", value, txid[:12], vout)
+                    log.error(
+                        "[RESTORE] Impossible UTXO value: %d sats (txid=%s vout=%d) — skipping",
+                        value, txid[:12], vout
+                    )
                     continue
 
                 utxo = {
@@ -713,7 +772,10 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
                     utxo["script_type"] = meta.get("type", utxo["script_type"])
                 else:
                     missing_address_count += 1
-                    log.warning("[RESTORE] UTXO missing address (no scriptPubKey): %s:%d", txid[:12], vout)
+                    log.warning(
+                        "[RESTORE] UTXO missing address (no scriptPubKey): %s:%d",
+                        txid[:12], vout
+                    )
 
                 restored_utxos.append(utxo)
 
@@ -723,7 +785,78 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
 
         if not restored_utxos:
             log.warning("[RESTORE] No valid UTXOs could be built from JSON")
-            return current_enriched, "Snapshot contains no usable UTXOs", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
+            return (
+                current_enriched,
+                "Snapshot contains no usable UTXOs",
+                None,
+                False,
+                False,
+                "failed",
+                "",
+                "",
+                "Recommended — ~40% consolidated (balanced savings & privacy)",
+                546
+            )
+
+        # ── Safety block: prevent restore if any UTXO is missing address ───────
+        if missing_address_count > 0:
+            return (
+                current_enriched,
+                f"""
+                <div style="
+                    color: #ffffff !important;
+                    padding: 28px !important;
+                    background: #550000 !important;
+                    border: 4px solid #ff4444 !important;
+                    border-radius: 16px !important;
+                    text-align: center !important;
+                    font-weight: 700 !important;
+                    box-shadow: 0 0 35px rgba(255,68,68,0.7) !important;
+                    max-width: 95% !important;
+                    margin: 20px auto !important;
+                ">
+                    <div style="
+                        font-size: 1.8rem !important;
+                        margin-bottom: 20px !important;
+                        color: #ffff88 !important;
+                        text-shadow: 0 0 16px #ffff88 !important;
+                    ">
+                        RESTORE BLOCKED — SAFETY TRIGGERED
+                    </div>
+
+                    <span style="font-size: 1.3rem !important; line-height: 1.6 !important;">
+                        <span style="font-weight:900 !important; color: #ffea99 !important;">
+                            {missing_address_count} UTXO(s) are missing their Bitcoin address
+                        </span><br><br>
+
+                        <span style="font-weight:900 !important;">
+                            Cannot safely derive scriptPubKey → PSBT generation would fail.
+                        </span><br><br>
+
+                        <span style="font-weight:800 !important; color: #ffdddd !important; font-size: 1.15rem !important;">
+                            Solution: Click ANALYZE again using the original address list.
+                        </span>
+                    </span>
+
+                    <div style="
+                        margin-top: 24px !important;
+                        font-size: 1.05rem !important;
+                        color: #ffbbbb !important;
+                        opacity: 0.95 !important;
+                    ">
+                        This block exists to prevent creating an invalid or dangerous PSBT.
+                    </div>
+                </div>
+                """,
+                None,
+                False,
+                False,
+                "failed",
+                "",
+                "",
+                "Recommended — ~40% consolidated (balanced savings & privacy)",
+                546
+            )
 
         # ── SORT by consolidation priority ────────────────────────────────────────────
         # DUST/HEAVY first (lowest HEALTH_PRIORITY), then highest value
@@ -733,17 +866,25 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
                 -u.get("value", 0)                                     # descending value
             )
         )
-        log.info("[RESTORE] Sorted %d UTXOs: consolidation priority (DUST/HEAVY top), then value descending", len(restored_utxos))
+        log.info(
+            "[RESTORE] Sorted %d UTXOs: consolidation priority (DUST/HEAVY top), then value descending",
+            len(restored_utxos)
+        )
 
         # Metadata from snapshot
         scan_source_restored = parsed_snapshot.get("scan_source", "")
         dest_restored = parsed_snapshot.get("dest_addr_override", "")
-        strategy_restored = parsed_snapshot.get("strategy", "Recommended — ~40% consolidated (balanced savings & privacy)")
+        strategy_restored = parsed_snapshot.get(
+            "strategy",
+            "Recommended — ~40% consolidated (balanced savings & privacy)"
+        )
         dust_threshold_restored = parsed_snapshot.get("dust_threshold", 546)
         fingerprint = parsed_snapshot.get("fingerprint")
 
-        log.info("[RESTORE] Successfully restored %d UTXOs from JSON (missing addresses: %d)",
-                 len(restored_utxos), missing_address_count)
+        log.info(
+            "[RESTORE] Successfully restored %d UTXOs from JSON (missing addresses: %d)",
+            len(restored_utxos), missing_address_count
+        )
 
         meta = {
             "strategy": strategy_restored,
@@ -760,63 +901,99 @@ def load_selection(parsed_snapshot: dict, current_enriched: Any) -> Tuple[Any, s
             "    margin: 20px auto !important; "
             "    padding: 30px !important; "
             "    max-width: 95% !important; "
-            "    background: rgba(0, 18, 35, 0.7) !important; "  # semi-transparent dark teal-cyan base (less pure black)
-            "    border: 3px solid #00ffcc !important; "         # brighter cyan border
+            "    background: rgba(0, 18, 35, 0.7) !important; "
+            "    border: 3px solid #00ffcc !important; "
             "    border-radius: 16px !important; "
             "    text-align: center !important; "
-            "    box-shadow: 0 0 35px rgba(0, 255, 204, 0.45) !important; "  # glow halo
-            "    color: #ccffeb !important;"                     # light mint-cyan text fallback
+            "    box-shadow: 0 0 35px rgba(0, 255, 204, 0.45) !important; "
+            "    color: #ccffeb !important;"
             "'>"
             
             "    <span style='"
-            "        color: #00ffdd !important; "                    # vivid cyan
+            "        color: #00ffdd !important; "
             "        font-size: 1.6rem !important; "
             "        font-weight: 900 !important; "
-            "        text-shadow: 0 0 18px #00ffdd80 !important; "   # strong glow (survives overrides well)
+            "        text-shadow: 0 0 18px #00ffdd80 !important; "
             "        letter-spacing: 1px !important;"
             "    '>"
             f"        Table restored from snapshot — {len(restored_utxos)} UTXOs loaded!"
             "    </span><br>"
             
             "    <small style='"
-            "        color: #aaffff !important; "                    # lighter cyan
+            "        color: #aaffff !important; "
             "        font-size: 1rem !important; "
             "        text-shadow: 0 0 8px rgba(170, 255, 255, 0.5) !important;"
             "    '>"
             "        Selection, strategy, dust threshold and metadata fully recovered.<br>"
             "        Ready to generate PSBT — no ANALYZE needed."
             "    </small>"
-            
             "    </div>"
         )
 
+        # Warning for missing addresses (now correctly indented under message)
         if missing_address_count:
             message += (
-                "    <br><br><div style='"
-                "        color: #ffea99 !important; "                # warm yellow warning text
+                "<br><br><div style='"
+                "        color: #ffea99 !important; "
                 "        font-weight: 900 !important; "
-                "        background: rgba(255, 180, 0, 0.18) !important; "  # faint orange glow bg
+                "        background: rgba(255, 180, 0, 0.18) !important; "
                 "        padding: 16px !important; "
                 "        border: 2px solid #ffcc66 !important; "
                 "        border-radius: 10px !important; "
                 "        text-shadow: 0 0 10px rgba(255, 204, 102, 0.6) !important;"
                 "        box-shadow: 0 0 20px rgba(255, 153, 0, 0.3) !important;"
                 "    '>"
-                f"        <strong style='color: #ff5555 !important; font-size: 1.1rem;'>Warning:</strong> "
-                f"        {missing_address_count} UTXO(s) missing address → no scriptPubKey.<br>"
-                "        PSBT generation may fail or exclude those inputs. "
-                "        <br><strong>Re-analyze with original addresses to fix.</strong>"
+                f"        <span style='color: #ff5555 !important; font-size: 1.1rem; font-weight:900 !important;'>"
+                f"            RESTORE BLOCKED FOR SAFETY"
+                f"        </span><br><br>"
+                f"        <span style='font-weight:900 !important;'>"
+                f"            {missing_address_count} input(s) missing address field in the JSON file."
+                f"        </span><br><br>"
+                "        This usually means the file was edited manually or corrupted.<br>"
+                "        PSBTs cannot be safely created without addresses.<br><br>"
+                "        <span style='font-weight:900 !important;'>"
+                "            Recommended: Re-ANALYZE using the original addresses."
+                "        </span><br>"
+                "        <span style='font-weight:700 !important; opacity: 0.9;'>"
+                "            (If you believe this is a bug in the tool, please report it.)"
+                "        </span>"
                 "    </div>"
             )
 
         if fingerprint:
-            message += f"<br><small style='color:#88ffcc;'>Fingerprint: {fingerprint[:16]}...</small>"
+            message += (
+                f"<br><small style='color:#88ffcc;'>"
+                f"Fingerprint: {fingerprint[:16]}..."
+                f"</small>"
+            )
 
-        return return_tuple, message, fingerprint, False, True, "success", scan_source_restored, dest_restored, strategy_restored, dust_threshold_restored
+        return (
+            return_tuple,
+            message,
+            fingerprint,
+            False,
+            True,
+            "success",
+            scan_source_restored,
+            dest_restored,
+            strategy_restored,
+            dust_threshold_restored
+        )
 
     except Exception as e:
         log.error("[RESTORE] Failed to process snapshot: %s", str(e), exc_info=True)
-        return current_enriched, f"Restore failed: {str(e)}", None, False, False, "failed", "", "", "Recommended — ~40% consolidated (balanced savings & privacy)", 546
+        return (
+            current_enriched,
+            f"Restore failed: {str(e)}",
+            None,
+            False,
+            False,
+            "failed",
+            "",
+            "",
+            "Recommended — ~40% consolidated (balanced savings & privacy)",
+            546
+        )
 		
 # ── Rebuild DataFrame rows from enriched state (for restore / refresh) ───────────
 def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
@@ -917,6 +1094,7 @@ def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
             u.get("address", "unknown"),
             u.get("input_weight", 0),
             display_type,
+			get_utxo_age_display(u.get("confirmed_at")),
             u.get("vout", 0),
         ])
 
@@ -1648,17 +1826,23 @@ def get_utxos(addr: str, dust: int = 546) -> List[dict]:
                         items = data if isinstance(data, list) else data.get("utxos", [])
                         for item in items:
                             val = int(item.get("value", 0))
-                            if val > dust:
-                                utxos.append({
-                                    "txid": item["txid"],
-                                    "vout": item["vout"],
-                                    "value": val,
-                                    "address": addr,
-                                    "confirmed": (
-                                        item.get("status", {}).get("confirmed", True)
-                                        if isinstance(item.get("status"), dict) else True
-                                    )
-                                })
+                            if val <= dust:
+                                continue
+
+                            status = item.get("status", {})
+                            confirmed = status.get("confirmed", True) if isinstance(status, dict) else True
+                            if not confirmed:
+                                continue  # already filtering confirmed, but explicit
+
+                            utxo = {
+                                "txid": item["txid"],
+                                "vout": item["vout"],
+                                "value": val,
+                                "address": addr,
+                                "confirmed_at": status.get("block_time"),   # ← NEW: Unix timestamp or None
+                            }
+                            utxos.append(utxo)
+
                         if utxos:
                             log.debug(f"Found {len(utxos)} UTXOs from {url}")
                             return utxos
@@ -1669,15 +1853,12 @@ def get_utxos(addr: str, dust: int = 546) -> List[dict]:
                     log.warning(f"Rate limited (429) on {url}, attempt {attempt+1}")
                     time.sleep(5 * (attempt + 1))
 
-                else:
-                    log.debug(f"Bad status {r.status_code} from {url}")
-
             except Exception as e:
                 log.warning(f"Request error on {url}: {type(e).__name__}: {e}")
 
-            time.sleep(1.0)  # polite delay between requests
+            time.sleep(1.0)
 
-        time.sleep(5)  # longer delay between full API rotation
+        time.sleep(5)
 
     log.warning(f"No UTXOs found after retries for address: {addr}")
     return []
@@ -1827,48 +2008,33 @@ def _classify_utxo(
 
 
 def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
-    """
-    Enrich raw UTXOs with script metadata, weight, health, recommendation,
-    scriptPubKey, optional Taproot internal key, and legacy flag.
-    """
     enriched = []
 
     for u in raw_utxos:
         addr = u.get("address", "")
 
-        # Derive scriptPubKey + metadata
         script_pubkey, meta = address_to_script_pubkey(addr)
-        input_weight = meta.get("input_vb", 68) * 4  # fallback to P2WPKH
+        input_weight = meta.get("input_vb", 68) * 4
 
         script_type_from_meta = meta.get("type", "")
 
-        # Classify
         script_type, health, recommend, is_legacy = _classify_utxo(
             u["value"], input_weight, script_type_from_meta
         )
 
-        # Normalize Taproot naming
         if script_type.upper() in ("TAPROOT", "P2TR"):
             script_type = "Taproot"
 
-        # Optional Taproot internal key
-        tap_internal_key = None
-        if script_type == "Taproot":
-            candidate = meta.get("tap_internal_key")
-            if candidate and len(candidate) == 32:
-                tap_internal_key = candidate
-
         enriched.append({
-            **u,
+            **u,                               # ← keeps "confirmed_at"
             "input_weight": input_weight,
             "health": health,
             "recommend": recommend,
             "script_type": script_type,
             "script_type_inferred": u.get("script_type_inferred", False),
-            "scriptPubKey": script_pubkey,          # bytes — needed for PSBT
-            "tap_internal_key": tap_internal_key,   # optional
-            "is_legacy": is_legacy,                 # for table styling / auto-disable
-            # "selected" set later by strategy or user
+            "scriptPubKey": script_pubkey,
+            "tap_internal_key": None,          # if Taproot
+            "is_legacy": is_legacy,
         })
 
     return enriched
@@ -2026,6 +2192,7 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
             u.get("address", "unknown"),
             u.get("input_weight", 0),
             display_type,
+			get_utxo_age_display(u.get("confirmed_at")),
             u.get("vout", 0),
         ])
 
@@ -4571,7 +4738,7 @@ with gr.Blocks(
     
 
 
-    # ── Health badge & legacy row styling ───────────────────────────────────────────
+    # ── Health badge & legacy row styling + Age column colors ──────────────────────
     gr.HTML("""
         <style>
             .health {
@@ -4623,6 +4790,23 @@ with gr.Blocks(
                 opacity: 0.3 !important;
                 cursor: not-allowed !important;
                 accent-color: #666 !important;
+            }
+
+            /* Age column visual cues */
+            .age-unknown {
+                color: #888888;
+                font-style: italic;
+            }
+            .age-recent {
+                color: #ff6666;
+                font-weight: bold;   /* fresh UTXOs red */
+            }
+            .age-medium {
+                color: #ffaa44;      /* months orange */
+            }
+            .age-old {
+                color: #00ff88;
+                font-weight: bold;   /* old coins green */
             }
         </style>
     """)
@@ -5383,9 +5567,10 @@ body:not(.dark-mode) .footer-donation button {
                 "Address",
                 "Weight (wu)",
                 "Type",
+				"Age",
                 "vout",
             ],
-            datatype=["bool", "str", "str", "html", "number", "str", "number", "html", "number"],
+            datatype=["bool", "str", "str", "html", "number", "str", "number", "html", "html","number"],
             type="array",
             interactive=True,
             wrap=True,
@@ -5393,8 +5578,8 @@ body:not(.dark-mode) .footer-donation button {
             max_height=500,
             max_chars=None,
             label=" ",
-            static_columns=[1, 2, 3, 4, 5, 6, 7, 8],  # 0-based index — CONSOLIDATION is editable
-            column_widths=["120px", "380", "380px", "120px", "140px", "380px", "130px", "105px", "80px"]
+            static_columns=[1, 2, 3, 4, 5, 6, 7, 8, 9],  # 0-based index — CONSOLIDATION is editable
+            column_widths=["120px", "380", "380px", "120px", "140px", "380px", "130px", "105px", "110px","80px"]
         )
 
         gr.HTML("""
