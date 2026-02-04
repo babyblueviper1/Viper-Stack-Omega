@@ -124,7 +124,7 @@ Import the PSBT into a wallet that already knows the account or recreate the tra
 - Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
 - **Per-input age display** — shows confirmation age ("<1 day", "12 days", "~3 months", "~4 years") with color-coding:  
   red = very recent (high linkage risk), orange = months-old, green = years-old (ideal for cleanup)  
-  helps prioritize dust/heavy UTXOs that are safe to consolidate without fresh linkage concerns  
+  **Age is secondary context only** — primary recommendations/pre-checks are still driven by value + weight/script type; age helps manual prioritization for lowest CIOH risk
 - Live wallet footprint comparison — before / after cleanup  
 - **One-Time Structural Consolidation Warning**  
 - 100% preview → PSBT fidelity  
