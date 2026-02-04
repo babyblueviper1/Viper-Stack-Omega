@@ -16,7 +16,7 @@
 
 ### Accessing Ωmega Pruner
 
-- Visit the Ωmega Pruner website.
+- Visit the [Ωmega Pruner website](https://omega-pruner.onrender.com/).
 - Make sure you’re using a supported browser (Google Chrome, Firefox, etc.).
 - No registration is required; simply navigate to the tool’s interface.
 
@@ -101,7 +101,7 @@ Here’s how to consolidate your UTXOs using Ωmega Pruner:
 
 ### Next Steps
 
-- Join the Ωmega Pruner community to stay updated on new features and updates.
+- Join the [Ωmega Pruner community](https://babyblueviper.com/subscribe) to stay updated on new features and updates.
 - Share your feedback to help improve the tool.
 
 ## Support
