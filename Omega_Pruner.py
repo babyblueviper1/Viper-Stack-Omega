@@ -5517,7 +5517,10 @@ body:not(.dark-mode) .footer-donation button {
             <div style="width: 100%; margin-top: 25px;"></div>
             <div class="check-to-consolidate-header">
                 <div class="header-title">CHECK TO CONSOLIDATE</div>
-                <div class="header-subtitle">Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = consolidate</div>
+                <div class="header-subtitle">Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = consolidate
+				<br>
+                Age column is secondary context: green (old) = safest, red (fresh) = highest CIOH risk if consolidated
+                </div>
             </div>
 
             <style>
