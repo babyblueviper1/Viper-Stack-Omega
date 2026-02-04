@@ -80,6 +80,9 @@ Spend or convert them separately before consolidation.
 - Tiered CIOH warnings — color-coded and impossible to miss  
 - “Consolidate now vs later” fee delta — see future regret in sats  
 - Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
+- **Per-input age display** — shows confirmation age ("<1 day", "12 days", "~3 months", "~4 years") with color-coding:  
+  red = very recent (high linkage risk), orange = months-old, green = years-old (ideal for cleanup)  
+  helps prioritize dust/heavy UTXOs that are safe to consolidate without fresh linkage concerns  
 - Live wallet footprint comparison — before / after cleanup  
 - **One-Time Structural Consolidation Warning**  
 - 100% preview → PSBT fidelity  
