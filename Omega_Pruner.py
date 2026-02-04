@@ -4812,270 +4812,280 @@ with gr.Blocks(
     """)
 	
     gr.HTML("""
-<style id="omega-dark-nuke">
+        <style id="omega-dark-nuke">
 
-/* ── Absolute dark-mode background nuke ───────────────────────────── */
-.dark-mode html,
-.dark-mode body,
-.dark-mode body > div,
-.dark-mode #root,
-.dark-mode .app {
-    background: #000000 !important;
-}
+            /* ── Absolute dark-mode background nuke ───────────────────────────── */
+            .dark-mode html,
+            .dark-mode body,
+            .dark-mode body > div,
+            .dark-mode #root,
+            .dark-mode .app {
+                background: #000000 !important;
+            }
 
-/* ── Root canvas ─────────────────────────────────────────────────────────── */
-html, body {
-    margin: 0 !important;
-    padding: 0 !important;
-    height: 100% !important;
-    background: #000000 !important;
-}
+            /* ── Root canvas ─────────────────────────────────────────────────────────── */
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                height: 100% !important;
+                background: #000000 !important;
+            }
 
-/* ── Dark mode root ───────────────────────────────────────────────────────── */
-.dark-mode body,
-.dark-mode .gradio-container {
-    background: #000000 !important;
-    color: #00cc00 !important;
-}
+            /* ── Dark mode root ───────────────────────────────────────────────────────── */
+            .dark-mode body,
+            .dark-mode .gradio-container {
+                background: #000000 !important;
+                color: #00cc00 !important;
+            }
 
-/* ── Layout containers (STRUCTURE ONLY — NO PAINT) ───────────────────────── */
-.gradio-container,
-.gr-container,
-.gr-panel,
-.gr-form,
-.gr-box,
-.gr-group,
-.gr-column,
-.gr-row {
-    max-width: 1200px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    padding: 0 clamp(16px, 4vw, 32px) !important;
-    box-sizing: border-box !important;
-    background: transparent !important; /* ← critical fix */
-}
+            /* ── Layout containers (STRUCTURE ONLY — NO PAINT) ───────────────────────── */
+            .gradio-container,
+            .gr-container,
+            .gr-panel,
+            .gr-form,
+            .gr-box,
+            .gr-group,
+            .gr-column,
+            .gr-row {
+                max-width: 1200px !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+                padding: 0 clamp(16px, 4vw, 32px) !important;
+                box-sizing: border-box !important;
+                background: transparent !important; /* ← critical fix */
+            }
 
-/* ── Dark mode elements ───────────────────────────────────────────────────── */
-.dark-mode,
-.dark-mode .gr-textbox,
-.dark-mode .gr-dropdown,
-.dark-mode textarea,
-.dark-mode input,
-.dark-mode .gr-button {
-    background: #000000 !important;
-    color: #00cc00 !important;
-    border-color: #f7931a !important;
-}
+            /* ── Dark mode elements ───────────────────────────────────────────────────── */
+            .dark-mode,
+            .dark-mode .gr-textbox,
+            .dark-mode .gr-dropdown,
+            .dark-mode textarea,
+            .dark-mode input,
+            .dark-mode .gr-button {
+                background: #000000 !important;
+                color: #00cc00 !important;
+                border-color: #f7931a !important;
+            }
 
-/* Dark mode button hover */
-.dark-mode .gr-button:hover {
-    background: #f7931a !important;
-    color: #000000 !important;
-    box-shadow: 0 0 25px rgba(247, 147, 26, 0.7);
-}
+            /* Dark mode button hover */
+            .dark-mode .gr-button:hover {
+                background: #f7931a !important;
+                color: #000000 !important;
+                box-shadow: 0 0 25px rgba(247, 147, 26, 0.7);
+            }
 
-/* Dark mode input focus */
-.dark-mode input:focus,
-.dark-mode textarea:focus,
-.dark-mode .gr-textbox:focus-within {
-    box-shadow: 0 0 12px rgba(0, 204, 0, 0.4) !important;
-    border-color: #00ff88 !important;
-}
+            /* Dark mode input focus */
+            .dark-mode input:focus,
+            .dark-mode textarea:focus,
+            .dark-mode .gr-textbox:focus-within {
+                box-shadow: 0 0 12px rgba(0, 204, 0, 0.4) !important;
+                border-color: #00ff88 !important;
+            }
 
-/* ── Checkbox (shared) ────────────────────────────────────────────────────── */
-input[type="checkbox"] {
-    width: clamp(28px, 6vw, 36px) !important;
-    height: clamp(28px, 6vw, 36px) !important;
-    appearance: none;
-    cursor: pointer;
-    border-radius: 8px !important;
-    border: 2px solid #f7931a !important;
-    background: #000000 !important;
-    box-shadow: 0 0 20px rgba(247, 147, 26, 0.6) !important;
-    position: relative;
-    transition: all 0.15s ease;
-}
+            /* ── Checkbox (shared) ────────────────────────────────────────────────────── */
+            input[type="checkbox"] {
+                width: clamp(28px, 6vw, 36px) !important;
+                height: clamp(28px, 6vw, 36px) !important;
+                appearance: none;
+                cursor: pointer;
+                border-radius: 8px !important;
+                border: 2px solid #f7931a !important;
+                background: #000000 !important;
+                box-shadow: 0 0 20px rgba(247, 147, 26, 0.6) !important;
+                position: relative;
+                transition: all 0.15s ease;
+            }
 
-input[type="checkbox"]:checked {
-    background: #00ff00 !important;
-    box-shadow: 0 0 30px #00ff00 !important;
-}
+            input[type="checkbox"]:checked {
+                background: #00ff00 !important;
+                box-shadow: 0 0 30px #00ff00 !important;
+            }
 
-input[type="checkbox"]:checked::after {
-    content: "✓";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #000000;
-    font-size: clamp(18px, 4vw, 24px) !important;
-    font-weight: 900;
-}
+            input[type="checkbox"]:checked::after {
+                content: "✓";
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #000000;
+                font-size: clamp(18px, 4vw, 24px) !important;
+                font-weight: 900;
+            }
 
-/* Light mode checkbox */
-body:not(.dark-mode) input[type="checkbox"] {
-    background: #ffffff !important;
-    border-color: #00aa55 !important;
-}
+            /* Light mode checkbox */
+            body:not(.dark-mode) input[type="checkbox"] {
+                background: #ffffff !important;
+                border-color: #00aa55 !important;
+            }
 
-body:not(.dark-mode) input[type="checkbox"]:checked {
-    background: #f7931a !important;
-}
-/* ───────────────────────────────────────────────────────────────
-   LIGHT MODE — CLEAN & FINAL
-   ─────────────────────────────────────────────────────────────── */
+            body:not(.dark-mode) input[type="checkbox"]:checked {
+                background: #f7931a !important;
+            }
 
-/* ── Canvas ──────────────────────────────────────────────────── */
-body:not(.dark-mode),
-body:not(.dark-mode) .gradio-container,
-body:not(.dark-mode) .gr-container,
-body:not(.dark-mode) .gr-panel {
-    background: #f6f7f8 !important;
-}
+            /* ───────────────────────────────────────────────────────────────
+               LIGHT MODE — CLEAN & FINAL
+               ─────────────────────────────────────────────────────────────── */
 
-/* ── Inputs, dropdowns, numbers ─────────────────────────────── */
-body:not(.dark-mode) input,
-body:not(.dark-mode) textarea,
-body:not(.dark-mode) select,
-body:not(.dark-mode) .gr-input,
-body:not(.dark-mode) .gr-textbox,
-body:not(.dark-mode) .gr-dropdown,
-body:not(.dark-mode) .gr-number {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-}
+            /* ── Canvas ──────────────────────────────────────────────────── */
+            body:not(.dark-mode),
+            body:not(.dark-mode) .gradio-container,
+            body:not(.dark-mode) .gr-container,
+            body:not(.dark-mode) .gr-panel {
+                background: #f6f7f8 !important;
+            }
 
-/* ── Inner Gradio wrappers (kill gray) ───────────────────────── */
-body:not(.dark-mode) .gr-dropdown > div,
-body:not(.dark-mode) .gr-number > div,
-body:not(.dark-mode) .gr-input > div,
-body:not(.dark-mode) .gr-textbox > div {
-    background-color: #ffffff !important;
-}
+            /* ── Inputs, dropdowns, numbers ─────────────────────────────── */
+            body:not(.dark-mode) input,
+            body:not(.dark-mode) textarea,
+            body:not(.dark-mode) select,
+            body:not(.dark-mode) .gr-input,
+            body:not(.dark-mode) .gr-textbox,
+            body:not(.dark-mode) .gr-dropdown,
+            body:not(.dark-mode) .gr-number {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
 
-/* ── Dropdown options ───────────────────────────────────────── */
-body:not(.dark-mode) select option {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-}
+            /* ── Inner Gradio wrappers (kill gray) ───────────────────────── */
+            body:not(.dark-mode) .gr-dropdown > div,
+            body:not(.dark-mode) .gr-number > div,
+            body:not(.dark-mode) .gr-input > div,
+            body:not(.dark-mode) .gr-textbox > div {
+                background-color: #ffffff !important;
+            }
 
-/* ── Placeholders ───────────────────────────────────────────── */
-body:not(.dark-mode) input::placeholder,
-body:not(.dark-mode) textarea::placeholder {
-    color: #000000 !important;
-    opacity: 1;
-}
+            /* ── Dropdown options ───────────────────────────────────────── */
+            body:not(.dark-mode) select option {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
 
-/* ── Focus ──────────────────────────────────────────────────── */
-body:not(.dark-mode) input:focus,
-body:not(.dark-mode) textarea:focus,
-body:not(.dark-mode) select:focus {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    outline: none !important;
-}
+            /* ── Placeholders ───────────────────────────────────────────── */
+            body:not(.dark-mode) input::placeholder,
+            body:not(.dark-mode) textarea::placeholder {
+                color: #000000 !important;
+                opacity: 1;
+            }
 
+            /* ── Focus ──────────────────────────────────────────────────── */
+            body:not(.dark-mode) input:focus,
+            body:not(.dark-mode) textarea:focus,
+            body:not(.dark-mode) select:focus {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                outline: none !important;
+            }
 
-/* ── Buttons ─────────────────────────────────────────────────── */
-body:not(.dark-mode) .gr-button {
-    background: #ededed !important;
-    color: #111111 !important;
-    border-color: #9a9a9a !important;
-}
+            /* ── Buttons ─────────────────────────────────────────────────── */
+            body:not(.dark-mode) .gr-button {
+                background: #ededed !important;
+                color: #111111 !important;
+                border-color: #9a9a9a !important;
+            }
 
-body:not(.dark-mode) .gr-button:hover {
-    background: #e2e2e2 !important;
-}
+            body:not(.dark-mode) .gr-button:hover {
+                background: #e2e2e2 !important;
+            }
 
-/* ── Hero readability fixes (LIGHT MODE ONLY) ─────────────────────── */
-body:not(.dark-mode) #omega-bg {
-    opacity: 0.55; /* let the Ω breathe but not overpower */
-}
+            /* ── Hero readability fixes (LIGHT MODE ONLY) ─────────────────────── */
+            body:not(.dark-mode) #omega-bg {
+                opacity: 0.55; /* let the Ω breathe but not overpower */
+            }
 
-body:not(.dark-mode) .hero-panel {
-    background: linear-gradient(
-        rgba(0, 0, 0, 0.55),
-        rgba(0, 0, 0, 0.35)
-    ) !important;
+            body:not(.dark-mode) .hero-panel {
+                background: linear-gradient(
+                    rgba(0, 0, 0, 0.55),
+                    rgba(0, 0, 0, 0.35)
+                ) !important;
 
-    backdrop-filter: blur(14px) !important;
-}
+                backdrop-filter: blur(14px) !important;
+            }
 
-/* Reduce white edge glow in light mode */
-body:not(.dark-mode) .hero-panel * {
-    text-shadow:
-        0 0 20px rgba(0,0,0,0.6),
-        0 0 40px rgba(0,0,0,0.4) !important;
-}
-/* ── DataFrame readability ────────────────────────────────────────────────── */
-.gr-dataframe td:nth-child(2),
-.gr-dataframe td:nth-child(3),
-.gr-dataframe td:nth-child(6) {
-    white-space: normal !important;
-    word-break: break-all !important;
-    font-family: "Courier New", monospace !important;
-    font-size: 0.95rem !important;
-    line-height: 1.4 !important;
-    padding: 10px 8px !important;
-}
+            /* Reduce white edge glow in light mode */
+            body:not(.dark-mode) .hero-panel * {
+                text-shadow:
+                    0 0 20px rgba(0,0,0,0.6),
+                    0 0 40px rgba(0,0,0,0.4) !important;
+            }
 
-.gr-dataframe td:hover {
-    background: rgba(0, 255, 136, 0.08) !important;
-}
+            /* ── DataFrame readability ────────────────────────────────────────────────── */
+            .gr-dataframe td:nth-child(2),
+            .gr-dataframe td:nth-child(3),
+            .gr-dataframe td:nth-child(6) {
+                white-space: normal !important;
+                word-break: break-all !important;
+                font-family: "Courier New", monospace !important;
+                font-size: 0.95rem !important;
+                line-height: 1.4 !important;
+                padding: 10px 8px !important;
+            }
 
-/* ── Input surface (readability anchor) ───────────────────────── */
-.input-surface {
-    border-radius: 14px;
-    padding: 18px 20px;
-    margin: 20px auto;
-}
+            .gr-dataframe td:hover {
+                background: rgba(0, 255, 136, 0.08) !important;
+            }
 
-/* ── Footer donation section ──────────────────────────────────────────────── */
-.footer-donation {
-    background: rgba(0, 0, 0, 0.45) !important;
-	backdrop-filter: blur(10px);
-    border-top: 2px solid #f7931a !important;
-}
+            /* ── Input surface (readability anchor) ───────────────────────── */
+            .input-surface {
+                border-radius: 14px;
+                padding: 18px 20px;
+                margin: 20px auto;
+            }
 
-.footer-donation,
-.footer-donation * {
-    color: #e6e6e6 !important;
-}
+            /* ── Footer donation section ──────────────────────────────────────────────── */
+            .footer-donation {
+                background: rgba(0, 0, 0, 0.45) !important;
+                backdrop-filter: blur(10px);
+                border-top: 2px solid #f7931a !important;
+            }
 
-.footer-donation strong {
-    color: #f7931a !important;
-}
+            .footer-donation,
+            .footer-donation * {
+                color: #e6e6e6 !important;
+            }
 
-.footer-donation span {
-    color: #cccccc !important;
-}
+            .footer-donation strong {
+                color: #f7931a !important;
+            }
 
-/* Light mode footer */
-body:not(.dark-mode) .footer-donation {
-    background: rgba(255, 255, 255, 0.86) !important;
-    backdrop-filter: blur(4px);
-	box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    border-top: 2px solid #c77c00 !important;
-}
+            .footer-donation span {
+                color: #cccccc !important;
+            }
 
-body:not(.dark-mode) .footer-donation,
-body:not(.dark-mode) .footer-donation * {
-    color: #111111 !important;
-}
+            /* Light mode footer */
+            body:not(.dark-mode) .footer-donation {
+                background: rgba(255, 255, 255, 0.86) !important;
+                backdrop-filter: blur(4px);
+                box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+                border-top: 2px solid #c77c00 !important;
+            }
 
-body:not(.dark-mode) .footer-donation strong {
-    color: #c77c00 !important;
-}
+            body:not(.dark-mode) .footer-donation,
+            body:not(.dark-mode) .footer-donation * {
+                color: #111111 !important;
+            }
 
-.footer-donation button {
-    color: #f7931a !important;
-}
+            body:not(.dark-mode) .footer-donation strong {
+                color: #c77c00 !important;
+            }
 
-body:not(.dark-mode) .footer-donation button {
-    color: #c77c00 !important;
-}
+            .footer-donation button {
+                color: #f7931a !important;
+            }
 
-</style>
+            body:not(.dark-mode) .footer-donation button {
+                color: #c77c00 !important;
+            }
+			
+        /* Force the table container to allow sticky */
+        .gr-dataframe {
+            overflow-x: auto !important;          /* enable horizontal scroll */
+            position: relative !important;        /* sticky needs a positioned parent */
+        }
+
+        .gr-dataframe table {
+            width: max-content !important;        /* prevent squishing */
+        }
+    </style>
 """)
 	
     # Dynamic network conditions badge (populated by load or timer)
@@ -5242,7 +5252,7 @@ body:not(.dark-mode) .footer-donation button {
                     Optimized for Modern Bitcoin
                 </div>
 
-                This is a <strong style="color:#00ffff !important;font-weight:900 !important;">single-sig tool</strong>
+                This is a <strong style="color:#00ffff !important;font-weight:900 !important;">single-sig tool demo</strong>
                 with strong emphasis on
                 <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>
                 and
@@ -5518,45 +5528,45 @@ body:not(.dark-mode) .footer-donation button {
             <div class="check-to-consolidate-header">
                 <div class="header-title">CHECK TO CONSOLIDATE</div>
                 <div class="header-subtitle">Pre-checked = recommended • OPTIMAL = ideal • DUST/HEAVY = consolidate
-				<br>
-                Age column is secondary context: green (old) = safest, red (fresh) = highest CIOH risk if consolidated
+                    <br>
+                    Age column is secondary context: green (old) = safest, red (fresh) = highest CIOH risk if consolidated
                 </div>
             </div>
 
             <style>
-            .check-to-consolidate-header {
-                text-align: center;
-                margin-bottom: 8px;
-            }
+                .check-to-consolidate-header {
+                    text-align: center;
+                    margin-bottom: 8px;
+                }
 
-            /* Dark mode */
-            .dark-mode .check-to-consolidate-header .header-title {
-                color: #00ff88;
-                font-size: clamp(1.2rem, 5vw, 1.4rem);
-                font-weight: 900;
-                text-shadow: 0 0 20px #00ff88;
-                letter-spacing: 1px;
-            }
+                /* Dark mode */
+                .dark-mode .check-to-consolidate-header .header-title {
+                    color: #00ff88;
+                    font-size: clamp(1.2rem, 5vw, 1.4rem);
+                    font-weight: 900;
+                    text-shadow: 0 0 20px #00ff88;
+                    letter-spacing: 1px;
+                }
 
-            .dark-mode .check-to-consolidate-header .header-subtitle {
-                color: #aaffaa;
-                font-size: clamp(0.95rem, 3.5vw, 1.1rem);
-                margin-top: 8px;
-            }
+                .dark-mode .check-to-consolidate-header .header-subtitle {
+                    color: #aaffaa;
+                    font-size: clamp(0.95rem, 3.5vw, 1.1rem);
+                    margin-top: 8px;
+                }
 
-            /* Light mode — softer, readable colors */
-            body:not(.dark-mode) .check-to-consolidate-header .header-title {
-                color: #008844;
-                font-size: clamp(1.2rem, 5vw, 1.4rem);
-                font-weight: 900;
-                letter-spacing: 1px;
-            }
+                /* Light mode — softer, readable colors */
+                body:not(.dark-mode) .check-to-consolidate-header .header-title {
+                    color: #008844;
+                    font-size: clamp(1.2rem, 5vw, 1.4rem);
+                    font-weight: 900;
+                    letter-spacing: 1px;
+                }
 
-            body:not(.dark-mode) .check-to-consolidate-header .header-subtitle {
-                color: #006633;
-                font-size: clamp(0.95rem, 3.5vw, 1.1rem);
-                margin-top: 8px;
-            }
+                body:not(.dark-mode) .check-to-consolidate-header .header-subtitle {
+                    color: #006633;
+                    font-size: clamp(0.95rem, 3.5vw, 1.1rem);
+                    margin-top: 8px;
+                }
             </style>
         """)
 
@@ -5570,10 +5580,10 @@ body:not(.dark-mode) .footer-donation button {
                 "Address",
                 "Weight (wu)",
                 "Type",
-				"Age",
+                "Age",
                 "vout",
             ],
-            datatype=["bool", "str", "str", "html", "number", "str", "number", "html", "html","number"],
+            datatype=["bool", "str", "str", "html", "number", "str", "number", "html", "html", "number"],
             type="array",
             interactive=True,
             wrap=True,
@@ -5582,9 +5592,10 @@ body:not(.dark-mode) .footer-donation button {
             max_chars=None,
             label=" ",
             static_columns=[1, 2, 3, 4, 5, 6, 7, 8, 9],  # 0-based index — CONSOLIDATION is editable
-            column_widths=["120px", "380", "380px", "120px", "140px", "380px", "130px", "105px", "110px","80px"]
+            column_widths=["120px", "380", "380px", "120px", "140px", "380px", "130px", "105px", "110px", "80px"]
         )
 
+    
         gr.HTML("""
             <script>
                 // Simple click-to-expand for TXID cells (very long TXIDs)
