@@ -708,7 +708,8 @@ def load_selection(
         log.info("[RESTORE] Building table directly from snapshot JSON (authoritative)")
         restored_utxos = []
         missing_address_count = 0
-        MAX_SATS = 21_000_000 * 100_000_000  # 21 million BTC cap
+        invalid_address_count = 0
+        MAX_SATS = 21_000_000 * 100_000_000
 
         for inp in parsed_snapshot.get("inputs", []):
             if not isinstance(inp, dict) or "txid" not in inp or "vout" not in inp:
@@ -719,68 +720,79 @@ def load_selection(
                 txid = str(inp["txid"]).lower().strip()
                 vout = int(inp["vout"])
 
-                # Safe value parsing
                 value_raw = inp.get("value", 0)
-                log.debug(
-                    "[RESTORE] Raw 'value' from JSON for %s:%d → %s (type=%s)",
-                    txid[:12], vout, value_raw, type(value_raw)
-                )
-
                 if isinstance(value_raw, str):
                     value_raw = value_raw.replace(",", "").strip()
-                    if "E" in value_raw.upper() or "e" in value_raw:
-                        try:
-                            value = int(float(value_raw))
-                        except Exception as e:
-                            log.warning("[RESTORE] Invalid scientific value '%s': %s", value_raw, e)
-                            value = 0
-                    else:
-                        value = int(value_raw)
-                else:
-                    value = int(value_raw)
+                value = int(value_raw)
 
-                if value <= 0:
-                    log.warning("[RESTORE] Skipping UTXO with invalid/zero value: %s", value_raw)
+                if value <= 0 or value > MAX_SATS * 10:
+                    log.warning("[RESTORE] Invalid value %s for %s:%d", value_raw, txid[:12], vout)
                     continue
 
-                # Sanity cap — prevent insane numbers from breaking everything
-                if value > MAX_SATS * 10:
-                    log.error(
-                        "[RESTORE] Impossible UTXO value: %d sats (txid=%s vout=%d) — skipping",
-                        value, txid[:12], vout
-                    )
-                    continue
+                addr = (inp.get("address") or "").strip()
+                source = inp.get("source", "Restored from snapshot")
 
                 utxo = {
                     "txid": txid,
                     "vout": vout,
                     "value": value,
-                    "address": inp.get("address", ""),
-                    "script_type": inp.get("script_type", "unknown"),
-                    "health": inp.get("health", "UNKNOWN"),
-                    "source": inp.get("source", "Restored from snapshot"),
-                    "selected": True,
-                    "scriptPubKey": b"",  # default — filled below if possible
+                    "address": addr,
+                    "source": source,
+                    "selected": True,  # default
                 }
 
-                # Derive scriptPubKey, weight, corrected type if address present
-                addr = utxo["address"].strip()
-                if addr:
-                    script_pubkey, meta = address_to_script_pubkey(addr)
-                    utxo["scriptPubKey"] = script_pubkey
-                    utxo["input_weight"] = meta.get("input_vb", 68) * 4
-                    utxo["script_type"] = meta.get("type", utxo["script_type"])
-                else:
+                # Re-validate & enrich
+                if not addr:
+                    utxo.update({
+                        "health": "NO_ADDRESS",
+                        "recommend": "Missing address",
+                        "script_type": "UNKNOWN",
+                        "scriptPubKey": b"",
+                        "input_weight": 0,
+                        "is_legacy": False,
+                        "error": "No address in snapshot",
+                    })
                     missing_address_count += 1
-                    log.warning(
-                        "[RESTORE] UTXO missing address (no scriptPubKey): %s:%d",
-                        txid[:12], vout
-                    )
+                else:
+                    try:
+                        script_pubkey, meta = address_to_script_pubkey(addr)
+                        input_weight = meta.get("input_vb", 68) * 4
+                        script_type_from_meta = meta.get("type", "")
+
+                        script_type, health, recommend, is_legacy = _classify_utxo(
+                            value, input_weight, script_type_from_meta
+                        )
+
+                        if script_type.upper() in ("TAPROOT", "P2TR"):
+                            script_type = "Taproot"
+
+                        utxo.update({
+                            "scriptPubKey": script_pubkey,
+                            "input_weight": input_weight,
+                            "script_type": script_type,
+                            "health": health,
+                            "recommend": recommend,
+                            "is_legacy": is_legacy,
+                            "script_type_inferred": False,
+                            "tap_internal_key": None,
+                        })
+
+                    except ValueError as e:
+                        invalid_address_count += 1
+                        utxo.update({
+                            "health": "INVALID",
+                            "recommend": "INVALID ADDRESS",
+                            "script_type": "INVALID",
+                            "scriptPubKey": b"",
+                            "input_weight": 0,
+                            "is_legacy": False,
+                            "error": str(e),
+                        })
 
                 restored_utxos.append(utxo)
 
             except (ValueError, TypeError) as e:
-                log.warning("[RESTORE] Skipping malformed UTXO in snapshot: %s", e)
+                log.warning("[RESTORE] Skipping malformed UTXO: %s", e)
                 continue
 
         if not restored_utxos:
@@ -788,103 +800,55 @@ def load_selection(
             return (
                 current_enriched,
                 "Snapshot contains no usable UTXOs",
-                None,
-                False,
-                False,
-                "failed",
-                "",
-                "",
+                None, False, False, "failed", "", "",
                 "Recommended — ~40% consolidated (balanced savings & privacy)",
                 546
             )
 
-        # ── Safety block: prevent restore if any UTXO is missing address ───────
-        if missing_address_count > 0:
+        # ── Safety block ─────────────────────────────────────────────────────────
+        total_problematic = missing_address_count + invalid_address_count
+        if total_problematic > 0:
+            details = []
+            if missing_address_count:
+                details.append(f"{missing_address_count} missing address(es)")
+            if invalid_address_count:
+                details.append(f"{invalid_address_count} invalid address(es)")
+
             return (
                 current_enriched,
                 f"""
-                <div style="
-                    color: #ffffff !important;
-                    padding: 28px !important;
-                    background: #550000 !important;
-                    border: 4px solid #ff4444 !important;
-                    border-radius: 16px !important;
-                    text-align: center !important;
-                    font-weight: 700 !important;
-                    box-shadow: 0 0 35px rgba(255,68,68,0.7) !important;
-                    max-width: 95% !important;
-                    margin: 20px auto !important;
-                ">
-                    <div style="
-                        font-size: 1.8rem !important;
-                        margin-bottom: 20px !important;
-                        color: #ffff88 !important;
-                        text-shadow: 0 0 16px #ffff88 !important;
-                    ">
-                        RESTORE BLOCKED — SAFETY TRIGGERED
-                    </div>
-
-                    <span style="font-size: 1.3rem !important; line-height: 1.6 !important;">
-                        <span style="font-weight:900 !important; color: #ffea99 !important;">
-                            {missing_address_count} UTXO(s) are missing their Bitcoin address
-                        </span><br><br>
-
-                        <span style="font-weight:900 !important;">
-                            Cannot safely derive scriptPubKey → PSBT generation would fail.
-                        </span><br><br>
-
-                        <span style="font-weight:800 !important; color: #ffdddd !important; font-size: 1.15rem !important;">
-                            Solution: Click ANALYZE again using the original address list.
-                        </span>
-                    </span>
-
-                    <div style="
-                        margin-top: 24px !important;
-                        font-size: 1.05rem !important;
-                        color: #ffbbbb !important;
-                        opacity: 0.95 !important;
-                    ">
-                        This block exists to prevent creating an invalid or dangerous PSBT.
-                    </div>
+                <div style="...">  <!-- your existing red blocked HTML -->
+                    RESTORE BLOCKED — SAFETY TRIGGERED<br><br>
+                    {', '.join(details)} detected.<br><br>
+                    Cannot safely derive scriptPubKey or proceed to PSBT.<br><br>
+                    <strong>Solution:</strong> Re-ANALYZE using original addresses.
                 </div>
                 """,
-                None,
-                False,
-                False,
-                "failed",
-                "",
-                "",
+                None, False, False, "failed", "", "",
                 "Recommended — ~40% consolidated (balanced savings & privacy)",
                 546
             )
 
-        # ── SORT by consolidation priority ────────────────────────────────────────────
-        # DUST/HEAVY first (lowest HEALTH_PRIORITY), then highest value
+        # ── Sort by priority ─────────────────────────────────────────────────────
         restored_utxos.sort(
             key=lambda u: (
-                HEALTH_PRIORITY.get(u.get("health", "UNKNOWN"), 999),  # low number = consolidate first
-                -u.get("value", 0)                                     # descending value
+                HEALTH_PRIORITY.get(u.get("health", "UNKNOWN"), 999),
+                -u.get("value", 0)
             )
         )
         log.info(
-            "[RESTORE] Sorted %d UTXOs: consolidation priority (DUST/HEAVY top), then value descending",
-            len(restored_utxos)
+            "[RESTORE] Sorted %d UTXOs (missing: %d, invalid: %d)",
+            len(restored_utxos), missing_address_count, invalid_address_count
         )
 
-        # Metadata from snapshot
+        # Metadata
         scan_source_restored = parsed_snapshot.get("scan_source", "")
         dest_restored = parsed_snapshot.get("dest_addr_override", "")
         strategy_restored = parsed_snapshot.get(
-            "strategy",
-            "Recommended — ~40% consolidated (balanced savings & privacy)"
+            "strategy", "Recommended — ~40% consolidated (balanced savings & privacy)"
         )
         dust_threshold_restored = parsed_snapshot.get("dust_threshold", 546)
         fingerprint = parsed_snapshot.get("fingerprint")
-
-        log.info(
-            "[RESTORE] Successfully restored %d UTXOs from JSON (missing addresses: %d)",
-            len(restored_utxos), missing_address_count
-        )
 
         meta = {
             "strategy": strategy_restored,
@@ -895,70 +859,15 @@ def load_selection(
 
         return_tuple = (meta, tuple(restored_utxos))
 
-        # ── Build success message ──────────────────────────────────────────────────
+        # ── Success message ──────────────────────────────────────────────────────
         message = (
-            "<div style='"
-            "    margin: 20px auto !important; "
-            "    padding: 30px !important; "
-            "    max-width: 95% !important; "
-            "    background: rgba(0, 18, 35, 0.7) !important; "
-            "    border: 3px solid #00ffcc !important; "
-            "    border-radius: 16px !important; "
-            "    text-align: center !important; "
-            "    box-shadow: 0 0 35px rgba(0, 255, 204, 0.45) !important; "
-            "    color: #ccffeb !important;"
-            "'>"
-            
-            "    <span style='"
-            "        color: #00ffdd !important; "
-            "        font-size: 1.6rem !important; "
-            "        font-weight: 900 !important; "
-            "        text-shadow: 0 0 18px #00ffdd80 !important; "
-            "        letter-spacing: 1px !important;"
-            "    '>"
-            f"        Table restored from snapshot — {len(restored_utxos)} UTXOs loaded!"
-            "    </span><br>"
-            
-            "    <small style='"
-            "        color: #aaffff !important; "
-            "        font-size: 1rem !important; "
-            "        text-shadow: 0 0 8px rgba(170, 255, 255, 0.5) !important;"
-            "    '>"
-            "        Selection, strategy, dust threshold and metadata fully recovered.<br>"
-            "        Ready to generate PSBT — no ANALYZE needed."
-            "    </small>"
-            "    </div>"
+            "<div style='...'>"  # your existing green success div
+            f"Table restored from snapshot — {len(restored_utxos)} UTXOs loaded!"
+            "<br><small style='color:#aaffff;'>"
+            "Selection, strategy, dust threshold and metadata recovered.<br>"
+            "All addresses re-validated — ready for PSBT."
+            "</small></div>"
         )
-
-        # Warning for missing addresses (now correctly indented under message)
-        if missing_address_count:
-            message += (
-                "<br><br><div style='"
-                "        color: #ffea99 !important; "
-                "        font-weight: 900 !important; "
-                "        background: rgba(255, 180, 0, 0.18) !important; "
-                "        padding: 16px !important; "
-                "        border: 2px solid #ffcc66 !important; "
-                "        border-radius: 10px !important; "
-                "        text-shadow: 0 0 10px rgba(255, 204, 102, 0.6) !important;"
-                "        box-shadow: 0 0 20px rgba(255, 153, 0, 0.3) !important;"
-                "    '>"
-                f"        <span style='color: #ff5555 !important; font-size: 1.1rem; font-weight:900 !important;'>"
-                f"            RESTORE BLOCKED FOR SAFETY"
-                f"        </span><br><br>"
-                f"        <span style='font-weight:900 !important;'>"
-                f"            {missing_address_count} input(s) missing address field in the JSON file."
-                f"        </span><br><br>"
-                "        This usually means the file was edited manually or corrupted.<br>"
-                "        PSBTs cannot be safely created without addresses.<br><br>"
-                "        <span style='font-weight:900 !important;'>"
-                "            Recommended: Re-ANALYZE using the original addresses."
-                "        </span><br>"
-                "        <span style='font-weight:700 !important; opacity: 0.9;'>"
-                "            (If you believe this is a bug in the tool, please report it.)"
-                "        </span>"
-                "    </div>"
-            )
 
         if fingerprint:
             message += (
@@ -979,7 +888,7 @@ def load_selection(
             strategy_restored,
             dust_threshold_restored
         )
-
+		
     except Exception as e:
         log.error("[RESTORE] Failed to process snapshot: %s", str(e), exc_info=True)
         return (
@@ -998,15 +907,15 @@ def load_selection(
 # ── Rebuild DataFrame rows from enriched state (for restore / refresh) ───────────
 def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
     """
-    Rebuild DataFrame rows from enriched_state for display.
-    Handles legacy/nested disabling, preserves saved 'selected' flags,
+    Rebuild DataFrame rows from enriched_state for display (e.g. after restore or refresh).
+    Handles legacy/nested/invalid disabling, preserves saved 'selected' flags (unless overridden),
     and flags unsupported types for UX warnings.
     Returns (rows, has_unsupported)
     """
     if not enriched_state:
         return [], False
 
-    # Normalize to list of dicts
+    # Normalize to list of dicts (handles both tuple and direct list cases)
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
         _, utxos = enriched_state
         state_list = list(utxos) if isinstance(utxos, (list, tuple)) else []
@@ -1015,7 +924,7 @@ def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
     else:
         return [], False
 
-    rows = []
+    rows: List[List] = []
     has_unsupported = False
 
     for u in state_list:
@@ -1026,65 +935,82 @@ def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
         selected = bool(u.get("selected", False))
         inferred = bool(u.get("script_type_inferred", False))
         is_legacy = bool(u.get("is_legacy", False))
+        health = u.get("health", "UNKNOWN")
+        error_msg = u.get("error", "")
 
-        # Force legacy unselected (safety + UX)
-        if is_legacy:
+        # ── Priority 1: Invalid / Error / No Address ─────────────────────────────
+        if health in ("INVALID", "ERROR", "NO_ADDRESS"):
+            has_unsupported = True
+            health_html = (
+                f'<div class="health health-invalid" style="color:#ff4444;font-weight:bold;background:rgba(255,68,68,0.25);padding:8px;border-radius:8px;">'
+                f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ {health}</span><br>'
+                f'<small style="font-size:clamp(0.8rem,3vw,0.9rem);">{error_msg[:80] or "Invalid entry"}</small>'
+                '</div>'
+            )
+            display_type = "Invalid / Error"
+            selected = False  # force unchecked
+
+        # ── Priority 2: Legacy ───────────────────────────────────────────────────
+        elif is_legacy or script_type in ("P2PKH", "Legacy"):
+            has_unsupported = True
             selected = False
-            has_unsupported = True
+            health_html = (
+                '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;background:rgba(255,68,68,0.12);padding:6px;border-radius:6px;">'
+                '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
+                '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported for PSBT – migrate first</small>'
+                '</div>'
+            )
+            display_type = "Legacy"
 
-        supported = script_type in ("P2WPKH", "Taproot", "P2TR")
-
-        # Health badge
-        if not supported or is_legacy:
+        # ── Priority 3: Nested SegWit ────────────────────────────────────────────
+        elif script_type in ("P2SH-P2WPKH", "Nested"):
             has_unsupported = True
-            if is_legacy or script_type in ("P2PKH", "Legacy"):
+            selected = False
+            health_html = (
+                '<div class="health health-nested" style="color:#ff9900;font-weight:bold;background:rgba(255,153,0,0.12);padding:6px;border-radius:6px;">'
+                '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
+                '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported yet</small>'
+                '</div>'
+            )
+            display_type = "Nested SegWit"
+
+        # ── Priority 4: Supported modern types ───────────────────────────────────
+        else:
+            supported = script_type in ("P2WPKH", "Taproot", "P2TR")
+            if not supported:
+                has_unsupported = True
                 health_html = (
-                    '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;background:rgba(255,68,68,0.12);padding:6px;border-radius:6px;">'
-                    '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
-                    '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported for PSBT – migrate first</small>'
-                    '</div>'
-                )
-            elif script_type in ("P2SH-P2WPKH", "Nested"):
-                health_html = (
-                    '<div class="health health-nested" style="color:#ff9900;font-weight:bold;background:rgba(255,153,0,0.12);padding:6px;border-radius:6px;">'
-                    '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
-                    '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported yet</small>'
-                    '</div>'
-                )
-            else:
-                health = u.get("health", "UNKNOWN")
-                health_html = (
-                    f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
+                    f'<div class="health health-unknown" style="padding:6px;border-radius:6px;">'
                     f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
                     f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Cannot consolidate</small>'
                     '</div>'
                 )
-        else:
-            health = u.get("health", "OPTIMAL")
-            recommend = u.get("recommend", "")
-            health_html = (
-                f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
-                f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
-                f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">{recommend}</small>'
-                '</div>'
-            )
+            else:
+                recommend = u.get("recommend", "")
+                health_html = (
+                    f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
+                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
+                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">{recommend}</small>'
+                    '</div>'
+                )
 
-        # Friendly type display
-        display_type_map = {
-            "P2WPKH": "Native SegWit",
-            "Taproot": "Taproot",
-            "P2TR": "Taproot",
-            "P2SH-P2WPKH": "Nested SegWit",
-            "P2PKH": "Legacy",
-            "Legacy": "Legacy",
-        }
-        display_type = display_type_map.get(script_type, script_type)
+            # Friendly type display for supported
+            display_type_map = {
+                "P2WPKH": "Native SegWit",
+                "Taproot": "Taproot",
+                "P2TR": "Taproot",
+            }
+            display_type = display_type_map.get(script_type, script_type)
 
+        # ── Common display_type enhancements ─────────────────────────────────────
         if inferred:
             display_type += ' <span style="color:#00cc66;font-weight:bold;">[inferred]</span>'
         if is_legacy:
             display_type += ' <span style="color:#ff6666;font-weight:bold;">[legacy – disabled]</span>'
+        if health in ("INVALID", "ERROR", "NO_ADDRESS"):
+            display_type += ' <span style="color:#ff4444;font-weight:bold;">[invalid]</span>'
 
+        # ── Build row ────────────────────────────────────────────────────────────
         rows.append([
             selected,
             u.get("source", "Single"),
@@ -1094,7 +1020,7 @@ def rebuild_df_rows(enriched_state: Any) -> tuple[List[List], bool]:
             u.get("address", "unknown"),
             u.get("input_weight", 0),
             display_type,
-			get_utxo_age_display(u.get("confirmed_at")),
+            get_utxo_age_display(u.get("confirmed_at")),
             u.get("vout", 0),
         ])
 
@@ -1521,9 +1447,12 @@ def address_to_script_pubkey(addr: str) -> tuple[bytes, dict]:
                     witness_version, len(prog), addr)
         return fallback_spk, fallback_meta
 
-    # ── Fallback for unrecognized format ───────────────────────────────────────
-    log.warning("Unrecognized address format: %s", addr)
-    return fallback_spk, fallback_meta
+       # ── Fallback for unrecognized format ───────────────────────────────────────
+    raise ValueError(
+        f"Unrecognized or invalid Bitcoin mainnet address format: '{addr}'\n"
+        "Only supports: bc1q… (P2WPKH), bc1p… (P2TR/Taproot), 1… (P2PKH), 3… (P2SH)\n"
+        "Check typing, network (must be mainnet), or copy-paste error."
+    )
 	
 # =========================
 # Transaction Economics (Single Source of Truth)
@@ -2008,34 +1937,82 @@ def _classify_utxo(
 
 
 def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
+    """
+    Enrich raw UTXOs with scriptPubKey, weight, health classification, etc.
+    Invalid addresses are marked clearly and skipped from normal processing.
+    """
     enriched = []
 
     for u in raw_utxos:
-        addr = u.get("address", "")
+        addr = u.get("address", "").strip()
 
-        script_pubkey, meta = address_to_script_pubkey(addr)
-        input_weight = meta.get("input_vb", 68) * 4
+        # Safety: skip entries with no address entirely
+        if not addr:
+            log.warning("UTXO missing address field — skipping")
+            enriched.append({
+                **u,
+                "input_weight": 0,
+                "health": "NO_ADDRESS",
+                "recommend": "Missing address",
+                "script_type": "UNKNOWN",
+                "scriptPubKey": b"",
+                "is_legacy": False,
+                "error": "No address provided",
+            })
+            continue
 
-        script_type_from_meta = meta.get("type", "")
+        try:
+            script_pubkey, meta = address_to_script_pubkey(addr)
+            input_weight = meta.get("input_vb", 68) * 4
+            script_type_from_meta = meta.get("type", "")
 
-        script_type, health, recommend, is_legacy = _classify_utxo(
-            u["value"], input_weight, script_type_from_meta
-        )
+            script_type, health, recommend, is_legacy = _classify_utxo(
+                u["value"], input_weight, script_type_from_meta
+            )
 
-        if script_type.upper() in ("TAPROOT", "P2TR"):
-            script_type = "Taproot"
+            # Normalize Taproot naming
+            if script_type.upper() in ("TAPROOT", "P2TR"):
+                script_type = "Taproot"
 
-        enriched.append({
-            **u,                               # ← keeps "confirmed_at"
-            "input_weight": input_weight,
-            "health": health,
-            "recommend": recommend,
-            "script_type": script_type,
-            "script_type_inferred": u.get("script_type_inferred", False),
-            "scriptPubKey": script_pubkey,
-            "tap_internal_key": None,          # if Taproot
-            "is_legacy": is_legacy,
-        })
+            enriched.append({
+                **u,                               # keeps "confirmed_at", "txid", "vout", etc.
+                "input_weight": input_weight,
+                "health": health,
+                "recommend": recommend,
+                "script_type": script_type,
+                "script_type_inferred": u.get("script_type_inferred", False),
+                "scriptPubKey": script_pubkey,
+                "tap_internal_key": None,          # placeholder for future Taproot support
+                "is_legacy": is_legacy,
+            })
+
+        except ValueError as e:
+            # Invalid address → mark clearly, do NOT use dummy scriptPubKey
+            log.warning(f"Invalid address '{addr}': {e}")
+            enriched.append({
+                **u,
+                "input_weight": 0,
+                "health": "INVALID",
+                "recommend": "INVALID ADDRESS",
+                "script_type": "INVALID",
+                "scriptPubKey": b"",               # never return dummy
+                "is_legacy": False,
+                "error": str(e),
+            })
+
+        except Exception as e:
+            # Catch-all for unexpected errors (should be rare)
+            log.error(f"Unexpected error enriching UTXO {addr}: {e}", exc_info=True)
+            enriched.append({
+                **u,
+                "input_weight": 0,
+                "health": "ERROR",
+                "recommend": "Processing failed",
+                "script_type": "ERROR",
+                "scriptPubKey": b"",
+                "is_legacy": False,
+                "error": f"Unexpected: {str(e)}",
+            })
 
     return enriched
     
@@ -2108,8 +2085,8 @@ def _apply_consolidation_strategy(enriched: List[Dict], strategy: str) -> List[D
 def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
     """
     Convert enriched UTXOs into Gradio DataFrame rows.
-    - Forces legacy/nested unselected with strong warnings
-    - Preserves 'selected' from strategy or restore
+    - Forces legacy/nested/invalid unselected with strong warnings
+    - Preserves 'selected' from strategy or restore (unless overridden for safety)
     - Fully responsive health badges & type display
     Returns (rows, has_unsupported)
     """
@@ -2124,65 +2101,82 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
         selected = bool(u.get("selected", False))
         inferred = bool(u.get("script_type_inferred", False))
         is_legacy = bool(u.get("is_legacy", False))
+        health = u.get("health", "UNKNOWN")
+        error_msg = u.get("error", "")
 
-        # Force legacy unselected (safety + UX)
-        if is_legacy:
+        # ── Priority 1: Invalid / Error / No Address ─────────────────────────────
+        if health in ("INVALID", "ERROR", "NO_ADDRESS"):
+            has_unsupported = True
+            health_html = (
+                f'<div class="health health-invalid" style="color:#ff4444;font-weight:bold;background:rgba(255,68,68,0.25);padding:8px;border-radius:8px;">'
+                f'<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ {health}</span><br>'
+                f'<small style="font-size:clamp(0.8rem,3vw,0.9rem);">{error_msg[:80] or "Invalid entry"}</small>'
+                '</div>'
+            )
+            display_type = "Invalid / Error"
+            selected = False  # force unchecked
+
+        # ── Priority 2: Legacy ───────────────────────────────────────────────────
+        elif is_legacy or script_type in ("P2PKH", "Legacy"):
+            has_unsupported = True
+            selected = False  # unbreakable rule
+            health_html = (
+                '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;background:rgba(255,68,68,0.12);padding:6px;border-radius:6px;">'
+                '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
+                '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported in PSBT — migrate first</small>'
+                '</div>'
+            )
+            display_type = "Legacy"
+
+        # ── Priority 3: Nested SegWit ────────────────────────────────────────────
+        elif script_type in ("P2SH-P2WPKH", "Nested"):
+            has_unsupported = True
             selected = False
-            has_unsupported = True
+            health_html = (
+                '<div class="health health-nested" style="color:#ff9900;font-weight:bold;background:rgba(255,153,0,0.12);padding:6px;border-radius:6px;">'
+                '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
+                '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported yet</small>'
+                '</div>'
+            )
+            display_type = "Nested SegWit"
 
-        supported = script_type in ("P2WPKH", "Taproot", "P2TR")
-
-        # Health badge HTML
-        if not supported or is_legacy:
-            has_unsupported = True
-            if is_legacy or script_type in ("P2PKH", "Legacy"):
+        # ── Priority 4: Supported modern types ───────────────────────────────────
+        else:
+            supported = script_type in ("P2WPKH", "Taproot", "P2TR")
+            if not supported:
+                has_unsupported = True
                 health_html = (
-                    '<div class="health health-legacy" style="color:#ff4444;font-weight:bold;background:rgba(255,68,68,0.12);padding:6px;border-radius:6px;">'
-                    '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ LEGACY</span><br>'
-                    '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported in PSBT — migrate first</small>'
-                    '</div>'
-                )
-            elif script_type in ("P2SH-P2WPKH", "Nested"):
-                health_html = (
-                    '<div class="health health-nested" style="color:#ff9900;font-weight:bold;background:rgba(255,153,0,0.12);padding:6px;border-radius:6px;">'
-                    '<span style="font-size:clamp(1rem,4vw,1.2rem);">⚠️ NESTED</span><br>'
-                    '<small style="font-size:clamp(0.8rem,3vw,0.9rem);">Not supported yet</small>'
-                    '</div>'
-                )
-            else:
-                health = u.get("health", "UNKNOWN")
-                health_html = (
-                    f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
+                    f'<div class="health health-unknown" style="padding:6px;border-radius:6px;">'
                     f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
                     f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">Cannot consolidate</small>'
                     '</div>'
                 )
-        else:
-            health = u.get("health", "OPTIMAL")
-            recommend = u.get("recommend", "")
-            health_html = (
-                f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
-                f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
-                f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">{recommend}</small>'
-                '</div>'
-            )
+            else:
+                recommend = u.get("recommend", "")
+                health_html = (
+                    f'<div class="health health-{health.lower()}" style="padding:6px;border-radius:6px;">'
+                    f'<span style="font-size:clamp(1rem,4vw,1.2rem);">{health}</span><br>'
+                    f'<small style="font-size:clamp(0.85rem,3vw,0.95rem);">{recommend}</small>'
+                    '</div>'
+                )
 
-        # Friendly type display
-        display_type_map = {
-            "P2WPKH": "Native SegWit",
-            "Taproot": "Taproot",
-            "P2TR": "Taproot",
-            "P2SH-P2WPKH": "Nested SegWit",
-            "P2PKH": "Legacy",
-            "Legacy": "Legacy",
-        }
-        display_type = display_type_map.get(script_type, script_type)
+            # Friendly type display for supported
+            display_type_map = {
+                "P2WPKH": "Native SegWit",
+                "Taproot": "Taproot",
+                "P2TR": "Taproot",
+            }
+            display_type = display_type_map.get(script_type, script_type)
 
+        # ── Common enhancements to display_type ──────────────────────────────────
         if inferred:
             display_type += ' <span style="color:#00cc66;font-weight:bold;">[inferred]</span>'
         if is_legacy:
             display_type += ' <span style="color:#ff6666;font-weight:bold;">[legacy – disabled]</span>'
+        if health in ("INVALID", "ERROR", "NO_ADDRESS"):
+            display_type += ' <span style="color:#ff4444;font-weight:bold;">[invalid]</span>'
 
+        # ── Final row ────────────────────────────────────────────────────────────
         rows.append([
             selected,
             u.get("source", "Single"),
@@ -2192,7 +2186,7 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
             u.get("address", "unknown"),
             u.get("input_weight", 0),
             display_type,
-			get_utxo_age_display(u.get("confirmed_at")),
+            get_utxo_age_display(u.get("confirmed_at")),
             u.get("vout", 0),
         ])
 
@@ -4448,292 +4442,304 @@ with gr.Blocks(
 
     # ── Full-screen animated background + Hero Banner ───────────────────────────────
     gr.HTML("""
-        <div id="omega-bg" style="
-        position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100vh;
-        pointer-events: none;
-        z-index: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        background: transparent;
-    ">
-        <span class="omega-wrap" style="
-            display: inline-block;
-            animation: gradient-pulse 18s infinite ease-in-out,
-                       omega-spin 120s linear infinite;
-        ">
-            <span class="omega-symbol" style="
-                font-size: 100vh !important;
-                font-weight: 900;
-                background: linear-gradient(135deg, rgba(247,147,26,0.34), rgba(0, 120, 255,0.18));
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                color: transparent;
-                text-shadow:
-                    0 0 95px rgba(247,147,26,0.65),
-                    0 0 165px rgba(0, 120, 255,0.42);
-                animation: omega-breath 28s infinite ease-in-out;
-                user-select: none;
-                line-height: 1;
-                opacity: 0.985;
-            ">Ω</span>
-        </span>
-    </div>
-
-    <div style="
-        display: flex;
-        justify-content: center;
-        margin: clamp(8px, 2.5vw, 20px) auto 30px auto;
-    ">
-        <div class="hero-panel" style="
-            text-align: center;
-            padding: clamp(40px, 7vw, 70px) clamp(15px, 4vw, 30px) clamp(30px, 6vw, 50px);
-            background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
-            backdrop-filter: blur(10px);
-            border: clamp(4px, 2vw, 8px) solid #f7931a;
-            box-shadow: 
-                inset 0 0 80px rgba(0, 100, 255, 0.25),
-                inset 0 0 20px rgba(0, 120, 255, 0.15),
-                0 0 80px rgba(247,147,26,0.4);
-            border-radius: clamp(16px, 5vw, 24px);
-            max-width: 1200px;
-            width: 95vw;
-        ">
-            <!-- Reclaim Sovereignty -->
-            <div style="
-                color: #ffcc00;
-                font-size: clamp(2.8rem, 11vw, 5.2rem);
-                font-weight: 900;
-                letter-spacing: clamp(2px, 1.8vw, 12px);
-                text-shadow:
-                    0 0 50px #ffcc00,
-                    0 0 100px #ffaa00,
-                    0 0 150px rgba(255,204,0,0.9),
-                    -2px -2px 0 #ffffff,
-                    2px -2px 0 #ffffff,
-                    -2px  2px 0 #ffffff,
-                    2px  2px 0 #ffffff;
-                line-height: 1;
-                margin: 0 auto clamp(28px, 5.5vw, 44px) auto;
-                transform: translateX(-0.03em); /* optical centering */
+	            <div id="omega-bg" style="
+                position: fixed;
+                inset: 0;
+                width: 100vw;
+                height: 100vh;
+                pointer-events: none;
+                z-index: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+                background: transparent;
             ">
-                Reclaim Sovereignty
+                <span class="omega-wrap" style="
+                    display: inline-block;
+                    animation: gradient-pulse 18s infinite ease-in-out,
+                               omega-spin 120s linear infinite;
+                ">
+                    <span class="omega-symbol" style="
+                        font-size: 100vh !important;
+                        font-weight: 900;
+                        background: linear-gradient(135deg, rgba(247,147,26,0.34), rgba(0, 120, 255,0.18));
+                        -webkit-background-clip: text;
+                        -webkit-text-fill-color: transparent;
+                        background-clip: text;
+                        color: transparent;
+                        text-shadow:
+                            0 0 95px rgba(247,147,26,0.65),
+                            0 0 165px rgba(0, 120, 255,0.42);
+                        animation: omega-breath 28s infinite ease-in-out;
+                        user-select: none;
+                        line-height: 1;
+                        opacity: 0.985;
+                    ">Ω</span>
+                </span>
             </div>
 
-            <!-- ΩMEGA PRUNER -->
+               <!-- Hero container – full width, safe padding -->
             <div style="
-                color: #e65c00;
-                font-size: clamp(2.4rem, 9vw, 4.8rem);
-                font-weight: 900;
-                letter-spacing: clamp(2px, 1.5vw, 12px);
-                text-shadow:
-                    0 0 25px #e65c00,
-                    0 0 50px #c94a00,
-                    0 0 75px rgba(230,92,0,0.9),
-                    0 4px 12px rgba(220, 0, 60, 0.6),   /* small vertical drop for subtle depth */
-                    0 0 120px rgba(200, 0, 0, 0.4);
-                margin: 4px auto clamp(26px, 5.5vw, 44px) auto;
+                width: 100%;
+                max-width: min(95vw, 1200px);
+                margin: clamp(8px, 2.5vw, 20px) auto clamp(20px, 5vw, 30px) auto;
+                padding: 0 clamp(8px, 3vw, 16px);
+                box-sizing: border-box;
             ">
-                ΩMEGA PRUNER
+                <div class="hero-panel" style="
+                    text-align: center;
+                    padding: clamp(24px, 5vw, 48px) clamp(12px, 4vw, 24px);
+                    background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
+                    backdrop-filter: blur(10px);
+                    border: clamp(3px, 1.5vw, 6px) solid #f7931a;
+                    box-shadow: 
+                        inset 0 0 60px rgba(0, 100, 255, 0.25),
+                        inset 0 0 15px rgba(0, 120, 255, 0.15),
+                        0 0 60px rgba(247,147,26,0.4);
+                    border-radius: clamp(12px, 4vw, 20px);
+                    width: 100%;
+                    box-sizing: border-box;
+                ">
+                    <!-- Reclaim Sovereignty -->
+                    <div style="
+                        color: #ffcc00;
+                        font-size: clamp(2.2rem, 9vw, 4.2rem);
+                        font-weight: 900;
+                        letter-spacing: clamp(1px, 1vw, 8px);
+                        line-height: 1.1;
+                        margin: 0 auto clamp(16px, 4vw, 32px) auto;
+                        max-width: 100%;
+                        word-break: break-word;
+                        overflow-wrap: break-word;
+                        text-align: center;
+                        text-shadow:
+                            0 0 50px #ffcc00,
+                            0 0 100px #ffaa00,
+                            0 0 150px rgba(255,204,0,0.9),
+                            -2px -2px 0 #ffffff,
+                            2px -2px 0 #ffffff,
+                            -2px  2px 0 #ffffff,
+                            2px  2px 0 #ffffff;
+                    ">
+                        Reclaim <span class="sovereignty-mobile">Sovereignty</span>
+                    </div>
+
+                    <!-- ΩMEGA PRUNER -->
+                    <div style="
+                        color: #e65c00;
+                        font-size: clamp(2.2rem, 9vw, 4.5rem);
+                        font-weight: 900;
+                        letter-spacing: clamp(2px, 1.5vw, 10px);
+                        text-shadow:
+                            0 0 25px #e65c00,
+                            0 0 50px #c94a00,
+                            0 0 75px rgba(230,92,0,0.9),
+                            0 4px 12px rgba(220, 0, 60, 0.6),
+                            0 0 120px rgba(200, 0, 0, 0.4);
+                        margin: 4px auto clamp(20px, 5vw, 36px) auto;
+                    ">
+                        ΩMEGA PRUNER
+                    </div>
+
+                    <!-- STRUCTURAL COIN CONTROL -->
+                    <div style="
+                        color: #0f0;
+                        font-size: clamp(1.6rem, 6.5vw, 3rem);
+                        font-weight: 900;
+                        letter-spacing: clamp(2px, 1vw, 6px);
+                        text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
+                        margin: clamp(16px, 4vw, 28px) 0;
+                    ">
+                        STRUCTURAL COIN CONTROL
+                    </div>
+
+                    <!-- Version -->
+                    <div style="
+                        color: #00ffaa;
+                        font-size: clamp(0.95rem, 3.5vw, 1.2rem);
+                        letter-spacing: clamp(1px, 0.8vw, 3px);
+                        text-shadow: 0 0 12px #00ffaa;
+                        margin: clamp(12px, 3vw, 20px) 0;
+                    ">
+                        FORGED ANEW — v11.1
+                    </div>
+
+                    <!-- Body text -->
+                    <div style="
+                        color: #ddd;
+                        font-size: clamp(1rem, 3.5vw, 1.3rem);
+                        line-height: 1.6;
+                        max-width: 900px;
+                        margin: clamp(20px, 5vw, 36px) auto;
+                        padding: 0 clamp(8px, 3vw, 16px);
+                    ">
+                        Consolidating isn’t just about saving sats today — it’s a deliberate step toward taking
+                        <strong style="color:#0f0;">full strategic control</strong> of your Bitcoin.<br><br>
+
+                        By consolidating inefficient UTXOs, you:<br>
+                        • <strong style="color:#00ff9d;">Slash fees</strong> during high-congestion periods<br>
+                        • <strong style="color:#00ff9d;">Reduce future costs</strong> with a cleaner UTXO set<br>
+                        • <strong style="color:#00ff9d;">Optimize your stack</strong> for speed, savings and privacy<br><br>
+
+                        <strong style="color:#f7931a; font-size: clamp(1.2rem, 4.5vw, 1.6rem); font-weight:900;">
+                            Consolidate smarter. Win forever.
+                        </strong>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div id="hero-arrow" style="
+                        font-size: clamp(2.2rem, 6.5vw, 3.8rem);
+                        color: #f7931a;
+                        opacity: 0;
+                        margin-top: clamp(16px, 4vw, 32px);
+                        animation: 
+                            arrow-fade-in 1.8s ease-out forwards,
+                            arrow-pulse-bounce 5s ease-in-out infinite 2s;
+                        text-shadow: 0 0 30px #f7931a, 0 0 60px #f7931a;
+                    ">
+                        ↓
+                    </div>
+                </div>
             </div>
 
-            <!-- STRUCTURAL COIN CONTROL -->
-            <div style="
-                color: #0f0;
-                font-size: clamp(1.8rem, 7vw, 3.2rem);
-                font-weight: 900;
-                letter-spacing: clamp(3px, 1.2vw, 6px);
-                text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
-                margin: clamp(20px, 5vw, 35px) 0;
-            ">
-                STRUCTURAL COIN CONTROL
-            </div>
+            <style>
+                /* Global overflow safety – prevents body horizontal scroll */
+                html, body, .gradio-container {
+                    overflow-x: hidden !important;
+                    width: 100vw !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
 
-            <!-- Version -->
-            <div style="
-                color: #00ffaa;
-                font-size: clamp(1rem, 3.5vw, 1.2rem);
-                letter-spacing: clamp(1px, 0.8vw, 3px);
-                text-shadow: 0 0 12px #00ffaa;
-                margin: clamp(15px, 4vw, 25px) 0;
-            ">
-                FORGED ANEW — v11.1
-            </div>
+                @media (max-width: 480px) {
+                    .sovereignty-mobile {
+                        font-size: clamp(1.8rem, 7vw, 3rem) !important;  /* much smaller on phones */
+                    }
+                }
 
-        <!-- Body text -->
-        <div style="
-            color: #ddd;
-            font-size: clamp(1.1rem, 3.8vw, 1.4rem);
-            line-height: 1.6;
-            max-width: 900px;
-            margin: clamp(30px, 6vw, 45px) auto;
-            padding: 0 clamp(10px, 3vw, 20px);
-        ">
-            Consolidating isn’t just about saving sats today — it’s a deliberate step toward taking
-            <strong style="color:#0f0;">full strategic control</strong> of your Bitcoin.<br><br>
+                /* Animations */
+                @keyframes arrow-fade-in {
+                    0%   { opacity: 0; transform: translateY(-40px) scale(0.8); }
+                    100% { opacity: 0.92; transform: translateY(0) scale(1); }
+                }
 
-            By consolidating inefficient UTXOs, you:<br>
-            • <strong style="color:#00ff9d;">Slash fees</strong> during high-congestion periods<br>
-            • <strong style="color:#00ff9d;">Reduce future costs</strong> with a cleaner UTXO set<br>
-            • <strong style="color:#00ff9d;">Optimize your stack</strong> for speed, savings and privacy<br><br>
+                @keyframes arrow-pulse-bounce {
+                    0%, 100% { transform: translateY(0) scale(1); opacity: 0.92; text-shadow: 0 0 30px #f7931a, 0 0 60px #f7931a; }
+                    50% { transform: translateY(12px) scale(1.08); opacity: 1.0; text-shadow: 0 0 50px #f7931a, 0 0 100px #f7931a; }
+                }
 
-            <strong style="color:#f7931a; font-size: clamp(1.3rem, 4.5vw, 1.7rem); font-weight:900;">
-                Consolidate smarter. Win forever.
-            </strong>
-        </div>
+                @keyframes omega-breath {
+                    0%, 100% { opacity: 0.78; transform: scale(0.97); }
+                    50% { opacity: 1.0; transform: scale(1.03); }
+                }
 
-        <!-- Arrow -->
-        <div id="hero-arrow" style="
-            font-size: clamp(2.5rem, 7vw, 4rem);
-            color: #f7931a;
-            opacity: 0;
-            margin-top: clamp(20px, 5vw, 40px);
-            animation: 
-                arrow-fade-in 1.8s ease-out forwards,
-                arrow-pulse-bounce 5s ease-in-out infinite 2s;
-            text-shadow: 0 0 30px #f7931a, 0 0 60px #f7931a;
-        ">
-            ↓
-        </div>
-    </div>
-</div>
+                @keyframes gradient-pulse {
+                    0%, 100% { transform: scale(0.97); }
+                    50% { transform: scale(1.03); }
+                }
 
-<style>
-    @keyframes arrow-fade-in {
-        0%   { opacity: 0; transform: translateY(-40px) scale(0.8); }
-        100% { opacity: 0.92; transform: translateY(0) scale(1); }
-    }
+                @keyframes omega-spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
 
-    @keyframes arrow-pulse-bounce {
-        0%, 100% { 
-            transform: translateY(0) scale(1); 
-            opacity: 0.92; 
-            text-shadow: 0 0 30px #f7931a, 0 0 60px #f7931a; 
-        }
-        50% { 
-            transform: translateY(12px) scale(1.08); 
-            opacity: 1.0; 
-            text-shadow: 0 0 50px #f7931a, 0 0 100px #f7931a; 
-        }
-    }
+                /* Fee button glow */
+                .fee-btn button:not(:disabled) {
+                    box-shadow: 0 0 20px rgba(247,147,26,0.6);
+                    animation: fee-glow 3s infinite alternate;
+                }
 
-    @keyframes pulse {
-        0%, 100% { transform: translateY(0); opacity: 0.8; }
-        50% { transform: translateY(20px); opacity: 1; }
-    }
+                .fee-btn button:disabled {
+                    box-shadow: none;
+                    animation: none;
+                    opacity: 0.35;
+                }
 
-        @keyframes omega-breath {
-            0%, 100% { opacity: 0.78; transform: scale(0.97); }
-            50% { opacity: 1.0; transform: scale(1.03); }
-        }
+                @keyframes fee-glow {
+                    from { box-shadow: 0 0 20px rgba(247,147,26,0.6); }
+                    to { box-shadow: 0 0 40px rgba(247,147,26,0.9); }
+                }
 
-        @keyframes gradient-pulse {
-            0%, 100% { transform: scale(0.97); }
-            50% { transform: scale(1.03); }
-        }
+                /* Slider halo */
+                .gr-slider::after {
+                    content: '';
+                    position: absolute;
+                    inset: -8px;
+                    border-radius: 12px;
+                    pointer-events: none;
+                    opacity: 0;
+                    box-shadow: 0 0 30px rgba(247,147,26,0.8);
+                    animation: slider-halo 3.5s infinite alternate;
+                    transition: opacity 0.5s;
+                }
 
-        @keyframes omega-spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+                .gr-slider:not(:has(input:disabled))::after { opacity: 1; }
+                .gr-slider:has(input:disabled)::after { opacity: 0; animation: none; }
 
-        .gradio-container {
-            position: relative;
-            z-index: 1;
-            background: transparent !important;
-        }
+                @keyframes slider-halo {
+                    from { box-shadow: 0 0 25px rgba(247,147,26,0.7); }
+                    to { box-shadow: 0 0 45px rgba(247,147,26,1); }
+                }
 
-        #omega-bg {
-            isolation: isolate;
-        }
+                /* Locked badge */
+                @keyframes badge-pulse {
+                    0%   { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
+                    50%  { transform: scale(1.15); box-shadow: 0 0 160px rgba(0,255,0,1); }
+                    100% { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
+                }
 
-        .omega-wrap {
-            will-change: transform;
-            animation-timing-function: linear;
-            transform-origin: 50% 52%;
-        }
+                @keyframes badge-entry {
+                    0%   { opacity: 0; transform: scale(0.4) translateY(-40px); }
+                    70%  { transform: scale(1.2); }
+                    100% { opacity: 1; transform: scale(1) translateY(0); }
+                }
 
-        .omega-symbol {
-            will-change: opacity;
-        }
+                .locked-badge {
+                    position: fixed;
+                    top: clamp(12px, 3vw, 24px);
+                    right: clamp(12px, 3vw, 24px);
+                    z-index: 9999;
+                    padding: clamp(12px, 4vw, 20px) clamp(32px, 8vw, 56px);
+                    background: #000;
+                    border: clamp(4px, 1.5vw, 8px) solid #f7931a;
+                    border-radius: 32px;
+                    box-shadow: 0 0 160px rgba(247,147,26,1);
+                    color: #ffaa00;
+                    text-shadow: 0 0 10px #ffaa00, 0 0 20px #ffaa00, 0 0 40px #ffaa00, 0 0 80px #ffaa00;
+                    font-weight: 900;
+                    font-size: clamp(1.8rem, 6vw, 2.8rem);
+                    letter-spacing: clamp(8px, 2vw, 14px);
+                    pointer-events: none;
+                    opacity: 0;
+                    animation: badge-entry 1s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
+                               badge-pulse 2.8s infinite alternate 1s;
+                }
 
-        /* Fee preset buttons glow */
-        .fee-btn button:not(:disabled) {
-            box-shadow: 0 0 20px rgba(247,147,26,0.6);
-            animation: fee-glow 3s infinite alternate;
-        }
+                /* Gradio container safety */
+                .gradio-container {
+                    position: relative;
+                    z-index: 1;
+                    background: transparent !important;
+                    width: 100vw !important;
+                    max-width: 100% !important;
+                    overflow-x: hidden !important;
+                }
 
-        .fee-btn button:disabled {
-            box-shadow: none;
-            animation: none;
-            opacity: 0.35;
-        }
+                #omega-bg {
+                    isolation: isolate;
+                }
 
-        @keyframes fee-glow {
-            from { box-shadow: 0 0 20px rgba(247,147,26,0.6); }
-            to { box-shadow: 0 0 40px rgba(247,147,26,0.9); }
-        }
+                .omega-wrap {
+                    will-change: transform;
+                    animation-timing-function: linear;
+                    transform-origin: 50% 52%;
+                }
 
-        /* Slider halo effect */
-        .gr-slider::after {
-            content: '';
-            position: absolute;
-            inset: -8px;
-            border-radius: 12px;
-            pointer-events: none;
-            opacity: 0;
-            box-shadow: 0 0 30px rgba(247,147,26,0.8);
-            animation: slider-halo 3.5s infinite alternate;
-            transition: opacity 0.5s;
-        }
-
-        .gr-slider:not(:has(input:disabled))::after { opacity: 1; }
-        .gr-slider:has(input:disabled)::after { opacity: 0; animation: none; }
-
-        @keyframes slider-halo {
-            from { box-shadow: 0 0 25px rgba(247,147,26,0.7); }
-            to { box-shadow: 0 0 45px rgba(247,147,26,1); }
-        }
-
-        /* Locked badge animation */
-        @keyframes badge-pulse {
-            0%   { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
-            50%  { transform: scale(1.15); box-shadow: 0 0 160px rgba(0,255,0,1); }
-            100% { transform: scale(1);   box-shadow: 0 0 80px rgba(0,255,0,0.8); }
-        }
-
-        @keyframes badge-entry {
-            0%   { opacity: 0; transform: scale(0.4) translateY(-40px); }
-            70%  { transform: scale(1.2); }
-            100% { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .locked-badge {
-            position: fixed;
-            top: 24px;
-            right: 24px;
-            z-index: 9999;
-            padding: 20px 56px;
-            background: #000;
-            border: 8px solid #f7931a;
-            border-radius: 32px;
-            box-shadow: 0 0 160px rgba(247,147,26,1);
-            color: #ffaa00;
-            text-shadow: 0 0 10px #ffaa00, 0 0 20px #ffaa00, 0 0 40px #ffaa00, 0 0 80px #ffaa00;
-            font-weight: 900;
-            font-size: 2.8rem;
-            letter-spacing: 14px;
-            pointer-events: none;
-            opacity: 0;
-            animation: badge-entry 1s cubic-bezier(0.175, 0.885, 0.32, 1.4) forwards,
-                       badge-pulse 2.8s infinite alternate 1s;
-        }
-    </style>
+                .omega-symbol {
+                    will-change: opacity;
+                }
+            </style>
     """)
     
 
@@ -4741,349 +4747,353 @@ with gr.Blocks(
     # ── Health badge & legacy row styling + Age column colors ──────────────────────
     gr.HTML("""
         <style>
-            .health {
-                font-weight: 900;
-                text-align: center;
-                padding: 6px 10px;
-                border-radius: 4px;
-                min-width: 70px;
-                display: inline-block;
-            }
-            .health-dust     { color: #ff3366; background: rgba(255, 51, 102, 0.12); }
-            .health-heavy    { color: #ff6600; background: rgba(255, 102, 0, 0.12); }
-            .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.12); }
-            .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
-            .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.12); }
+      /* ── Base health badge styling ─────────────────────────────────────── */
+        .health {
+            font-weight: 900;
+            text-align: center;
+            padding: 6px 10px;
+            border-radius: 4px;
+            min-width: 70px;
+            display: inline-block;
+        }
 
-            .health small {
-                display: block;
-                color: #aaa;
-                font-weight: normal;
-                font-size: 0.8em;
-                margin-top: 2px;
-            }
+        /* Health priority colors */
+        .health-dust     { color: #ff3366; background: rgba(255, 51, 102, 0.12); }
+        .health-heavy    { color: #ff6600; background: rgba(255, 102, 0, 0.12); }
+        .health-careful  { color: #ff00ff; background: rgba(255, 0, 255, 0.12); }
+        .health-medium   { color: #ff9900; background: rgba(255, 153, 0, 0.12); }
+        .health-optimal  { color: #00ff9d; background: rgba(0, 255, 157, 0.12); }
 
-            .gr-textbox input:disabled {
-                background-color: #111 !important;
-                color: #555 !important;
-                opacity: 0.6;
-                cursor: not-allowed;
-            }
+        /* New: invalid/error states */
+        .health-invalid {
+            color: #ff4444 !important;
+            background: rgba(255, 68, 68, 0.25) !important;
+            border: 1px solid #ff6666 !important;
+        }
+        .health-unknown {
+            color: #aaaaaa !important;
+            background: rgba(170, 170, 170, 0.15) !important;
+        }
 
-            /* Legacy row styling */
-            .health-legacy {
-                color: #ff4444 !important;
-                font-weight: bold;
-            }
+        /* Common small text inside badges */
+        .health small {
+            display: block;
+            color: #aaa;
+            font-weight: normal;
+            font-size: 0.8em;
+            margin-top: 2px;
+        }
 
-            tr:has(.health-legacy) {
-                background-color: #330000 !important;
-                opacity: 0.65;
-            }
+        /* Disabled textbox styling */
+        .gr-textbox input:disabled {
+            background-color: #111 !important;
+            color: #555 !important;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
 
-            tr:has(.health-legacy) td {
-                color: #ffaaaa !important;
-            }
+        /* Legacy row styling */
+        .health-legacy {
+            color: #ff4444 !important;
+            font-weight: bold;
+        }
 
-            tr:has(.health-legacy) input[type="checkbox"],
-            tr:has(.health-nested) input[type="checkbox"] {
-                opacity: 0.3 !important;
-                cursor: not-allowed !important;
-                accent-color: #666 !important;
-            }
+        tr:has(.health-legacy) {
+            background-color: #330000 !important;
+            opacity: 0.65;
+        }
 
-            /* Age column visual cues */
-            .age-unknown {
-                color: #888888;
-                font-style: italic;
-            }
-            .age-recent {
-                color: #ff6666;
-                font-weight: bold;   /* fresh UTXOs red */
-            }
-            .age-medium {
-                color: #ffaa44;      /* months orange */
-            }
-            .age-old {
-                color: #00ff88;
-                font-weight: bold;   /* old coins green */
-            }
-        </style>
+        tr:has(.health-legacy) td {
+            color: #ffaaaa !important;
+        }
+
+        tr:has(.health-legacy) input[type="checkbox"],
+        tr:has(.health-nested) input[type="checkbox"] {
+            opacity: 0.3 !important;
+            cursor: not-allowed !important;
+            accent-color: #666 !important;
+        }
+
+        /* Age column visual cues */
+        .age-unknown {
+            color: #888888;
+            font-style: italic;
+        }
+        .age-recent {
+            color: #ff6666;
+            font-weight: bold;   /* fresh UTXOs red */
+        }
+        .age-medium {
+            color: #ffaa44;      /* months orange */
+        }
+        .age-old {
+            color: #00ff88;
+            font-weight: bold;   /* old coins green */
+        }
+    </style>
     """)
 	
     gr.HTML("""
-        <style id="omega-dark-nuke">
+    <style id="omega-dark-nuke">
+        /* ── Global canvas & overflow safety (prevents horizontal scroll) ──────── */
+        html, body, .gradio-container {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100vw !important;
+            max-width: 100% !important;
+            overflow-x: hidden !important;
+            height: 100% !important;
+            box-sizing: border-box !important;
+        }
 
-            /* ── Absolute dark-mode background nuke ───────────────────────────── */
-            .dark-mode html,
-            .dark-mode body,
-            .dark-mode body > div,
-            .dark-mode #root,
-            .dark-mode .app {
-                background: #000000 !important;
-            }
+        /* ── Absolute dark-mode background nuke ──────────────────────────────── */
+        .dark-mode html,
+        .dark-mode body,
+        .dark-mode body > div,
+        .dark-mode #root,
+        .dark-mode .app,
+        .dark-mode .gradio-container {
+            background: #000000 !important;
+            color: #00cc00 !important;
+        }
 
-            /* ── Root canvas ─────────────────────────────────────────────────────────── */
-            html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                height: 100% !important;
-                background: #000000 !important;
-            }
+        /* ── Light mode canvas ────────────────────────────────────────────────── */
+        body:not(.dark-mode),
+        body:not(.dark-mode) .gradio-container {
+            background: #f6f7f8 !important;
+        }
 
-            /* ── Dark mode root ───────────────────────────────────────────────────────── */
-            .dark-mode body,
-            .dark-mode .gradio-container {
-                background: #000000 !important;
-                color: #00cc00 !important;
-            }
+        /* ── Layout containers (structure only — no paint) ────────────────────── */
+        .gradio-container,
+        .gr-container,
+        .gr-panel,
+        .gr-form,
+        .gr-box,
+        .gr-group,
+        .gr-column,
+        .gr-row {
+            width: 100% !important;
+            max-width: min(95vw, 1200px) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            padding: clamp(12px, 3vw, 24px) !important;
+            box-sizing: border-box !important;
+            background: transparent !important;
+        }
 
-            /* ── Layout containers (STRUCTURE ONLY — NO PAINT) ───────────────────────── */
-            .gradio-container,
-            .gr-container,
-            .gr-panel,
-            .gr-form,
-            .gr-box,
-            .gr-group,
-            .gr-column,
-            .gr-row {
-                max-width: 1200px !important;
-                margin-left: auto !important;
-                margin-right: auto !important;
-                padding: 0 clamp(16px, 4vw, 32px) !important;
-                box-sizing: border-box !important;
-                background: transparent !important; /* ← critical fix */
-            }
+        /* ── Dark mode inputs & elements ──────────────────────────────────────── */
+        .dark-mode .gr-textbox,
+        .dark-mode .gr-dropdown,
+        .dark-mode textarea,
+        .dark-mode input,
+        .dark-mode .gr-button,
+        .dark-mode .gr-number {
+            background: #000000 !important;
+            color: #00cc00 !important;
+            border-color: #f7931a !important;
+        }
 
-            /* ── Dark mode elements ───────────────────────────────────────────────────── */
-            .dark-mode,
-            .dark-mode .gr-textbox,
-            .dark-mode .gr-dropdown,
-            .dark-mode textarea,
-            .dark-mode input,
-            .dark-mode .gr-button {
-                background: #000000 !important;
-                color: #00cc00 !important;
-                border-color: #f7931a !important;
-            }
+        /* Dark mode hover/focus */
+        .dark-mode .gr-button:hover {
+            background: #f7931a !important;
+            color: #000000 !important;
+            box-shadow: 0 0 25px rgba(247, 147, 26, 0.7) !important;
+        }
 
-            /* Dark mode button hover */
-            .dark-mode .gr-button:hover {
-                background: #f7931a !important;
-                color: #000000 !important;
-                box-shadow: 0 0 25px rgba(247, 147, 26, 0.7);
-            }
+        .dark-mode input:focus,
+        .dark-mode textarea:focus,
+        .dark-mode .gr-textbox:focus-within {
+            box-shadow: 0 0 12px rgba(0, 204, 0, 0.4) !important;
+            border-color: #00ff88 !important;
+        }
 
-            /* Dark mode input focus */
-            .dark-mode input:focus,
-            .dark-mode textarea:focus,
-            .dark-mode .gr-textbox:focus-within {
-                box-shadow: 0 0 12px rgba(0, 204, 0, 0.4) !important;
-                border-color: #00ff88 !important;
-            }
+        /* ── Checkboxes (dark & light) ────────────────────────────────────────── */
+        input[type="checkbox"] {
+            width: clamp(28px, 6vw, 36px) !important;
+            height: clamp(28px, 6vw, 36px) !important;
+            appearance: none;
+            cursor: pointer;
+            border-radius: 8px !important;
+            border: 2px solid #f7931a !important;
+            background: #000000 !important;
+            box-shadow: 0 0 20px rgba(247, 147, 26, 0.6) !important;
+            position: relative;
+            transition: all 0.15s ease;
+        }
 
-            /* ── Checkbox (shared) ────────────────────────────────────────────────────── */
-            input[type="checkbox"] {
-                width: clamp(28px, 6vw, 36px) !important;
-                height: clamp(28px, 6vw, 36px) !important;
-                appearance: none;
-                cursor: pointer;
-                border-radius: 8px !important;
-                border: 2px solid #f7931a !important;
-                background: #000000 !important;
-                box-shadow: 0 0 20px rgba(247, 147, 26, 0.6) !important;
-                position: relative;
-                transition: all 0.15s ease;
-            }
+        input[type="checkbox"]:checked {
+            background: #00ff00 !important;
+            box-shadow: 0 0 30px #00ff00 !important;
+        }
 
-            input[type="checkbox"]:checked {
-                background: #00ff00 !important;
-                box-shadow: 0 0 30px #00ff00 !important;
-            }
+        input[type="checkbox"]:checked::after {
+            content: "✓";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #000000;
+            font-size: clamp(18px, 4vw, 24px) !important;
+            font-weight: 900;
+        }
 
-            input[type="checkbox"]:checked::after {
-                content: "✓";
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                color: #000000;
-                font-size: clamp(18px, 4vw, 24px) !important;
-                font-weight: 900;
-            }
+        body:not(.dark-mode) input[type="checkbox"] {
+            background: #ffffff !important;
+            border-color: #00aa55 !important;
+        }
 
-            /* Light mode checkbox */
-            body:not(.dark-mode) input[type="checkbox"] {
-                background: #ffffff !important;
-                border-color: #00aa55 !important;
-            }
+        body:not(.dark-mode) input[type="checkbox"]:checked {
+            background: #f7931a !important;
+        }
 
-            body:not(.dark-mode) input[type="checkbox"]:checked {
-                background: #f7931a !important;
-            }
+        /* ── Light mode inputs ────────────────────────────────────────────────── */
+        body:not(.dark-mode) input,
+        body:not(.dark-mode) textarea,
+        body:not(.dark-mode) select,
+        body:not(.dark-mode) .gr-input,
+        body:not(.dark-mode) .gr-textbox,
+        body:not(.dark-mode) .gr-dropdown,
+        body:not(.dark-mode) .gr-number {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
 
-            /* ───────────────────────────────────────────────────────────────
-               LIGHT MODE — CLEAN & FINAL
-               ─────────────────────────────────────────────────────────────── */
+        body:not(.dark-mode) .gr-dropdown > div,
+        body:not(.dark-mode) .gr-number > div,
+        body:not(.dark-mode) .gr-input > div,
+        body:not(.dark-mode) .gr-textbox > div {
+            background-color: #ffffff !important;
+        }
 
-            /* ── Canvas ──────────────────────────────────────────────────── */
-            body:not(.dark-mode),
-            body:not(.dark-mode) .gradio-container,
-            body:not(.dark-mode) .gr-container,
-            body:not(.dark-mode) .gr-panel {
-                background: #f6f7f8 !important;
-            }
+        body:not(.dark-mode) select option {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
 
-            /* ── Inputs, dropdowns, numbers ─────────────────────────────── */
-            body:not(.dark-mode) input,
-            body:not(.dark-mode) textarea,
-            body:not(.dark-mode) select,
-            body:not(.dark-mode) .gr-input,
-            body:not(.dark-mode) .gr-textbox,
-            body:not(.dark-mode) .gr-dropdown,
-            body:not(.dark-mode) .gr-number {
-                background-color: #ffffff !important;
-                color: #000000 !important;
-            }
+        body:not(.dark-mode) input::placeholder,
+        body:not(.dark-mode) textarea::placeholder {
+            color: #000000 !important;
+            opacity: 1;
+        }
 
-            /* ── Inner Gradio wrappers (kill gray) ───────────────────────── */
-            body:not(.dark-mode) .gr-dropdown > div,
-            body:not(.dark-mode) .gr-number > div,
-            body:not(.dark-mode) .gr-input > div,
-            body:not(.dark-mode) .gr-textbox > div {
-                background-color: #ffffff !important;
-            }
+        body:not(.dark-mode) input:focus,
+        body:not(.dark-mode) textarea:focus,
+        body:not(.dark-mode) select:focus {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            outline: none !important;
+        }
 
-            /* ── Dropdown options ───────────────────────────────────────── */
-            body:not(.dark-mode) select option {
-                background-color: #ffffff !important;
-                color: #000000 !important;
-            }
+        body:not(.dark-mode) .gr-button {
+            background: #ededed !important;
+            color: #111111 !important;
+            border-color: #9a9a9a !important;
+        }
 
-            /* ── Placeholders ───────────────────────────────────────────── */
-            body:not(.dark-mode) input::placeholder,
-            body:not(.dark-mode) textarea::placeholder {
-                color: #000000 !important;
-                opacity: 1;
-            }
+        body:not(.dark-mode) .gr-button:hover {
+            background: #e2e2e2 !important;
+        }
 
-            /* ── Focus ──────────────────────────────────────────────────── */
-            body:not(.dark-mode) input:focus,
-            body:not(.dark-mode) textarea:focus,
-            body:not(.dark-mode) select:focus {
-                background-color: #ffffff !important;
-                color: #000000 !important;
-                outline: none !important;
-            }
+        /* ── Hero light mode readability ──────────────────────────────────────── */
+        body:not(.dark-mode) #omega-bg {
+            opacity: 0.55 !important;
+        }
 
-            /* ── Buttons ─────────────────────────────────────────────────── */
-            body:not(.dark-mode) .gr-button {
-                background: #ededed !important;
-                color: #111111 !important;
-                border-color: #9a9a9a !important;
-            }
+        body:not(.dark-mode) .hero-panel {
+            background: linear-gradient(
+                rgba(0, 0, 0, 0.55),
+                rgba(0, 0, 0, 0.35)
+            ) !important;
+            backdrop-filter: blur(14px) !important;
+        }
 
-            body:not(.dark-mode) .gr-button:hover {
-                background: #e2e2e2 !important;
-            }
+        body:not(.dark-mode) .hero-panel * {
+            text-shadow:
+                0 0 20px rgba(0,0,0,0.6),
+                0 0 40px rgba(0,0,0,0.4) !important;
+        }
 
-            /* ── Hero readability fixes (LIGHT MODE ONLY) ─────────────────────── */
-            body:not(.dark-mode) #omega-bg {
-                opacity: 0.55; /* let the Ω breathe but not overpower */
-            }
+        /* ── DataFrame readability & mobile scroll ────────────────────────────── */
+        .gr-dataframe td:nth-child(2),
+        .gr-dataframe td:nth-child(3),
+        .gr-dataframe td:nth-child(6) {
+            white-space: normal !important;
+            word-break: break-all !important;
+            font-family: "Courier New", monospace !important;
+            font-size: 0.95rem !important;
+            line-height: 1.4 !important;
+            padding: 10px 8px !important;
+        }
 
-            body:not(.dark-mode) .hero-panel {
-                background: linear-gradient(
-                    rgba(0, 0, 0, 0.55),
-                    rgba(0, 0, 0, 0.35)
-                ) !important;
+        .gr-dataframe td:hover {
+            background: rgba(0, 255, 136, 0.08) !important;
+        }
 
-                backdrop-filter: blur(14px) !important;
-            }
-
-            /* Reduce white edge glow in light mode */
-            body:not(.dark-mode) .hero-panel * {
-                text-shadow:
-                    0 0 20px rgba(0,0,0,0.6),
-                    0 0 40px rgba(0,0,0,0.4) !important;
-            }
-
-            /* ── DataFrame readability ────────────────────────────────────────────────── */
-            .gr-dataframe td:nth-child(2),
-            .gr-dataframe td:nth-child(3),
-            .gr-dataframe td:nth-child(6) {
-                white-space: normal !important;
-                word-break: break-all !important;
-                font-family: "Courier New", monospace !important;
-                font-size: 0.95rem !important;
-                line-height: 1.4 !important;
-                padding: 10px 8px !important;
-            }
-
-            .gr-dataframe td:hover {
-                background: rgba(0, 255, 136, 0.08) !important;
-            }
-
-            /* ── Input surface (readability anchor) ───────────────────────── */
-            .input-surface {
-                border-radius: 14px;
-                padding: 18px 20px;
-                margin: 20px auto;
-            }
-
-            /* ── Footer donation section ──────────────────────────────────────────────── */
-            .footer-donation {
-                background: rgba(0, 0, 0, 0.45) !important;
-                backdrop-filter: blur(10px);
-                border-top: 2px solid #f7931a !important;
-            }
-
-            .footer-donation,
-            .footer-donation * {
-                color: #e6e6e6 !important;
-            }
-
-            .footer-donation strong {
-                color: #f7931a !important;
-            }
-
-            .footer-donation span {
-                color: #cccccc !important;
-            }
-
-            /* Light mode footer */
-            body:not(.dark-mode) .footer-donation {
-                background: rgba(255, 255, 255, 0.86) !important;
-                backdrop-filter: blur(4px);
-                box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-                border-top: 2px solid #c77c00 !important;
-            }
-
-            body:not(.dark-mode) .footer-donation,
-            body:not(.dark-mode) .footer-donation * {
-                color: #111111 !important;
-            }
-
-            body:not(.dark-mode) .footer-donation strong {
-                color: #c77c00 !important;
-            }
-
-            .footer-donation button {
-                color: #f7931a !important;
-            }
-
-            body:not(.dark-mode) .footer-donation button {
-                color: #c77c00 !important;
-            }
-			
-        /* Force the table container to allow sticky */
         .gr-dataframe {
-            overflow-x: auto !important;          /* enable horizontal scroll */
-            position: relative !important;        /* sticky needs a positioned parent */
+            overflow-x: auto !important;
+            position: relative !important;
+            width: 100% !important;
+            max-width: 100% !important;
         }
 
         .gr-dataframe table {
-            width: max-content !important;        /* prevent squishing */
+            width: max-content !important;
+            min-width: 100% !important;
+        }
+
+        /* ── Footer donation section ──────────────────────────────────────────── */
+        .footer-donation {
+            width: 100% !important;
+            max-width: min(95vw, 760px) !important;
+            margin: clamp(40px, 10vw, 80px) auto 60px auto !important;
+            padding: clamp(20px, 5vw, 40px) !important;
+            background: rgba(0, 0, 0, 0.45) !important;
+            backdrop-filter: blur(10px);
+            border-top: 2px solid #f7931a !important;
+            box-sizing: border-box !important;
+        }
+
+        .footer-donation,
+        .footer-donation * {
+            color: #e6e6e6 !important;
+        }
+
+        .footer-donation strong { color: #f7931a !important; }
+        .footer-donation span   { color: #cccccc !important; }
+
+        /* Light mode footer */
+        body:not(.dark-mode) .footer-donation {
+            background: rgba(255, 255, 255, 0.86) !important;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            border-top: 2px solid #c77c00 !important;
+        }
+
+        body:not(.dark-mode) .footer-donation,
+        body:not(.dark-mode) .footer-donation * {
+            color: #111111 !important;
+        }
+
+        body:not(.dark-mode) .footer-donation strong {
+            color: #c77c00 !important;
+        }
+
+        .footer-donation button {
+            color: #f7931a !important;
+        }
+
+        body:not(.dark-mode) .footer-donation button {
+            color: #c77c00 !important;
+        }
+
+        /* ── Input surface readability anchor ─────────────────────────────────── */
+        .input-surface {
+            border-radius: 14px;
+            padding: clamp(12px, 4vw, 18px) clamp(16px, 4vw, 20px);
+            margin: clamp(16px, 5vw, 20px) auto;
+            width: 100% !important;
+            max-width: min(95vw, 960px) !important;
+            box-sizing: border-box !important;
         }
     </style>
 """)
