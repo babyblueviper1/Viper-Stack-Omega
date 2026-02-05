@@ -386,6 +386,48 @@ def get_utxo_age_display(confirmed_at: Optional[int]) -> str:
     except Exception:
         return '<span class="age-unknown">unknown</span>'
 
+def get_mempool_utxos(addr: str, dust: int = 546) -> List[dict]:
+    """
+    Fetch ONLY unconfirmed (mempool) UTXOs for an address from mempool.space.
+    Returns list of dicts similar to get_utxos(), or empty on failure/timeout.
+    """
+    addr = addr.strip()
+    if not addr:
+        return []
+
+    url = f"{MEMPOOL_API}/address/{addr}/txs/mempool"
+    
+    try:
+        r = safe_get(url, timeout=10)
+        if not r or r.status_code != 200:
+            log.warning(f"Mempool UTXO fetch failed for {addr}: {r.status_code if r else 'No response'}")
+            return []
+
+        data = r.json()
+        utxos = []
+        for tx in data:
+            for vout_idx, output in enumerate(tx.get("vout", [])):
+                if output.get("scriptpubkey_address") == addr:
+                    val = int(output.get("value", 0))
+                    if val <= dust:
+                        continue
+                    utxo = {
+                        "txid": tx["txid"],
+                        "vout": vout_idx,
+                        "value": val,
+                        "address": addr,
+                        "confirmed_at": None,  # unconfirmed
+                        "source": "mempool",
+                    }
+                    utxos.append(utxo)
+
+        log.debug(f"Found {len(utxos)} unconfirmed UTXOs for {addr}")
+        return utxos
+
+    except Exception as e:
+        log.warning(f"Mempool UTXO fetch error for {addr}: {e}")
+        return []
+
 
 def get_consolidation_score() -> str:
     """
@@ -800,7 +842,12 @@ def load_selection(
             return (
                 current_enriched,
                 "Snapshot contains no usable UTXOs",
-                None, False, False, "failed", "", "",
+                None,
+                False,
+                False,
+                "failed",
+                "",
+                "",
                 "Recommended — ~40% consolidated (balanced savings & privacy)",
                 546
             )
@@ -817,14 +864,55 @@ def load_selection(
             return (
                 current_enriched,
                 f"""
-                <div style="...">  <!-- your existing red blocked HTML -->
-                    RESTORE BLOCKED — SAFETY TRIGGERED<br><br>
-                    {', '.join(details)} detected.<br><br>
-                    Cannot safely derive scriptPubKey or proceed to PSBT.<br><br>
-                    <strong>Solution:</strong> Re-ANALYZE using original addresses.
+                <div style="
+                    color: #ffffff !important;
+                    padding: 28px !important;
+                    background: #550000 !important;
+                    border: 4px solid #ff4444 !important;
+                    border-radius: 16px !important;
+                    text-align: center !important;
+                    font-weight: 700 !important;
+                    box-shadow: 0 0 35px rgba(255,68,68,0.7) !important;
+                    max-width: 95% !important;
+                    margin: 20px auto !important;
+                ">
+                    <div style="
+                        font-size: 1.8rem !important;
+                        margin-bottom: 20px !important;
+                        color: #ffff88 !important;
+                        text-shadow: 0 0 16px #ffff88 !important;
+                    ">
+                        RESTORE BLOCKED — SAFETY TRIGGERED
+                    </div>
+
+                    <span style="font-size: 1.3rem !important; line-height: 1.6 !important;">
+                        {', '.join(details)} detected in snapshot.<br><br>
+
+                        <span style="font-weight:900 !important; color: #ffea99 !important;">
+                            Cannot safely derive scriptPubKey or proceed to PSBT.
+                        </span><br><br>
+
+                        <span style="font-weight:800 !important; color: #ffdddd !important; font-size: 1.15rem !important;">
+                            Solution: Re-ANALYZE using the original address list.
+                        </span>
+                    </span>
+
+                    <div style="
+                        margin-top: 24px !important;
+                        font-size: 1.05rem !important;
+                        color: #ffbbbb !important;
+                        opacity: 0.95 !important;
+                    ">
+                        This block prevents creating invalid or dangerous PSBTs.
+                    </div>
                 </div>
                 """,
-                None, False, False, "failed", "", "",
+                None,
+                False,
+                False,
+                "failed",
+                "",
+                "",
                 "Recommended — ~40% consolidated (balanced savings & privacy)",
                 546
             )
@@ -861,12 +949,38 @@ def load_selection(
 
         # ── Success message ──────────────────────────────────────────────────────
         message = (
-            "<div style='...'>"  # your existing green success div
-            f"Table restored from snapshot — {len(restored_utxos)} UTXOs loaded!"
-            "<br><small style='color:#aaffff;'>"
-            "Selection, strategy, dust threshold and metadata recovered.<br>"
-            "All addresses re-validated — ready for PSBT."
-            "</small></div>"
+            "<div style='"
+            "    margin: 20px auto !important; "
+            "    padding: 30px !important; "
+            "    max-width: 95% !important; "
+            "    background: rgba(0, 18, 35, 0.7) !important; "
+            "    border: 3px solid #00ffcc !important; "
+            "    border-radius: 16px !important; "
+            "    text-align: center !important; "
+            "    box-shadow: 0 0 35px rgba(0, 255, 204, 0.45) !important; "
+            "    color: #ccffeb !important;"
+            "'>"
+            
+            "    <span style='"
+            "        color: #00ffdd !important; "
+            "        font-size: 1.6rem !important; "
+            "        font-weight: 900 !important; "
+            "        text-shadow: 0 0 18px #00ffdd80 !important; "
+            "        letter-spacing: 1px !important;"
+            "    '>"
+            f"        Table restored from snapshot — {len(restored_utxos)} UTXOs loaded!"
+            "    </span><br>"
+            
+            "    <small style='"
+            "        color: #aaffff !important; "
+            "        font-size: 1rem !important; "
+            "        text-shadow: 0 0 8px rgba(170, 255, 255, 0.5) !important;"
+            "    '>"
+            "        Selection, strategy, dust threshold and metadata fully recovered.<br>"
+            "        All addresses re-validated during restore — no issues found.<br>"
+            "        Ready to generate PSBT — no ANALYZE needed."
+            "    </small>"
+            "</div>"
         )
 
         if fingerprint:
@@ -888,7 +1002,7 @@ def load_selection(
             strategy_restored,
             dust_threshold_restored
         )
-		
+        
     except Exception as e:
         log.error("[RESTORE] Failed to process snapshot: %s", str(e), exc_info=True)
         return (
@@ -2240,6 +2354,52 @@ def analyze(
         future_fee_slider=future_fee_slider,
     )
 
+    # ── Check for unconfirmed UTXOs (moved outside legacy check) ───────────────
+    unconfirmed_utxos = []
+    unconfirmed_warning = ""
+
+    if params.addr_input:
+        entries = [e.strip() for e in params.addr_input.splitlines() if e.strip()]
+        for addr in entries:
+            if not addr.startswith(("bc1", "1", "3")):
+                continue
+            mempool_utxos = get_mempool_utxos(addr, params.dust_threshold)
+            unconfirmed_utxos.extend(mempool_utxos)
+
+    if unconfirmed_utxos:
+        count = len(unconfirmed_utxos)
+        unconfirmed_warning = f"""
+        <div style="
+            margin: clamp(16px, 4vw, 32px) auto !important;
+            padding: clamp(16px, 4vw, 24px) !important;
+            background: rgba(80, 40, 0, 0.7) !important;
+            border: 3px solid #ffaa00 !important;
+            border-radius: 16px !important;
+            color: #ffdd88 !important;
+            text-align: center !important;
+            max-width: min(95vw, 800px) !important;
+            box-shadow: 0 0 40px rgba(255,170,0,0.5) !important;
+        ">
+            <div style="
+                color: #ffcc00 !important;
+                font-size: clamp(1.3rem, 5vw, 1.6rem) !important;
+                font-weight: 900 !important;
+                margin-bottom: 12px !important;
+            ">
+                ⚠️ {count} Unconfirmed UTXO{'s' if count != 1 else ''} Detected
+            </div>
+            <div style="font-size: clamp(1rem, 3.5vw, 1.15rem) !important; line-height: 1.5;">
+                These UTXOs are still pending in the mempool and <span style="font-weight: 900 !important;">cannot be safely consolidated yet</span>.<br><br>
+                Risk: They could be replaced-by-fee (RBF), double-spent, or dropped before confirmation.<br>
+                <span style="font-weight: 900 !important;">Recommendation:</span> Wait for at least 1 confirmation before proceeding.<br><br>
+                They are automatically excluded from this table and PSBT — re-analyze after they confirm to include them.
+            </div>
+            <small style="opacity: 0.8; margin-top: 12px; display: block;">
+                Checked via mempool.space — last update: {datetime.now().strftime('%H:%M UTC')}
+            </small>
+        </div>
+        """
+
     # 2. Collect raw UTXOs (online only)
     log.debug("Proceeding with UTXO fetch")
     raw_utxos, scan_debug, _ = _collect_online_utxos(params)
@@ -2255,14 +2415,11 @@ def analyze(
         is_legacy_attempt = bool(addr and addr[0] in ('1', '3'))
 
         if is_legacy_attempt:
-            # Legacy/nested case — use the orange legacy-specific banner
             return _analyze_empty(
                 scan_source=params.scan_source,
                 is_legacy_attempt=True
             )
-
         else:
-            # Online timeout/rate-limit or empty modern address
             timeout_msg = """
             <div style='
                 color:#aaffcc !important;
@@ -2303,45 +2460,43 @@ def analyze(
             """
 
             return (
-                gr.update(value=[]),                   # 0: Empty DataFrame
-                (),                                    # 1: Empty enriched_state
-                gr.update(value=timeout_msg),          # 2: Timeout/rate-limit warning
-                gr.update(visible=False),              # 3
-                gr.update(visible=False),              # 4
-                params.scan_source,                    # 5
-                "",                                    # 6
-                gr.update(visible=False),              # 7
-                gr.update(visible=True),               # 8: Keep analyze button
+                gr.update(value=[]),
+                (),
+                gr.update(value=timeout_msg),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                params.scan_source,
+                "",
+                gr.update(visible=False),
+                gr.update(visible=True),
             )
 
-    # 3. Enrich UTXOs with metadata, health, script info
+    # 3. Enrich UTXOs
     enriched = _enrich_utxos(raw_utxos, params)
     log.debug(f"Enriched {len(enriched)} UTXOs")
 
-    # Invariant check: every UTXO must have script_type
+    # Invariant check
     if any("script_type" not in u for u in enriched):
         log.error("Missing 'script_type' in enriched UTXOs — invariant violation")
         raise RuntimeError("Missing 'script_type' in enriched UTXOs — invariant violation")
 
-    # 4. Apply consolidation strategy (sets 'selected' flags)
-    # (pure computation — safe)
+    # 4. Apply consolidation strategy
     enriched_consolidated = _apply_consolidation_strategy(enriched, params.strategy)
     log.debug(
         f"After consolidation strategy: {len(enriched_consolidated)} UTXOs total, "
         f"{sum(1 for u in enriched_consolidated if u['selected'])} selected"
     )
 
-    # Safety assertions (protect canonical model invariants)
+    # Safety assertions
     assert len(enriched_consolidated) >= MIN_KEEP_UTXOS, "Too few UTXOs after consolidation"
     assert any(not u["selected"] for u in enriched_consolidated), "All UTXOs selected — invalid consolidation"
     assert params.strategy in CONSOLIDATION_RATIOS, f"Unknown strategy: {params.strategy}"
 
-    # 5. Build DataFrame rows for display
-    # (pure UI — safe)
+    # 5. Build DataFrame rows
     df_rows, has_unsupported = _build_df_rows(enriched_consolidated)
     log.debug(f"Built {len(df_rows)} table rows, has_unsupported={has_unsupported}")
 
-    # Build warning banner if needed
+    # Build warning banner
     warning_banner = ""
     if has_unsupported:
         warning_banner = (
@@ -2351,14 +2506,21 @@ def analyze(
             "</div>"
         )
 
-        # 6. Freeze the enriched state (immutable tuple)
+    # Merge unconfirmed warning into the same variable
+    if unconfirmed_warning:
+        if warning_banner:
+            warning_banner += "<br>" + unconfirmed_warning
+        else:
+            warning_banner = unconfirmed_warning
+
+    # 6. Freeze enriched state
     frozen_state = _freeze_enriched(
         enriched_consolidated,
         strategy=params.strategy,
         scan_source=params.scan_source,
     )
 
-    # Return unified success state (exactly 9 outputs for Gradio)
+    # Return unified success state
     return _analyze_success(
         df_rows=df_rows,
         frozen_state=frozen_state,
@@ -2377,7 +2539,7 @@ def _analyze_success(
     return (
         gr.update(value=df_rows),              # 0: DataFrame rows (UTXO table)
         frozen_state,                          # 1: enriched_state (frozen tuple)
-        gr.update(value=warning_banner),       # 2: Legacy/nested warning banner
+        gr.update(value=warning_banner),   # 2: Legacy/nested + unconfirmed UTXO warning banner
         gr.update(visible=True),               # 3: Show generate_row (PSBT button)
         gr.update(visible=True),               # 4: Show import_file (JSON load area)
         scan_source,                           # 5: scan_source state
@@ -5333,7 +5495,7 @@ with gr.Blocks(
 
         # Keep these at top level — always active
         json_parsed_state = gr.State({})  # global state — never hide
-        warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
+        
 
         # ── Main Input Fields ──
         with gr.Row():
@@ -5532,6 +5694,8 @@ with gr.Blocks(
             inputs=dest,
             outputs=dest_value
         )
+        
+        warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
 
         gr.HTML("""
             <div style="width: 100%; margin-top: 25px;"></div>
