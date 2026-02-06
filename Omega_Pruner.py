@@ -4643,7 +4643,6 @@ with gr.Blocks(
                         <!-- Hero container – full width, safe padding -->
                         <div style="
                             width: 100%;
-                            max-width: 100% !important;
                             margin: clamp(8px, 2vw, 16px) auto clamp(16px, 4vw, 24px) auto;  <!-- ← reduced side margins -->
                             padding: 0 clamp(8px, 3vw, 16px);                          <!-- ← reduced side padding -->
                             box-sizing: border-box;
@@ -4900,6 +4899,21 @@ with gr.Blocks(
                 .omega-symbol {
                     will-change: opacity;
                 }
+				/* Desktop: cap hero width for better readability */
+                        @media (min-width: 1024px) {
+                            .hero-panel {
+                                max-width: 1200px !important;          /* or 1400px if you prefer slightly wider */
+                                margin-left: auto !important;
+                                margin-right: auto !important;
+                            }
+                            
+                            /* Optional: center body text better on large screens */
+                            .hero-panel > div:not(#hero-arrow) {
+                                max-width: 1000px !important;          /* keeps text column readable */
+                                margin-left: auto !important;
+                                margin-right: auto !important;
+                            }
+                        }
             </style>
     """)
 
