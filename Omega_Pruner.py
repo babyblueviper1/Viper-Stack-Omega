@@ -4643,7 +4643,7 @@ with gr.Blocks(
                         <!-- Hero container – full width, safe padding -->
                         <div style="
                             width: 100%;
-                            max-width: min(98vw, 1200px);
+                            max-width: 100% !important;
                             margin: clamp(8px, 2.5vw, 20px) auto clamp(20px, 5vw, 30px) auto;
                             padding: 0 clamp(12px, 5vw, 24px);               <!-- ← increased min to 12px, max to 24px -->
                             box-sizing: border-box;
