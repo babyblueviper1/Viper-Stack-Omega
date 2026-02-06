@@ -4640,29 +4640,28 @@ with gr.Blocks(
                     ">Ω</span>
                 </span>
             </div>
-
-               <!-- Hero container – full width, safe padding -->
-            <div style="
-                width: 100%;
-                max-width: 100% !important;
-                margin: clamp(8px, 2.5vw, 20px) auto clamp(20px, 5vw, 30px) auto;
-                padding: 0 clamp(8px, 3vw, 16px);
-                box-sizing: border-box;
-            ">
-                <div class="hero-panel" style="
-                    text-align: center;
-                    padding: clamp(24px, 5vw, 48px) clamp(12px, 4vw, 24px);
-                    background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
-                    backdrop-filter: blur(10px);
-                    border: clamp(3px, 1.5vw, 6px) solid #f7931a;
-                    box-shadow: 
-                        inset 0 0 60px rgba(0, 100, 255, 0.25),
-                        inset 0 0 15px rgba(0, 120, 255, 0.15),
-                        0 0 60px rgba(247,147,26,0.4);
-                    border-radius: clamp(12px, 4vw, 20px);
-                    width: 100%;
-                    box-sizing: border-box;
-                ">
+                        <!-- Hero container – full width, safe padding -->
+                        <div style="
+                            width: 100%;
+                            max-width: min(98vw, 1200px);
+                            margin: clamp(8px, 2.5vw, 20px) auto clamp(20px, 5vw, 30px) auto;
+                            padding: 0 clamp(12px, 5vw, 24px);               <!-- ← increased min to 12px, max to 24px -->
+                            box-sizing: border-box;
+                        ">
+                            <div class="hero-panel" style="
+                                text-align: center;
+                                padding: clamp(24px, 6vw, 48px) clamp(16px, 6vw, 32px);  <!-- ← increased horizontal min/max -->
+                                background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
+                                backdrop-filter: blur(10px);
+                                border: clamp(3px, 1.5vw, 6px) solid #f7931a;
+                                box-shadow: 
+                                    inset 0 0 60px rgba(0, 100, 255, 0.25),
+                                    inset 0 0 15px rgba(0, 120, 255, 0.15),
+                                    0 0 60px rgba(247,147,26,0.4);
+                                border-radius: clamp(12px, 4vw, 20px);
+                                width: 100%;
+                                box-sizing: border-box;
+                            ">
                     <!-- Reclaim Sovereignty -->
                     <div style="
                         color: #ffcc00;
