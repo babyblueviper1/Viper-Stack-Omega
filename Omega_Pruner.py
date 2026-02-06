@@ -4602,7 +4602,7 @@ with gr.Blocks(
     title="Ωmega Pruner v11 — Forged Anew"
 ) as demo:
 
-    # ── Full-screen animated background + Hero Banner ───────────────────────────────
+ # ── Full-screen animated background + Hero Banner ───────────────────────────────
     gr.HTML("""
 	            <div id="omega-bg" style="
                 position: fixed;
@@ -4644,7 +4644,7 @@ with gr.Blocks(
                <!-- Hero container – full width, safe padding -->
             <div style="
                 width: 100%;
-                max-width: min(95vw, 1200px);
+                max-width: 100% !important;
                 margin: clamp(8px, 2.5vw, 20px) auto clamp(20px, 5vw, 30px) auto;
                 padding: 0 clamp(8px, 3vw, 16px);
                 box-sizing: border-box;
@@ -4903,8 +4903,6 @@ with gr.Blocks(
                 }
             </style>
     """)
-    
-
 
     # ── Health badge & legacy row styling + Age column colors ──────────────────────
     gr.HTML("""
@@ -5035,7 +5033,7 @@ with gr.Blocks(
         .gr-column,
         .gr-row {
             width: 100% !important;
-            max-width: min(95vw, 1200px) !important;
+            max-width: 100% !important;
             margin-left: auto !important;
             margin-right: auto !important;
             padding: clamp(12px, 3vw, 24px) !important;
@@ -5254,7 +5252,7 @@ with gr.Blocks(
             padding: clamp(12px, 4vw, 18px) clamp(16px, 4vw, 20px);
             margin: clamp(16px, 5vw, 20px) auto;
             width: 100% !important;
-            max-width: min(95vw, 960px) !important;
+            max-width: 100% !important;
             box-sizing: border-box !important;
         }
     </style>
@@ -5400,7 +5398,7 @@ with gr.Blocks(
             <div style="
                 margin: clamp(20px, 5vw, 60px) auto !important;
                 padding: clamp(16px, 4vw, 28px) !important;
-                max-width: 95% !important;
+                max-width: 100% !important;
                 width: 100% !important;
                 background: rgba(0, 20, 10, 0.6) !important;
                 border: 3px solid #00ff9d !important;
@@ -5538,7 +5536,7 @@ with gr.Blocks(
                     0 12px 40px rgba(0,0,0,0.6) !important,
                     0 8px 32px rgba(0,255,136,0.3) !important,
                     inset 0 0 30px rgba(0,255,136,0.15) !important;
-                max-width:95% !important;
+                max-width:100% !important;
                 margin-left:auto !important;
                 margin-right:auto !important;
             "> 
