@@ -1773,8 +1773,12 @@ def create_psbt(tx: Tx, utxos: list[dict]) -> tuple[str, str]:
         )
         write_kv(psbt, 0x01, b"", witness_utxo)
 
-        # ALWAYS write SIGHASH_ALL
-        write_kv(psbt, 0x03, b"", bytes([0x01, 0x00, 0x00, 0x00]))
+        # Choose sighash based on script type
+        sighash_type = 0x01  # SIGHASH_ALL default
+        if u.get("script_type", "").upper() in ("TAPROOT", "P2TR"):
+            sighash_type = 0x00  # SIGHASH_DEFAULT for Taproot
+
+        write_kv(psbt, 0x03, b"", bytes([sighash_type, 0x00, 0x00, 0x00]))
 
         # ── Optional: BIP-32 derivation + master fingerprint ────────────────────
         if all(k in u for k in ["pubkey", "master_fingerprint", "derivation_path"]):
