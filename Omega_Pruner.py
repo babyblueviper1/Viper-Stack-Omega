@@ -4644,13 +4644,13 @@ with gr.Blocks(
                         <div style="
                             width: 100%;
                             max-width: 100% !important;
-                            margin: clamp(8px, 2.5vw, 20px) auto clamp(20px, 5vw, 30px) auto;
-                            padding: 0 clamp(12px, 5vw, 24px);               <!-- ← increased min to 12px, max to 24px -->
+                            margin: clamp(8px, 2vw, 16px) auto clamp(16px, 4vw, 24px) auto;  <!-- ← reduced side margins -->
+                            padding: 0 clamp(8px, 3vw, 16px);                          <!-- ← reduced side padding -->
                             box-sizing: border-box;
                         ">
                             <div class="hero-panel" style="
                                 text-align: center;
-                                padding: clamp(24px, 6vw, 48px) clamp(16px, 6vw, 32px);  <!-- ← increased horizontal min/max -->
+                                padding: clamp(24px, 6vw, 48px) clamp(12px, 4vw, 24px);  <!-- ← reduced horizontal sides -->
                                 background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
                                 backdrop-filter: blur(10px);
                                 border: clamp(3px, 1.5vw, 6px) solid #f7931a;
