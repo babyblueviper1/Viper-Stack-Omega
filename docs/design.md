@@ -2,9 +2,13 @@
 
 ## Design Overview
 
-Ωmega Pruner is an experimental tool for **fee-aware and time-aware UTXO consolidation**, with deliberate, user-visible exposure to **Common Input Ownership Heuristic (CIOH)** tradeoffs.
+Ωmega Pruner has evolved from an experimental standalone tool into an **infrastructure layer** for Bitcoin wallets and services.
+
+It provides **fee-aware, time-aware UTXO consolidation analysis** with deliberate, user-visible exposure to **Common Input Ownership Heuristic (CIOH)** tradeoffs — enabling smarter structural decisions before any transaction is constructed.
 
 Rather than treating consolidation as a one-time wallet cleanup, the project frames it as an **economic decision made under observable network conditions**, where timing, fee environment, and linkage risk are as consequential as transaction construction itself.
+
+As an infrastructure layer, Ωmega Pruner integrates seamlessly into existing wallets and platforms, enhancing their UTXO management capabilities without compromising custody, control, or privacy.
 
 > **Visual reference:**  
 > System flow and threat-model diagrams are included in the full README:  
@@ -18,7 +22,7 @@ Rather than treating consolidation as a one-time wallet cleanup, the project fra
 
 ## Core Question
 
-Can UTXO consolidation be modeled as a **fee- and time-dependent economic choice**—rather than a static cleanup operation—**without increasing address linkage or CIOH exposure**?
+Can UTXO consolidation be modeled as a **fee- and time-dependent economic choice** — rather than a static cleanup operation — **without increasing address linkage or CIOH exposure**, and can this model be provided as a reusable **infrastructure layer** for wallets and services?
 
 ---
 
@@ -29,6 +33,7 @@ Can UTXO consolidation be modeled as a **fee- and time-dependent economic choice
 - Preserve **determinism and signability** across software and hardware wallets
 - Avoid hidden aggregation, inference, or wallet-level assumptions
 - Ensure all risk signals are **user-visible and decision-relevant**
+- Provide a **reusable, non-custodial infrastructure layer** that wallets and services can integrate to offer intelligent UTXO optimization
 
 ---
 
@@ -46,6 +51,8 @@ This constraint is intentional.
 
 Reducing scope is treated as a **security property**, not a limitation.  
 By refusing to infer wallet structure or user intent, the tool minimizes CIOH amplification and avoids false certainty derived from assumed UTXO relationships.
+
+As an infrastructure layer, these constraints ensure safe, predictable integration into higher-level systems without introducing hidden trust or privacy leakage.
 
 ---
 
@@ -126,6 +133,8 @@ This condition is surfaced clearly in the UI and does **not** block transaction 
 
 Safety is derived from **scope reduction, determinism, and visibility** — not from attempting to approximate offline guarantees in unsuitable environments.
 
+As an infrastructure layer, these properties ensure safe, predictable integration into higher-level systems without introducing hidden trust or privacy leakage.
+
 ---
 
 ## Assumptions & Failure Modes
@@ -189,6 +198,8 @@ It attempts to **make risk legible before it becomes irreversible**.
 Any consolidation decision made with incomplete information is the user’s responsibility —  
 the tool’s responsibility is to ensure that **no risk is obscured by design**.
 
+As an infrastructure layer, it provides wallets and services with the primitives to surface these tradeoffs explicitly, enabling more informed structural decisions across the ecosystem.
+
 ---
 
 ## Explicit Non-Goals
@@ -196,7 +207,7 @@ the tool’s responsibility is to ensure that **no risk is obscured by design**.
 Ωmega Pruner deliberately does **not** attempt to provide:
 
 - Wallet clustering or address attribution
-- Cross-wallet or cross-account inference
+- Cross-wallet or multi-account inference
 - Heuristic enrichment beyond visible CIOH signals
 - Automatic consolidation or silent optimization
 - Fee prediction beyond observed historical context
