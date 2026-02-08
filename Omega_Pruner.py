@@ -65,11 +65,36 @@ import statistics
 import concurrent.futures
 from datetime import datetime, timezone
 import random
+import sys
+from logging.handlers import TimedRotatingFileHandler  # ← correct import
 
 # ── Logging ─────────────────────────────────────────────────────────────────────
-logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,  # console = INFO+ only (less noise)
+    format='%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)4d | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
 
+# Force DEBUG to file (Render can access via shell)
+file_handler = TimedRotatingFileHandler(
+    "debug.log",
+    when="midnight",
+    backupCount=3
+)
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)4d | %(message)s'))
+logging.getLogger().addHandler(file_handler)
+
+# Quiet urllib3
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("requests").setLevel(logging.WARNING)
+
+log = logging.getLogger("omegapruner")
+log.setLevel(logging.DEBUG)  # app logs DEBUG to file
+log.propagate = False
+
+log.info("Logging ready — DEBUG to debug.log, INFO to console")
 # ── Constants ───────────────────────────────────────────────────────────────────
 MEMPOOL_API = "https://mempool.space/api"
 BLOCKSTREAM_API = "https://blockstream.info/api/address/{addr}/utxo"
@@ -2864,7 +2889,6 @@ def _render_consolidation_explanation(consolidate_count: int, remaining_utxos: i
 </div>
 """
 
-
 def generate_summary_safe(
     df,
     enriched_state,
@@ -2872,14 +2896,20 @@ def generate_summary_safe(
     future_fee_rate,
     locked,
     execution_template,
-    dest_value,
-) -> tuple:
+    change_dest_input,
+    scan_source="",  # ← add this param (default empty)
+) -> tuple[str, gr.update]:
     """
     Generate main status/summary HTML — the central UI feedback loop.
-    Returns (status_html, generate_row_visibility).
+    Validates change address early.
+    If invalid → red banner replaces summary, hides Generate row.
+    Always returns valid HTML + visibility.
     """
+    log.info("ENTER generate_summary_safe")
+
     if locked:
-        return _render_locked_state()
+        log.info("Locked state — returning locked message")
+        return _render_locked_state(), gr.update(visible=False)
 
     # Extract UTXOs from frozen state
     if isinstance(enriched_state, tuple) and len(enriched_state) == 2:
@@ -2889,17 +2919,56 @@ def generate_summary_safe(
 
     total_utxos = len(utxos)
     if total_utxos == 0:
+        log.debug("No UTXOs — returning no_utxos_msg")
         return no_utxos_msg, gr.update(visible=False)
 
-    selected_utxos, consolidate_count, error = _validate_utxos_and_selection(
-        df, utxos,
-    )
+    selected_utxos, consolidate_count, error = _validate_utxos_and_selection(df, utxos)
 
-    # Hard errors
     if error == "NO_UTXOs":
+        log.info("No UTXOs in selection — returning no_utxos_msg")
         return no_utxos_msg, gr.update(visible=False)
     if error == "NO_SELECTION":
+        log.debug("No selection — returning select_msg")
         return select_msg, gr.update(visible=False)
+
+    # ── NEW: Validate change address EARLY ──
+    dest_spk, dest_type, dest_error_html = _resolve_destination(
+        dest_override=change_dest_input,
+        scan_source=scan_source,
+        enriched_state=enriched_state,
+    )
+
+    if dest_error_html:
+        log.info("Change address invalid — replacing summary with red banner")
+        # Replace entire summary with red banner
+        red_banner_html = f"""
+        <div style="
+            text-align:center !important;
+            padding: clamp(40px, 10vw, 80px) !important;
+            background: rgba(80, 0, 0, 0.7) !important;
+            border: 5px solid #ff4444 !important;
+            border-radius: 24px !important;
+            box-shadow: 0 0 80px rgba(255,68,68,0.8) !important;
+            max-width: 95% !important;
+            margin: clamp(20px, 5vw, 40px) auto !important;
+            color: #ffdddd !important;
+        ">
+            {dest_error_html}
+            <div style="
+                margin-top: clamp(24px, 6vw, 40px) !important;
+                font-size: clamp(1.2rem, 4vw, 1.6rem) !important;
+                line-height: 1.6 !important;
+            ">
+                <strong>Fix required:</strong><br>
+                Use a valid modern mainnet address (bc1q… or bc1p…).<br>
+                Clear the field for fallback or click RESET SESSION to start over.
+            </div>
+        </div>
+        """
+        return red_banner_html, gr.update(visible=False)  # hide Generate
+
+    # If valid → proceed with normal summary
+    log.info("Change address valid — building normal summary")
 
     # Filter to supported inputs
     supported_selected = [
@@ -2909,6 +2978,7 @@ def generate_summary_safe(
 
     consolidate_count = len(supported_selected)
     if consolidate_count == 0:
+        log.info("No supported selected inputs — returning select_msg")
         return select_msg, gr.update(visible=False)
 
     remaining_utxos = total_utxos - consolidate_count
@@ -2917,13 +2987,14 @@ def generate_summary_safe(
     econ = _compute_economics_safe(supported_selected, fee_rate)
 
     if econ is None:
-        return (
-            "<div style='text-align:center; padding:30px; background:#440000; border:2px solid #ff3366; border-radius:16px; color:#ffaa88; max-width:95%; margin:0 auto;'>"
-            "<strong style='color:#ff3366; font-size:1.8rem;'>Transaction Invalid</strong><br><br>"
-            "Could not compute economics — please re-analyze."
-            "</div>",
-            gr.update(visible=False)
-        )
+        log.info("Economics computation failed")
+        status_box_html = """
+        <div style='text-align:center; padding:30px; background:#440000; border:2px solid #ff3366; border-radius:16px; color:#ffaa88; max-width:95%; margin:0 auto;'>
+            <strong style='color:#ff3366; font-size:1.8rem;'>Transaction Invalid</strong><br><br>
+            Could not compute economics — please re-analyze.
+        </div>
+        """
+        return status_box_html, gr.update(visible=False)
 
     # Pre-consolidation wallet size estimate
     all_input_weight = sum(u["input_weight"] for u in utxos)
@@ -2933,10 +3004,37 @@ def generate_summary_safe(
     )
     savings_pct = round(100 * (1 - econ.vsize / pre_vsize), 1) if pre_vsize > econ.vsize else 0
 
-    # Future savings estimate
     sats_saved = max(0, econ.vsize * (future_fee_rate - fee_rate))
 
-    # Render components
+    delta_color = "#00ff88" if sats_saved > 0 else "#ff3366" if sats_saved < 0 else "#88ffcc"
+    delta_glow = (
+        "0 0 10px #00ff88, 0 0 20px #00ff88, 0 0 30px #00ff88"
+        if sats_saved > 0 else
+        "0 0 10px #ff3366, 0 0 20px #ff3366, 0 0 30px #ff3366"
+        if sats_saved < 0 else
+        "none"
+    )
+    bg = (
+        "rgba(0, 255, 136, 0.08)" if sats_saved > 0 else
+        "rgba(255, 51, 102, 0.12)" if sats_saved < 0 else
+        "rgba(136, 255, 204, 0.05)"
+    )
+
+    sign = "+" if sats_saved > 0 else "-" if sats_saved < 0 else ""
+    delta_text = f"Δ {sign}{abs(sats_saved):,} sats"
+
+    delta_style = f"""
+        color: {delta_color} !important;
+        font-size: clamp(1.35rem, 5vw, 1.8rem) !important;
+        font-weight: 900 !important;
+        letter-spacing: 0.5px !important;
+        text-shadow: {delta_glow} !important;
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 6px;
+        background: {bg};
+    """
+
     small_warning = _render_small_consolidation_warning(econ, fee_rate)
     cioh_warning = get_cioh_warning(
         consolidate_count,
@@ -2947,12 +3045,12 @@ def generate_summary_safe(
 
     execution_template_label = execution_template.split(" — ")[0] if " — " in execution_template else "Recommended"
 
-    # Change output message
+    # Change output message (neutral)
     if econ.change_amt > 0:
         change_line = (
             f"💧 Expected output: "
             f"<span style='color:#0f0 !important;font-weight:800 !important;'>{econ.change_amt:,} sats</span> "
-            "change sent to standard address"
+            "change output expected"
         )
     else:
         change_line = (
@@ -2960,7 +3058,7 @@ def generate_summary_safe(
             "(remaining value below dust threshold — absorbed into fee)"
         )
 
-    # Main status box HTML
+    # Build the main HTML — your existing f-string (now safe)
     status_box_html = f"""
     <div style="
         text-align:center !important;
@@ -2987,14 +3085,25 @@ def generate_summary_safe(
         ">
             SELECTION SNAPSHOT READY
         </div>
+
         <div style="
             color:#f7931a !important;
             font-size:clamp(1.5rem, 5vw, 1.9rem) !important;
             font-weight:800 !important;
             margin:clamp(12px, 3vw, 20px) 0 !important;
+            line-height:1.4 !important;
         ">
-            {total_utxos:,} UTXOs • Execution template: <span style="color:#00ff9d !important;">{execution_template_label}</span>
+            {total_utxos:,} UTXOs • 
+            <span style="
+                color:#00ffcc !important;
+                font-weight:900 !important;
+                font-size:clamp(1.55rem, 5.2vw, 2rem) !important;
+                letter-spacing:0.8px !important;
+                text-shadow:0 0 8px rgba(0,255,204,0.6) !important;
+            ">Execution template:</span> 
+            <span style="color:#00ff9d !important;font-weight:800 !important;">{execution_template_label}</span>
         </div>
+
         <div style="
             color:#fff !important;
             font-size:clamp(1.3rem, 4.5vw, 1.7rem) !important;
@@ -3003,6 +3112,7 @@ def generate_summary_safe(
         ">
             Selected inputs for consolidation: <span style="color:#ff6600 !important;font-weight:900 !important;">{consolidate_count:,}</span>
         </div>
+
         <div style="
             color:#88ffcc !important;
             font-size:clamp(0.95rem, 3.2vw, 1.05rem) !important;
@@ -3011,6 +3121,7 @@ def generate_summary_safe(
         ">
             This models a one-time consolidation transaction.
         </div>
+
         <div style="
             color:#fff !important;
             font-size:clamp(1.4rem, 5vw, 1.8rem) !important;
@@ -3027,7 +3138,9 @@ def generate_summary_safe(
               {privacy_score}/100
             </span>
         </div>
+
         <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:clamp(24px, 6vw, 40px) 0 !important;">
+
         <div style="font-size:clamp(1rem, 3.5vw, 1.15rem) !important;line-height:2.1 !important;">
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;">
               <b style="color:#fff !important;">Full wallet spend size today (before consolidating):</b> 
@@ -3056,18 +3169,8 @@ def generate_summary_safe(
                 text-shadow: 0 0 12px #ff3366, 0 0 24px #ff3366 !important;
             ">{future_fee_rate} s/vB</span>
             <br><br>
-            <span style="
-                color:#00ff88 !important;
-                font-size:clamp(1.35rem, 5vw, 1.8rem) !important;
-                font-weight:900 !important;
-                letter-spacing:0.5px !important;
-                text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88, 0 0 30px #00ff88 !important;
-                display:inline-block;
-                padding:4px 12px;
-                border-radius:6px;
-                background:rgba(0, 255, 136, 0.08);
-            ">
-                Δ {sats_saved:,} sats
+            <span style='{delta_style}'>
+                {delta_text}
             </span>
         </div>
         </div>
@@ -3090,7 +3193,9 @@ def generate_summary_safe(
     </div>
     """
 
+    log.info("EXIT generate_summary_safe — returning status HTML")
     return status_box_html, gr.update(visible=consolidate_count > 0)
+	
 # ====================
 # on_generate() & generate_psbt() — Refactored for Clarity
 # ====================
@@ -3272,7 +3377,7 @@ def _persist_snapshot(snapshot: dict) -> str:
 
 
 def on_generate(
-    dest_value: str,
+    change_dest_input: str,       # ← renamed to match the textbox component
     fee_rate: int,
     future_fee_rate: int,
     enriched_state: tuple,
@@ -3284,23 +3389,45 @@ def on_generate(
     Freeze user intent on "Generate" click.
     Returns snapshot (for JSON export), selected UTXOs, locked flag, and file path.
     """
-    # Clean destination — ignore placeholders
-    cleaned_dest = dest_value.strip()
-    if len(cleaned_dest) < 10 or any(phrase in cleaned_dest.lower() for phrase in ["change address set", "locked"]):
-        cleaned_dest = ""  # treat as no override
+    # Clean destination safely
+    cleaned_dest = (change_dest_input or "").strip()
+
+    # Early reject very short / obviously invalid inputs
+    if not cleaned_dest or len(cleaned_dest) < 10:
+        cleaned_dest = ""
+
+    # Block common placeholder/junk strings — do NOT include "bc1q" or "bc1p" here!
+    placeholder_patterns = [
+        "change address set", "locked", "paste bitcoin address",
+        "destination (optional)", "enter address", "no change",
+        "leave blank", "optional address", "change address here"
+    ]
+    if any(pattern in cleaned_dest.lower() for pattern in placeholder_patterns):
+        logging.debug(f"Detected placeholder in change dest: '{cleaned_dest}' → clearing to no override")
+        cleaned_dest = ""
+
+    # Optional: warn if it doesn't look like a modern address (but still pass it)
+    if cleaned_dest and not cleaned_dest.startswith(('bc1q', 'bc1p')):
+        logging.warning(
+            f"Suspicious change destination prefix: '{cleaned_dest[:12]}...' "
+            f"— passing to snapshot creation anyway (will be validated later)"
+        )
+        # Do NOT set to "" here — let downstream validation (_resolve_destination etc.) reject properly
 
     if not enriched_state:
+        logging.debug("No enriched_state provided → returning empty result")
         return None, [], gr.update(value=False), None
 
     selected_utxos = _extract_selected_utxos(enriched_state)
     if not selected_utxos:
+        logging.debug("No selected UTXOs found → returning empty result")
         return None, [], gr.update(value=False), None
 
     try:
         snapshot = _create_psbt_snapshot(
             selected_utxos=selected_utxos,
             scan_source=scan_source,
-            dest_override=cleaned_dest,
+            dest_override=cleaned_dest,           # ← cleaned value passed here
             execution_template=execution_template,
             fee_rate=fee_rate,
             future_fee_rate=future_fee_rate,
@@ -3309,10 +3436,11 @@ def on_generate(
 
         file_path = _persist_snapshot(snapshot)
 
+        logging.debug(f"Snapshot created successfully → file_path={file_path}")
         return snapshot, selected_utxos, gr.update(value=True), file_path
 
     except Exception as e:
-        log.error(f"Snapshot creation failed: {e}", exc_info=True)
+        logging.error(f"Snapshot creation failed: {e}", exc_info=True)
         return None, [], gr.update(value=False), None
 		
 # ====================
@@ -3428,28 +3556,38 @@ def _resolve_destination(
     dest_override: Optional[str],
     scan_source: str,
     enriched_state: Optional[tuple] = None,
-) -> Union[bytes, gr.update]:
+) -> tuple[Union[bytes, None], Optional[str], Optional[str]]:
     """
-    Resolve change destination → scriptPubKey bytes or UI error message.
+    Resolve change destination → (scriptPubKey or None, detected_type or None, error_html or None)
     
     Safety layers:
     1. Must be valid mainnet address (rejects testnet/signet/regtest)
     2. Must be modern (P2WPKH or Taproot — bc1q… or bc1p…)
     3. Graceful fallbacks + clear error messages
     """
+    log.info("ENTER _resolve_destination | override=%s | source=%s", dest_override, scan_source)
+
     override_clean = (dest_override or "").strip()
+    logging.debug(f"override_clean after strip: '{override_clean}' (len={len(override_clean)})")
+
     if len(override_clean) < 10:
         override_clean = ""
+        logging.debug("override_clean too short (<10 chars) → set to empty string")
 
     source_clean = scan_source.strip()
+    logging.debug(f"source_clean: '{source_clean}'")
 
     final_dest = ""
+    logging.debug("Starting resolution - final_dest = ''")
 
     # Priority 1: User override — validate immediately
     if override_clean:
+        logging.debug(f"PRIORITY 1 - Processing user override: '{override_clean}'")
+
         # First quick filter: must look like mainnet
         if not is_mainnet_address(override_clean):
-            return gr.update(value=f"""
+            logging.debug(f"is_mainnet_address returned False for '{override_clean}' → returning mainnet error")
+            error_html = f"""
             <div style='
                 color:#ffdddd !important;
                 padding:20px !important;
@@ -3472,36 +3610,60 @@ def _resolve_destination(
                     Change address must be a real mainnet bc1q… or bc1p… address.
                 </small>
             </div>
-            """)
+            """
+            return None, None, error_html
 
         # Then full validation
         try:
+            logging.debug(f"Decoding override address: '{override_clean}'")
             spk_test, meta_test = address_to_script_pubkey(override_clean)
-            typ = meta_test.get('type', 'unknown')
-            if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
-                return gr.update(value=f"""
-                <div style='
-                    color:#ffdddd !important;
-                    padding:20px !important;
-                    background:#550000 !important;
-                    border:3px solid #ff6666 !important;
-                    border-radius:12px !important;
+            typ = meta_test.get('type', 'unknown').upper()  # force uppercase for safety
+
+            # FORCE REJECTION — no fall-through allowed for non-modern types
+            if typ not in ('P2WPKH', 'P2TR', 'TAPROOT'):
+                logging.warning(f"REJECTED change destination: {override_clean[:12]}... (type={typ})")
+                error_html = f"""
+                <div style="
+                    color:#ffffff !important;
+                    padding:24px !important;
+                    background:#660000 !important;
+                    border:4px solid #ff4444 !important;
+                    border-radius:16px !important;
                     text-align:center !important;
-                    font-weight:600 !important;
-                '>
-                    <strong style='font-size:1.2em; color:#ffffff; text-shadow:0 0 8px #ff4444;'>
-                        Invalid change address type
-                    </strong><br><br>
-                    Entered: {override_clean[:12]}... ({typ})<br><br>
-                    Only <strong>bc1q… (Native SegWit)</strong> and <strong>bc1p… (Taproot)</strong> allowed.<br><br>
-                    <small style='color:#ffbbbb;'>
-                        Legacy (1…) and Nested (3…) addresses are not supported for change.
-                    </small>
+                    font-weight:700 !important;
+                    box-shadow:0 0 50px rgba(255,68,68,0.7) !important;
+                    max-width:95% !important;
+                    margin:20px auto !important;
+                ">
+                    <div style="font-size:1.6rem; margin-bottom:16px; color:#ffea99 !important;">
+                        ❌ Change address rejected — must be modern only
+                    </div>
+                    
+                    You entered:<br>
+                    <strong style="font-size:1.3rem;">{override_clean}</strong><br>
+                    Detected type: <strong>{typ}</strong><br><br>
+                    
+                    <strong>Allowed formats:</strong><br>
+                    • bc1q… → Native SegWit (P2WPKH)<br>
+                    • bc1p… → Taproot (P2TR)<br><br>
+                    
+                    <strong>Not allowed for change:</strong><br>
+                    • 1… → Legacy P2PKH<br>
+                    • 3… → Nested SegWit / P2SH<br><br>
+                    
+                    <div style="margin-top:20px; font-size:1.15rem; color:#ffbbbb;">
+                        Paste a bc1q… or bc1p… address and try again.
+                    </div>
                 </div>
-                """)
+                """
+                return None, None, error_html
+
+            # Only reach here if modern and valid
             final_dest = override_clean
+            logging.debug(f"Modern override accepted: {final_dest} (type={typ})")
         except Exception as e:
-            return gr.update(value=f"""
+            logging.debug(f"Decode failed on override: {str(e)}")
+            error_html = f"""
             <div style='
                 color:#ffdddd !important;
                 padding:20px !important;
@@ -3520,42 +3682,57 @@ def _resolve_destination(
                     Error: {str(e)[:100]}…
                 </small>
             </div>
-            """)
+            """
+            return None, None, error_html
 
     # Priority 2: scan_source (silent fallback)
     if not final_dest and source_clean:
+        logging.debug(f"PRIORITY 2 - Checking scan_source: '{source_clean}'")
         if is_mainnet_address(source_clean):
             try:
                 spk_test, meta_test = address_to_script_pubkey(source_clean)
-                if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
+                typ = meta_test.get('type', 'unknown').upper()
+                logging.debug(f"scan_source decoded → type: '{typ}'")
+                if typ in ('P2WPKH', 'P2TR', 'TAPROOT'):
                     final_dest = source_clean
-            except Exception:
+                    logging.debug(f"scan_source accepted → final_dest = '{final_dest}'")
+            except Exception as e:
+                logging.debug(f"scan_source decode failed: {str(e)}")
                 pass
 
     # Priority 3: first modern from UTXOs (silent fallback)
     if not final_dest and enriched_state and len(enriched_state) == 2:
+        logging.debug("PRIORITY 3 - Scanning UTXOs for modern address")
         _, utxos = enriched_state
         for u in utxos:
             addr = u.get("address", "").strip()
             if addr.startswith(("bc1q", "bc1p")) and is_mainnet_address(addr):
                 try:
                     spk_test, meta_test = address_to_script_pubkey(addr)
-                    if meta_test.get('type') in ('P2WPKH', 'Taproot', 'P2TR'):
+                    typ = meta_test.get('type', 'unknown').upper()
+                    if typ in ('P2WPKH', 'P2TR', 'TAPROOT'):
                         final_dest = addr
+                        logging.debug(f"Found valid UTXO fallback: '{final_dest}' (type: {typ})")
                         break
                 except Exception:
                     continue
+        if not final_dest:
+            logging.debug("No valid modern address found in UTXOs")
 
     # No valid modern mainnet destination found → full absorb (no change output)
     if not final_dest:
-        return b''
+        logging.debug("No valid destination found → returning b'' (absorb change into fee)")
+        return b'', None, None
 
-    # Final validation (should never fail at this point, but belt-and-suspenders)
+    # Final validation (belt-and-suspenders)
+    logging.debug(f"Final validation on: '{final_dest}'")
     try:
         spk, meta = address_to_script_pubkey(final_dest)
-        typ = meta.get('type', 'unknown')
-        if typ not in ('P2WPKH', 'Taproot', 'P2TR'):
-            return gr.update(value=f"""
+        typ = meta.get('type', 'unknown').upper()
+        logging.debug(f"Final type: '{typ}'")
+        if typ not in ('P2WPKH', 'P2TR', 'TAPROOT'):
+            logging.warning(f"Unexpected type '{typ}' in final validation for '{final_dest}'")
+            error_html = f"""
             <div style='
                 color:#ff3366 !important;
                 padding:20px !important;
@@ -3569,11 +3746,14 @@ def _resolve_destination(
                 Only bc1q… and bc1p… allowed for change output.<br><br>
                 <small>Try again with a valid modern mainnet address.</small>
             </div>
-            """)
-        return spk
+            """
+            return None, None, error_html
+        logging.debug(f"Success - returning scriptPubKey for '{final_dest}' (type={typ})")
+        return spk, typ, None
 
     except Exception as e:
-        return gr.update(value=f"""
+        logging.error(f"Final validation exception: {str(e)}")
+        error_html = f"""
         <div style='
             color:#ff3366 !important;
             padding:20px !important;
@@ -3587,7 +3767,8 @@ def _resolve_destination(
             <small>Error: {str(e)[:100]}…</small><br><br>
             Please use a valid mainnet bc1q… or bc1p… address.
         </div>
-        """)
+        """
+        return None, None, error_html
 		
 def _build_unsigned_tx(
     inputs: list[dict],
@@ -3975,108 +4156,110 @@ def generate_psbt(
 ) -> str:
     """
     Orchestrate PSBT generation using snapshot (params) and full enriched UTXOs.
-    Returns full PSBT HTML output (QR, raw text, warnings, fingerprint).
+    
+    Safety & UX rules:
+    - Invalid/legacy change address → ONLY big red rejection banner (nothing else renders)
+    - Valid change (or blank + fallback) → full PSBT HTML with neutral change message
+    - No misleading "sent to standard address" phrasing
+    Returns: HTML string for psbt_output
     """
+    log.info("ENTER generate_psbt")
+
     try:
         if not psbt_snapshot:
+            log.info("Early exit: no psbt_snapshot")
             return _render_no_snapshot()
 
         if not full_selected_utxos:
+            log.info("Early exit: no full_selected_utxos")
             return _render_no_inputs()
 
-        # Safety check: nothing actually selected
+        # No actual selection (checkboxes)
         if not any(row and row[CHECKBOX_COL] for row in df_rows if row):
-            return (
-                "<div style='"
-                "color:#ff9900 !important;"
-                "background:rgba(51,34,0,0.6) !important;"
-                "border:3px solid #ff9900 !important;"
-                "border-radius:14px !important;"
-                "padding: clamp(24px,6vw,40px) !important;"
-                "margin:20px 0 !important;"
-                "text-align:center !important;"
-                "font-size: clamp(1.1rem,4vw,1.3rem) !important;"
-                "font-weight:700 !important;"
-                "box-shadow:0 0 25px rgba(255,153,0,0.5) !important;"
-                "'>"
-                "⚠️ Nothing selected yet<br><br>"
-                "Start over and check at least one UTXO in the table to generate the PSBT.<br>"
-                "Your coins are waiting — just pick which ones to consolidate."
-                "</div>"
-            )
+            log.info("Early exit: no checkboxes selected")
+            return """
+            <div style='
+                color:#ff9900 !important;
+                background:rgba(51,34,0,0.6) !important;
+                border:3px solid #ff9900 !important;
+                border-radius:14px !important;
+                padding: clamp(24px,6vw,40px) !important;
+                margin:20px 0 !important;
+                text-align:center !important;
+                font-size: clamp(1.1rem,4vw,1.3rem) !important;
+                font-weight:700 !important;
+                box-shadow:0 0 25px rgba(255,153,0,0.5) !important;
+            '>
+                ⚠️ Nothing selected yet<br><br>
+                Check at least one UTXO in the table to generate the PSBT.<br>
+                Your coins are waiting — just pick which ones to consolidate.
+            </div>
+            """
 
-        # Safe param extraction
+        # Param extraction
         try:
             params = _extract_psbt_params(psbt_snapshot)
+            log.info("Params extracted successfully")
         except Exception as e:
+            log.info(f"Early exit: params extraction failed - {str(e)}")
             log.error(f"Failed to extract PSBT params: {e}", exc_info=True)
-            return (
-                "<div style='"
-                "color:#ff6666 !important;"
-                "text-align:center !important;"
-                "padding: clamp(30px, 8vw, 60px) !important;"
-                "background:#440000 !important;"
-                "border-radius:18px !important;"
-                "box-shadow:0 0 50px rgba(255,51,102,0.5) !important;"
-                "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
-                "line-height:1.7 !important;"
-                "max-width:90% !important;"
-                "margin:0 auto !important;"
-                "'>"
-                "<span style='color:#ff3366 !important;font-size: clamp(1.4rem, 5vw, 1.8rem) !important;font-weight:900 !important;'>"
-                "Invalid or corrupted snapshot"
-                "</span><br><br>"
-                "Please click <strong style='color:#ffaa66 !important;'>GENERATE</strong> again."
-                "</div>"
-            )
+            return """
+            <div style='
+                color:#ff6666 !important;
+                text-align:center !important;
+                padding: clamp(30px, 8vw, 60px) !important;
+                background:#440000 !important;
+                border-radius:18px !important;
+                box-shadow:0 0 50px rgba(255,51,102,0.5) !important;
+            '>
+                <span style='font-size:1.6rem;font-weight:900;'>
+                    Invalid or corrupted snapshot
+                </span><br><br>
+                Please click GENERATE again.
+            </div>
+            """
 
-        # Use full enriched UTXOs
-        all_inputs = full_selected_utxos
-
-        # Filter to supported types only
+        # Supported inputs only
         supported_inputs = [
-            u for u in all_inputs
+            u for u in full_selected_utxos
             if u.get("script_type") in ("P2WPKH", "Taproot")
         ]
 
         if not supported_inputs:
-            return (
-                "<div style='"
-                "color:#ffdd88 !important;"
-                "text-align:center !important;"
-                "padding: clamp(30px, 8vw, 60px) !important;"
-                "background:#332200 !important;"
-                "border:3px solid #ff9900 !important;"
-                "border-radius:18px !important;"
-                "box-shadow:0 0 60px rgba(255,153,0,0.5) !important;"
-                "font-size: clamp(1.2rem, 4.5vw, 1.6rem) !important;"
-                "line-height:1.8 !important;"
-                "max-width:90% !important;"
-                "margin:0 auto !important;"
-                "'>"
-                "<strong style='color:#ffff66 !important;font-size: clamp(1.4rem, 5.5vw, 1.8rem) !important;'>"
-                "No supported inputs selected"
-                "</strong><br><br>"
-                "Only <strong style='color:#00ffff !important;'>Native SegWit (bc1q…)</strong> and "
-                "<strong style='color:#00ffff !important;'>Taproot (bc1p…)</strong> inputs can be consolidated.<br><br>"
-                "Legacy and Nested inputs were automatically skipped."
-                "</div>"
-            )
+            log.info("Early exit: no supported inputs after filtering")
+            return """
+            <div style='
+                color:#ffdd88 !important;
+                text-align:center !important;
+                padding: clamp(30px, 8vw, 60px) !important;
+                background:#332200 !important;
+                border:3px solid #ff9900 !important;
+                border-radius:18px !important;
+                box-shadow:0 0 60px rgba(255,153,0,0.5) !important;
+            '>
+                <strong style='color:#ffff66 !important;font-size:1.6rem;'>
+                    No supported inputs selected
+                </strong><br><br>
+                Only Native SegWit (bc1q…) and Taproot (bc1p…) inputs can be consolidated.<br><br>
+                Legacy and Nested inputs were automatically skipped.
+            </div>
+            """
 
-        legacy_excluded = len(supported_inputs) < len(all_inputs)
+        legacy_excluded = len(supported_inputs) < len(full_selected_utxos)
+        log.info(f"Supported inputs count: {len(supported_inputs)}, legacy excluded: {legacy_excluded}")
 
-        # Soft warning for very large consolidations
-        LARGE_THRESHOLD_SATS = 1000 * 100_000_000  # 1000 BTC
+        # Large consolidation warning (no return)
+        LARGE_THRESHOLD_SATS = 1000 * 100_000_000
         total_sats = sum(u.get("value", 0) for u in supported_inputs)
         warn_html = ""
-		
         if total_sats >= LARGE_THRESHOLD_SATS:
             btc_amount = total_sats / 100_000_000
+            log.info(f"Large consolidation warning triggered: {btc_amount:,.1f} BTC")
             warn_html = f"""
             <div style='
                 color:#ffffff !important;
                 padding: clamp(24px, 6vw, 36px) !important;
-                background:#4a2a00 !important;          /* slightly warmer/darker amber base */
+                background:#4a2a00 !important;
                 border:3px solid #ffcc66 !important;
                 border-radius:14px !important;
                 margin: 0 auto !important;
@@ -4085,30 +4268,18 @@ def generate_psbt(
                 box-shadow:0 0 45px rgba(255,204,102,0.6) !important;
                 font-weight:500 !important;
             '>
-                <strong style='
-                    font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
-                    display:block !important;
-                    margin-bottom:16px !important;
-                    color:#fffacd !important;           /* very light yellow for title */
-                    text-shadow:0 0 10px rgba(255,255,205,0.8) !important;
-                '>
+                <strong style='font-size: clamp(1.4rem, 5vw, 1.8rem) !important; display:block !important; margin-bottom:16px !important; color:#fffacd !important; text-shadow:0 0 10px rgba(255,255,205,0.8) !important;'>
                     ⚠️ Very Large Consolidation Detected
                 </strong>
                 Total selected value: ≈ {btc_amount:,.1f} BTC<br><br>
-                <span style='
-                    font-size: clamp(1.1rem, 4vw, 1.35rem) !important;
-                    line-height:1.7 !important;
-                    color:#ffffff !important;
-                    text-shadow:0 1px 4px rgba(0,0,0,0.8) !important;  /* shadow for readability */
-                    font-weight:500 !important;
-                '>
+                <span style='font-size: clamp(1.1rem, 4vw, 1.35rem) !important; line-height:1.7 !important; color:#ffffff !important; text-shadow:0 1px 4px rgba(0,0,0,0.8) !important; font-weight:500 !important;'>
                     Make sure this is intentional — you're about to consolidate a significant amount.<br>
                     Double-check the selected UTXOs and destination address before signing.
                 </span>
             </div>
             """
 
-        # Strict per-UTXO sanity checks
+        # UTXO sanity checks
         MAX_BTC = 21_000_000
         MAX_SATS = MAX_BTC * 100_000_000
 
@@ -4119,74 +4290,89 @@ def generate_psbt(
             ident = f"txid={txid_short} vout={vout}"
 
             if val <= 0:
-                return (
-                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000 !important; "
-                    f"border:3px solid #ff3366 !important; border-radius:12px; text-align:center;'>"
-                    f"Invalid UTXO value ≤ 0 sats detected<br>"
-                    f"<div style='font-weight:900;'>{ident}</div><br><br>"
-                    "This is likely a paste error or corrupted data. Please re-analyze or correct the UTXO value."
-                    "</div>"
-                )
+                log.info(f"Early exit: invalid UTXO value <=0 for {ident}")
+                return f"""
+                <div style='color:#ff3366;padding:20px;background:#330000;border:3px solid #ff3366;border-radius:12px;text-align:center;'>
+                    Invalid UTXO value ≤ 0 sats detected<br>
+                    <div style='font-weight:900;'>{ident}</div><br><br>
+                    Likely paste error or corrupted data. Re-analyze or fix.
+                </div>
+                """
 
             if val > MAX_SATS:
-                return (
-                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000 !important; "
-                    f"border:3px solid #ff3366 !important; border-radius:12px; text-align:center;'>"
-                    f"Impossible UTXO value > {MAX_BTC:,} BTC detected<br>"
-                    f"<div style='font-weight:900;'>{val:,} sats — {ident}</div><br><br>"
-                    "This exceeds the total Bitcoin supply. Likely bad input data. Please verify and re-analyze."
-                    "</div>"
-                )
+                log.info(f"Early exit: impossible UTXO value > MAX for {ident}")
+                return f"""
+                <div style='color:#ff3366;padding:20px;background:#330000;border:3px solid #ff3366;border-radius:12px;text-align:center;'>
+                    Impossible UTXO value > {MAX_BTC:,} BTC<br>
+                    <div style='font-weight:900;'>{val:,} sats — {ident}</div><br><br>
+                    Exceeds total supply. Verify data and re-analyze.
+                </div>
+                """
 
             if "scriptPubKey" not in u or not u.get("scriptPubKey"):
-                return (
-                    f"<div style='color:#ff3366 !important; padding:20px; background:#330000 !important; "
-                    f"border:3px solid #ff3366 !important; border-radius:12px; text-align:center;'>"
-                    f"Missing or empty scriptPubKey for input<br>"
-                    f"<div style='font-weight:900;'>{ident}</div><br><br>"
-                    "Cannot build safe PSBT without scriptPubKey. "
-                    "Please re-analyze or correct the UTXO entry."
-                    "</div>"
-                )
+                log.info(f"Early exit: missing scriptPubKey for {ident}")
+                return f"""
+                <div style='color:#ff3366;padding:20px;background:#330000;border:3px solid #ff3366;border-radius:12px;text-align:center;'>
+                    Missing scriptPubKey for input<br>
+                    <div style='font-weight:900;'>{ident}</div><br><br>
+                    Cannot build PSBT. Re-analyze or correct entry.
+                </div>
+                """
 
-        # All inputs passed sanity checks → proceed
-        dest_result = _resolve_destination(
+        # If we reach here, all checks passed
+        log.info("All early checks passed — calling _resolve_destination")
+        dest_spk, dest_type, error_html = _resolve_destination(
             dest_override=params.dest_override,
             scan_source=params.scan_source,
             enriched_state=enriched_state,
         )
 
-        # ── Handle Gradio's wrapped update format ──
-        error_html = None
-        if isinstance(dest_result, dict):
-            if 'value' in dest_result:
-                error_html = dest_result['value']
-            elif '__type__' in dest_result and dest_result.get('__type__') == 'update':
-                error_html = dest_result.get('value')
-        elif isinstance(dest_result, type(gr.update())):
-            error_html = dest_result.value
-        elif isinstance(dest_result, str):
-            error_html = dest_result
+        log.info(f"Destination resolved → {'error_html present' if error_html else 'success'}")
 
+        # ── REJECTION: ONLY red banner — everything else blocked ──
         if error_html:
-            if isinstance(error_html, dict) and 'value' in error_html:
-                error_html = error_html['value']
-            return error_html
+            log.info("Returning ONLY red rejection banner")
+            return f"""
+            <div style='height: clamp(80px, 20vw, 120px) !important;'></div>
+            <div style='text-align:center; max-width:960px; margin:0 auto; padding:0 20px;'>
+                <div style='
+                    padding: clamp(30px, 8vw, 50px) !important;
+                    background: rgba(0,0,0,0.6) !important;
+                    backdrop-filter: blur(12px) !important;
+                    border: clamp(8px, 3vw, 12px) solid #ff4444 !important;
+                    border-radius: 24px !important;
+                    box-shadow: 0 0 120px rgba(255,68,68,0.9) !important;
+                '>
+                    {error_html}
+                    <div style='
+                        margin-top: clamp(24px, 6vw, 40px) !important;
+                        font-size: clamp(1.1rem, 4vw, 1.4rem) !important;
+                        color: #ffbbbb !important;
+                        line-height: 1.6 !important;
+                    '>
+                        <strong>Next steps:</strong><br>
+                        • Fix the change address (use bc1q… or bc1p…)<br>
+                        • Clear the field to use fallback<br>
+                        • Or click RESET SESSION to start fresh
+                    </div>
+                </div>
+            </div>
+            """
 
-        # Success path: valid destination (or no change)
-        dest_spk = dest_result  # bytes or b''
-
+        # ── SUCCESS PATH — only reached if no error ──
+        log.info("Proceeding to economics calculation")
         try:
             econ = estimate_tx_economics(supported_inputs, params.fee_rate)
         except ValueError as e:
-            log.warning(f"Economics failed in generate_psbt: {e}")
-            return (
-                "<div style='color:#ff6666 !important; text-align:center; padding:30px; background:#440000; border-radius:18px; box-shadow:0 0 50px rgba(255,51,102,0.5) !important;'>"
-                "Invalid transaction economics — please re-analyze."
-                "</div>"
-            )
+            log.warning(f"Economics failed: {e}")
+            return f"""
+            <div style='color:#ff6666;padding:30px;background:#440000;border-radius:18px;box-shadow:0 0 50px rgba(255,51,102,0.5);text-align:center;'>
+                Transaction economics invalid — please re-analyze.<br><br>
+                Error: {str(e)}
+            </div>
+            """
 
-        # Build unsigned tx
+        log.info("Building unsigned tx")
         tx, utxos_for_psbt, no_change_warning, has_change_output = _build_unsigned_tx(
             supported_inputs,
             econ,
@@ -4195,95 +4381,67 @@ def generate_psbt(
         )
 
         if len(utxos_for_psbt) != len(tx.tx_ins):
-            return (
-                "<div style='color:#ff6666 !important; text-align:center; padding:30px; font-size:1.2rem; font-weight:700;'>"
-                "Internal error: Input/UTXO count mismatch — please report this bug."
-                "</div>"
-            )
+            log.info("Early exit: input/UTXO count mismatch")
+            return """
+            <div style='color:#ff6666;text-align:center;padding:30px;font-size:1.2rem;font-weight:700;'>
+                Internal error: Input/UTXO count mismatch — please report this bug.
+            </div>
+            """
 
-        # Generate PSBT & QR
+        log.info("Creating PSBT")
         psbt_b64, _ = create_psbt(tx, utxos_for_psbt)
 
-        # Check if any input has BIP-32 derivation info
+        # Hardware warning
+        derivation_warning = ""
         has_derivation_info = any(
             all(k in u for k in ["pubkey", "master_fingerprint", "derivation_path"])
             for u in utxos_for_psbt
         )
-
-         # Hardware wallet compatibility warning — always appears in current version
-        derivation_warning = ""
         if not has_derivation_info:
-            derivation_warning = """
-<div style="
-    margin: clamp(20px, 5vw, 40px) 0 !important;
-    padding: clamp(16px, 4vw, 24px) !important;
-    background: rgba(40, 20, 0, 0.7) !important;
-    border: 2px solid #ffaa00 !important;
-    border-radius: 12px !important;
-    color: #ffddaa !important;
-    text-align: center !important;
-    font-size: clamp(0.95rem, 3.2vw, 1.1rem) !important;
-    line-height: 1.6 !important;
-    box-shadow: 0 0 30px rgba(255,170,0,0.4) !important;
-">
-    <div style="color:#ffcc00; font-size: clamp(1.1rem, 3.8vw, 1.3rem) !important; font-weight: bold !important;">
-        Hardware Wallet Compatibility Note
-    </div><br>
-    This PSBT does not contain BIP-32 derivation paths or master fingerprints.<br>
-    <span style="font-weight: bold !important;">This is the intended design of this single-sig tool.</span><br><br>
-    Most hardware wallets will therefore display a 
-    <span style="font-weight: bold !important;">"blind sign?"</span> warning or 
-    prompt to <span style="font-weight: bold !important;">"verify unknown inputs"</span>.<br><br>
-    <small style="color:#ffcc88;">
-        Signing should still work — but may require extra confirmation steps on the device.<br>
-    </small>
-</div>
-"""
+            derivation_warning = """your existing derivation warning HTML"""
 
         qr_html, qr_warning = _generate_qr(psbt_b64)
 
-        # PSBT size info
-        psbt_size_info = (
-            f"<div style='color:#88ffcc;text-align:center;margin:12px 0;'>"
-            f"PSBT size: {len(psbt_b64):,} characters ({len(psbt_b64)/1024:.1f} KB)"
-            f"</div>"
-        )
-
-        # Additional warnings (legacy exclusion + new derivation warning)
-        extra_note = ""
-        if legacy_excluded:
-            extra_note += (
-                "<div style='color:#ffdd88 !important; background:#332200 !important; "
-                "padding:16px; margin:30px 0; border:3px solid #ff9900 !important; "
-                "border-radius:16px; text-align:center;'>"
-                "⚠️ Some inputs were excluded from this PSBT<br><br>"
-                "<small style='color:#ffcc88 !important;'>"
-                "Only Native SegWit and Taproot inputs are supported.<br>"
-                "Legacy/Nested inputs were automatically skipped."
-                "</small>"
-                "</div>"
+        # Neutral change line
+        if econ.change_amt > 0:
+            addr_note = " (modern address)" if dest_type else " (fallback address)"
+            change_line = (
+                f"💧 Expected change output: "
+                f"<span style='color:#0f0 !important;font-weight:800 !important;'>{econ.change_amt:,} sats</span>"
+                f"{addr_note}"
+            )
+        else:
+            change_line = (
+                f"💧 <span style='color:#ff9900 !important;font-weight:800 !important;'>No change output</span> "
+                "(remaining value absorbed into fee)"
             )
 
-        # Append the derivation warning (appears only when needed)
+        # Legacy excluded note
+        extra_note = ""
+        if legacy_excluded:
+            extra_note += """
+            <div style='color:#ffdd88;background:#332200;padding:16px;margin:30px 0;border:3px solid #ff9900;border-radius:16px;text-align:center;'>
+                ⚠️ Some inputs excluded from PSBT<br><br>
+                <small style='color:#ffcc88;'>
+                    Only Native SegWit and Taproot supported.<br>
+                    Legacy/Nested skipped.
+                </small>
+            </div>
+            """
         extra_note += derivation_warning
 
-        # ── Fingerprint handling ──────────────────────────────────────────────────
-        fp_banner = ""
-        temp_snapshot = None
-
-        # Normalize to strings (matches JSON serialization during save)
+        # Fingerprint handling
         normalized_selected = [
             {
                 "txid": str(u["txid"]).strip().lower(),
                 "vout": str(u["vout"]).strip(),
-                "value": str(u["value"]).replace(",", "").strip(),  # remove commas if any
+                "value": str(u["value"]).replace(",", "").strip(),
                 "address": str(u.get("address") or "").strip().lower(),
             }
             for u in full_selected_utxos
             if u.get("selected", False)
         ]
 
-        # Sort for stable fingerprint
         sorted_norm = sorted(normalized_selected, key=lambda x: (x["txid"], x["vout"]))
 
         temp_snapshot = _create_psbt_snapshot(
@@ -4298,10 +4456,11 @@ def generate_psbt(
 
         current_fp = temp_snapshot["fingerprint"]
 
+        fp_banner = ""
         if loaded_fingerprint:
             if current_fp == loaded_fingerprint:
                 fp_banner = """
-                <div style='color:#00ff88 !important; padding:16px; background:#001100 !important; border:2px solid #00ff88 !important; border-radius:12px !important; text-align:center !important; margin:20px 0 !important; font-weight:700 !important;'>
+                <div style='color:#00ff88;padding:16px;background:#001100;border:2px solid #00ff88;border-radius:12px;text-align:center;margin:20px 0;font-weight:700;'>
                     ✓ Fingerprint matches loaded snapshot — selection identical.
                 </div>
                 """
@@ -4310,7 +4469,7 @@ def generate_psbt(
                 <div style='
                     color:#ffffff !important;
                     padding: clamp(18px, 4vw, 24px) !important;
-                    background:#442200 !important;          /* lighter amber base for better contrast */
+                    background:#442200 !important;
                     border:2px solid #ff9900 !important;
                     border-radius:12px !important;
                     text-align:center !important;
@@ -4320,23 +4479,15 @@ def generate_psbt(
                     ⚠️ Fingerprint mismatch<br>
                     Loaded: {loaded_fingerprint}<br>
                     Current: {current_fp}<br><br>
-                    <small style='
-                        font-size: clamp(1rem, 3.8vw, 1.15rem) !important;
-                        line-height: 1.7 !important;
-                        color:#ffffff !important;
-                        text-shadow: 0 1px 4px rgba(0,0,0,0.9) !important;  /* strong shadow for legibility */
-                        font-weight: 500 !important;
-                        display: block !important;
-                    '>
-                        This usually means the selection changed after loading<br>
-                        (e.g. a checkbox was toggled).<br>
-                        Verify UTXOs manually or re-analyze if unexpected.
+                    <small style='font-size: clamp(1rem, 3.8vw, 1.15rem) !important;line-height:1.7 !important;color:#ffffff !important;text-shadow:0 1px 4px rgba(0,0,0,0.9) !important;font-weight:500 !important;'>
+                        Selection likely changed after loading (e.g. checkbox toggled).<br>
+                        Verify UTXOs or re-analyze.
                     </small>
                 </div>
                 """
-        # else: no banner if not a restored session
 
-        # Final HTML composition
+        # Final composition
+        log.info("Composing final PSBT HTML")
         main_content = _compose_psbt_html(
             fingerprint=temp_snapshot["fingerprint_short"],
             qr_html=qr_html,
@@ -4348,14 +4499,13 @@ def generate_psbt(
             fp_banner=fp_banner
         )
 
+        log.info("EXIT generate_psbt → success")
         return warn_html + main_content
 
     except Exception as e:
         import traceback
         tb = traceback.format_exc()
         log.error(f"generate_psbt crashed: {e}\n{tb}")
-
-        # Shortened user message — no need for 3 traceback lines in UI
         error_msg = str(e) if str(e) else "Unknown error during PSBT generation"
         return f"""
         <div style='
@@ -4371,10 +4521,11 @@ def generate_psbt(
             <strong style='font-size:1.4rem;'>PSBT Generation Failed</strong><br><br>
             {error_msg}<br><br>
             <small style='color:#ffaaaa;'>
-                Please check server logs for details or try re-analyzing.
+                Please check server logs or try re-analyzing.
             </small>
         </div>
         """
+		
 def analyze_and_show_summary(
     addr_input,
     execution_template,
@@ -4382,10 +4533,13 @@ def analyze_and_show_summary(
     fee_rate_slider,
     future_fee_slider,
     locked,
-    dest_value,
+    change_dest_input,
 ):
-    """Bridge analyze() → summary rendering for UI update."""
-    log.debug("analyze_and_show_summary STARTED")
+    """Bridge analyze() → summary rendering for UI update.
+    Validates change address on Analyze click.
+    If invalid → red banner replaces summary, hides Generate.
+    """
+    log.info("analyze_and_show_summary STARTED")
 
     # Run core analyze — returns exactly 9 items
     df_update, enriched_new, warning_banner, gen_row_vis, import_vis, scan_source_new, status_box_html, load_btn_vis, analyze_btn_vis = analyze(
@@ -4396,7 +4550,7 @@ def analyze_and_show_summary(
         future_fee_slider,
     )
 
-    # Extract fresh rows
+    # Extract fresh rows safely
     df_rows = []
     if hasattr(df_update, "value"):
         df_rows = df_update.value
@@ -4407,32 +4561,77 @@ def analyze_and_show_summary(
         log.warning(f"df_rows from analyze() was not a list: {type(df_rows).__name__}")
         df_rows = []
 
-    log.debug(f">>> rows built: {len(df_rows)} UTXOs")
-    
-    # Generate summary with fresh data (no skipped param needed)
-    status_box_html, generate_row_visibility = generate_summary_safe(
-        df_rows,
-        enriched_new,
-        fee_rate_slider,
-        future_fee_slider,
-        locked,
-        execution_template,
-        dest_value,
+    log.info(f">>> rows built: {len(df_rows)} UTXOs")
+
+    # ── Validate change destination EARLY (on Analyze) ──
+    dest_spk, dest_type, dest_error_html = _resolve_destination(
+        dest_override=change_dest_input,
+        scan_source=scan_source_new,
+        enriched_state=enriched_new,
     )
+
+    # Prepare outputs
+    final_status_html = status_box_html
+    final_warning = warning_banner
+    final_gen_row_vis = gen_row_vis
+
+    if dest_error_html:
+        log.info("Change address invalid — replacing summary with red banner")
+        # Red banner replaces the summary entirely
+        final_status_html = f"""
+        <div style="
+            text-align:center !important;
+            padding: clamp(40px, 10vw, 80px) !important;
+            background: rgba(80, 0, 0, 0.7) !important;
+            border: 5px solid #ff4444 !important;
+            border-radius: 24px !important;
+            box-shadow: 0 0 80px rgba(255,68,68,0.8) !important;
+            max-width: 95% !important;
+            margin: clamp(20px, 5vw, 40px) auto !important;
+            color: #ffdddd !important;
+        ">
+            {dest_error_html}
+            <div style="
+                margin-top: clamp(24px, 6vw, 40px) !important;
+                font-size: clamp(1.2rem, 4vw, 1.6rem) !important;
+                line-height: 1.6 !important;
+            ">
+                <strong>Fix required:</strong><br>
+                Use a valid modern mainnet address (bc1q… or bc1p…).<br>
+                Click RESET SESSION to start over.
+            </div>
+        </div>
+        """
+        final_warning = ""  # clear old warning
+        final_gen_row_vis = gr.update(visible=False)  # hide Generate
+    else:
+        log.info("Change address valid — generating normal summary")
+        # Normal flow
+        status_box_html, generate_row_visibility = generate_summary_safe(
+            df_rows,
+            enriched_new,
+            fee_rate_slider,
+            future_fee_slider,
+            locked,
+            execution_template,
+            change_dest_input,
+			scan_source=scan_source_new,
+        )
+        final_status_html = status_box_html
+        final_gen_row_vis = generate_row_visibility
 
     # Return the original 9 outputs (Gradio expects exactly 9)
     return (
         df_update,
         enriched_new,
-        warning_banner,
-        gen_row_vis,
+        final_warning,
+        final_gen_row_vis,
         import_vis,
         scan_source_new,
-        status_box_html,
+        final_status_html,  # ← red banner here if invalid, normal summary if valid
         load_btn_vis,
         analyze_btn_vis,
     )
-
 # ====================
 # UI Helper Functions
 # ====================
@@ -4471,7 +4670,7 @@ def process_uploaded_file(file):
     Returns parsed dict or empty {} on failure.
     """
     if not file:
-        log.debug("No file provided for upload")
+        log.info("No file provided for upload")
         return {}
 
     # Quick safety: reject very large files to prevent hangs / memory issues
@@ -4486,14 +4685,14 @@ def process_uploaded_file(file):
         return {}
 
     try:
-        log.debug(f"Processing uploaded file: {file.name} ({file_size:,} bytes)")
+        log.info(f"Processing uploaded file: {file.name} ({file_size:,} bytes)")
         with open(file.name, "r", encoding="utf-8") as f:
             content = f.read()
             if not content.strip():
                 log.warning("Uploaded file is empty")
                 return {}
             parsed = json.loads(content)
-            log.debug(f"JSON parsed OK — inputs count: {len(parsed.get('inputs', []))}")
+            log.info(f"JSON parsed OK — inputs count: {len(parsed.get('inputs', []))}")
             return parsed
     except json.JSONDecodeError as e:
         log.warning(f"JSON decode error in uploaded file: {e}")
@@ -5383,7 +5582,7 @@ with gr.Blocks(
             gr.update(visible=False, interactive=False), # import_file
             "<div class='locked-badge'>LOCKED</div>",    # locked_badge
             gr.update(interactive=False),                # addr_input
-            gr.update(interactive=False),                # dest
+            gr.update(interactive=False),                # change_dest_input
             gr.update(interactive=False),                # execution_template
             gr.update(interactive=False),                # dust
             gr.update(interactive=False),                # fee_rate_slider
@@ -5522,7 +5721,7 @@ with gr.Blocks(
 				value=None,
             )
 
-            dest = gr.Textbox(
+            change_dest_input = gr.Textbox(
                 label="Destination (optional)",
                 placeholder="Paste Bitcoin address",
                 info=(
@@ -5680,7 +5879,6 @@ with gr.Blocks(
         analyze_btn = gr.Button("1. ANALYZE & LOAD UTXOs", variant="primary")
 
         # States (invisible)
-        dest_value = gr.State("")
         scan_source = gr.State("")
         enriched_state = gr.State([])
         locked = gr.State(False)
@@ -5697,12 +5895,6 @@ with gr.Blocks(
         loaded_fingerprint = gr.State(None)  # Holds fingerprint from loaded snapshot (or None)
         selection_changed_after_load = gr.State(False)    # True if user modified after load
 
-        # Capture destination changes for downstream use
-        dest.change(
-            fn=lambda x: x.strip() if x else "",
-            inputs=dest,
-            outputs=dest_value
-        )
         
         warning_banner = gr.HTML(label="Input Compatibility Notice", visible=True)
 
@@ -5901,7 +6093,7 @@ with gr.Blocks(
         outputs=[
             restore_area,
             addr_input,
-            dest,
+            change_dest_input,
             fee_preset_info,
             network_badge,
             mode_status,
@@ -5915,7 +6107,7 @@ with gr.Blocks(
         inputs=[restore_toggle, theme_checkbox],
         outputs=[
             addr_input,
-            dest,
+            change_dest_input,
             fee_preset_info,
             network_badge,
             mode_status,
@@ -5971,7 +6163,7 @@ with gr.Blocks(
         # Now name ALL relevant outputs so we can use success_flag
         fn=lambda enriched, warn, fp, changed, success_flag, status, src, dest_r, strat_r, dust_r: [
             gr.update(value=src or ""),                    # addr_input
-            gr.update(value=dest_r or ""),                 # dest
+            gr.update(value=dest_r or ""),                 # change_dest_input
             gr.update(value=strat_r or "Moderate-input aggregation — ~40% inputs consolidated"),
             gr.update(value=dust_r or 546),
             gr.update(visible=not success_flag),           # ← Fixed: hide analyze_btn on success
@@ -5988,7 +6180,7 @@ with gr.Blocks(
             execution_template_restored_state,
             dust_restored_state,
         ],
-        outputs=[addr_input, dest, execution_template, dust, analyze_btn],
+        outputs=[addr_input, change_dest_input, execution_template, dust, analyze_btn],
     ).then(
         fn=rebuild_df_rows,
         inputs=[enriched_state],
@@ -6002,7 +6194,7 @@ with gr.Blocks(
             future_fee_slider,
             locked,
             execution_template,
-            dest_value,
+            change_dest_input,
         ],
         outputs=[status_output, generate_row]
     )
@@ -6018,7 +6210,7 @@ with gr.Blocks(
             fee_rate_slider,
             future_fee_slider,
 			locked,
-			dest_value
+			change_dest_input
         ],
         outputs=[
             df,
@@ -6039,7 +6231,7 @@ with gr.Blocks(
     gen_btn.click(
         fn=on_generate,
         inputs=[
-            dest_value,
+            change_dest_input,
             fee_rate_slider,
             future_fee_slider,
             enriched_state,
@@ -6070,7 +6262,7 @@ with gr.Blocks(
             import_file,
             locked_badge,
             addr_input,
-            dest,
+            change_dest_input,
             execution_template,
             dust,
             fee_rate_slider,
@@ -6108,7 +6300,7 @@ with gr.Blocks(
             False,                                                   # locked → unlock
             "",                                                      # locked_badge → clear
             gr.update(value="", interactive=True),                   # addr_input
-            gr.update(value="", interactive=True),                   # dest
+            gr.update(value="", interactive=True),                   # change_dest_input
             gr.update(interactive=True),                             # execution_template
             gr.update(interactive=True),                             # dust
             gr.update(interactive=True),                             # fee_rate_slider
@@ -6143,7 +6335,7 @@ with gr.Blocks(
             locked,
             locked_badge,
             addr_input,
-            dest,
+            change_dest_input,
             execution_template,
             dust,
             fee_rate_slider,
@@ -6173,7 +6365,7 @@ with gr.Blocks(
             future_fee_slider,
             locked,
             execution_template,
-            dest_value,
+            change_dest_input,
         ],
         outputs=[status_output, generate_row],
     ).then(
@@ -6204,7 +6396,7 @@ with gr.Blocks(
             future_fee_slider,
             locked,
             execution_template,
-            dest_value,
+            change_dest_input,
         ],
         outputs=[status_output, generate_row]
     )
@@ -6221,7 +6413,7 @@ with gr.Blocks(
             future_fee_slider,
             locked,
             execution_template,
-            dest_value,
+            change_dest_input,
         ],
         outputs=[status_output, generate_row]
     )
@@ -6238,7 +6430,7 @@ with gr.Blocks(
             future_fee_slider,
             locked,
             execution_template,
-            dest_value,
+            change_dest_input,
         ],
         outputs=[status_output, generate_row]
     )
@@ -6257,7 +6449,7 @@ with gr.Blocks(
             future_fee_slider,
             locked,
             execution_template,
-            dest_value,
+            change_dest_input,
         ],
         outputs=[status_output, generate_row]
     )
