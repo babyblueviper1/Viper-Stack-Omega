@@ -1,100 +1,100 @@
-# Ωmega Pruner v11.1 — Forged Anew  
-**Reclaim Sovereignty**
+# Ωmega Pruner v11.1
 
-Ωmega Pruner is a **fee-aware UTXO consolidation tool** built to surface **privacy tradeoffs**
-*before* any transaction is constructed.
+Ωmega Pruner is a fee-aware UTXO consolidation infrastructure layer that surfaces privacy tradeoffs **before** any transaction is constructed.  
+It’s designed to integrate seamlessly into Bitcoin-based systems, enhancing wallet infrastructure with intelligent fee management and privacy-first functionality.
 
-It is non-custodial and responsive to real network conditions.  
-**No inputs are processed until the user explicitly chooses to analyze.**
+- **Non-custodial**  
+- **Responsive to real network conditions**  
+- No inputs are processed until the user explicitly chooses to analyze.
 
-> **Terminology note:**  
-> “Pruning” here refers to *wallet-side UTXO consolidation*,  
-> **not** Bitcoin Core’s node-level UTXO set pruning.
+### Terminology note
+“Pruning” here refers to **wallet-side UTXO consolidation**, not Bitcoin Core’s node-level UTXO set pruning.
 
-> **Design note:**  
-> For a formal overview of the fee model, scope, and CIOH tradeoffs, see  
-> **[`docs/design.md`](docs/design.md)**.  
->  
-> A longer, text-heavy README with architecture diagrams and the threat model lives in  
-> **[`docs/README.md`](docs/README.md)**.
+### Design note
+For a formal overview of the fee model, scope, and CIOH tradeoffs, see  
+[`docs/design.md`](docs/design.md)
 
----
+A longer, text-heavy README with architecture diagrams and the threat model lives in  
+[`docs/README.md`](docs/README.md)
 
 ## New in v11.1
 
-- **Network Conditions Badge** — immediate fee-context snapshot  
-- Current economy fee vs 1-day / 1-week / 1-month mined medians  
-  (mempool.space mining data)  
-- Clear vertical layout: **current fee → VS → medians**  
-  (1-day → 1-week → 1-month)  
-- Live BTC price, block height, and network hashrate  
-- Next difficulty adjustment and halving countdown  
-- **Instant insight:** assess whether consolidation conditions are favorable  
-  *before pasting anything*
+**Network Conditions Badge** — immediate fee-context snapshot
 
----
+- Current economy fee vs 1-day / 1-week / 1-month mined medians  
+  (mempool.space mining data)
+- Clear vertical layout: current fee → VS → medians (1-day → 1-week → 1-month)
+- Live BTC price, block height, and network hashrate
+- Next difficulty adjustment and halving countdown
+
+**Instant insight**: assess whether consolidation conditions are favorable before pasting anything.
 
 ## Optimized for Modern Bitcoin
 
-**Fully supported input types:**
+**Fully supported input types**:
+
 - Native SegWit (`bc1q…`)
 - Taproot (`bc1p…`)
 
-**Legacy (`1…`) and Nested SegWit (`3…`) inputs** are displayed for transparency only and  
-**cannot be consolidated** (faded rows, disabled checkboxes).
+Legacy (`1…`) and Nested SegWit (`3…`) inputs are displayed for transparency only and **cannot be consolidated** (faded rows, disabled checkboxes).
 
 Spend or convert them separately before consolidation.
 
----
+## UTXO Consolidation as an Infrastructure Layer
+
+Ωmega Pruner is designed not just as a tool, but as an **infrastructure layer** that empowers Bitcoin wallets and services to scale more effectively.
+
+As the backend layer for fee-aware consolidation, it enables immediate, on-demand UTXO analysis and optimization of your wallet's structure, making it the next-gen tool for privacy-conscious and fee-sensitive Bitcoin users and services.
+
+Ωmega Pruner integrates seamlessly into existing Bitcoin wallets and platforms, enhancing user experience without sacrificing security or control.  
+It’s built to be part of an overarching Bitcoin infrastructure, enabling smarter transactions without compromising sovereignty.
 
 ## Scope & Safety Model (Important)
 
-- Single-address analysis only  
-- **No** cross-wallet or multi-wallet mixing  
-- **No** hidden aggregation — ever  
-- Deterministic results → safer signing → reduced CIOH risk  
-
----
+- Single-address analysis only
+- No cross-wallet or multi-wallet mixing
+- No hidden aggregation — ever
+- Deterministic results → safer signing → reduced CIOH risk
 
 ## Hardware Wallet & Taproot Notes
 
-- Taproot inputs may require a derivation path for some hardware wallets  
-- If no derivation path is provided, PSBTs remain valid but signing may fail on certain devices  
-- A **non-blocking warning** appears when this condition is detected  
-- **No automatic re-generation with corrected paths** is currently supported  
+- Taproot inputs may require a derivation path for some hardware wallets
+- If no derivation path is provided, PSBTs remain valid but signing may fail on certain devices
+- A non-blocking warning appears when this condition is detected
+- No automatic re-generation with corrected paths is currently supported  
   — use a wallet that already knows the account or recreate the transaction there
-
----
 
 ## Core Features
 
-- Table-first interface — data loads instantly; decide before reading  
-- Analysis-first flow — intent is evaluated before any commitment  
-- Unambiguous labeling — no confusion between pre- and post-consolidation states  
-- CIOH recovery guidance — warnings translated into concrete next steps  
-- Explicit online execution model — no simulated or partial “offline mode”  
-- Pure dark mode — full contrast, no haze  
-- Deterministic selection export — JSON + cryptographic fingerprint  
-- Live mempool fee oracle — Economy / 1h / 30m / Fastest presets  
-- **Privacy Score (0–100)** — linkage, merge exposure, CIOH risk  
-- Tiered CIOH warnings — color-coded and impossible to miss  
-- “Consolidate now vs later” fee delta — see future regret in sats  
-- Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked  
-- **Per-input age display** — shows confirmation age ("<1 day", "12 days", "~3 months", "~4 years") with color-coding:  
-  red = very recent (high linkage risk), orange = months-old, green = years-old (ideal for cleanup)  
-  **Age is secondary context only** — primary recommendations/pre-checks are still driven by value + weight/script type; age helps manual prioritization for lowest CIOH risk 
-- Live wallet footprint comparison — before / after cleanup  
-- **One-Time Structural Consolidation Warning**  
-- 100% preview → PSBT fidelity  
-- Zero custody • Full coin control • RBF • Taproot • Dust-resistant  
-
----
+- Infrastructure Layer for UTXO analysis and optimization
+- Table-first interface — data loads instantly; decide before reading
+- Analysis-first flow — intent is evaluated before any commitment
+- Unambiguous labeling — no confusion between pre- and post-consolidation states
+- CIOH recovery guidance — warnings translated into concrete next steps
+- Explicit online execution model — no simulated or partial “offline mode”
+- Pure dark mode — full contrast, no haze
+- Deterministic selection export — JSON + cryptographic fingerprint
+- Live mempool fee oracle — Economy / 1h / 30m / Fastest presets
+- Privacy Score (0–100) — linkage, merge exposure, CIOH risk
+- Tiered CIOH warnings — color-coded and impossible to miss
+- “Consolidate now vs later” fee delta — see future regret in sats
+- Per-input weight (wu) — SegWit vs Taproot vs dust clearly marked
+- Per-input age display — shows confirmation age ("<1 day", "12 days", "~3 months", "~4 years") with color-coding:
+  - red = very recent (high linkage risk)
+  - orange = months-old
+  - green = years-old (ideal for cleanup)
+  - Age is secondary context only — primary recommendations/pre-checks are still driven by value + weight/script type; age helps manual prioritization for lowest CIOH risk
+- Live wallet footprint comparison — before / after cleanup
+- One-Time Structural Consolidation Warning
+- 100% preview → PSBT fidelity
+- Zero custody • Full coin control • RBF • Taproot • Dust-resistant
 
 ## Offline vs Online Operation
 
 Ωmega Pruner does not currently provide a dedicated offline mode within the browser.
 
-Implementing partial or simulated offline workflows often creates more confusion than real safety benefits, so the project avoids half-measures. If a genuinely sound, inspectable offline architecture becomes feasible in the future, it may be added explicitly.
+Implementing partial or simulated offline workflows often creates more confusion than real safety benefits, so the project avoids half-measures.  
+If a genuinely sound, inspectable offline architecture becomes feasible in the future, it may be added explicitly.
 
 More broadly, offline and online operation involve tradeoffs that are often misunderstood.  
 Offline is not automatically safer, and online is not inherently surveillance.  
@@ -102,17 +102,13 @@ Both approaches can succeed or fail depending on how they are designed.
 
 Ωmega Pruner prioritizes clarity, explicit behavior, and minimized trust over ideology.
 
----
-
 ## Limitations
 
-- Only Native SegWit and Taproot inputs can be consolidated  
-- Legacy and Nested SegWit inputs cannot be included in PSBTs  
-- No automatic derivation path inference for Taproot hardware signing  
-- Single-address scope only — no batch or multi-wallet support  
+- Only Native SegWit and Taproot inputs can be consolidated
+- Legacy and Nested SegWit inputs cannot be included in PSBTs
+- No automatic derivation path inference for Taproot hardware signing
+- Single-address scope only — no batch or multi-wallet support
 
----
+Consolidate smarter. Win forever. • Ω
 
-**Consolidate smarter. Win forever. • Ω**
-
-**Custom builds** → babyblueviperbusiness@gmail
+**Custom builds** → babyblueviperbusiness@gmail.com
