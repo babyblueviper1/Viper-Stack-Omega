@@ -3,7 +3,7 @@ CANONICAL STATE MODEL (AUTHORITATIVE — DO NOT VIOLATE)
 
 User Inputs (mutable via UI):
 - addr_input
-- strategy (consolidation strategy dropdown)
+- execution_template (input aggregation template dropdown)
 - dust_threshold
 - dest_addr
 - fee_rate_slider
@@ -35,7 +35,7 @@ Phase (derived — do not store):
 RULES:
 1. Only analyze() may assign enriched_state
 2. No function may mutate enriched_state contents (utxos are immutable after analyze)
-3. Strategy changes require re-running analyze()
+3. Execution template changes require re-running analyze()
 4. After lock, no economic recomputation — use frozen values only
 5. All summary/economics must derive from enriched_state[1] (utxos) + current sliders (pre-lock) or frozen snapshot (post-lock)
 
@@ -153,7 +153,7 @@ select_msg = (
     "font-size: clamp(1rem, 3.5vw, 1.2rem) !important;"
     "line-height:1.7 !important;"
     "'>"
-    "Check the boxes — summary and privacy score update instantly."
+    "Check the boxes — summary and privacy index update instantly."
     "</div>"
     "</div>"
 )
@@ -162,10 +162,10 @@ CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
 CONSOLIDATION_RATIOS = {
-    "Privacy First — ~30% consolidated (lowest CIOH risk, minimal linkage)": 0.30,
-    "Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)": 0.40,
-    "More Savings — ~50% consolidated (higher linkage risk, best when fees are below recent medians)": 0.50,
-    "NUCLEAR — ~90% consolidated (maximum linkage, deep cleanup during exceptionally low fees)": 0.90,
+    "Low-input aggregation — ~30% inputs consolidated": 0.30,
+    "Moderate-input aggregation — ~40% inputs consolidated": 0.40,
+    "High-input aggregation — ~50% inputs consolidated": 0.50,
+    "Extreme-input aggregation — ~90% inputs consolidated": 0.90,
 }
 
 # ── Global HTTP session ─────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ def _selection_snapshot(
     selected_utxos: List[dict],
     scan_source: str = "",
     dest_addr: str = "",
-    strategy: str = "Recommended — ~40% consolidated (balanced savings & privacy)",
+    execution_template: str = "Moderate-input aggregation — ~40% inputs consolidated",
     fee_rate: int = 15,
     future_fee_rate: int = 60,
     dust_threshold: int = 546,
@@ -240,7 +240,7 @@ def _selection_snapshot(
             "utxos": [],
             "scan_source": scan_source.strip(),
             "dest_addr": dest_addr.strip(),
-            "strategy": strategy,
+            "execution_template": execution_template,
             "fee_rate": fee_rate,
             "future_fee_rate": future_fee_rate,
             "dust_threshold": dust_threshold,
@@ -254,7 +254,7 @@ def _selection_snapshot(
         "total_value": sum(u["value"] for u in sorted_utxos),
         "scan_source": scan_source.strip(),
         "dest_addr": dest_addr.strip(),
-        "strategy": strategy,
+        "execution_template": execution_template,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
         "dust_threshold": dust_threshold,
@@ -275,7 +275,7 @@ def _selection_snapshot(
 def _selection_fingerprint(selected_utxos: List[dict]) -> str:
     """
     Deterministic short hash of selected inputs (sorted by txid:vout).
-    Excludes user-specific fields like strategy, fees, addresses.
+    Excludes user-specific fields like execution_template, fees, addresses.
     """
     if not selected_utxos:
         return "none"
@@ -332,16 +332,15 @@ def get_live_fees() -> Dict[str, int]:
             data = r.json()
             fees = {
                 "fastest":   int(data["fastestFee"]),
-                "half_hour": int(data["halfHourFee"]),
-                "hour":      int(data["hourFee"]),
-                "economy":   int(data["economyFee"]),
+                "half_hour_rate": int(data["halfHourFee"]),
+                "hour_rate":      int(data["hourFee"]),
+                "low_fee_rate":   int(data["economyFee"]),
                 "minimum":   int(data["minimumFee"]),
             }
             now = time.time()
             with _fee_cache_lock:
                 get_live_fees.cache = fees
                 get_live_fees.cache_time = now
-            log.debug(f"Fetched live fees: economy={fees['economy']}, fastest={fees['fastest']}")
             return fees
         else:
             log.warning(f"Fees endpoint returned {r.status_code}: {r.text[:100]}")
@@ -352,8 +351,8 @@ def get_live_fees() -> Dict[str, int]:
     fallback = {
         "fastest":   10,
         "half_hour": 6,
-        "hour":      3,
-        "economy":   1,
+        "hour_rate":      3,
+        "low_fee_rate":   1,
         "minimum":   1,
     }
     log.debug("Returning fallback fees due to fetch/cache failure")
@@ -462,9 +461,9 @@ def get_consolidation_score() -> str:
         log.warning(f"Failed to fetch fee-rates: {e}")
         avgs = {'24h': None, '1w': None, '1m': None}
 
-    # Current economy fee — guarded
-    current_fees = get_live_fees() or {'economy': 1}
-    current = current_fees['economy']
+    # Current low-fee rate fee — guarded
+    current_fees = get_live_fees() or {'low_fee_rate': 1}
+    current = current_fees['low_fee_rate']
 
     # Primary avg: 1w preferred
     primary_avg = avgs['1w'] or avgs['1m'] or avgs['24h'] or None
@@ -606,7 +605,7 @@ def get_consolidation_score() -> str:
         font-size: clamp(1rem, 3.8vw, 1.3rem) !important;
         margin-bottom: 20px !important;
     ">
-        Current economy entry rate
+        Current low-fee entry rate
     </div>
 
     <div style="
@@ -666,7 +665,7 @@ def get_consolidation_score() -> str:
         margin-top: 20px !important;
     ">
         <small style="color: #66cc99 !important; font-weight: normal !important;">
-            Context: economy-tier entry today vs median fees the network has recently cleared
+            Context: low-fee rate entry today vs median fees the network has recently cleared
             <br>{context_line}
         </small>
     </div>
@@ -726,7 +725,7 @@ def load_selection(
             "failed",
             "",
             "",
-            "Recommended — ~40% consolidated (balanced savings & privacy)",
+            "Moderate-input aggregation — ~40% inputs consolidated",
             546
         )
 
@@ -742,7 +741,7 @@ def load_selection(
                 "failed",
                 "",
                 "",
-                "Recommended — ~40% consolidated (balanced savings & privacy)",
+                "Moderate-input aggregation — ~40% inputs consolidated",
                 546
             )
 
@@ -848,7 +847,7 @@ def load_selection(
                 "failed",
                 "",
                 "",
-                "Recommended — ~40% consolidated (balanced savings & privacy)",
+                "Moderate-input aggregation — ~40% inputs consolidated",
                 546
             )
 
@@ -913,7 +912,7 @@ def load_selection(
                 "failed",
                 "",
                 "",
-                "Recommended — ~40% consolidated (balanced savings & privacy)",
+                "Moderate-input aggregation — ~40% inputs consolidated",
                 546
             )
 
@@ -932,14 +931,14 @@ def load_selection(
         # Metadata
         scan_source_restored = parsed_snapshot.get("scan_source", "")
         dest_restored = parsed_snapshot.get("dest_addr_override", "")
-        strategy_restored = parsed_snapshot.get(
-            "strategy", "Recommended — ~40% consolidated (balanced savings & privacy)"
+        execution_template_restored = parsed_snapshot.get(
+            "execution_template", "Moderate-input aggregation — ~40% inputs consolidated"
         )
         dust_threshold_restored = parsed_snapshot.get("dust_threshold", 546)
         fingerprint = parsed_snapshot.get("fingerprint")
 
         meta = {
-            "strategy": strategy_restored,
+            "execution_template": execution_template_restored,
             "scan_source": scan_source_restored,
             "timestamp": int(time.time()),
             "restored_from": "snapshot"
@@ -976,7 +975,7 @@ def load_selection(
             "        font-size: 1rem !important; "
             "        text-shadow: 0 0 8px rgba(170, 255, 255, 0.5) !important;"
             "    '>"
-            "        Selection, strategy, dust threshold and metadata fully recovered.<br>"
+            "        Selection, execution_template, dust threshold and metadata fully recovered.<br>"
             "        All addresses re-validated during restore — no issues found.<br>"
             "        Ready to generate PSBT — no ANALYZE needed."
             "    </small>"
@@ -999,7 +998,7 @@ def load_selection(
             "success",
             scan_source_restored,
             dest_restored,
-            strategy_restored,
+            execution_template_restored,
             dust_threshold_restored
         )
         
@@ -1014,7 +1013,7 @@ def load_selection(
             "failed",
             "",
             "",
-            "Recommended — ~40% consolidated (balanced savings & privacy)",
+            "Moderate-input aggregation — ~40% inputs consolidated",
             546
         )
 		
@@ -1149,7 +1148,7 @@ def sats_to_btc_str(sats: int) -> str:
         return f"{btc:,.8f}".rstrip("0").rstrip(".") + " BTC"
     return f"{int(sats):,} sats"
 
-# ── Privacy scoring & CIOH warnings ─────────────────────────────────────────────
+# ── Privacy index & CIOH warnings ─────────────────────────────────────────────
 def calculate_privacy_score(selected_utxos: List[dict], total_utxos: int) -> int:
     """
     Realistic 2025–2026 privacy score.
@@ -1186,8 +1185,9 @@ def estimate_coinjoin_mixes_needed(
     privacy_score: int
 ) -> tuple[int, int]:
     """
-    Rough estimate of CoinJoin rounds needed to meaningfully restore privacy.
-    Caps at realistic Whirlpool / similar limits.
+Rough, non-binding estimate of the scale of collaborative transactions
+typically required to reduce prior CIOH linkage.
+This is not a guarantee of privacy restoration.
     """
     if privacy_score > 80:
         return 0, 1     # Minimal linkage — optional single mix
@@ -1233,8 +1233,11 @@ def get_cioh_warning(
     privacy_score: int
 ) -> str:
     """
-    Generate CIOH (Common Input Ownership Heuristic) warning HTML.
-    Color-coded severity, includes recovery suggestions when needed.
+    Generate CIOH (Common Input Ownership Heuristic) analysis HTML.
+
+    Describes transaction-level linkage implications using color-coded severity.
+    Includes contextual information about typical linkage-reduction effort
+    without providing operational guidance or guarantees.
     """
     if input_count <= 1:
         return ""
@@ -1243,7 +1246,7 @@ def get_cioh_warning(
         input_count, distinct_addrs, privacy_score
     )
 
-    # Recovery suggestion shown when score ≤ 70
+    # Context block shown when score ≤ 70
     recovery_note = ""
     if privacy_score <= 70:
         recovery_note = f"""
@@ -1263,13 +1266,15 @@ def get_cioh_warning(
         font-size:clamp(1rem, 3.5vw, 1.2rem) !important;
         font-weight:900 !important;
         text-shadow:0 0 20px #00ffdd !important;
-    ">Recovery Plan</span>:<br>
-    Break address linkage using transactions that involve other participants<br>
+    ">Linkage Reduction Context</span>:<br>
+    Address linkage introduced by CIOH is typically reduced only through
+    transactions involving multiple participants.<br>
     <small style="color:#88ffcc !important;">
-        (~{min_mixes}–{max_mixes} coordinated rounds typically needed)
+        (Order-of-magnitude effort often observed: ~{min_mixes}–{max_mixes} coordinated rounds)
     </small><br>
     <small style="color:#66ffaa !important;">
-        Examples: CoinJoin (Whirlpool), PayJoin, Silent Payments
+        Examples of collaborative transaction types include CoinJoin-style protocols,
+        PayJoin, or Silent Payments, depending on wallet support.
     </small>
 </div>
 """
@@ -1294,25 +1299,29 @@ def get_cioh_warning(
     <div style="color:#ff6688 !important; font-size:clamp(1rem, 3.5vw, 1.2rem) !important;">
         Common Input Ownership Heuristic (CIOH)
     </div><br>
-    This consolidation strongly proves common ownership of many inputs and addresses
+    This consolidation provides strong evidence of common ownership across many inputs and addresses
     <strong style="color:#ffcccc !important;">for this transaction</strong>.<br><br>
-    
+
     <div style="color:#ffaaaa !important;">
-        Privacy state (this transaction): Severely compromised
+        Linkage state (this transaction): Severely compromised
     </div><br>
-    
-    Maximum fee efficiency achieved —
-    however analysts will confidently cluster these addresses as yours
+
+    Maximum fee efficiency is achieved; however, analysts can confidently cluster
+    these inputs as belonging to the same entity
     <strong style="color:#ffcccc !important;">in this spend</strong>.<br><br>
+
     <div style="color:#ffbbbb !important;">
-        <span style="color: #fff5f5 !important; font-weight:900 !important;">Best practices after this point:</span><br>
-        • Do not consolidate these addresses again<br>
-        • Avoid direct spending to KYC or identity-linked services<br>
-        • Restore privacy only via transactions involving other participants
+        <span style="color: #fff5f5 !important; font-weight:900 !important;">
+            Observed implications:
+        </span><br>
+        • Repeated consolidation of these outputs increases analyst confidence<br>
+        • Direct interaction with identity-linked services makes attribution durable<br>
+        • Reducing prior linkage typically requires transactions involving other participants
     </div>
+
     <div style="margin-top:10px; color:#ff9999 !important; font-size:0.95em;">
-        Examples include CoinJoin, PayJoin, or Silent Payments —
-        which require wallet support or coordination and cannot be added after the fact.
+        Examples of collaborative transaction types include CoinJoin-style protocols,
+        PayJoin, or Silent Payments, depending on wallet support.
     </div>
     {recovery_note}
 </div>
@@ -1337,10 +1346,13 @@ def get_cioh_warning(
     <div style="color:#ffaa44 !important; font-size:clamp(1rem, 3.5vw, 1.2rem) !important;">
         Common Input Ownership Heuristic (CIOH)
     </div><br>
-    Merging {input_count} inputs from {distinct_addrs} address(es) → analysts can reliably cluster them as belonging to the same entity.<br><br>
-    <div style="color:#ffcc88 !important;">Privacy state: Significantly reduced</div><br>
-    Good fee savings, but a real privacy trade-off.<br>
-    Further consolidation will worsen linkage — consider restoring privacy before your next spend.
+    Merging {input_count} inputs from {distinct_addrs} address(es) allows analysts
+    to reliably cluster them as belonging to the same entity.<br><br>
+    <div style="color:#ffcc88 !important;">
+        Linkage state: Significantly increased
+    </div><br>
+    Fee efficiency improves, with a corresponding increase in on-chain linkage.
+    Additional consolidation further strengthens this inference.
     {recovery_note}
 </div>
 """
@@ -1364,11 +1376,10 @@ def get_cioh_warning(
     <div style="color:#66ffaa !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;">
         Common Input Ownership Heuristic (CIOH)
     </div><br>
-    Spending multiple inputs together creates some on-chain linkage.<br>
-    Analysts may assume common ownership — but it is not definitive.<br>
-    Repeated use of this spending pattern increases analyst confidence over time.<br><br>
-    Privacy impact is moderate.<br>
-    Avoid repeating this pattern if long-term privacy is a priority.
+    Spending multiple inputs together introduces observable on-chain linkage.<br>
+    Analysts may infer common ownership, though confidence remains limited.<br>
+    Repeated use of this spending pattern increases clustering confidence over time.<br><br>
+    Linkage impact is moderate for this transaction.
     {recovery_note}
 </div>
 """
@@ -1398,9 +1409,8 @@ def get_cioh_warning(
     <span style="color:#00ffdd !important; font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;">
         (Common Input Ownership Heuristic)
     </span><br><br>
-    Few inputs spent together — minimal new linkage created.<br>
-    Address separation remains strong.<br>
-    Privacy preserved.
+    Few inputs are spent together, creating minimal new linkage.<br>
+    Address separation remains strong for this transaction.
     {recovery_note}
 </div>
 """
@@ -1920,14 +1930,14 @@ class AnalyzeParams:
     fee_rate: int
     future_fee_rate: int
     dust_threshold: int
-    strategy: str
+    execution_template: str
     addr_input: str
     scan_source: str
 
 
 def _sanitize_analyze_inputs(
     addr_input: str,
-    strategy: str,
+    execution_template: str,
     dust_threshold: Any,
     fee_rate_slider: Any,
     future_fee_slider: Any,
@@ -1947,7 +1957,7 @@ def _sanitize_analyze_inputs(
         fee_rate=fee_rate,
         future_fee_rate=future_fee_rate,
         dust_threshold=dust_threshold,
-        strategy=strategy,
+        execution_template=execution_template,
         addr_input=scan_source,
         scan_source=scan_source,
     )
@@ -2134,15 +2144,15 @@ def _enrich_utxos(raw_utxos: list[dict], params: AnalyzeParams) -> list[dict]:
 
     return enriched
     
-# ── Apply consolidation strategy to enriched UTXOs ────────────────────────────────────
-def _apply_consolidation_strategy(enriched: List[Dict], strategy: str) -> List[Dict]:
+# ── Apply execution_template to enriched UTXOs ────────────────────────────────────
+def _apply_consolidation_execution_template(enriched: List[Dict], execution_template: str) -> List[Dict]:
     """
-    Apply deterministic consolidation strategy to enriched UTXOs.
+    Apply deterministic execution_template to enriched UTXOs.
     - Excludes legacy/unsupported from consolidation calculation
     - Consolidates only supported UTXOs (priority: dust → heavy → optimal)
     - Returns list with consolidated supported first, unsupported last (always unselected)
     """
-    ratio = CONSOLIDATION_RATIOS.get(strategy, 0.40)
+    ratio = CONSOLIDATION_RATIOS.get(execution_template, 0.40)
 
     # Step 1: Split supported vs unsupported
     supported = []
@@ -2204,7 +2214,7 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
     """
     Convert enriched UTXOs into Gradio DataFrame rows.
     - Forces legacy/nested/invalid unselected with strong warnings
-    - Preserves 'selected' from strategy or restore (unless overridden for safety)
+    - Preserves 'selected' from execution_template or restore (unless overridden for safety)
     - Fully responsive health badges & type display
     Returns (rows, has_unsupported)
     """
@@ -2315,7 +2325,7 @@ def _build_df_rows(enriched: List[Dict]) -> tuple[List[List], bool]:
 def _freeze_enriched(
     enriched: List[Dict],
     *,
-    strategy: str,
+    execution_template: str,
     scan_source: str,
 ) -> tuple:
     """
@@ -2325,7 +2335,7 @@ def _freeze_enriched(
     frozen_utxos = tuple(copy.deepcopy(u) for u in enriched)
 
     meta = {
-        "strategy": strategy,
+        "execution_template": execution_template,
         "scan_source": scan_source,
         "timestamp": int(time.time()),
     }
@@ -2338,7 +2348,7 @@ def _freeze_enriched(
 
 def analyze(
     addr_input: str,
-    strategy: str,
+    execution_template: str,
     dust_threshold: Any,
     fee_rate_slider: Any,
     future_fee_slider: Any,
@@ -2352,7 +2362,7 @@ def analyze(
     # 1. Sanitize & normalize all inputs
     params = _sanitize_analyze_inputs(
         addr_input=addr_input,
-        strategy=strategy,
+        execution_template=execution_template,
         dust_threshold=dust_threshold,
         fee_rate_slider=fee_rate_slider,
         future_fee_slider=future_fee_slider,
@@ -2484,17 +2494,17 @@ def analyze(
         log.error("Missing 'script_type' in enriched UTXOs — invariant violation")
         raise RuntimeError("Missing 'script_type' in enriched UTXOs — invariant violation")
 
-    # 4. Apply consolidation strategy
-    enriched_consolidated = _apply_consolidation_strategy(enriched, params.strategy)
+    # 4. Apply execution_template
+    enriched_consolidated = _apply_consolidation_execution_template(enriched, params.execution_template)
     log.debug(
-        f"After consolidation strategy: {len(enriched_consolidated)} UTXOs total, "
+        f"After execution_template: {len(enriched_consolidated)} UTXOs total, "
         f"{sum(1 for u in enriched_consolidated if u['selected'])} selected"
     )
 
     # Safety assertions
     assert len(enriched_consolidated) >= MIN_KEEP_UTXOS, "Too few UTXOs after consolidation"
     assert any(not u["selected"] for u in enriched_consolidated), "All UTXOs selected — invalid consolidation"
-    assert params.strategy in CONSOLIDATION_RATIOS, f"Unknown strategy: {params.strategy}"
+    assert params.execution_template in CONSOLIDATION_RATIOS, f"Unknown execution_template: {params.execution_template}"
 
     # 5. Build DataFrame rows
     df_rows, has_unsupported = _build_df_rows(enriched_consolidated)
@@ -2520,7 +2530,7 @@ def analyze(
     # 6. Freeze enriched state
     frozen_state = _freeze_enriched(
         enriched_consolidated,
-        strategy=params.strategy,
+        execution_template=params.execution_template,
         scan_source=params.scan_source,
     )
 
@@ -2792,19 +2802,17 @@ def _render_small_consolidation_warning(econ: TxEconomics, fee_rate: int) -> str
 
 
 def _render_consolidation_explanation(consolidate_count: int, remaining_utxos: int) -> str:
-    """Educational explanation of UTXO consolidation benefits."""
+    """Neutral summary of structural changes caused by consolidation."""
     return f"""
 <div style="
-    margin: clamp(24px, 8vw, 48px) 0 !important;
-    padding: clamp(20px, 6vw, 36px) !important;
-    background: #001a00 !important;
-    border: 3px solid #00ff9d !important;
-    border-radius: 18px !important;
-    box-shadow:
-        0 0 50px rgba(0,255,157,0.6) !important,
-        inset 0 0 30px rgba(0,255,157,0.08) !important;
-    font-size: clamp(1.05rem, 3.8vw, 1.25rem) !important;
-    line-height: 1.85 !important;
+    margin: clamp(20px, 6vw, 36px) 0 !important;
+    padding: clamp(16px, 5vw, 28px) !important;
+    background: #001410 !important;
+    border: 2px solid #00ff9d !important;
+    border-radius: 14px !important;
+    box-shadow: 0 0 28px rgba(0,255,157,0.35) !important;
+    font-size: clamp(1rem, 3.5vw, 1.15rem) !important;
+    line-height: 1.7 !important;
     color: #ccffe6 !important;
     max-width: 95% !important;
     margin-left: auto !important;
@@ -2812,44 +2820,46 @@ def _render_consolidation_explanation(consolidate_count: int, remaining_utxos: i
 ">
     <div style="
         color: #00ff9d !important;
-        font-size: clamp(1.35rem, 5vw, 1.7rem) !important;
+        font-size: clamp(1.2rem, 4.5vw, 1.5rem) !important;
         font-weight: 900 !important;
-        text-shadow: 0 0 20px #00ff9d !important;
-        margin-bottom: clamp(12px, 4vw, 18px) !important;
+        text-shadow: 0 0 16px #00ff9d !important;
+        margin-bottom: 12px !important;
     ">
-        🧩 WHAT UTXO CONSOLIDATION ACTUALLY DOES
+        UTXO SET STATE CHANGE
     </div>
 
-    Consolidation reorganizes
-    <span style="color:#aaffff !important; font-weight:700 !important;">inefficient UTXOs</span>
-    (dust, legacy, or high-weight inputs) into a smaller, cleaner set.<br><br>
+    This execution consumes
+    <span style="color:#aaffff !important; font-weight:800 !important;">
+        {consolidate_count}
+    </span>
+    inputs and replaces them with a smaller set of outputs.<br><br>
 
-    • You pay a fee now to consolidate
-      <span style="color:#00ffff !important; font-weight:800 !important;">{consolidate_count}</span>
-      inefficient inputs into fewer outputs<br>
-
-    • The remaining
-      <span style="color:#00ffff !important; font-weight:800 !important;">{remaining_utxos}</span>
-      UTXOs become cheaper, simpler, and more private to spend in future transactions<br>
-
-    • If no change output is created, some value is absorbed into fees —
-      but your wallet structure becomes
-      <span style="color:#aaffff !important;">permanently more efficient</span><br><br>
-
-    <span style="color:#00ffaa !important; font-weight:800 !important;">Goal:</span>
-    a healthier UTXO set and lower future fees.<br>
-    Consolidation is often most effective during low-fee periods.
+    After confirmation:
+    <ul style="margin-left:18px !important;">
+        <li>
+            The wallet will contain
+            <span style="color:#aaffff !important; font-weight:800 !important;">
+                {remaining_utxos}
+            </span>
+            UTXOs
+        </li>
+        <li>
+            Input count per future spend is reduced
+        </li>
+        <li>
+            Address and input linkage created in this transaction is permanent
+        </li>
+    </ul>
 
     <small style="
-        display: block !important;
-        margin-top: 18px !important;
-        color: #88ffcc !important;
-        font-style: italic !important;
+        display:block !important;
+        margin-top:14px !important;
+        color:#88ffcc !important;
         font-size: clamp(0.9rem, 3vw, 1rem) !important;
-        opacity: 0.85 !important;
+        opacity:0.85 !important;
     ">
-        💡 Tip (optional): If your goal is to receive change, consolidate when the total value consolidated
-        ~10–20× the expected fee.
+        This summary describes structural effects only.
+        Fee efficiency and privacy outcomes depend on future spending behavior.
     </small>
 </div>
 """
@@ -2861,7 +2871,7 @@ def generate_summary_safe(
     fee_rate,
     future_fee_rate,
     locked,
-    strategy,
+    execution_template,
     dest_value,
 ) -> tuple:
     """
@@ -2922,12 +2932,6 @@ def generate_summary_safe(
         (all_input_weight + 150 + total_utxos * 60) // 4 + 10,
     )
     savings_pct = round(100 * (1 - econ.vsize / pre_vsize), 1) if pre_vsize > econ.vsize else 0
-    savings_label = (
-        "NUCLEAR" if savings_pct >= 70 else
-        "EXCELLENT" if savings_pct >= 50 else
-        "GOOD" if savings_pct >= 30 else
-        "WEAK"
-    )
 
     # Future savings estimate
     sats_saved = max(0, econ.vsize * (future_fee_rate - fee_rate))
@@ -2941,7 +2945,7 @@ def generate_summary_safe(
     )
     consolidation_explanation = _render_consolidation_explanation(consolidate_count, remaining_utxos)
 
-    strategy_label = strategy.split(" — ")[0] if " — " in strategy else "Recommended"
+    execution_template_label = execution_template.split(" — ")[0] if " — " in execution_template else "Recommended"
 
     # Change output message
     if econ.change_amt > 0:
@@ -2981,7 +2985,7 @@ def generate_summary_safe(
             text-shadow:0 0 35px #0f0 !important, 0 0 70px #0f0 !important;
             margin-bottom:clamp(16px, 4vw, 24px) !important;
         ">
-            SELECTION READY
+            SELECTION SNAPSHOT READY
         </div>
         <div style="
             color:#f7931a !important;
@@ -2989,7 +2993,7 @@ def generate_summary_safe(
             font-weight:800 !important;
             margin:clamp(12px, 3vw, 20px) 0 !important;
         ">
-            {total_utxos:,} UTXOs • <span style="color:#00ff9d !important;">{strategy_label}</span> Strategy Active
+            {total_utxos:,} UTXOs • Execution template: <span style="color:#00ff9d !important;">{execution_template_label}</span>
         </div>
         <div style="
             color:#fff !important;
@@ -2997,7 +3001,7 @@ def generate_summary_safe(
             font-weight:700 !important;
             margin:clamp(12px, 3vw, 20px) 0 !important;
         ">
-            Consolidating <span style="color:#ff6600 !important;font-weight:900 !important;">{consolidate_count:,}</span> inputs
+            Selected inputs for consolidation: <span style="color:#ff6600 !important;font-weight:900 !important;">{consolidate_count:,}</span>
         </div>
         <div style="
             color:#88ffcc !important;
@@ -3005,7 +3009,7 @@ def generate_summary_safe(
             line-height:1.6 !important;
             margin-bottom:16px !important;
         ">
-            This is a one-time structural consolidation.
+            This models a one-time consolidation transaction.
         </div>
         <div style="
             color:#fff !important;
@@ -3013,7 +3017,7 @@ def generate_summary_safe(
             font-weight:800 !important;
             margin:clamp(16px, 4vw, 28px) 0 !important;
         ">
-            Privacy Score (after this transaction): 
+            Privacy Index (simulated, post-execution): 
             <span style="
                 color:{score_color} !important;
                 font-size:clamp(1.8rem, 7vw, 2.5rem) !important;
@@ -3034,34 +3038,38 @@ def generate_summary_safe(
               <span style="color:#0f0 !important;font-weight:800 !important;">~{econ.vsize:,} vB</span>
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.6 !important;">
-              💡 After consolidating: your full wallet spend size drops to roughly 
-              <span style="color:#aaffcc !important;font-weight:700 !important;">~{pre_vsize - econ.vsize + 200:,} vB</span>
-            </div>
-            <div style="
-                margin:clamp(16px, 4vw, 28px) 0 !important;
-                color:#0f0 !important;
-                font-size:clamp(1.2rem, 4.5vw, 1.5rem) !important;
-                font-weight:900 !important;
-                text-shadow:0 0 30px #0f0 !important;
-                line-height:1.6 !important;
-            ">
-              {savings_label.upper()} WALLET CLEANUP
+              💡 Modeled effect on future full-wallet spend size: 
+              <span style="color:#aaffcc !important;font-weight:700 !important;">~{pre_vsize - econ.vsize + 200:,} vB (est.)</span>
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;">
-              <b style="color:#fff !important;">Current fee (paid now):</b> 
+              <b style="color:#fff !important;">Modeled fee at selected fee rate:</b> 
               <span style="color:#0f0 !important;font-weight:800 !important;">{econ.fee:,} sats @ {fee_rate} s/vB</span>
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.6 !important;">
               {change_line}
             </div>
             <div style="margin:clamp(12px, 3vw, 16px) 0 !important;color:#88ffcc !important;font-size:clamp(0.95rem, 3.2vw, 1.1rem) !important;line-height:1.7 !important;">
-              💡 Consolidating now saves you <span style="color:#0f0 !important;font-weight:800 !important;">+{sats_saved:,} sats</span> versus consolidating later if fees reach
-              <span style="
-                  color:#ff3366 !important;
-                  font-weight:900 !important;
-                  text-shadow: 0 0 12px #ff3366, 0 0 24px #ff3366 !important;
-              ">{future_fee_rate} s/vB</span>
-            </div>
+            💡 Fee sensitivity comparison: modeled cost difference executing now at <span style="color:#0f0 !important;font-weight:800 !important;">{fee_rate} s/vB</span> vs later at
+            <span style="
+                color:#ff3366 !important;
+                font-weight:900 !important;
+                text-shadow: 0 0 12px #ff3366, 0 0 24px #ff3366 !important;
+            ">{future_fee_rate} s/vB</span>
+            <br><br>
+            <span style="
+                color:#00ff88 !important;
+                font-size:clamp(1.35rem, 5vw, 1.8rem) !important;
+                font-weight:900 !important;
+                letter-spacing:0.5px !important;
+                text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88, 0 0 30px #00ff88 !important;
+                display:inline-block;
+                padding:4px 12px;
+                border-radius:6px;
+                background:rgba(0, 255, 136, 0.08);
+            ">
+                Δ {sats_saved:,} sats
+            </span>
+        </div>
         </div>
         <hr style="border:none !important;border-top:1px solid rgba(247,147,26,0.3) !important;margin:clamp(24px, 6vw, 40px) 0 !important;">
         <div style="margin:clamp(24px, 6vw, 40px) 0 30px 0 !important;line-height:1.7 !important;">
@@ -3133,7 +3141,7 @@ def _create_psbt_snapshot(
     selected_utxos: List[dict],
     scan_source: str = "",
     dest_override: Optional[str] = None,
-    strategy: str = "Recommended — ~40% consolidated (balanced savings & privacy)",
+    execution_template: str = "Moderate-input aggregation — ~40% inputs consolidated",
     fee_rate: int = 15,
     future_fee_rate: int = 60,
     dust_threshold: int = 546,
@@ -3146,7 +3154,7 @@ def _create_psbt_snapshot(
             "utxos": [],
             "scan_source": scan_source.strip(),
             "dest_addr_override": None,
-            "strategy": strategy,
+            "execution_template": execution_template,
             "fee_rate": fee_rate,
             "future_fee_rate": future_fee_rate,
             "dust_threshold": dust_threshold,
@@ -3196,7 +3204,7 @@ def _create_psbt_snapshot(
         "dest_addr_override": dest_override.strip() if dest_override else None,
         "fee_rate": fee_rate,
         "future_fee_rate": future_fee_rate,
-        "strategy": strategy,
+        "execution_template": execution_template,
         "dust_threshold": dust_threshold,
         "consolidate_count": len(clean_inputs),
         "inputs": clean_inputs,
@@ -3269,7 +3277,7 @@ def on_generate(
     future_fee_rate: int,
     enriched_state: tuple,
     scan_source: str,
-    strategy: str,
+    execution_template: str,
     dust_threshold: int,
 ) -> tuple:
     """
@@ -3293,7 +3301,7 @@ def on_generate(
             selected_utxos=selected_utxos,
             scan_source=scan_source,
             dest_override=cleaned_dest,
-            strategy=strategy,
+            execution_template=execution_template,
             fee_rate=fee_rate,
             future_fee_rate=future_fee_rate,
             dust_threshold=dust_threshold
@@ -3361,7 +3369,7 @@ class PsbtParams:
     dest_override: Optional[str]
     fee_rate: int
     future_fee_rate: int
-    strategy: str                      
+    execution_template: str                      
     dust_threshold: int                 
     fingerprint_short: str
     full_spend_no_change: bool = False
@@ -3374,7 +3382,7 @@ def _extract_psbt_params(snapshot: dict) -> PsbtParams:
         dest_override=snapshot.get("dest_addr_override"),
         fee_rate=snapshot["fee_rate"],
         future_fee_rate=snapshot["future_fee_rate"],
-        strategy=snapshot.get("strategy", "Recommended — ~40% consolidated (balanced savings & privacy)"),
+        execution_template=snapshot.get("execution_template", "Moderate-input aggregation — ~40% inputs consolidated"),
         dust_threshold=snapshot.get("dust_threshold", 546),
         fingerprint_short=snapshot["fingerprint_short"],
         full_spend_no_change=snapshot.get("full_spend_no_change", False),
@@ -4284,7 +4292,7 @@ def generate_psbt(
             dest_override=params.dest_override,
             fee_rate=params.fee_rate,
             future_fee_rate=params.future_fee_rate,
-            strategy=params.strategy,
+            execution_template=params.execution_template,
             dust_threshold=params.dust_threshold
         )
 
@@ -4369,7 +4377,7 @@ def generate_psbt(
         """
 def analyze_and_show_summary(
     addr_input,
-    strategy,
+    execution_template,
     dust_threshold,
     fee_rate_slider,
     future_fee_slider,
@@ -4382,7 +4390,7 @@ def analyze_and_show_summary(
     # Run core analyze — returns exactly 9 items
     df_update, enriched_new, warning_banner, gen_row_vis, import_vis, scan_source_new, status_box_html, load_btn_vis, analyze_btn_vis = analyze(
         addr_input,
-        strategy,
+        execution_template,
         dust_threshold,
         fee_rate_slider,
         future_fee_slider,
@@ -4408,7 +4416,7 @@ def analyze_and_show_summary(
         fee_rate_slider,
         future_fee_slider,
         locked,
-        strategy,
+        execution_template,
         dest_value,
     )
 
@@ -4603,7 +4611,7 @@ def ui_toggle_handler(restore: bool, dark: bool) -> tuple:
 # Gradio UI
 # --------------------------
 with gr.Blocks(
-    title="Ωmega Pruner v11 — Forged Anew"
+    title="Ωmega Pruner v11.1"
 ) as demo:
 
  # ── Full-screen animated background + Hero Banner ───────────────────────────────
@@ -4644,124 +4652,111 @@ with gr.Blocks(
                     ">Ω</span>
                 </span>
             </div>
-                        <!-- Hero container – full width, safe padding -->
-                        <div style="
-                            width: 100%;
-                            margin: clamp(8px, 2vw, 16px) auto clamp(16px, 4vw, 24px) auto;  <!-- ← reduced side margins -->
-                            padding: 0 clamp(8px, 3vw, 16px);                          <!-- ← reduced side padding -->
-                            box-sizing: border-box;
-                        ">
-                            <div class="hero-panel" style="
-                                text-align: center;
-                                padding: clamp(24px, 6vw, 48px) clamp(12px, 4vw, 24px);  <!-- ← reduced horizontal sides -->
-                                background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
-                                backdrop-filter: blur(10px);
-                                border: clamp(3px, 1.5vw, 6px) solid #f7931a;
-                                box-shadow: 
-                                    inset 0 0 60px rgba(0, 100, 255, 0.25),
-                                    inset 0 0 15px rgba(0, 120, 255, 0.15),
-                                    0 0 60px rgba(247,147,26,0.4);
-                                border-radius: clamp(12px, 4vw, 20px);
-                                width: 100%;
-                                box-sizing: border-box;
-                            ">
-                    <!-- Reclaim Sovereignty -->
-                    <div style="
-                        color: #ffcc00;
-                        font-size: clamp(2.2rem, 9vw, 4.2rem);
-                        font-weight: 900;
-                        letter-spacing: clamp(1px, 1vw, 8px);
-                        line-height: 1.1;
-                        margin: 0 auto clamp(16px, 4vw, 32px) auto;
-                        max-width: 100%;
-                        word-break: break-word;
-                        overflow-wrap: break-word;
+                <!-- Hero container – full width, safe padding -->
+                <div style="
+                    width: 100%;
+                    margin: clamp(8px, 2vw, 16px) auto clamp(16px, 4vw, 24px) auto;
+                    padding: 0 clamp(8px, 3vw, 16px);
+                    box-sizing: border-box;
+                ">
+                    <div class="hero-panel" style="
                         text-align: center;
-                        text-shadow:
-                            0 0 50px #ffcc00,
-                            0 0 100px #ffaa00,
-                            0 0 150px rgba(255,204,0,0.9),
-                            -2px -2px 0 #ffffff,
-                            2px -2px 0 #ffffff,
-                            -2px  2px 0 #ffffff,
-                            2px  2px 0 #ffffff;
+                        padding: clamp(24px, 6vw, 48px) clamp(12px, 4vw, 24px);
+                        background: linear-gradient(rgba(0,0,0,0.42), rgba(0, 30, 80,0.02));
+                        backdrop-filter: blur(10px);
+                        border: clamp(3px, 1.5vw, 6px) solid #f7931a;
+                        box-shadow:
+                            inset 0 0 40px rgba(0, 100, 255, 0.18),
+                            inset 0 0 12px rgba(0, 120, 255, 0.12),
+                            0 0 40px rgba(247,147,26,0.35);
+                        border-radius: clamp(12px, 4vw, 20px);
+                        width: 100%;
+                        box-sizing: border-box;
                     ">
-                        Reclaim <span class="sovereignty-mobile">Sovereignty</span>
-                    </div>
 
-                    <!-- ΩMEGA PRUNER -->
-                    <div style="
-                        color: #e65c00;
-                        font-size: clamp(2.2rem, 9vw, 4.5rem);
-                        font-weight: 900;
-                        letter-spacing: clamp(2px, 1.5vw, 10px);
-                        text-shadow:
-                            0 0 25px #e65c00,
-                            0 0 50px #c94a00,
-                            0 0 75px rgba(230,92,0,0.9),
-                            0 4px 12px rgba(220, 0, 60, 0.6),
-                            0 0 120px rgba(200, 0, 0, 0.4);
-                        margin: 4px auto clamp(20px, 5vw, 36px) auto;
-                    ">
-                        ΩMEGA PRUNER
-                    </div>
+                        <!-- System classification -->
+                        <div style="
+                            color: #00ffaa;
+                            font-size: clamp(1.1rem, 4vw, 1.4rem);
+                            font-weight: 800;
+                            letter-spacing: clamp(1px, 0.8vw, 3px);
+                            margin-bottom: clamp(12px, 3vw, 20px);
+                            text-shadow: 0 0 12px #00ffaa;
+                        ">
+                            DETERMINISTIC UTXO CONSOLIDATION ENGINE
+                        </div>
 
-                    <!-- STRUCTURAL COIN CONTROL -->
-                    <div style="
-                        color: #0f0;
-                        font-size: clamp(1.6rem, 6.5vw, 3rem);
-                        font-weight: 900;
-                        letter-spacing: clamp(2px, 1vw, 6px);
-                        text-shadow: 0 0 35px #0f0, 0 0 70px #0f0;
-                        margin: clamp(16px, 4vw, 28px) 0;
-                    ">
-                        STRUCTURAL COIN CONTROL
-                    </div>
+                        <!-- ΩMEGA PRUNER -->
+                        <div style="
+                            color: #e65c00;
+                            font-size: clamp(2.4rem, 9vw, 4.6rem);
+                            font-weight: 900;
+                            letter-spacing: clamp(2px, 1.5vw, 10px);
+                            text-shadow:
+                                0 0 20px #e65c00,
+                                0 0 40px rgba(230,92,0,0.8),
+                                0 0 80px rgba(230,92,0,0.35);
+                            margin: 4px auto clamp(20px, 5vw, 36px) auto;
+                        ">
+                            ΩMEGA PRUNER
+                        </div>
 
-                    <!-- Version -->
-                    <div style="
-                        color: #00ffaa;
-                        font-size: clamp(0.95rem, 3.5vw, 1.2rem);
-                        letter-spacing: clamp(1px, 0.8vw, 3px);
-                        text-shadow: 0 0 12px #00ffaa;
-                        margin: clamp(12px, 3vw, 20px) 0;
-                    ">
-                        FORGED ANEW — v11.1
-                    </div>
+                        <!-- Capability descriptor -->
+                        <div style="
+                            color: #0f0;
+                            font-size: clamp(1.6rem, 6.5vw, 3rem);
+                            font-weight: 900;
+                            letter-spacing: clamp(2px, 1vw, 6px);
+                            text-shadow: 0 0 30px #0f0;
+                            margin: clamp(16px, 4vw, 28px) 0;
+                        ">
+                            STRUCTURAL COIN CONTROL
+                        </div>
 
-                    <!-- Body text -->
-                    <div style="
-                        color: #ddd;
-                        font-size: clamp(1rem, 3.5vw, 1.3rem);
-                        line-height: 1.6;
-                        max-width: 900px;
-                        margin: clamp(20px, 5vw, 36px) auto;
-                        padding: 0 clamp(8px, 3vw, 16px);
-                    ">
-                        Consolidating isn’t just about saving sats today — it’s a deliberate step toward taking
-                        <strong style="color:#0f0;">full strategic control</strong> of your Bitcoin.<br><br>
+                        <!-- Version -->
+                        <div style="
+                            color: #88ffcc;
+                            font-size: clamp(0.95rem, 3.5vw, 1.15rem);
+                            letter-spacing: clamp(1px, 0.8vw, 3px);
+                            margin: clamp(12px, 3vw, 20px) 0;
+                        ">
+                            v11.1
+                        </div>
 
-                        By consolidating inefficient UTXOs, you:<br>
-                        • <strong style="color:#00ff9d;">Slash fees</strong> during high-congestion periods<br>
-                        • <strong style="color:#00ff9d;">Reduce future costs</strong> with a cleaner UTXO set<br>
-                        • <strong style="color:#00ff9d;">Optimize your stack</strong> for speed, savings and privacy<br><br>
+                        <!-- Body text -->
+                        <div style="
+                            color: #ddd;
+                            font-size: clamp(1rem, 3.5vw, 1.25rem);
+                            line-height: 1.65;
+                            max-width: 900px;
+                            margin: clamp(20px, 5vw, 36px) auto;
+                            padding: 0 clamp(8px, 3vw, 16px);
+                        ">
+                            Ωmega Pruner is a non-custodial, PSBT-only infrastructure layer for analyzing and executing
+                            <strong style="color:#0f0;">one-time UTXO consolidation</strong> under explicit fee and privacy assumptions.
+                            <br><br>
 
-                        <strong style="color:#f7931a; font-size: clamp(1.2rem, 4.5vw, 1.6rem); font-weight:900;">
-                            Consolidate smarter. Win forever.
-                        </strong>
-                    </div>
+                            The system:
+                            <br>
+                            • <strong style="color:#00ff9d;">Models future spend efficiency</strong> under differing fee environments<br>
+                            • <strong style="color:#00ff9d;">Exposes privacy trade-offs</strong> created by consolidation decisions<br>
+                            • <strong style="color:#00ff9d;">Preserves user control</strong> by never signing or broadcasting transactions<br><br>
 
-                    <!-- Arrow -->
-                    <div id="hero-arrow" style="
-                        font-size: clamp(2.2rem, 6.5vw, 3.8rem);
-                        color: #f7931a;
-                        opacity: 0;
-                        margin-top: clamp(16px, 4vw, 32px);
-                        animation: 
-                            arrow-fade-in 1.8s ease-out forwards,
-                            arrow-pulse-bounce 5s ease-in-out infinite 2s;
-                        text-shadow: 0 0 30px #f7931a, 0 0 60px #f7931a;
-                    ">
+                            All outputs are <strong style="color:#f7931a;">deterministic, inspectable and reversible</strong>
+                            until a PSBT is finalized by the user.
+                        </div>
+
+                        <!-- Arrow -->
+                        <div id="hero-arrow" style="
+                            font-size: clamp(2.2rem, 6.5vw, 3.8rem);
+                            color: #f7931a;
+                            opacity: 0;
+                            margin-top: clamp(16px, 4vw, 32px);
+                            animation:
+                                arrow-fade-in 1.8s ease-out forwards,
+                                arrow-pulse-bounce 5s ease-in-out infinite 2s;
+                            text-shadow: 0 0 24px #f7931a;
+                        ">
                         ↓
                     </div>
                 </div>
@@ -5329,8 +5324,8 @@ with gr.Blocks(
         rate_map = {
             "fastest":   fees.get("fastestFee", 10),
             "half_hour": fees.get("halfHourFee", 6),
-            "hour":      fees.get("hourFee", 3),
-            "economy":   fees.get("economyFee", 1),
+            "hour_rate":      fees.get("hourFee", 3),
+            "low_fee_rate":   fees.get("economyFee", 1),
         }
 
         new_rate = rate_map.get(preset, 3)
@@ -5389,14 +5384,14 @@ with gr.Blocks(
             "<div class='locked-badge'>LOCKED</div>",    # locked_badge
             gr.update(interactive=False),                # addr_input
             gr.update(interactive=False),                # dest
-            gr.update(interactive=False),                # strategy
+            gr.update(interactive=False),                # execution_template
             gr.update(interactive=False),                # dust
             gr.update(interactive=False),                # fee_rate_slider
             gr.update(interactive=False),                # future_fee_slider
             gr.update(interactive=False),                # theme_checkbox
-            gr.update(interactive=False),                # economy_btn
-            gr.update(interactive=False),                # hour_btn
-            gr.update(interactive=False),                # halfhour_btn
+            gr.update(interactive=False),                # low_fee_rate_btn
+            gr.update(interactive=False),                # hour_rate_btn
+            gr.update(interactive=False),                # half_hour_rate_btn
             gr.update(interactive=False),                # fastest_btn
             gr.update(visible=False),                    # load_json_btn
             gr.update(visible=False),                    # import_file (duplicate, already hidden)
@@ -5439,7 +5434,7 @@ with gr.Blocks(
                     Optimized for Modern Bitcoin
                 </div>
 
-                This is a <strong style="color:#00ffff !important;font-weight:900 !important;">single-sig demo tool</strong>
+                This is a <strong style="color:#00ffff !important;font-weight:900 !important;">single-sig demo</strong>
                 with strong emphasis on
                 <strong style="color:#00ffff !important;font-weight:900 !important;">fee efficiency</strong>
                 and
@@ -5451,7 +5446,7 @@ with gr.Blocks(
                 <strong style="color:#00ffff !important;">Taproot / BIP86 (bc1p…)</strong>
                 <br><br>
 
-                <strong style="color:#ffea99 !important;">Hardware note:</strong> Due to this tool's address-only design, 
+                <strong style="color:#ffea99 !important;">Hardware note:</strong> Due to this demo's address-only design, 
                 PSBTs lack BIP-32 paths/fingerprints — expect "blind sign?" prompts on most devices 
                 (signing should still work with extra confirms).
                 <br><br>
@@ -5539,7 +5534,7 @@ with gr.Blocks(
 				value=None,
             )
     
-        # === Consolidation Strategy & Economic Controls Header ===
+        # === Execution Template & Economic Controls Header ===
         gr.HTML(
             value="""
             <div style="
@@ -5564,7 +5559,7 @@ with gr.Blocks(
                   text-shadow:0 0 30px #00ff88 !important;
                   margin-bottom: clamp(10px, 3vw, 16px) !important;
               ">
-                Consolidation Strategy & Fee Dynamics
+                Execution Template & Fee Dynamics
               </div>
 
               <div style="
@@ -5573,25 +5568,25 @@ with gr.Blocks(
                   line-height:1.7 !important;
                   text-shadow:0 2px 4px rgba(0,0,0,0.8) !important;
               ">
-                Compare current vs future fees and choose your privacy–cost tradeoff
+                Explore how different fee environments affect cost and linkage outcomes
               </div>
             </div>
             """
         )
 
-        # Strategy dropdown + Dust threshold
+        # Execution template dropdown + Dust threshold
         with gr.Row():
-            strategy = gr.Dropdown(
+            execution_template = gr.Dropdown(
                 choices=[
-                    "Privacy First — ~30% consolidated (lowest CIOH risk)",
-                    "Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)",
-                    "More Savings — ~50% consolidated (higher linkage risk, best when fees are below recent medians)",
-                    "NUCLEAR — ~90% consolidated (maximum linkage, deep cleanup during exceptionally low fees)",
+                    "Low-input aggregation — ~30% inputs consolidated",
+                    "Moderate-input aggregation — ~40% inputs consolidated",
+                    "High-input aggregation — ~50% inputs consolidated",
+                    "Extreme-input aggregation — ~90% inputs consolidated",
                 ],
-                value="Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)",
-                label="Consolidation Strategy — fee savings vs privacy (Common Input Ownership Heuristic)",
-				info="Use the Network Conditions panel above to judge how aggressive consolidation should be today.",
-				allow_custom_value=True
+                value="Moderate-input aggregation — ~40% inputs consolidated",
+                label="Execution Template (mechanical input aggregation profile)",
+                info="Templates describe transaction construction only. Timing, frequency, and acceptability are policy decisions external to Ωmega.",
+                allow_custom_value=True
             )
 
         dust = gr.Slider(
@@ -5648,10 +5643,10 @@ with gr.Blocks(
             )
 
         with gr.Row():
-            economy_btn   = gr.Button("Economy",   size="sm", elem_classes="fee-btn", interactive=True)
-            hour_btn      = gr.Button("1 hour",    size="sm", elem_classes="fee-btn", interactive=True)
-            halfhour_btn  = gr.Button("30 min",    size="sm", elem_classes="fee-btn", interactive=True)
-            fastest_btn   = gr.Button("Fastest",   size="sm", elem_classes="fee-btn", interactive=True)
+            low_fee_rate_btn   = gr.Button("Low-fee preset",   size="sm", elem_classes="fee-btn", interactive=True)
+            hour_rate_btn      = gr.Button("~1 hour",    size="sm", elem_classes="fee-btn", interactive=True)
+            half_hour_rate_btn  = gr.Button("~Half-hour",    size="sm", elem_classes="fee-btn", interactive=True)
+            fastest_btn   = gr.Button("Fastest (~10 mins)",   size="sm", elem_classes="fee-btn", interactive=True)
 
         pre_analysis_info = gr.HTML("""
 <div style="
@@ -5668,17 +5663,16 @@ with gr.Blocks(
     line-height: 1.5;
 ">
     <span style="color:#aaffff !important; font-weight:700 !important;">What this does:</span><br>
-    These values estimate whether consolidating now reduces future costs.<br>
-    Lower current fees vs higher future fees favor consolidation.
-    <br><br>
-    <span style="color:#aaffff !important; font-weight:700 !important;">Timing hint:</span><br>
-    Consolidation is most effective when today’s economy rate is below recent mined medians.
+    This panel models how different fee environments affect consolidation cost and linkage outcomes.<br>
+    <br>
+    <span style="color:#aaffff !important; font-weight:700 !important;">Interpretation note:</span><br>
+    Relative differences between current and historical fee levels materially influence consolidation mechanics.
     <br><br>
     <span style="color:#aaffff !important; font-weight:700 !important;">Next step:</span><br>
     Click the <span style="color:#88ffcc !important; font-weight:700 !important;">Analyze & Load UTXOs</span>
-	button below to evaluate network conditions and
+	button below to view network condition analysis and
 	<span style="color:#88ffcc !important; font-weight:700 !important; white-space:nowrap;">
-	privacy&nbsp;trade-offs
+	resulting privacy&nbsp;metrics
     </span><br>
     before any PSBT is created.
 </div>
@@ -5696,7 +5690,7 @@ with gr.Blocks(
         status_msg_state   = gr.State("")      
         scan_source_restored_state  = gr.State("") 
         dest_restored_state = gr.State("")    
-        strategy_restored_state = gr.State("")  
+        execution_template_restored_state = gr.State("")  
         dust_restored_state = gr.State(546)      
         
         selected_utxos_for_psbt = gr.State([])
@@ -5940,9 +5934,9 @@ with gr.Blocks(
     # — FEE PRESET BUTTONS (pure parameter change) —
     # =============================
     for btn, preset in [
-        (economy_btn, "economy"),
-        (hour_btn, "hour"),
-        (halfhour_btn, "half_hour"),
+        (low_fee_rate_btn, "low_fee_rate"),
+        (hour_rate_btn, "hour_rate"),
+        (half_hour_rate_btn, "half_hour"),
         (fastest_btn, "fastest"),
     ]:
         btn.click(
@@ -5970,7 +5964,7 @@ with gr.Blocks(
             status_msg_state,                 # 5
             scan_source_restored_state,       # 6
             dest_restored_state,              # 7
-            strategy_restored_state,          # 8
+            execution_template_restored_state,          # 8
             dust_restored_state,             # 9
         ],
     ).then(
@@ -5978,7 +5972,7 @@ with gr.Blocks(
         fn=lambda enriched, warn, fp, changed, success_flag, status, src, dest_r, strat_r, dust_r: [
             gr.update(value=src or ""),                    # addr_input
             gr.update(value=dest_r or ""),                 # dest
-            gr.update(value=strat_r or "Recommended — ~40% consolidated (balanced savings & privacy under typical conditions)"),
+            gr.update(value=strat_r or "Moderate-input aggregation — ~40% inputs consolidated"),
             gr.update(value=dust_r or 546),
             gr.update(visible=not success_flag),           # ← Fixed: hide analyze_btn on success
         ],
@@ -5991,10 +5985,10 @@ with gr.Blocks(
             status_msg_state,
             scan_source_restored_state,
             dest_restored_state,
-            strategy_restored_state,
+            execution_template_restored_state,
             dust_restored_state,
         ],
-        outputs=[addr_input, dest, strategy, dust, analyze_btn],
+        outputs=[addr_input, dest, execution_template, dust, analyze_btn],
     ).then(
         fn=rebuild_df_rows,
         inputs=[enriched_state],
@@ -6007,7 +6001,7 @@ with gr.Blocks(
             fee_rate_slider,
             future_fee_slider,
             locked,
-            strategy,
+            execution_template,
             dest_value,
         ],
         outputs=[status_output, generate_row]
@@ -6019,7 +6013,7 @@ with gr.Blocks(
         fn=analyze_and_show_summary,
         inputs=[
             addr_input,
-            strategy,
+            execution_template,
             dust,
             fee_rate_slider,
             future_fee_slider,
@@ -6050,7 +6044,7 @@ with gr.Blocks(
             future_fee_slider,
             enriched_state,
             scan_source,
-            strategy,
+            execution_template,
             dust
         ],
         outputs=[psbt_snapshot, selected_utxos_for_psbt, locked, export_file],
@@ -6077,14 +6071,14 @@ with gr.Blocks(
             locked_badge,
             addr_input,
             dest,
-            strategy,
+            execution_template,
             dust,
             fee_rate_slider,
             future_fee_slider,
             theme_checkbox,
-            economy_btn,
-            hour_btn,
-            halfhour_btn,
+            low_fee_rate_btn,
+            hour_rate_btn,
+            half_hour_rate_btn,
             fastest_btn,
             load_json_btn,
             import_file,
@@ -6115,15 +6109,15 @@ with gr.Blocks(
             "",                                                      # locked_badge → clear
             gr.update(value="", interactive=True),                   # addr_input
             gr.update(value="", interactive=True),                   # dest
-            gr.update(interactive=True),                             # strategy
+            gr.update(interactive=True),                             # execution_template
             gr.update(interactive=True),                             # dust
             gr.update(interactive=True),                             # fee_rate_slider
             gr.update(interactive=True),                             # future_fee_slider
             gr.update(value=True, interactive=True),                 # theme_checkbox → reset to dark
             gr.update(interactive=True),                             # fastest_btn
-            gr.update(interactive=True),                             # halfhour_btn
-            gr.update(interactive=True),                             # hour_btn
-            gr.update(interactive=True),                             # economy_btn
+            gr.update(interactive=True),                             # half_hour_rate_btn
+            gr.update(interactive=True),                             # hour_rate_btn
+            gr.update(interactive=True),                             # low_fee_rate_btn
             gr.update(visible=False),                                # export_title_row
             gr.update(visible=False),                                # export_file_row
             None,                                                    # export_file
@@ -6150,15 +6144,15 @@ with gr.Blocks(
             locked_badge,
             addr_input,
             dest,
-            strategy,
+            execution_template,
             dust,
             fee_rate_slider,
             future_fee_slider,
             theme_checkbox,
             fastest_btn,
-            halfhour_btn,
-            hour_btn,
-            economy_btn,
+            half_hour_rate_btn,
+            hour_rate_btn,
+            low_fee_rate_btn,
             export_title_row,
             export_file_row,
             export_file,
@@ -6178,7 +6172,7 @@ with gr.Blocks(
             fee_rate_slider,
             future_fee_slider,
             locked,
-            strategy,
+            execution_template,
             dest_value,
         ],
         outputs=[status_output, generate_row],
@@ -6209,7 +6203,7 @@ with gr.Blocks(
             fee_rate_slider,
             future_fee_slider,
             locked,
-            strategy,
+            execution_template,
             dest_value,
         ],
         outputs=[status_output, generate_row]
@@ -6226,7 +6220,7 @@ with gr.Blocks(
             fee_rate_slider,
             future_fee_slider,
             locked,
-            strategy,
+            execution_template,
             dest_value,
         ],
         outputs=[status_output, generate_row]
@@ -6243,7 +6237,7 @@ with gr.Blocks(
             fee_rate_slider,
             future_fee_slider,
             locked,
-            strategy,
+            execution_template,
             dest_value,
         ],
         outputs=[status_output, generate_row]
@@ -6262,7 +6256,7 @@ with gr.Blocks(
             fee_rate_slider,
             future_fee_slider,
             locked,
-            strategy,
+            execution_template,
             dest_value,
         ],
         outputs=[status_output, generate_row]
@@ -6302,7 +6296,7 @@ with gr.Blocks(
     demo.load(
         fn=update_fee_buttons_state,
         inputs=[locked],
-        outputs=[economy_btn, hour_btn, halfhour_btn, fastest_btn]
+        outputs=[low_fee_rate_btn, hour_rate_btn, half_hour_rate_btn, fastest_btn]
     )
 
     # 5. FOOTER
@@ -6325,7 +6319,7 @@ with gr.Blocks(
                 color: #f7931a;
                 text-shadow: 0 0 15px rgba(247,147,26,0.7);
             ">
-                Ωmega Pruner v11.1 — Forged Anew
+                Ωmega Pruner v11.1
             </div>
 
             <!-- GITHUB LINK -->
@@ -6387,7 +6381,7 @@ with gr.Blocks(
             Support Ωmega Pruner
         </strong><br>
 		    <span>
-            If this tool saved you sats or helped your stack — show your love.
+            If this demo saved you sats or helped your stack — show your love.
         </span>
     </div>
 
