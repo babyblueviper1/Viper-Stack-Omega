@@ -2860,21 +2860,21 @@ def _render_consolidation_explanation(consolidate_count: int, remaining_utxos: i
     inputs and replaces them with a smaller set of outputs.<br><br>
 
     After confirmation:
-    <ul style="margin-left:18px !important;">
-        <li>
-            The wallet will contain
-            <span style="color:#aaffff !important; font-weight:800 !important;">
-                {remaining_utxos}
-            </span>
-            UTXOs
-        </li>
-        <li>
-            Input count per future spend is reduced
-        </li>
-        <li>
-            Address and input linkage created in this transaction is permanent
-        </li>
-    </ul>
+<ul style="margin: 0 0 16px 24px; padding: 0; list-style-position: outside;">
+    <li style="margin-bottom: 10px; font-weight: 700; color: #ffffff;">
+        The wallet will contain 
+        <span style="color: #aaffff; font-weight: 900; letter-spacing: 0.4px;">
+            {remaining_utxos}
+        </span>
+        UTXOs
+    </li>
+    <li style="margin-bottom: 10px; font-weight: 700; color: #ffffff;">
+        Input count per future spend is reduced
+    </li>
+    <li style="margin-bottom: 0; font-weight: 700; color: #ffffff;">
+        Address and input linkage created in this transaction is permanent
+    </li>
+</ul>
 
     <small style="
         display:block !important;
