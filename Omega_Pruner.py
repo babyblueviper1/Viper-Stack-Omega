@@ -1512,8 +1512,16 @@ def address_to_script_pubkey(addr: str) -> tuple[bytes, dict]:
     Convert Bitcoin address → scriptPubKey + metadata.
     Supports: P2PKH, P2SH, P2WPKH, P2WSH, P2TR (Taproot).
     Returns fallback on invalid input.
+
+    NOTE (fixed 2026-07-17): this used to lowercase unconditionally before
+    branching on type. Base58 (P2PKH/P2SH, the '1'/'3' branches below) is
+    case-sensitive -- lowercasing silently corrupted decoding of any real
+    legacy address containing uppercase letters (nearly all of them),
+    producing a false 'invalid' result. Bech32 (bc1...) IS case-insensitive
+    (BIP-173), so lowercasing only there is correct -- moved below into
+    just that branch.
     """
-    addr = (addr or "").strip().lower()
+    addr = (addr or "").strip()
     fallback_spk = b'\x00\x14' + b'\x00' * 20
     fallback_meta = {'input_vb': 68, 'output_vb': 31, 'type': 'unknown'}
 
@@ -1549,7 +1557,8 @@ def address_to_script_pubkey(addr: str) -> tuple[bytes, dict]:
         return fallback_spk, {'input_vb': 91, 'output_vb': 32, 'type': 'invalid'}
 
     # ── Bech32 / Bech32m (bc1...) ──────────────────────────────────────────────
-    if addr.startswith('bc1'):
+    if addr.lower().startswith('bc1'):
+        addr = addr.lower()  # bech32 is case-insensitive per BIP-173 (base58 above is not)
         hrp = 'bc'
         data_part = addr[3:]
         data = [CHARSET.find(c) for c in data_part]
@@ -6790,13 +6799,19 @@ if __name__ == "__main__":
     import time
     
     demo.launch(
-        server_name="0.0.0.0",
+        # 2026-07-17: bind localhost-only, matching invinoveritas.service's own S177
+        # lesson -- nginx reverse-proxies this, binding 0.0.0.0 would let the raw port
+        # bypass nginx entirely even with ufw as a second layer.
+        server_name=os.environ.get("HOST", "127.0.0.1"),
         server_port=int(os.environ.get("PORT", 7860)),
         share=False,
         debug=False,
         allowed_paths=["/"],
         prevent_thread_lock=True,
-        show_error=True
+        show_error=True,
+        # 2026-07-17: reverse-proxied under api.babyblueviper.com/tools/omega-pruner/
+        # (no dedicated DNS record for this move -- path-based, not subdomain-based).
+        root_path=os.environ.get("ROOT_PATH", "")
     )
     
     # Keep-alive for Render
