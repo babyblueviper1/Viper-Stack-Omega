@@ -21,7 +21,7 @@ without ever compromising custody, control, or privacy.
 > A technical overview of the fee model, scope constraints, and CIOH tradeoffs  
 > is available in **[`design.md`](design.md)**.
 
-**LIVE:** https://omega-pruner.onrender.com  
+**LIVE:** https://api.babyblueviper.com/tools/omega-pruner/  
 **Launched:** 26 December 2025  
 **Latest:** v11.1 — January 2026
 
