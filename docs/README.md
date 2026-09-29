@@ -255,7 +255,7 @@ Your treasury. Your rules.
 - Dedicated support
 
 **By quote only**  
-📧 [babyblueviperbusiness@gmail.com](mailto:babyblueviperbusiness@gmail.com)
+📧 [federico@invinoveritas.dev](mailto:federico@invinoveritas.dev)
 
 🎙 **Baby Blue Viper** — [https://babyblueviper.com](https://babyblueviper.com)
 

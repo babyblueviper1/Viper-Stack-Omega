@@ -106,4 +106,4 @@ Here’s how to consolidate your UTXOs using Ωmega Pruner:
 
 ## Support
 
-**babyblueviperbusiness@gmail.com**
+**federico@invinoveritas.dev**
