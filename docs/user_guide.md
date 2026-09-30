@@ -16,7 +16,7 @@
 
 ### Accessing Ωmega Pruner
 
-- Visit the [Ωmega Pruner website](https://omega-pruner.onrender.com/).
+- Visit the [Ωmega Pruner website](https://invinoveritas.dev/tools/omega-pruner/).
 - Make sure you’re using a supported browser (Google Chrome, Firefox, etc.).
 - No registration is required; simply navigate to the tool’s interface.
 
